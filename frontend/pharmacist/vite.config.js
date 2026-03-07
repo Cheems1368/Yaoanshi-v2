@@ -52,6 +52,17 @@ export default defineConfig(({ mode }) => {
       open: true,
       proxy
     },
+    build: {
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            'vendor-vue': ['vue', 'vue-router', 'pinia'],
+            'vendor-element': ['element-plus', '@element-plus/icons-vue'],
+            'vendor-axios': ['axios']
+          }
+        }
+      }
+    },
     define: {
       'process.env': {
         VITE_API_BASE_URL: JSON.stringify(legacyApiTarget),

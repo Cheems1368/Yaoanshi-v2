@@ -37,6 +37,17 @@ export default defineConfig(({ mode }) => {
       __API_BASE_URL__: JSON.stringify(apiTarget),
       __API_PREFIX__: JSON.stringify('/app-api')
     },
+    build: {
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            'vendor-vue': ['vue', 'vue-router'],
+            'vendor-ionic': ['@ionic/vue', '@ionic/vue-router'],
+            'vendor-axios': ['axios']
+          }
+        }
+      }
+    },
     test: {
       globals: true,
       environment: 'jsdom'

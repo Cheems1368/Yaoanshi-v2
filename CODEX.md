@@ -61,7 +61,7 @@ Active product surfaces:
 
 1. Legacy backend: `backend`
 2. New backend target: `backend-v2`
-3. Current `backendV2` naming is a normalization issue and must not be treated as the final target name
+3. Backend directory normalization from `backendV2` to `backend-v2` is completed
 
 ### 3.3 Fixed route prefixes
 

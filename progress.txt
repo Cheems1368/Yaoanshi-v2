@@ -2,16 +2,14 @@ Project
 - Yaoshian MVP P0
 
 Current Branch / Work Context
-- Branch: not recorded in repo state yet
-- Active workstream: Phase 1 backend-v2 foundation
-- Active workstream: Phase 3 MVP core flows
-- Active workstream: Phase 4 trial-run closure: pharmacist plan UI + professional realtime notifications + browser/runtime verification
-- Active workstream: Phase 3 patient-side feature closure: rational-medication + ai-assistant (challenge-cup override)
+- Branch: main (origin: https://github.com/Cheems1368/Yaoanshi-v2.git)
+- Active workstream: Post-P0 收尾 — dual-agent collaboration, code quality, build optimization
 - Active surfaces: backend-v2, patient app, pharmacist web, doctor web
 
 Current Phase / Step
-- IMPLEMENTATION_PLAN.md -> Phase 4 in progress (trial-run closure items implemented and local validation passed across backend-v2, patient app, pharmacist web, and doctor web; remaining non-P0 focus is challenge-cup runtime verification)
+- IMPLEMENTATION_PLAN.md -> Phase 4 completed (trial-run closure implemented and validated across all surfaces; remaining item is challenge-cup AI runtime E2E pending upstream config)
 - Challenge-cup special track completed at code/build level: rational-medication recovery + AI assistant backend proxy/frontend integration (non-P0 dependency)
+- Dual-agent collaboration plan established: docs/DUAL_AGENT_COLLABORATION.md (Claude Opus 4.6 + GPT-5.3 Codex)
 
 Completed
 - Formal product document created: Standard document/PRD.md
@@ -21,7 +19,10 @@ Completed
 - Formal backend structure document created: Standard document/BACKEND_STRUCTURE.md
 - Formal implementation sequence document created: Standard document/IMPLEMENTATION_PLAN.md
 - AI operating manual created: CODEX.md
-- backend directory normalization complete: backendV2 -> backend-v2
+- backend directory normalization complete: backendV2 -> backend-v2 (resolved)
+- Initial commit pushed to GitHub (https://github.com/Cheems1368/Yaoanshi-v2.git) on main branch with 4446 files
+- Dual-agent collaboration plan added: docs/DUAL_AGENT_COLLABORATION.md on branch dual-agent-collab-plan
+- Document alignment audit completed: all progress.txt claims verified against actual codebase — no missing deliverables found
 - Patient app Vite proxy baseline aligned to /app-api (port 3001 kept)
 - Doctor web env baseline added: .env.example and .env.development with port 3002
 - Java 17 path validated: D:/Java/Java 17
