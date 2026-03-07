@@ -77,9 +77,10 @@
 4. 需要 Claude 进一步处理的 action items
 
 **共享状态源：**
-- `progress.txt` — 当前执行记忆和状态源
-- `CLAUDE.md` — AI 操作手册（两端共同遵守）
-- `Standard document/*` — 权威规范文档
+- `progress.txt` — 当前执行记忆和状态源（双方共享）
+- `CLAUDE.md` — Claude Opus 4.6 操作手册
+- `CODEX.md` — GPT-5.3 Codex 操作手册
+- `Standard document/*` — 权威规范文档（双方共同遵守）
 
 ### A4. 验证门控
 

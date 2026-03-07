@@ -34,8 +34,9 @@ Additional precedence rules:
 
 1. `docs/` is reference only.
 2. If `docs/` conflicts with any file in `Standard document/`, `Standard document/` wins.
-3. `CLAUDE.md` governs AI session behavior.
+3. `CLAUDE.md` governs Claude session behavior; `CODEX.md` governs Codex session behavior.
 4. Formal product, design, technical, and backend details still belong to the formal documents listed above.
+5. Dual-agent collaboration plan: `docs/DUAL_AGENT_COLLABORATION.md`
 
 ## 2. Mandatory Read Order
 
@@ -245,8 +246,9 @@ Output requirements for implementation work:
 
 Relationship between session files:
 
-1. `CLAUDE.md` = AI operating manual
-2. `progress.txt` = current execution memory and state source
+1. `CLAUDE.md` = Claude operating manual
+2. `CODEX.md` = Codex operating manual
+3. `progress.txt` = shared execution memory and state source
 
 `CLAUDE.md` does not contain:
 
