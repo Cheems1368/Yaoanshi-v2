@@ -18,7 +18,7 @@ Completed
 - Formal frontend design system document created: Standard document/FRONTEND_GUIDELINES.md
 - Formal backend structure document created: Standard document/BACKEND_STRUCTURE.md
 - Formal implementation sequence document created: Standard document/IMPLEMENTATION_PLAN.md
-- AI operating manual created: CODEX.md
+- AI operating manual created: CLAUDE.md
 - backend directory normalization complete: backendV2 -> backend-v2 (resolved)
 - Initial commit pushed to GitHub (https://github.com/Cheems1368/Yaoanshi-v2.git) on main branch with 4446 files
 - Dual-agent collaboration plan added: docs/DUAL_AGENT_COLLABORATION.md on branch dual-agent-collab-plan
@@ -46,7 +46,7 @@ Completed
 - Pharmacist web routes reduced to MVP menu only: dashboard, patients, prescriptions, workorders, profile
 - Pharmacist web service boundary started under src/modules/pharmacist/api with patients, prescriptions, and workorders modules
 - Pharmacist web package/env/startup metadata updated to pharmacist naming
-- Repository path references updated from frontend/medicinal-his-web-delivery to frontend/pharmacist in CODEX.md, README.md, Standard document, .dockerignore, and ops compose files
+- Repository path references updated from frontend/medicinal-his-web-delivery to frontend/pharmacist in CLAUDE.md, README.md, Standard document, .dockerignore, and ops compose files
 - Pharmacist web Phase 2 cleanup completed: router aliases added for legacy pharmacist paths while main MVP routes remain /dashboard, /patients, /prescriptions, /workorders, /profile
 - Pharmacist web shell/layout/login/pages rewritten to clean MVP-only professional UI copy; leftover doctor/chat/prescription-review pages and old src/api business modules removed
 - Pharmacist web dependency baseline aligned to Element Plus 2.3.7 and package metadata normalized to yaoshian-pharmacist-web

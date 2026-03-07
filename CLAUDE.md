@@ -1,4 +1,10 @@
-﻿# CODEX.md
+﻿# CLAUDE.md
+
+## 0. 语言与沟通规则
+
+1. 请始终使用简体中文与用户对话，并在回答时保持专业、简洁。
+2. 代码注释、Git commit message、文档文件名可保持英文。
+3. 技术术语优先使用业界通用英文原词（如 DTO、API、JWT），无需强制翻译。
 
 ## 1. Purpose and Precedence
 
@@ -11,6 +17,7 @@ It defines:
 3. naming and structure rules
 4. allowed and forbidden actions
 5. document precedence
+6. language and communication rules
 
 This file does not replace the formal project documents.
 
@@ -27,14 +34,14 @@ Additional precedence rules:
 
 1. `docs/` is reference only.
 2. If `docs/` conflicts with any file in `Standard document/`, `Standard document/` wins.
-3. `CODEX.md` governs AI session behavior.
+3. `CLAUDE.md` governs AI session behavior.
 4. Formal product, design, technical, and backend details still belong to the formal documents listed above.
 
 ## 2. Mandatory Read Order
 
 Every AI session must follow this default read order:
 
-1. Read `CODEX.md`
+1. Read `CLAUDE.md`
 2. Read `progress.txt`
 3. Read `Standard document/IMPLEMENTATION_PLAN.md`
 4. Read only the task-relevant formal documents from `Standard document/`
@@ -218,7 +225,7 @@ Public names that must not be renamed without updating the formal contract:
 
 Every AI session should follow this default workflow:
 
-1. Read `CODEX.md`
+1. Read `CLAUDE.md`
 2. Read `progress.txt`
 3. Read `Standard document/IMPLEMENTATION_PLAN.md`
 4. Identify task-relevant formal documents
@@ -238,10 +245,10 @@ Output requirements for implementation work:
 
 Relationship between session files:
 
-1. `CODEX.md` = AI operating manual
+1. `CLAUDE.md` = AI operating manual
 2. `progress.txt` = current execution memory and state source
 
-`CODEX.md` does not contain:
+`CLAUDE.md` does not contain:
 
 1. full PRD content
 2. full design token tables

@@ -25,7 +25,7 @@
 1. backend-v2 数据层设计与实现（schema、mapper、service、API controller）
 2. 前端页面开发与产品交互实现（Vue组件、路由、状态管理、UI对齐）
 3. 前后端联调与 Playwright/浏览器 E2E 自动化测试
-4. 标准文档维护（CODEX.md、progress.txt、Standard document/*）
+4. 标准文档维护（CLAUDE.md、progress.txt、Standard document/*）
 5. 部署配置与运维脚本（docker-compose、ops/scripts）
 
 **GPT-5.3 Codex 主导领域（通过 `.codex/skills`）：**
@@ -78,7 +78,7 @@
 
 **共享状态源：**
 - `progress.txt` — 当前执行记忆和状态源
-- `CODEX.md` — AI 操作手册（两端共同遵守）
+- `CLAUDE.md` — AI 操作手册（两端共同遵守）
 - `Standard document/*` — 权威规范文档
 
 ### A4. 验证门控
