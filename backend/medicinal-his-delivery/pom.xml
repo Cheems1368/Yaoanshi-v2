@@ -1,0 +1,220 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>com.sqlapk</groupId>
+    <artifactId>medicine</artifactId>
+    <version>1.7.2-SNAPSHOT</version>
+    <packaging>pom</packaging>
+    <modules>
+        <module>medicine-dependencies</module>
+        <module>medicine-framework</module>
+        <!-- Server 主项�?-->
+        <module>medicine-server</module>
+        <!-- 各种 module 拓展 -->
+
+        <module>medicine-module-system</module>
+        <module>medicine-module-infra</module>
+        <module>medicine-module-drug</module>
+        <module>medicine-module-patient</module>
+        <module>medicine-module-doctor</module>
+<!--        <module>medicine-module-bpm</module>-->
+<!--        <module>medicine-module-report</module>-->
+<!--        <module>medicine-module-mp</module>-->
+<!--        <module>medicine-module-mall</module>-->
+        <!-- 示例项目已删�?-->
+    </modules>
+
+    <name>${project.artifactId}</name>
+
+    <properties>
+        <revision>1.7.2-SNAPSHOT</revision>
+
+        <!-- Java 版本统一为 11 -->
+        <java.version>11</java.version>
+        <maven.compiler.release>${java.version}</maven.compiler.release>
+        <!-- 兼容部分插件仍读取 source/target 的场景 -->
+        <maven.compiler.source>${maven.compiler.release}</maven.compiler.source>
+        <maven.compiler.target>${maven.compiler.release}</maven.compiler.target>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+
+        <!-- 插件版本（适配 JDK 11） -->
+        <maven-compiler-plugin.version>3.11.0</maven-compiler-plugin.version>
+        <maven-surefire-plugin.version>3.2.5</maven-surefire-plugin.version>
+        <build-helper-maven-plugin.version>3.6.0</build-helper-maven-plugin.version>
+
+        <!-- 依赖版本 -->
+        <spring.boot.version>2.7.18</spring.boot.version>
+        <mapstruct.version>1.5.5.Final</mapstruct.version>
+        <lombok.version>1.18.30</lombok.version>
+
+        <!-- 三档总闸：UT、IT、全部 -->
+        <maven.test.skip>false</maven.test.skip>
+        <skipTests>false</skipTests>
+        <skipUTs>false</skipUTs>
+        <skipITs>false</skipITs>
+    </properties>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>com.sqlapk</groupId>
+                <artifactId>medicine-dependencies</artifactId>
+                <version>1.7.2-SNAPSHOT</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+    <dependencies>
+        <!-- MapStruct API（源码使用） -->
+        <dependency>
+            <groupId>org.mapstruct</groupId>
+            <artifactId>mapstruct</artifactId>
+            <version>${mapstruct.version}</version>
+        </dependency>
+
+        <!-- Lombok（仅编译期） -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <version>${lombok.version}</version>
+            <scope>provided</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <pluginManagement>
+            <plugins>
+                <!-- 编译器：固定 JDK 11 + 注解处理�?-->
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-compiler-plugin</artifactId>
+                    <version>${maven-compiler-plugin.version}</version>
+                    <configuration>
+                        <release>${maven.compiler.release}</release>
+                        <parameters>true</parameters>
+                        <annotationProcessorPaths>
+                            <path>
+                                <groupId>org.springframework.boot</groupId>
+                                <artifactId>spring-boot-configuration-processor</artifactId>
+                                <version>${spring.boot.version}</version>
+                            </path>
+                            <path>
+                                <groupId>org.projectlombok</groupId>
+                                <artifactId>lombok</artifactId>
+                                <version>${lombok.version}</version>
+                            </path>
+                            <path>
+                                <groupId>org.mapstruct</groupId>
+                                <artifactId>mapstruct-processor</artifactId>
+                                <version>${mapstruct.version}</version>
+                            </path>
+                        </annotationProcessorPaths>
+                    </configuration>
+                </plugin>
+
+                <!-- 单元测试：JDK9+ 关闭模块路径 -->
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-surefire-plugin</artifactId>
+                    <version>${maven-surefire-plugin.version}</version>
+                    <configuration>
+                        <useModulePath>false</useModulePath>
+                        <failIfNoTests>false</failIfNoTests>
+                        <!-- 这三行把所有常见"停测"开关都接上 -->
+                        <skip>${maven.test.skip}</skip>
+                        <skipTests>${skipTests}</skipTests>
+                        <testFailureIgnore>false</testFailureIgnore>
+                    </configuration>
+                </plugin>
+
+                <!-- Integration Test：Failsafe -->
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-failsafe-plugin</artifactId>
+                    <version>3.2.5</version>
+                    <configuration>
+                        <!-- failsafe 默认跑在 integration-test/verify；接上我们的三档开关 -->
+                        <skipITs>${skipITs}</skipITs>
+                        <skipTests>${maven.test.skip}</skipTests>
+                    </configuration>
+                </plugin>
+
+                <!-- 兜底：把注解生成目录标记为源码目录（VS Code 常用�?-->
+                <plugin>
+                    <groupId>org.codehaus.mojo</groupId>
+                    <artifactId>build-helper-maven-plugin</artifactId>
+                    <version>${build-helper-maven-plugin.version}</version>
+                    <executions>
+                        <execution>
+                            <id>add-generated-sources</id>
+                            <phase>generate-sources</phase>
+                            <goals><goal>add-source</goal></goals>
+                            <configuration>
+                                <sources>
+                                    <source>target/generated-sources/annotations</source>
+                                </sources>
+                            </configuration>
+                        </execution>
+                        <execution>
+                            <id>add-generated-test-sources</id>
+                            <phase>generate-test-sources</phase>
+                            <goals><goal>add-test-source</goal></goals>
+                            <configuration>
+                                <sources>
+                                    <source>target/generated-test-sources/test-annotations</source>
+                                </sources>
+                            </configuration>
+                        </execution>
+                    </executions>
+                </plugin>
+            </plugins>
+        </pluginManagement>
+
+        <!-- 让所有子模块继承上面的 pluginManagement 配置 -->
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-failsafe-plugin</artifactId>
+            </plugin>
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>build-helper-maven-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
+
+    <!-- 使用 aliyun 的 Maven 源，提升下载速度 -->
+    <repositories>
+        <repository>
+            <id>aliyunmaven</id>
+            <name>aliyun</name>
+            <url>https://maven.aliyun.com/repository/public</url>
+        </repository>
+    </repositories>
+
+    <!-- 快速跳过所有测试的 profile -->
+    <profiles>
+        <profile>
+            <id>skip-all-tests</id>
+            <properties>
+                <maven.test.skip>true</maven.test.skip>
+                <skipTests>true</skipTests>
+                <skipUTs>true</skipUTs>
+                <skipITs>true</skipITs>
+            </properties>
+        </profile>
+    </profiles>
+
+</project>

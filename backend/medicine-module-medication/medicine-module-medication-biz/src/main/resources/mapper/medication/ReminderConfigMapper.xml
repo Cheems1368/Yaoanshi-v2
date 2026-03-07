@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.sqlapk.medicine.module.medication.dal.mysql.ReminderConfigMapper">
+
+    <!-- 根据患者ID查询提醒配置 -->
+    <select id="selectByPatientId" resultType="com.sqlapk.medicine.module.medication.dal.dataobject.ReminderConfigDO">
+        SELECT id, patient_id, type, enabled, advance_minutes, notification_method, 
+               template_id, creator, create_time, updater, update_time, deleted, tenant_id
+        FROM reminder_configs
+        WHERE patient_id = #{patientId}
+          AND deleted = 0
+        ORDER BY type ASC
+    </select>
+
+    <!-- 根据患者ID和类型查询提醒配置 -->
+    <select id="selectByPatientIdAndType" resultType="com.sqlapk.medicine.module.medication.dal.dataobject.ReminderConfigDO">
+        SELECT id, patient_id, type, enabled, advance_minutes, notification_method, 
+               template_id, creator, create_time, updater, update_time, deleted, tenant_id
+        FROM reminder_configs
+        WHERE patient_id = #{patientId}
+          AND type = #{type}
+          AND deleted = 0
+        LIMIT 1
+    </select>
+
+    <!-- 根据类型查询启用的提醒配置 -->
+    <select id="selectEnabledByType" resultType="com.sqlapk.medicine.module.medication.dal.dataobject.ReminderConfigDO">
+        SELECT id, patient_id, type, enabled, advance_minutes, notification_method, 
+               template_id, creator, create_time, updater, update_time, deleted, tenant_id
+        FROM reminder_configs
+        WHERE type = #{type}
+          AND enabled = 1
+          AND deleted = 0
+        ORDER BY patient_id ASC
+    </select>
+
+</mapper>

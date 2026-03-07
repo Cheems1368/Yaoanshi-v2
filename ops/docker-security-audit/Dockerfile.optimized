@@ -1,0 +1,70 @@
+# 优化版Dockerfile - 药学管理系统后端服务
+# 基于多阶段构建和安全最佳实践
+
+# 构建阶段
+FROM maven:3.8-openjdk-11-slim AS builder
+
+# 设置工作目录
+WORKDIR /app
+
+# 复制POM文件并下载依赖（利用Docker层缓存）
+COPY pom.xml .
+RUN mvn dependency:go-offline -B
+
+# 复制源代码并构建
+COPY src ./src
+RUN mvn clean package -DskipTests -B
+
+# 运行阶段
+FROM eclipse-temurin:11-jre-alpine
+
+# 安装必要的工具
+RUN apk add --no-cache \
+    curl \
+    tzdata \
+    && rm -rf /var/cache/apk/*
+
+# 创建非root用户
+RUN addgroup -g 1001 -S appgroup && \
+    adduser -u 1001 -S appuser -G appgroup
+
+# 设置时区
+ENV TZ=Asia/Shanghai
+
+# 创建应用目录
+RUN mkdir -p /medicine-server && \
+    chown -R appuser:appgroup /medicine-server
+
+# 设置工作目录
+WORKDIR /medicine-server
+
+# 从构建阶段复制JAR文件
+COPY --from=builder /app/target/medicine-server.jar app.jar
+
+# 设置文件权限
+RUN chown appuser:appgroup app.jar
+
+# 切换到非root用户
+USER appuser
+
+# 设置JVM参数
+ENV JAVA_OPTS="-Xms512m -Xmx1g \
+    -XX:+UseG1GC \
+    -XX:MaxGCPauseMillis=200 \
+    -XX:+UseStringDeduplication \
+    -Djava.security.egd=file:/dev/./urandom \
+    -Djava.awt.headless=true \
+    -Dfile.encoding=UTF-8"
+
+# 应用参数
+ENV ARGS=""
+
+# 暴露端口
+EXPOSE 48080
+
+# 健康检查
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD curl -f http://localhost:48080/actuator/health || exit 1
+
+# 启动应用
+CMD ["sh", "-c", "java $JAVA_OPTS -jar app.jar $ARGS"]

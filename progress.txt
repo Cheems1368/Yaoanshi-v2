@@ -1,0 +1,169 @@
+Project
+- Yaoshian MVP P0
+
+Current Branch / Work Context
+- Branch: not recorded in repo state yet
+- Active workstream: Phase 1 backend-v2 foundation
+- Active workstream: Phase 3 MVP core flows
+- Active workstream: Phase 4 trial-run closure: pharmacist plan UI + professional realtime notifications + browser/runtime verification
+- Active workstream: Phase 3 patient-side feature closure: rational-medication + ai-assistant (challenge-cup override)
+- Active surfaces: backend-v2, patient app, pharmacist web, doctor web
+
+Current Phase / Step
+- IMPLEMENTATION_PLAN.md -> Phase 4 in progress (trial-run closure items implemented and local validation passed across backend-v2, patient app, pharmacist web, and doctor web; remaining non-P0 focus is challenge-cup runtime verification)
+- Challenge-cup special track completed at code/build level: rational-medication recovery + AI assistant backend proxy/frontend integration (non-P0 dependency)
+
+Completed
+- Formal product document created: Standard document/PRD.md
+- Formal app flow document created: Standard document/APP_FLOW.md
+- Formal tech stack document created: Standard document/TECH_STACK.md
+- Formal frontend design system document created: Standard document/FRONTEND_GUIDELINES.md
+- Formal backend structure document created: Standard document/BACKEND_STRUCTURE.md
+- Formal implementation sequence document created: Standard document/IMPLEMENTATION_PLAN.md
+- AI operating manual created: CODEX.md
+- backend directory normalization complete: backendV2 -> backend-v2
+- Patient app Vite proxy baseline aligned to /app-api (port 3001 kept)
+- Doctor web env baseline added: .env.example and .env.development with port 3002
+- Java 17 path validated: D:/Java/Java 17
+- backend-v2 Maven project initialized with Spring Boot 3.2.12
+- backend-v2 package structure created under com.medicine
+- CommonResult, global exception handler, and /health endpoint created
+- JWT security baseline created with /app-api/** and /admin-api/** route segmentation
+- Redis, OpenAPI, and S3-compatible object storage placeholder configuration created
+- Initial DTO, entity, and mapper skeletons created for identity, prescription, medication, help order, notification, assessment, and ddi domains
+- backend-v2 compile validation passed with JDK17 session override
+- backend-v2 runtime validation passed and /health returned CommonResult payload
+- Patient app routing baseline aligned to login / binding / active-plan gate flow
+- Patient app shared HTTP baseline aligned to CommonResult and /app-api service boundary
+- Patient app light-theme tokens aligned closer to shared UI baseline
+- Doctor web routes reduced to MVP work-order queue + profile only
+- Doctor web layout and professional tokens aligned to shared professional UI baseline
+- Legacy pharmacist frontend retired from active workspace path: frontend/medicinal-his-web-delivery
+- New pharmacist frontend path established: frontend/pharmacist
+- frontend/pharmacist rebuilt from doctor web shell baseline instead of continuing legacy pharmacist app
+- Pharmacist web dev baseline aligned: port 3003 and /admin-api proxy only
+- Pharmacist web routes reduced to MVP menu only: dashboard, patients, prescriptions, workorders, profile
+- Pharmacist web service boundary started under src/modules/pharmacist/api with patients, prescriptions, and workorders modules
+- Pharmacist web package/env/startup metadata updated to pharmacist naming
+- Repository path references updated from frontend/medicinal-his-web-delivery to frontend/pharmacist in CODEX.md, README.md, Standard document, .dockerignore, and ops compose files
+- Pharmacist web Phase 2 cleanup completed: router aliases added for legacy pharmacist paths while main MVP routes remain /dashboard, /patients, /prescriptions, /workorders, /profile
+- Pharmacist web shell/layout/login/pages rewritten to clean MVP-only professional UI copy; leftover doctor/chat/prescription-review pages and old src/api business modules removed
+- Pharmacist web dependency baseline aligned to Element Plus 2.3.7 and package metadata normalized to yaoshian-pharmacist-web
+- Doctor web Phase 2 cleanup completed: main MVP routes fixed to /workorders and /profile with /doctor-dashboard compatibility redirect retained
+- Doctor web login/layout/pages rewritten to doctor-only MVP shell; leftover pharmacist/patient/prescription/chat pages and old src/api business modules removed
+- Doctor web dependency baseline aligned to Element Plus 2.11.2 and package metadata normalized to yaoshian-doctor-web
+- Professional web login-page mojibake cleanup completed in frontend/pharmacist/src/views/Login.vue and frontend/yisheng/web-admin/src/views/Login.vue with UTF-8 Chinese copy restored
+- frontend/pharmacist npm install completed successfully
+- frontend/pharmacist npm run build passed
+- frontend/yisheng/web-admin npm install completed successfully
+- frontend/yisheng/web-admin npm run build passed
+- frontend/huanzhe package-lock corruption around rollup entries removed by regenerating lockfile with fresh npm install
+- frontend/huanzhe Phase 2 build blockers partially cleaned: RealnamePage.vue, HelpOrderPage.vue, DrugCategoryPage.vue, ExportRecords.vue, QuestionnairePage.vue, patientApi.ts, router/index.ts, shared/http/client.ts, and PrescriptionPage.vue received compile-focused fixes
+- frontend/huanzhe npm install completed successfully and local dependency binaries are now present
+- frontend/huanzhe broken image imports cleaned from QuestionnairePage.vue and LoginPage.vue so Vite asset resolution no longer blocks production build
+- frontend/huanzhe npm run build passed
+- Phase 2 frontend validation gate completed across patient app, pharmacist web, and doctor web
+- frontend/huanzhe patient login page realigned from username/password to mobile + OTP flow through src/modules/patient/api/mvp.ts
+- frontend/huanzhe patient binding page realigned from local-only realname stub to /app-api/patients/bind contract flow
+- frontend/huanzhe session/http baseline extended with refreshToken, deviceId persistence, and 401 refresh retry path for app auth contract
+- Patient app rational-medication module rebuilt with structured static knowledge base (category -> topic -> item/detail) under /rational-medication flow
+- Patient app route chain restored for rational-medication: /rational-medication -> /drug-category/:id -> /drug-detail/:id
+- Patient app AI assistant module added with project service-layer integration (/app-api/ai/chat) and Home quick entry /ai-assistant
+- backend-v2 AI proxy endpoint implemented: POST /app-api/ai/chat with message limits, user-window rate limit, upstream error mapping, and medical safety disclaimer
+- backend-v2 AI configuration added via medicine.ai.base-url/api-key/model/timeout-ms (env override ready)
+- backend-v2 security response normalized for unauthorized access to 401 JSON CommonResult on protected APIs
+- frontend/huanzhe AI assistant failure path now supports one-click retry of last failed prompt
+- backend-v2 app auth baseline implemented for /app-api/auth/send-otp, /app-api/auth/login, /app-api/auth/refresh-token, /app-api/auth/logout, and /app-api/auth/me
+- backend-v2 patient self-service baseline implemented for /app-api/patients/bind, /app-api/patients/me, and /app-api/patients/me/family-bindings
+- backend-v2 JWT auth filter now exposes parsed claims on Authentication details for app-side self-service handlers
+- backend-v2 auth/patient baseline upgraded from in-memory stubs to Redis + persistence-backed service flow with datasource configuration, identity mappers, and durable session / otp audit entities
+- backend-v2 TokenPair realigned to formal contract with accessToken, refreshToken, expiresIn, refreshExpiresIn, and deviceId
+- backend-v2 local runtime profile added with env-driven MySQL/Redis credentials plus SQL auto-init for auth/patient smoke tables
+- backend-v2 local smoke script added for send-otp -> login -> auth/me -> bind -> patients/me verification
+- backend-v2 runtime bug risk around MyBatis underscore mapping removed by enabling map-underscore-to-camel-case
+- backend-v2 auth/patient baseline compile validation passed with JDK17 session override
+- backend-v2 refresh-token rotation corrected by adding unique JWT jti so same-second refresh no longer returns identical token strings
+- backend-v2 auth/patient unit coverage added for Redis/database-backed service flow via AppAuthServiceTest and AppPatientServiceTest
+- backend-v2 local runtime smoke passed against real MySQL + Redis on this machine for patient auth/binding flow, with rows observed in app_account, app_account_device_session, otp_login_log, patient and refresh keys observed in Redis
+- frontend/huanzhe API target realigned from legacy 48081/48080 admin endpoints to backend-v2 local target 127.0.0.1:8080 with TokenPair contract fields synced to backend
+- frontend/huanzhe build passed after adding Vite define typings for __API_BASE_URL__ and wiring login/session handling to backend-returned deviceId
+- frontend/huanzhe dev server at 127.0.0.1:3001 successfully proxied /app-api auth/bind smoke traffic to backend-v2 local runtime
+- backend-v2 local smoke script extended to cover refresh-token rotation, device-preserving refresh response, logout, and post-logout refresh invalidation
+- patient frontend local env override files added (.env.local and .env.development.local) so current Vite runtime no longer depends on legacy 48080/admin-api variables
+- patient frontend historical .env, .env.development, and .env.example files were rewritten to a unified UTF-8 minimal config targeting backend-v2 at 127.0.0.1:8080, removing legacy 48080/admin-api variables
+- Playwright was added under frontend/huanzhe and a browser E2E script was added for login -> realname -> home closure
+- patient browser E2E passed in Chromium against http://127.0.0.1:3001 with successful login, binding, home navigation, and persisted session state
+- Phase 3.2 pharmacist patient-management backend closure completed at code/runtime level: legacy admin login token is now accepted by backend-v2 patient APIs through a dedicated legacy-auth datasource pointed at the real legacy MySQL port mapping
+- backend-v2 patient management runtime closure passed against real legacy token on this machine: GET /admin-api/patients, GET /admin-api/patients/{id}, and PUT /admin-api/patients/{id} now succeed with tenant-id=1 + Bearer token from legacy /admin-api/system/auth/login
+- backend-v2 pharmacist first-claim flow verified on patient id 10: saving medical fields assigned responsible pharmacist profile id 1 and created latest ABCD2 snapshot with score=6, riskLevel=HIGH
+- backend-v2 patient list runtime regression fixed after smoke: explicit SQL aliases were added so saved primary disease / responsible pharmacist / pending-fields state now round-trip back to list responses
+- backend-v2 local schema bootstrap compatibility fixed for current MySQL runtime by replacing unsupported ALTER TABLE ... ADD COLUMN IF NOT EXISTS statements with information_schema + PREPARE based conditional DDL
+- frontend/pharmacist patient runtime boundary aligned to mixed backends: legacy auth stays on 48080 while /admin-api/patients* proxies to backend-v2 and pharmacist build remains green
+- Phase 3.3 prescription minimum loop implemented at code/build level: app-side presign + upload registration, backend-v2 prescription/file/DDI persistence/service/controller flow, and pharmacist-side real prescription review screen with manual item entry, reject, and DDI confirmation
+- backend-v2 local schema bootstrap extended with file_asset, prescription, prescription_item, prescription_attachment, prescription_ocr_record, ddi_rule, and ddi_screening_log plus deterministic HIGH-risk DDI seed rules
+- backend-v2 app-side prescription endpoints implemented: POST /app-api/files/presign and POST /app-api/prescriptions/uploads using S3CompatibleObjectStorageStub URLs and persistence-backed upload registration
+- backend-v2 admin-side prescription endpoints implemented: GET /admin-api/prescriptions, GET /admin-api/prescriptions/{id}, POST /admin-api/prescriptions/{id}/confirm, POST /admin-api/prescriptions/{id}/reject, and POST /admin-api/ddi/screenings/{id}/confirm
+- frontend/huanzhe prescription page rewired from legacy mock prescription list to MVP upload-registration flow via src/modules/patient/api/mvp.ts with local image preview and session-scoped registration results
+- frontend/pharmacist prescription page rewired from static cards to backend-v2-powered list + drawer review flow with editable medication items and DDI confirmation actions
+- backend-v2 unit coverage added for AppFileServiceTest, AppPrescriptionServiceTest, AdminPrescriptionServiceTest, and PrescriptionControllerTest
+- backend-v2 Phase 3.4-3.7 contract groundwork started: formal DTO payloads and request DTOs were filled for medication plan, dose task, check-in, help-order, notification log, knowledge assessment, and satisfaction survey
+- backend-v2 Phase 3.4-3.7 domain/model groundwork added: medication plan item/task/check-in/event, help-order event, doctor profile, knowledge assessment answer, and satisfaction survey entities are now present
+- backend-v2 Phase 3.4-3.7 persistence groundwork added: real mappers and local schema bootstrap were extended for medication plan/task/check-in tables, help-order/event tables, notification_log, doctor_profile, knowledge_assessment_answer, and satisfaction_survey
+- backend-v2 app/professional identity baseline extended for family-account delegation and doctor-profile resolution, including accountType exposure in /app-api/auth/me and family access-context enforcement
+- backend-v2 medication-plan backend baseline added at code level: app active-plan/today-task/check-in/correction services plus admin create/update/activate/tasks/adherence-report services/controllers were introduced but not yet compile-validated in this session
+- backend-v2 Phase 3.4-3.7 backend API closure advanced to compile-green: app help-order submit/list/detail, app knowledge/satisfaction assessment submit, admin help-order queue/detail/claim/reply/escalate/reject/close, admin notification-log query, and patient family-binding create/unbind endpoints are now wired and compile validated
+- backend-v2 new mapper methods were hardened with explicit MyBatis @Param bindings to reduce runtime parameter-name drift on new medication/help-order/assessment/notification queries
+- patient app medication/help-order surfaces were rewritten off local storage / legacy patientApi stubs: HomePage, MedicationReminderPage, MedicationRecordPage, and HelpOrderPage now consume mvp.ts real APIs for active plan, dose tasks, check-ins, and help-orders
+- patient app mvp service boundary extended with typed medication/help-order/check-in/assessment/family-binding methods so page code no longer needs legacy patientApi for P0 medication/help-order flows
+- pharmacist and doctor dev proxies were realigned so new `/admin-api/help-orders`, `/admin-api/medication-plans`, `/admin-api/notifications`, `/admin-api/prescriptions`, and `/admin-api/ddi` traffic can reach backend-v2 while legacy auth remains on 48080
+- pharmacist and doctor work-order pages were replaced from static placeholders to backend-v2-driven queue/detail/action pages using claim/reply/escalate/reject/close flows
+- backend-v2 Phase 3 runtime-focused tests added and passed for help-order state transitions, satisfaction one-order-one-survey constraints, and medication correction-window/effective-record switching
+- Phase 3.3-3.7 local runtime closure completed end-to-end: prescription/API smoke, medication-family-help-order API smoke, and three Playwright browser E2E scripts all passed against live local services
+- professional web runtime proxy closure completed: pharmacist prescriptions/help-orders and doctor help-orders now use same-origin dev proxy routing to backend-v2 while legacy auth remains on 48080
+- Phase 4 pharmacist closure completed: `/patient/info` now embeds medication plan create/edit/activate/task/adherence maintenance and prescription review can jump directly into the patient plan panel
+- Phase 4 professional realtime notification closure completed: backend-v2 now exposes `/ws/admin-notifications`, notification_log delivery statuses are written back as SENT/FAILED, and unassigned professional notifications broadcast by role to active pharmacist/doctor sessions
+- Phase 4 browser/runtime validation assets completed: patient auth 401-refresh and natural-expiry E2E split into dedicated scripts, pharmacist patient save smoke was added, and realtime notification E2E now covers submit -> escalate -> doctor reply/close
+- Phase 4 local trial-run delivery assets completed: docs/03-运维部署/phase4-local-runbook.md, docs/06-测试文档/phase4-acceptance.md, docs/06-测试文档/phase4-test-report.md, and ops/scripts/phase4-local-run.ps1 were added
+- backend-v2 local smoke now uses generated patient/family identities per run so repeated execution no longer collides with prior state
+
+In Progress
+- Challenge-cup AI runtime E2E verification (real JWT login + upstream AI key) pending environment readiness
+
+Next
+- Run challenge-cup integration checks after auth endpoints are available: /rational-medication flow + /ai-assistant chat + Home entry fallback behavior
+- Continue non-P0 follow-up items after Phase 4 local runtime closure: challenge-cup AI runtime verification and optional patient prescription-history follow-up only after contract review
+
+Blockers
+- Phase 3.3 upload flow intentionally does not perform real object-storage PUT yet; current patient page only completes metadata registration and local preview, so attachment replay still depends on later storage integration
+- AI upstream provider key/base-url is not configured in this workspace session, so live upstream chat verification is not yet executable
+- Current local P0 runtime still depends on mixed machine services: local MySQL on 3306, Dockerized legacy MySQL/Redis/server on 13306/16379/48080, backend-v2 on 8080, and three manually started Vite dev servers on 3001/3002/3003
+
+Open Decisions
+- None
+
+Recent Validation
+- Docker Desktop was started and legacy stack was restored via `docker compose -f D:/yaoanshi/backend/medicinal-his-delivery/docker-compose.yml up -d mysql redis server`; `13306`, `16379`, and `48080` revalidated as healthy
+- backend-v2 local runtime was repackaged and relaunched successfully on `http://127.0.0.1:8080` using local MySQL `3306`, legacy MySQL `13306`, and Redis `16379`
+- powershell -ExecutionPolicy Bypass -File D:/yaoanshi/backend-v2/scripts/smoke-prescription-local.ps1 passed with DDI_REQUIRED -> screening confirm -> PHARMACIST_CONFIRMED plus reject-reason round-trip
+- powershell -ExecutionPolicy Bypass -File D:/yaoanshi/backend-v2/scripts/smoke-core-flows-local.ps1 passed with ACTIVE plan task generation, patient check-in/correction, family delegated check-in, pharmacist claim/reply/escalate, doctor reply/close, knowledge assessment, satisfaction survey, adherence report, notification query, and post-unbind PATIENT_BIND_CONFLICT
+- node --check passed for frontend/huanzhe/scripts/e2e-shared.mjs, e2e-prescription-review.mjs, e2e-medication-family.mjs, and e2e-helporder-collab.mjs
+- node D:/yaoanshi/frontend/huanzhe/scripts/e2e-prescription-review.mjs passed with patient upload registration, pharmacist drawer visibility, DDI confirm, final confirm, and reject-reason verification
+- node D:/yaoanshi/frontend/huanzhe/scripts/e2e-medication-family.mjs passed with task status transition to COMPLETED, correction rewrite to MISSED with effective=true, family delegated check-in operatorType=FAMILY, and post-unbind PATIENT_BIND_CONFLICT
+- node D:/yaoanshi/frontend/huanzhe/scripts/e2e-helporder-collab.mjs passed with family submit, pharmacist queue visibility, pharmacist reply/escalate, doctor reply/close, knowledge assessment submit, satisfaction submit, and closed-notification query
+- frontend/pharmacist dev proxy routing was fixed by putting backend-v2 prefixes ahead of the legacy `/admin-api` fallback and by making work-order requests use same-origin backend-v2 proxy resolution
+- frontend/yisheng/web-admin work-order requests were aligned to same-origin backend-v2 proxy resolution so doctor queue traffic no longer bypasses Vite proxy
+- mvn -q "-Dtest=AdminHelpOrderServiceTest,AppAssessmentServiceTest,AppMedicationServiceTest,AdminPrescriptionServiceTest,AppPrescriptionServiceTest" test -f D:/yaoanshi/backend-v2/pom.xml passed
+- mvn -q -DskipTests compile -f D:/yaoanshi/backend-v2/pom.xml passed after final runtime-fix edits
+- npm run build passed in D:/yaoanshi/frontend/huanzhe
+- npm run build passed in D:/yaoanshi/frontend/pharmacist
+- npm run build passed in D:/yaoanshi/frontend/yisheng/web-admin
+- mvn -q "-Dtest=JwtTokenServiceTest,NotificationDispatchServiceTest,AdminHelpOrderServiceTest" test -f D:/yaoanshi/backend-v2/pom.xml passed
+- mvn -q "-Dtest=AdminNotificationRealtimeServiceTest,NotificationDispatchServiceTest,AdminHelpOrderServiceTest" test -f D:/yaoanshi/backend-v2/pom.xml passed
+- node --check passed for frontend/huanzhe/scripts/e2e-auth-refresh.mjs, e2e-auth-expiry.mjs, e2e-pharmacist-patient.mjs, and e2e-admin-notifications.mjs
+- powershell -ExecutionPolicy Bypass -File D:/yaoanshi/ops/scripts/phase4-local-run.ps1 -SkipBuild -SkipExpiryE2E passed with backend smoke, patient 401 refresh E2E, pharmacist patient smoke, and realtime notification E2E
+- node D:/yaoanshi/frontend/huanzhe/scripts/e2e-admin-notifications.mjs passed with pharmacist realtime queue refresh, doctor realtime queue refresh, doctor reply/close, and closed notification status=SENT
+- powershell -ExecutionPolicy Bypass -File D:/yaoanshi/ops/scripts/phase4-local-run.ps1 -SkipBuild -JwtAccessTokenSeconds 2 passed with backend smoke, short-TTL patient refresh/logout E2E, and realtime-notification E2E skipped by design under expiry mode
+
+Last Updated
+- 2026-03-07 Asia/Shanghai
+- Reason: Phase 4 trial-run closure completed with pharmacist medication-plan UI, professional realtime notifications, local orchestrator/runbook assets, repeatable smoke scripts, and normal/short-TTL runtime validations passing

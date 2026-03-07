@@ -1,0 +1,131 @@
+package com.medicine.service.auth;
+
+import com.medicine.api.dto.auth.BindPatientRequest;
+import com.medicine.common.exception.BusinessException;
+import com.medicine.domain.identity.AppAccount;
+import com.medicine.domain.identity.Patient;
+import com.medicine.domain.identity.PatientFamilyBinding;
+import com.medicine.repository.identity.AppAccountMapper;
+import com.medicine.repository.identity.PatientFamilyBindingMapper;
+import com.medicine.repository.identity.PatientMapper;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Map;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+@ExtendWith(MockitoExtension.class)
+class AppPatientServiceTest {
+
+    @Mock
+    private PatientMapper patientMapper;
+
+    @Mock
+    private AppAccountMapper appAccountMapper;
+
+    @Mock
+    private PatientFamilyBindingMapper patientFamilyBindingMapper;
+
+    @InjectMocks
+    private AppPatientService appPatientService;
+
+    @Test
+    void shouldInsertPatientBindingWhenNoExistingRecord() {
+        AppAccount appAccount = appAccount(1001L, "13800138000");
+        when(appAccountMapper.selectActiveByMobile(1L, "13800138000")).thenReturn(appAccount);
+        when(patientMapper.selectByAppAccountId(1L, 1001L)).thenReturn(null);
+        when(patientMapper.selectByHospitalPatientId(1L, "HZY-1001")).thenReturn(null);
+        when(patientMapper.selectByMobileAndHospitalPatientId(1L, "13800138000", "HZY-1001")).thenReturn(null);
+        doAnswer(invocation -> {
+            Patient patient = invocation.getArgument(0);
+            patient.setId(3001L);
+            return 1;
+        }).when(patientMapper).insert(any(Patient.class));
+
+        Map<String, Object> result = appPatientService.bindPatient("13800138000", bindRequest("HZY-1001"));
+
+        assertThat(result.get("id")).isEqualTo(3001L);
+        assertThat(result.get("bound")).isEqualTo(true);
+        verify(patientMapper).insert(any(Patient.class));
+    }
+
+    @Test
+    void shouldRejectBindingWhenHospitalIdAlreadyOwnedByAnotherAccount() {
+        AppAccount currentAccount = appAccount(1001L, "13800138000");
+        Patient duplicatePatient = new Patient();
+        duplicatePatient.setId(3002L);
+        duplicatePatient.setAppAccountId(2002L);
+        duplicatePatient.setHospitalPatientId("HZY-1001");
+        duplicatePatient.setMobile("13900139000");
+
+        when(appAccountMapper.selectActiveByMobile(1L, "13800138000")).thenReturn(currentAccount);
+        when(patientMapper.selectByAppAccountId(1L, 1001L)).thenReturn(null);
+        when(patientMapper.selectByHospitalPatientId(1L, "HZY-1001")).thenReturn(duplicatePatient);
+
+        assertThatThrownBy(() -> appPatientService.bindPatient("13800138000", bindRequest("HZY-1001")))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("PATIENT_BIND_REQUIRES_PHARMACIST_CONFIRM");
+
+        verify(patientMapper, never()).insert(any(Patient.class));
+    }
+
+    @Test
+    void shouldReadCurrentPatientAndFamilyBindingsFromPersistence() {
+        AppAccount appAccount = appAccount(1001L, "13800138000");
+        Patient patient = new Patient();
+        patient.setId(3001L);
+        patient.setAppAccountId(1001L);
+        patient.setHospitalPatientId("HZY-1001");
+        patient.setMobile("13800138000");
+        patient.setName("Test Patient");
+        patient.setBindingStatus("BOUND");
+        patient.setBoundAt(LocalDateTime.of(2026, 3, 6, 9, 30));
+
+        PatientFamilyBinding binding = new PatientFamilyBinding();
+        binding.setId(4001L);
+        binding.setPatientId(3001L);
+        binding.setFamilyAccountId(5001L);
+        binding.setRelationshipType("spouse");
+        binding.setStatus("ACTIVE");
+        binding.setAuthorizedAt(LocalDateTime.of(2026, 3, 6, 10, 0));
+
+        when(appAccountMapper.selectActiveByMobile(1L, "13800138000")).thenReturn(appAccount);
+        when(patientMapper.selectByAppAccountId(1L, 1001L)).thenReturn(patient);
+        when(patientFamilyBindingMapper.selectActiveByPatientId(1L, 3001L)).thenReturn(List.of(binding));
+
+        Map<String, Object> currentPatient = appPatientService.getCurrentPatient("13800138000");
+        List<Map<String, Object>> familyBindings = appPatientService.getFamilyBindings("13800138000");
+
+        assertThat(currentPatient.get("hospitalPatientId")).isEqualTo("HZY-1001");
+        assertThat(currentPatient.get("bound")).isEqualTo(true);
+        assertThat(familyBindings).hasSize(1);
+        assertThat(familyBindings.get(0).get("familyAccountId")).isEqualTo(5001L);
+    }
+
+    private AppAccount appAccount(Long id, String mobile) {
+        AppAccount appAccount = new AppAccount();
+        appAccount.setId(id);
+        appAccount.setMobile(mobile);
+        return appAccount;
+    }
+
+    private BindPatientRequest bindRequest(String hospitalPatientId) {
+        BindPatientRequest request = new BindPatientRequest();
+        request.setMobile("13800138000");
+        request.setHospitalPatientId(hospitalPatientId);
+        request.setName("Test Patient");
+        return request;
+    }
+}

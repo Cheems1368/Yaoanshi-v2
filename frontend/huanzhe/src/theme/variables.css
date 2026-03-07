@@ -1,0 +1,91 @@
+/* Patient surface tokens aligned with FRONTEND_GUIDELINES.md */
+:root {
+  --ion-color-primary: #2979ff;
+  --ion-color-primary-rgb: 41, 121, 255;
+  --ion-color-primary-contrast: #ffffff;
+  --ion-color-primary-shade: #256ae0;
+  --ion-color-primary-tint: #4a90ff;
+
+  --ion-color-secondary: #dbeaff;
+  --ion-color-secondary-rgb: 219, 234, 255;
+  --ion-color-secondary-contrast: #333333;
+  --ion-color-secondary-shade: #c6d5e6;
+  --ion-color-secondary-tint: #e4efff;
+
+  --ion-color-success: #67c23a;
+  --ion-color-warning: #e6a23c;
+  --ion-color-danger: #f56c6c;
+  --ion-color-medium: #556c8a;
+  --ion-color-light: #f5f7fa;
+  --ion-background-color: #ffffff;
+  --ion-text-color: #333333;
+
+  --patient-bg-gradient: linear-gradient(180deg, #dbeaff 0%, #ffffff 48%, #f5f7fa 100%);
+  --patient-font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", sans-serif;
+  --patient-title-font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", sans-serif;
+  --ion-font-family: var(--patient-font-family);
+  --patient-space-1: 4px;
+  --patient-space-2: 8px;
+  --patient-space-3: 12px;
+  --patient-space-4: 16px;
+  --patient-space-5: 20px;
+  --patient-space-6: 24px;
+  --patient-radius-sm: 8px;
+  --patient-radius-md: 12px;
+  --patient-radius-lg: 16px;
+  --patient-radius-xl: 24px;
+  --patient-shadow-sm: 0 2px 12px rgba(0, 0, 0, 0.1);
+  --patient-shadow-md: 0 4px 16px rgba(0, 0, 0, 0.15);
+}
+
+html,
+body,
+ion-app,
+ion-content,
+ion-page,
+ion-router-outlet {
+  font-family: var(--patient-font-family);
+  background: var(--patient-bg-gradient);
+  color: var(--ion-text-color);
+}
+
+ion-toolbar {
+  --background: transparent;
+  --border-width: 0;
+  --color: #333333;
+}
+
+ion-title,
+.patient-page-title,
+.patient-section-title {
+  font-family: var(--patient-title-font-family);
+}
+
+ion-button,
+ion-label,
+ion-input,
+ion-textarea,
+ion-tab-button,
+ion-segment-button {
+  font-family: var(--patient-font-family);
+}
+
+ion-card {
+  --background: #ffffff;
+  --color: #333333;
+  border-radius: var(--patient-radius-lg);
+  box-shadow: var(--patient-shadow-sm);
+  border: 1px solid rgba(41, 121, 255, 0.08);
+}
+
+ion-button {
+  --border-radius: var(--patient-radius-md);
+  --box-shadow: none;
+  font-weight: 600;
+}
+
+ion-tab-bar {
+  --background: rgba(255, 255, 255, 0.98);
+  --border: 1px solid rgba(41, 121, 255, 0.08);
+  box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.08);
+}

@@ -1,0 +1,111 @@
+﻿# Docker鏋勫缓涓婁笅鏂囧拷鐣ユ枃浠?
+# 鍑忓皯鏋勫缓涓婁笅鏂囧ぇ灏忥紝鎻愰珮鏋勫缓閫熷害
+
+# 鏋勫缓浜х墿锛堝凡鏋勫缓鐨凧AR鏂囦欢锛孌ocker鏋勫缓涓細閲嶆柊鏋勫缓锛?
+**/target/
+*.jar
+*.war
+*.ear
+
+# 鐗堟湰鎺у埗
+.git/
+.gitignore
+.gitattributes
+
+# IDE鏂囦欢
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+.project
+.classpath
+.settings/
+
+# 鏃ュ織鏂囦欢
+*.log
+**/logs/
+**/log/
+
+# 涓存椂鏂囦欢
+tmp/
+temp/
+*.tmp
+*.temp
+
+# 鏂囨。锛堜繚鐣欏繀瑕佺殑锛屼絾鎺掗櫎澶ч儴鍒嗭級
+docs/
+*.md
+!pom.xml
+CHANGELOG*
+
+# 娴嬭瘯鏂囦欢锛堝彲閫夛紝濡傛灉闇€瑕佸彲浠ヤ繚鐣欙級
+# src/test/
+# test/
+# *Test.java
+# *Tests.java
+
+# 鏁忔劅閰嶇疆鏂囦欢锛堟瀯寤烘椂涓嶅鍒讹紝杩愯鏃堕€氳繃鐜鍙橀噺鎴杤olume娉ㄥ叆锛?
+# application-*.yml
+# application-*.properties
+*.env
+.env*
+
+# 鏁版嵁搴撴枃浠?
+*.db
+*.sqlite
+*.h2.db
+
+# 缂撳瓨鏂囦欢
+.m2/
+.gradle/
+node_modules/
+npm-debug.log*
+
+# 绯荤粺鏂囦欢
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+
+# Docker鐩稿叧鏂囦欢锛堜笉褰卞搷鏋勫缓锛屼絾鍑忓皯涓婁笅鏂囧ぇ灏忥級
+docker-security-audit/Dockerfile*
+docker-security-audit/docker-compose*.yml
+docker-security-audit/.dockerignore
+docker-security-audit/*.md
+docker-security-audit/*.ps1
+
+# 鍓嶇鐩稿叧锛堝鏋滃彧鏋勫缓鍚庣锛?
+pharmacist/
+pharmacist/**/*
+
+# 澶囦唤鐩綍
+backup_*/
+**/backup_*/
+
+# 鎶ュ憡鏂囦欢
+reports/
+coverage/
+target/site/
+
+# 鎬ц兘娴嬭瘯鏂囦欢
+*.jmx
+performance-*
+
+# 鍏朵粬椤圭洰鐩綍锛堝鏋滀笉闇€瑕侊級
+medicinal-his-delivery/
+
+# Python鑴氭湰锛堝鏋滀笉闇€瑕侊級
+*.py
+__pycache__/
+*.pyc
+
+
+
+
+
+
+
+
+
+

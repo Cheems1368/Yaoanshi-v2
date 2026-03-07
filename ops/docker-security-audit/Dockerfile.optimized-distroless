@@ -1,0 +1,54 @@
+# 药学管理系统 - Distroless优化版Dockerfile
+# 基于Google Distroless，最小化攻击面
+
+# 第一阶段：构建阶段
+FROM openjdk:11-jre-slim AS builder
+
+# 安装Maven
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        maven \
+    && rm -rf /var/lib/apt/lists/*
+
+# 设置工作目录
+WORKDIR /app
+
+# 复制POM文件并下载依赖
+COPY pom.xml .
+RUN mvn dependency:go-offline -B
+
+# 复制源代码并构建
+COPY src ./src
+RUN mvn clean package -DskipTests -B
+
+# 第二阶段：运行阶段
+FROM gcr.io/distroless/java11-debian11
+
+# 创建应用目录
+WORKDIR /app
+
+# 从构建阶段复制JAR文件
+COPY --from=builder /app/target/medicine-server.jar app.jar
+
+# 设置环境变量
+ENV JAVA_OPTS="-XX:+UseContainerSupport \
+    -XX:MaxRAMPercentage=70.0 \
+    -XX:InitialRAMPercentage=50.0 \
+    -XX:MaxMetaspaceSize=256m \
+    -XX:+HeapDumpOnOutOfMemoryError \
+    -XX:+UseG1GC \
+    -XX:MaxGCPauseMillis=200 \
+    -XX:+UseStringDeduplication \
+    -Djava.security.egd=file:/dev/./urandom \
+    -Djava.awt.headless=true \
+    -Dfile.encoding=UTF-8 \
+    -Dserver.shutdown=graceful"
+
+ENV SPRING_PROFILES_ACTIVE=prod
+
+# 暴露端口
+EXPOSE 48080
+
+# 启动命令
+CMD ["java", "-XX:+UseContainerSupport", "-XX:MaxRAMPercentage=70.0", "-jar", "app.jar"]
+

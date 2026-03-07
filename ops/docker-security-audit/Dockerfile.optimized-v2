@@ -1,0 +1,109 @@
+# 优化版Dockerfile v2 - 药学管理系统后端服务
+# 基于多阶段构建和安全最佳实践
+# 支持构建参数：BUILD_DATE, VCS_REF, VERSION
+
+# 构建参数
+ARG BUILD_DATE
+ARG VCS_REF
+ARG VERSION
+
+# 构建阶段
+FROM maven:3.8-openjdk-11-slim AS builder
+
+# 设置工作目录
+WORKDIR /app
+
+# 先复制所有POM文件（用于依赖解析和缓存）
+COPY pom.xml .
+COPY medicine-dependencies/pom.xml ./medicine-dependencies/
+COPY medicine-framework/pom.xml ./medicine-framework/
+COPY medicine-server/pom.xml ./medicine-server/
+COPY medicine-module-system/pom.xml ./medicine-module-system/
+COPY medicine-module-infra/pom.xml ./medicine-module-infra/
+COPY medicine-module-drug/pom.xml ./medicine-module-drug/
+COPY medicine-module-patient/pom.xml ./medicine-module-patient/
+COPY medicine-module-doctor/pom.xml ./medicine-module-doctor/
+COPY medicine-module-medication/pom.xml ./medicine-module-medication/
+
+# 尝试下载依赖（利用Docker层缓存，即使失败也继续）
+# 这步可以缓存Maven依赖，提高后续构建速度
+RUN mvn dependency:go-offline -B -N -q || mvn dependency:resolve -B -N -q || true
+
+# 复制所有源代码
+COPY . .
+
+# 构建整个项目，只构建 medicine-server 模块及其依赖
+RUN mvn clean package -pl medicine-server -am -DskipTests -B
+
+# 运行阶段
+FROM eclipse-temurin:11-jre-alpine
+
+# 构建参数（运行时可用）
+ARG BUILD_DATE
+ARG VCS_REF
+ARG VERSION
+
+# 标签信息
+LABEL org.opencontainers.image.created="${BUILD_DATE}" \
+      org.opencontainers.image.authors="Medicine Delivery Team" \
+      org.opencontainers.image.url="https://github.com/medicinal-his-delivery" \
+      org.opencontainers.image.documentation="https://github.com/medicinal-his-delivery/docs" \
+      org.opencontainers.image.source="https://github.com/medicinal-his-delivery" \
+      org.opencontainers.image.version="${VERSION}" \
+      org.opencontainers.image.revision="${VCS_REF}" \
+      org.opencontainers.image.vendor="Medicine Delivery" \
+      org.opencontainers.image.title="Medicine Server" \
+      org.opencontainers.image.description="药学管理系统后端服务"
+
+# 安装必要的工具
+RUN apk add --no-cache \
+    curl \
+    tzdata \
+    && rm -rf /var/cache/apk/*
+
+# 创建非root用户
+RUN addgroup -g 1001 -S appgroup && \
+    adduser -u 1001 -S appuser -G appgroup
+
+# 设置时区
+ENV TZ=Asia/Shanghai
+RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
+
+# 创建应用目录
+RUN mkdir -p /medicine-server && \
+    chown -R appuser:appgroup /medicine-server
+
+# 设置工作目录
+WORKDIR /medicine-server
+
+# 从构建阶段复制JAR文件
+COPY --from=builder /app/medicine-server/target/medicine-server.jar app.jar
+
+# 设置文件权限
+RUN chown appuser:appgroup app.jar
+
+# 切换到非root用户
+USER appuser
+
+# 设置JVM参数
+ENV JAVA_OPTS="-Xms512m -Xmx1g \
+    -XX:+UseG1GC \
+    -XX:MaxGCPauseMillis=200 \
+    -XX:+UseStringDeduplication \
+    -Djava.security.egd=file:/dev/./urandom \
+    -Djava.awt.headless=true \
+    -Dfile.encoding=UTF-8"
+
+# 应用参数
+ENV ARGS=""
+
+# 暴露端口
+EXPOSE 48080
+
+# 健康检查
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD curl -f http://localhost:48080/actuator/health || exit 1
+
+# 启动应用
+CMD ["sh", "-c", "java $JAVA_OPTS -jar app.jar $ARGS"]
+

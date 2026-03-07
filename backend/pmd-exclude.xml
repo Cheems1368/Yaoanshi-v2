@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<exclude-pattern>
+    <!-- 排除一些过于严格的代码风格规则 -->
+    <rule ref="category/java/codestyle.xml/LongVariable"/>
+    <rule ref="category/java/codestyle.xml/MethodArgumentCouldBeFinal"/>
+    <rule ref="category/java/codestyle.xml/LocalVariableCouldBeFinal"/>
+    <rule ref="category/java/codestyle.xml/AtLeastOneConstructor"/>
+    
+    <!-- 排除一些设计规则 -->
+    <rule ref="category/java/design.xml/LawOfDemeter"/>
+    
+    <!-- 排除一些错误检查规则 -->
+    <rule ref="category/java/errorprone.xml/DataflowAnomalyAnalysis"/>
+    
+    <!-- 排除一些性能规则 -->
+    <rule ref="category/java/performance.xml/AvoidInstantiatingObjectsInLoops"/>
+</exclude-pattern>
+
+

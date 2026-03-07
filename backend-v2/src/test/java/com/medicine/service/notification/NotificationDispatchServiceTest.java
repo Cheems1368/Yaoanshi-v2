@@ -1,0 +1,122 @@
+package com.medicine.service.notification;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.medicine.domain.notification.NotificationLog;
+import com.medicine.repository.notification.NotificationLogMapper;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.Spy;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.time.LocalDateTime;
+import java.util.Map;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+@ExtendWith(MockitoExtension.class)
+class NotificationDispatchServiceTest {
+
+    @Mock
+    private NotificationLogMapper notificationLogMapper;
+
+    @Mock
+    private AdminNotificationRealtimeService realtimeService;
+
+    @Spy
+    private ObjectMapper objectMapper = new ObjectMapper();
+
+    @InjectMocks
+    private NotificationDispatchService notificationDispatchService;
+
+    @Test
+    void shouldMarkProfessionalNotificationAsSentWhenRealtimeDispatchSucceeds() {
+        doAnswer(invocation -> {
+            NotificationLog log = invocation.getArgument(0);
+            log.setId(9001L);
+            return 1;
+        }).when(notificationLogMapper).insert(any(NotificationLog.class));
+        when(realtimeService.dispatch(any(NotificationLog.class))).thenReturn(NotificationDispatchService.DispatchResult.sent());
+
+        notificationDispatchService.createAndDispatch(
+                1L,
+                "unit-test",
+                "PHARMACIST",
+                101L,
+                "HELP_ORDER_SUBMITTED",
+                6001L,
+                Map.of("status", "SUBMITTED"),
+                LocalDateTime.now()
+        );
+
+        ArgumentCaptor<NotificationLog> captor = ArgumentCaptor.forClass(NotificationLog.class);
+        verify(notificationLogMapper).updateDelivery(captor.capture());
+        NotificationLog updated = captor.getValue();
+        assertThat(updated.getChannel()).isEqualTo("WEBSOCKET");
+        assertThat(updated.getDeliveryStatus()).isEqualTo("SENT");
+        assertThat(updated.getSentAt()).isNotNull();
+        assertThat(updated.getFailureCode()).isNull();
+    }
+
+    @Test
+    void shouldMarkProfessionalNotificationAsFailedWhenNoRealtimeSessionExists() {
+        doAnswer(invocation -> {
+            NotificationLog log = invocation.getArgument(0);
+            log.setId(9002L);
+            return 1;
+        }).when(notificationLogMapper).insert(any(NotificationLog.class));
+        when(realtimeService.dispatch(any(NotificationLog.class)))
+                .thenReturn(NotificationDispatchService.DispatchResult.failed("NO_ACTIVE_SESSION", "No active WebSocket session"));
+
+        notificationDispatchService.createAndDispatch(
+                1L,
+                "unit-test",
+                "DOCTOR",
+                202L,
+                "HELP_ORDER_ESCALATED",
+                6002L,
+                Map.of("status", "WAITING_DOCTOR"),
+                LocalDateTime.now()
+        );
+
+        ArgumentCaptor<NotificationLog> captor = ArgumentCaptor.forClass(NotificationLog.class);
+        verify(notificationLogMapper).updateDelivery(captor.capture());
+        NotificationLog updated = captor.getValue();
+        assertThat(updated.getDeliveryStatus()).isEqualTo("FAILED");
+        assertThat(updated.getFailureCode()).isEqualTo("NO_ACTIVE_SESSION");
+        assertThat(updated.getSentAt()).isNull();
+    }
+
+    @Test
+    void shouldTreatAppNotificationsAsSentWithoutRealtimeDispatch() {
+        doAnswer(invocation -> {
+            NotificationLog log = invocation.getArgument(0);
+            log.setId(9003L);
+            return 1;
+        }).when(notificationLogMapper).insert(any(NotificationLog.class));
+
+        notificationDispatchService.createAndDispatch(
+                1L,
+                "unit-test",
+                "PATIENT",
+                301L,
+                "HELP_ORDER_CLOSED",
+                6003L,
+                Map.of("status", "CLOSED"),
+                LocalDateTime.now()
+        );
+
+        ArgumentCaptor<NotificationLog> captor = ArgumentCaptor.forClass(NotificationLog.class);
+        verify(notificationLogMapper).updateDelivery(captor.capture());
+        NotificationLog updated = captor.getValue();
+        assertThat(updated.getChannel()).isEqualTo("IN_APP");
+        assertThat(updated.getDeliveryStatus()).isEqualTo("SENT");
+        assertThat(updated.getSentAt()).isNotNull();
+    }
+}

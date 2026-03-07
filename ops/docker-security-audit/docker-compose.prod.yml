@@ -1,0 +1,227 @@
+﻿# 鑽绠＄悊绯荤粺 - 鐢熶骇鐜Docker Compose閰嶇疆
+# 瀹夊叏纭寲銆佽祫婧愰檺鍒躲€佸彲瑙傛祴鎬ч厤缃?
+
+version: '3.8'
+
+services:
+  mysql:
+    container_name: medicine-mysql-prod
+    image: mysql:8.0
+    restart: unless-stopped
+    # 鐢熶骇鐜涓嶆毚闇茬鍙ｅ埌瀹夸富鏈?
+    expose:
+      - "3306"
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-medicine}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+    volumes:
+      - mysql_prod_data:/var/lib/mysql/
+      - ./mysql/conf.d:/etc/mysql/conf.d:ro
+    networks:
+      - medicine-prod-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}"]
+      timeout: 20s
+      retries: 10
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    security_opt:
+      - no-new-privileges:true
+    read_only: false
+    tmpfs:
+      - /tmp
+      - /var/run/mysqld
+
+  redis:
+    container_name: medicine-redis-prod
+    image: redis:7-alpine
+    restart: unless-stopped
+    # 鐢熶骇鐜涓嶆毚闇茬鍙ｅ埌瀹夸富鏈?
+    expose:
+      - "6379"
+    volumes:
+      - redis_prod_data:/data
+      - ./redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
+    networks:
+      - medicine-prod-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      timeout: 20s
+      retries: 10
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    security_opt:
+      - no-new-privileges:true
+    read_only: false
+    tmpfs:
+      - /tmp
+
+  server:
+    container_name: medicine-server-prod
+    build:
+      context: ../
+      dockerfile: docker-security-audit/Dockerfile.optimized-v2
+    image: medicine-server:${APP_VERSION:-latest}
+    restart: unless-stopped
+    # 鐢熶骇鐜閫氳繃鍙嶅悜浠ｇ悊璁块棶
+    expose:
+      - "48080"
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      JAVA_OPTS: ${JAVA_OPTS}
+    secrets:
+      - db_password
+      - redis_password
+    networks:
+      - medicine-prod-network
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:48080/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+        reservations:
+          cpus: '1.0'
+          memory: 1G
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /app/logs
+      - /app/tmp
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.medicine-server.rule=Host(`api.medicine.local`)"
+      - "traefik.http.services.medicine-server.loadbalancer.server.port=48080"
+
+  # 鍓嶇绠＄悊绔紙鐢熶骇鐜锛?
+  admin:
+    container_name: medicine-admin-prod
+    image: nginx:alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ../pharmacist/dist:/usr/share/nginx/html:ro
+      - ./nginx-prod.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+    networks:
+      - medicine-prod-network
+    depends_on:
+      - server
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /var/cache/nginx
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # 鐩戞帶鍜屾棩蹇楁敹闆?
+  prometheus:
+    container_name: medicine-prometheus
+    image: prom/prometheus:latest
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    networks:
+      - medicine-prod-network
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+
+  grafana:
+    container_name: medicine-grafana
+    image: grafana/grafana:latest
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+    networks:
+      - medicine-prod-network
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin123}
+      - GF_USERS_ALLOW_SIGN_UP=false
+
+networks:
+  medicine-prod-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+
+volumes:
+  mysql_prod_data:
+    driver: local
+  redis_prod_data:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+
+secrets:
+  db_password:
+    file: ./secrets/db_password.txt
+  redis_password:
+    file: ./secrets/redis_password.txt
+
+

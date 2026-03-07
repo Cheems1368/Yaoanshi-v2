@@ -1,0 +1,103 @@
+﻿# 鑽绠＄悊绯荤粺 - 寮€鍙戠幆澧僁ocker Compose閰嶇疆
+# 鐢ㄤ簬鏈湴寮€鍙戝拰娴嬭瘯锛屼娇鐢ㄧ畝鍖栭厤缃?
+
+version: '3.8'
+
+services:
+  mysql:
+    container_name: medicine-mysql-dev
+    image: mysql:8.0
+    restart: unless-stopped
+    ports:
+      - "13306:3306"
+    environment:
+      MYSQL_DATABASE: medicine
+      MYSQL_ROOT_PASSWORD: "123456"
+    volumes:
+      - mysql_dev_data:/var/lib/mysql/
+      - ./sql/mysql/ruoyi-vue-pro.sql:/docker-entrypoint-initdb.d/01-init.sql
+    networks:
+      - medicine-dev-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p123456"]
+      timeout: 20s
+      retries: 10
+      start_period: 30s
+
+  redis:
+    container_name: medicine-redis-dev
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "16379:6379"
+    volumes:
+      - redis_dev_data:/data
+    networks:
+      - medicine-dev-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      timeout: 20s
+      retries: 10
+      start_period: 30s
+
+  server:
+    container_name: medicine-server-dev
+    build:
+      context: ../
+      dockerfile: docker-security-audit/Dockerfile.optimized-v2
+    image: medicine-server:dev
+    restart: unless-stopped
+    ports:
+      - "48080:48080"
+    environment:
+      SPRING_PROFILES_ACTIVE: dev
+      JAVA_OPTS: "-Xms512m -Xmx1g -XX:+UseContainerSupport"
+    networks:
+      - medicine-dev-network
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:48080/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    # 寮€鍙戠幆澧冨厑璁歌皟璇?
+    security_opt:
+      - seccomp:unconfined
+    volumes:
+      - ../logs:/app/logs
+      - ../tmp:/app/tmp
+
+  # 鍓嶇绠＄悊绔紙寮€鍙戠幆澧冿級
+  admin:
+    container_name: medicine-admin-dev
+    image: nginx:alpine
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    volumes:
+      - ../pharmacist/dist:/usr/share/nginx/html
+      - ./nginx-dev.conf:/etc/nginx/nginx.conf
+    networks:
+      - medicine-dev-network
+    depends_on:
+      - server
+
+networks:
+  medicine-dev-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.1.0/24
+
+volumes:
+  mysql_dev_data:
+    driver: local
+  redis_dev_data:
+    driver: local
+
+

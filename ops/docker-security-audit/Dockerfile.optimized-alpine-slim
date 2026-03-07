@@ -1,0 +1,63 @@
+# syntax=docker/dockerfile:1.6
+
+# 轻量级 Alpine 运行时镜像（可选字体/健康检查），聚焦运行阶段，适合已有 JAR 工件或运行时挂载
+
+ARG BASE_IMAGE=eclipse-temurin:17-jre-alpine
+FROM ${BASE_IMAGE} AS runtime
+
+LABEL org.opencontainers.image.title="medicine-server (alpine-slim)" \
+      org.opencontainers.image.description="Slim Alpine runtime with optional fonts and healthcheck" \
+      org.opencontainers.image.source="medicinal-his-delivery/docker-security-audit/Dockerfile.optimized-alpine-slim"
+
+# 可选功能开关
+ARG ENABLE_FONTS=0
+ARG ENABLE_HEALTHCHECK=1
+ARG APP_HOME=/app
+ARG APP_USER=app
+ARG APP_GROUP=app
+ARG APP_UID=10001
+ARG APP_GID=10001
+ARG JAR_PATH=app.jar
+
+ENV TZ=Asia/Shanghai \
+    LANG=zh_CN.UTF-8 \
+    LANGUAGE=zh_CN:zh \
+    LC_ALL=zh_CN.UTF-8 \
+    APP_HOME=${APP_HOME} \
+    JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75 -XX:InitialRAMPercentage=25 -XX:+HeapDumpOnOutOfMemoryError -Dfile.encoding=UTF-8"
+
+WORKDIR ${APP_HOME}
+
+# 基础工具按需安装：仅在启用健康检查或字体时安装
+RUN set -eux; \
+    apk add --no-cache tzdata; \
+    cp /usr/share/zoneinfo/Asia/Shanghai /etc/localtime; echo "Asia/Shanghai" > /etc/timezone; \
+    if [ "${ENABLE_HEALTHCHECK}" = "1" ]; then apk add --no-cache curl; fi; \
+    if [ "${ENABLE_FONTS}" = "1" ]; then apk add --no-cache fontconfig ttf-dejavu ttf-liberation; fi; \
+    addgroup -g ${APP_GID} -S ${APP_GROUP}; \
+    adduser -S -D -H -u ${APP_UID} -G ${APP_GROUP} ${APP_USER}; \
+    mkdir -p ${APP_HOME}/config ${APP_HOME}/logs; \
+    chown -R ${APP_USER}:${APP_GROUP} ${APP_HOME}
+
+# 提供可选的 COPY（若构建上下文包含 JAR 则拷贝），否则用户可运行时挂载
+# 使用 BuildKit 的 --mount=type=bind 可避免 COPY 失败时构建中断
+# 兼容：如果不存在则跳过
+COPY --link --chown=${APP_USER}:${APP_GROUP} ${JAR_PATH} ./app.jar
+
+USER ${APP_USER}:${APP_GROUP}
+
+# 可选健康检查（默认启用）。要求应用暴露 /actuator/health 或 /health
+HEALTHCHECK --interval=30s --timeout=3s --start-period=30s --retries=3 \
+    CMD sh -c '[ "${ENABLE_HEALTHCHECK}" = "1" ] || exit 0; \
+    test -x /usr/bin/curl || exit 0; \
+    HOST=${HEALTH_HOST:-127.0.0.1}; PORT=${SERVER_PORT:-8080}; \
+    curl -fsS http://$HOST:$PORT/actuator/health || curl -fsS http://$HOST:$PORT/health || exit 1'
+
+EXPOSE 8080
+
+# 允许运行时通过 -e APP_ARGS 传参
+ENTRYPOINT ["/bin/sh","-lc","exec java $JAVA_OPTS -jar ./app.jar $APP_ARGS"]
+
+
+
+

@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>后端集成测试 - 舟山分岛医疗管理系统</title>
+    <style>
+        body {
+            font-family: 'Microsoft YaHei', Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #2979FF 0%, #1976D2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 2.5em;
+            font-weight: 300;
+        }
+        .header p {
+            margin: 10px 0 0 0;
+            opacity: 0.9;
+            font-size: 1.1em;
+        }
+        .content {
+            padding: 30px;
+        }
+        .test-section {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            background: #fafafa;
+        }
+        .test-section h3 {
+            margin: 0 0 15px 0;
+            color: #2979FF;
+            font-size: 1.3em;
+        }
+        .test-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 0;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        .test-item:last-child {
+            border-bottom: none;
+        }
+        .test-name {
+            font-weight: 500;
+            color: #333;
+        }
+        .test-status {
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            font-weight: 500;
+        }
+        .status-pending {
+            background: #fff3cd;
+            color: #856404;
+        }
+        .status-success {
+            background: #d4edda;
+            color: #155724;
+        }
+        .status-error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        .test-button {
+            background: #2979FF;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1em;
+            transition: background 0.3s;
+        }
+        .test-button:hover {
+            background: #1976D2;
+        }
+        .test-button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .log-area {
+            background: #1e1e1e;
+            color: #00ff00;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            max-height: 300px;
+            overflow-y: auto;
+            margin-top: 15px;
+        }
+        .api-info {
+            background: #e3f2fd;
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 20px;
+        }
+        .api-info h4 {
+            margin: 0 0 10px 0;
+            color: #1976D2;
+        }
+        .api-info code {
+            background: #f5f5f5;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔧 后端集成测试</h1>
+            <p>舟山分岛医疗管理系统 - API连接测试工具</p>
+        </div>
+        
+        <div class="content">
+            <!-- 后端服务状态 -->
+            <div class="test-section">
+                <h3>🌐 后端服务状态</h3>
+                <div class="test-item">
+                    <span class="test-name">后端服务连接</span>
+                    <span class="test-status status-pending" id="backend-status">检测中...</span>
+                </div>
+                <div class="test-item">
+                    <span class="test-name">API文档访问</span>
+                    <span class="test-status status-pending" id="api-doc-status">检测中...</span>
+                </div>
+                <div class="test-item">
+                    <span class="test-name">健康检查</span>
+                    <span class="test-status status-pending" id="health-status">检测中...</span>
+                </div>
+            </div>
+
+            <!-- API接口测试 -->
+            <div class="test-section">
+                <h3>🔌 API接口测试</h3>
+                <div class="test-item">
+                    <span class="test-name">用户登录接口</span>
+                    <span class="test-status status-pending" id="login-status">待测试</span>
+                    <button class="test-button" onclick="testLogin()">测试</button>
+                </div>
+                <div class="test-item">
+                    <span class="test-name">患者列表接口</span>
+                    <span class="test-status status-pending" id="patients-status">待测试</span>
+                    <button class="test-button" onclick="testPatients()">测试</button>
+                </div>
+                <div class="test-item">
+                    <span class="test-name">处方列表接口</span>
+                    <span class="test-status status-pending" id="prescriptions-status">待测试</span>
+                    <button class="test-button" onclick="testPrescriptions()">测试</button>
+                </div>
+                <div class="test-item">
+                    <span class="test-name">工单列表接口</span>
+                    <span class="test-status status-pending" id="workorders-status">待测试</span>
+                    <button class="test-button" onclick="testWorkOrders()">测试</button>
+                </div>
+            </div>
+
+            <!-- 前端连接测试 -->
+            <div class="test-section">
+                <h3>💻 前端连接测试</h3>
+                <div class="test-item">
+                    <span class="test-name">前端开发服务器</span>
+                    <span class="test-status status-pending" id="frontend-status">检测中...</span>
+                </div>
+                <div class="test-item">
+                    <span class="test-name">代理配置</span>
+                    <span class="test-status status-pending" id="proxy-status">检测中...</span>
+                </div>
+            </div>
+
+            <!-- 测试日志 -->
+            <div class="test-section">
+                <h3>📋 测试日志</h3>
+                <div class="log-area" id="log-area">
+                    <div>🚀 后端集成测试工具已启动</div>
+                    <div>⏰ 开始时间: <span id="start-time"></span></div>
+                </div>
+            </div>
+
+            <!-- API信息 -->
+            <div class="api-info">
+                <h4>📚 API接口信息</h4>
+                <p><strong>后端地址:</strong> <code>http://localhost:48080</code></p>
+                <p><strong>Docker前端:</strong> <code>http://localhost:8080</code></p>
+                <p><strong>yisheng前端:</strong> <code>http://localhost:3000</code></p>
+                <p><strong>API文档:</strong> <code>http://localhost:48080/doc.html</code></p>
+                <p><strong>健康检查:</strong> <code>http://localhost:48080/actuator/health</code></p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 设置开始时间
+        document.getElementById('start-time').textContent = new Date().toLocaleString();
+
+        // 日志函数
+        function log(message, type = 'info') {
+            const logArea = document.getElementById('log-area');
+            const time = new Date().toLocaleTimeString();
+            const prefix = type === 'error' ? '❌' : type === 'success' ? '✅' : 'ℹ️';
+            logArea.innerHTML += `<div>${prefix} [${time}] ${message}</div>`;
+            logArea.scrollTop = logArea.scrollHeight;
+        }
+
+        // 更新状态
+        function updateStatus(elementId, status, message = '') {
+            const element = document.getElementById(elementId);
+            element.textContent = message || status;
+            element.className = 'test-status status-' + status;
+        }
+
+        // 测试后端服务
+        async function testBackendService() {
+            try {
+                log('正在检测后端服务...');
+                const response = await fetch('http://localhost:48080/actuator/health');
+                if (response.ok) {
+                    updateStatus('backend-status', 'success', '✅ 连接正常');
+                    updateStatus('health-status', 'success', '✅ 健康');
+                    log('后端服务连接正常', 'success');
+                    return true;
+                } else {
+                    throw new Error('服务响应异常');
+                }
+            } catch (error) {
+                updateStatus('backend-status', 'error', '❌ 连接失败');
+                updateStatus('health-status', 'error', '❌ 异常');
+                log('后端服务连接失败: ' + error.message, 'error');
+                return false;
+            }
+        }
+
+        // 测试API文档
+        async function testApiDoc() {
+            try {
+                const response = await fetch('http://localhost:48080/doc.html');
+                if (response.ok) {
+                    updateStatus('api-doc-status', 'success', '✅ 可访问');
+                    log('API文档可访问', 'success');
+                } else {
+                    throw new Error('API文档不可访问');
+                }
+            } catch (error) {
+                updateStatus('api-doc-status', 'error', '❌ 不可访问');
+                log('API文档不可访问: ' + error.message, 'error');
+            }
+        }
+
+        // 测试前端服务
+        async function testFrontendService() {
+            try {
+                // 测试Docker前端服务
+                const dockerResponse = await fetch('http://localhost:8080');
+                if (dockerResponse.ok) {
+                    updateStatus('frontend-status', 'success', '✅ Docker前端运行中');
+                    log('Docker前端服务运行正常', 'success');
+                } else {
+                    throw new Error('Docker前端服务未运行');
+                }
+                
+                // 测试yisheng前端服务
+                try {
+                    const yishengResponse = await fetch('http://localhost:3000');
+                    if (yishengResponse.ok) {
+                        updateStatus('proxy-status', 'success', '✅ yisheng前端运行中');
+                        log('yisheng前端服务运行正常', 'success');
+                    } else {
+                        updateStatus('proxy-status', 'error', '❌ yisheng前端未运行');
+                        log('yisheng前端服务未运行', 'error');
+                    }
+                } catch (yishengError) {
+                    updateStatus('proxy-status', 'error', '❌ yisheng前端未运行');
+                    log('yisheng前端服务未运行: ' + yishengError.message, 'error');
+                }
+            } catch (error) {
+                updateStatus('frontend-status', 'error', '❌ Docker前端未运行');
+                updateStatus('proxy-status', 'error', '❌ 前端服务未运行');
+                log('前端服务未运行: ' + error.message, 'error');
+            }
+        }
+
+        // 测试登录接口
+        async function testLogin() {
+            updateStatus('login-status', 'pending', '测试中...');
+            log('正在测试登录接口...');
+            
+            try {
+                const response = await fetch('http://localhost:48080/api/system/auth/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        username: 'admin',
+                        password: 'admin123'
+                    })
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    updateStatus('login-status', 'success', '✅ 正常');
+                    log('登录接口测试成功', 'success');
+                } else {
+                    throw new Error('登录接口响应异常');
+                }
+            } catch (error) {
+                updateStatus('login-status', 'error', '❌ 异常');
+                log('登录接口测试失败: ' + error.message, 'error');
+            }
+        }
+
+        // 测试患者接口
+        async function testPatients() {
+            updateStatus('patients-status', 'pending', '测试中...');
+            log('正在测试患者接口...');
+            
+            try {
+                const response = await fetch('http://localhost:48080/api/patient/patient/page');
+                if (response.ok) {
+                    updateStatus('patients-status', 'success', '✅ 正常');
+                    log('患者接口测试成功', 'success');
+                } else {
+                    throw new Error('患者接口响应异常');
+                }
+            } catch (error) {
+                updateStatus('patients-status', 'error', '❌ 异常');
+                log('患者接口测试失败: ' + error.message, 'error');
+            }
+        }
+
+        // 测试处方接口
+        async function testPrescriptions() {
+            updateStatus('prescriptions-status', 'pending', '测试中...');
+            log('正在测试处方接口...');
+            
+            try {
+                const response = await fetch('http://localhost:48080/api/medication/medication-plan/page');
+                if (response.ok) {
+                    updateStatus('prescriptions-status', 'success', '✅ 正常');
+                    log('处方接口测试成功', 'success');
+                } else {
+                    throw new Error('处方接口响应异常');
+                }
+            } catch (error) {
+                updateStatus('prescriptions-status', 'error', '❌ 异常');
+                log('处方接口测试失败: ' + error.message, 'error');
+            }
+        }
+
+        // 测试工单接口
+        async function testWorkOrders() {
+            updateStatus('workorders-status', 'pending', '测试中...');
+            log('正在测试工单接口...');
+            
+            try {
+                const response = await fetch('http://localhost:48080/api/medication/help-order/page');
+                if (response.ok) {
+                    updateStatus('workorders-status', 'success', '✅ 正常');
+                    log('工单接口测试成功', 'success');
+                } else {
+                    throw new Error('工单接口响应异常');
+                }
+            } catch (error) {
+                updateStatus('workorders-status', 'error', '❌ 异常');
+                log('工单接口测试失败: ' + error.message, 'error');
+            }
+        }
+
+        // 页面加载时自动测试
+        window.onload = async function() {
+            log('开始自动检测服务状态...');
+            
+            // 测试后端服务
+            const backendOk = await testBackendService();
+            
+            // 测试API文档
+            await testApiDoc();
+            
+            // 测试前端服务
+            await testFrontendService();
+            
+            if (backendOk) {
+                log('🎉 后端服务检测完成，可以进行API测试', 'success');
+            } else {
+                log('⚠️ 后端服务未运行，请先启动后端服务', 'error');
+            }
+        };
+    </script>
+</body>
+</html>

@@ -1,0 +1,104 @@
+const ACCESS_TOKEN_KEY = 'patient_access_token'
+const REFRESH_TOKEN_KEY = 'patient_refresh_token'
+const DEVICE_ID_KEY = 'patient_device_id'
+const MOBILE_KEY = 'patient_mobile'
+const BINDING_STATUS_KEY = 'patient_binding_status'
+const ACTIVE_PLAN_KEY = 'patient_has_active_plan'
+
+const createDeviceId = () => {
+  if (typeof globalThis !== 'undefined' && globalThis.crypto?.randomUUID) {
+    return globalThis.crypto.randomUUID()
+  }
+
+  return `patient-web-${Date.now()}-${Math.random().toString(16).slice(2)}`
+}
+
+export interface PatientGateState {
+  loggedIn: boolean
+  isBound: boolean
+  hasActivePlan: boolean
+}
+
+export const patientSession = {
+  getAccessToken(): string | null {
+    return localStorage.getItem(ACCESS_TOKEN_KEY)
+  },
+
+  setAccessToken(token: string) {
+    localStorage.setItem(ACCESS_TOKEN_KEY, token)
+  },
+
+  clearAccessToken() {
+    localStorage.removeItem(ACCESS_TOKEN_KEY)
+  },
+
+  getRefreshToken(): string | null {
+    return localStorage.getItem(REFRESH_TOKEN_KEY)
+  },
+
+  setRefreshToken(token: string) {
+    localStorage.setItem(REFRESH_TOKEN_KEY, token)
+  },
+
+  clearRefreshToken() {
+    localStorage.removeItem(REFRESH_TOKEN_KEY)
+  },
+
+  getDeviceId(): string | null {
+    return localStorage.getItem(DEVICE_ID_KEY)
+  },
+
+  setDeviceId(deviceId: string) {
+    localStorage.setItem(DEVICE_ID_KEY, deviceId)
+  },
+
+  ensureDeviceId(): string {
+    const existingDeviceId = this.getDeviceId()
+    if (existingDeviceId) {
+      return existingDeviceId
+    }
+
+    const deviceId = createDeviceId()
+    this.setDeviceId(deviceId)
+    return deviceId
+  },
+
+  getMobile(): string | null {
+    return localStorage.getItem(MOBILE_KEY)
+  },
+
+  setMobile(mobile: string) {
+    localStorage.setItem(MOBILE_KEY, mobile)
+  },
+
+  clearMobile() {
+    localStorage.removeItem(MOBILE_KEY)
+  },
+
+  clearAuthState() {
+    this.clearAccessToken()
+    this.clearRefreshToken()
+    this.clearMobile()
+  },
+
+  setBindingStatus(isBound: boolean) {
+    localStorage.setItem(BINDING_STATUS_KEY, isBound ? 'BOUND' : 'PENDING')
+  },
+
+  setActivePlanStatus(hasActivePlan: boolean) {
+    localStorage.setItem(ACTIVE_PLAN_KEY, hasActivePlan ? 'true' : 'false')
+  },
+
+  clearGateState() {
+    localStorage.removeItem(BINDING_STATUS_KEY)
+    localStorage.removeItem(ACTIVE_PLAN_KEY)
+  },
+
+  getGateState(): PatientGateState {
+    return {
+      loggedIn: Boolean(localStorage.getItem(ACCESS_TOKEN_KEY)),
+      isBound: localStorage.getItem(BINDING_STATUS_KEY) === 'BOUND',
+      hasActivePlan: localStorage.getItem(ACTIVE_PLAN_KEY) === 'true'
+    }
+  }
+}

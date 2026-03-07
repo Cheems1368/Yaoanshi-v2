@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.sqlapk.medicine.module.medication.dal.mysql.ReminderTaskMapper">
+
+    <!-- 根据患者ID查询提醒任务 -->
+    <select id="selectByPatientId" resultType="com.sqlapk.medicine.module.medication.dal.dataobject.ReminderTaskDO">
+        SELECT id, today_task_id, patient_id, scheduled_time, type, status, 
+               retry_count, last_retry_time, notification_content, failure_reason,
+               creator, create_time, updater, update_time, deleted, tenant_id
+        FROM reminder_tasks
+        WHERE patient_id = #{patientId}
+          AND deleted = 0
+        ORDER BY scheduled_time ASC
+    </select>
+
+    <!-- 根据状态查询提醒任务 -->
+    <select id="selectByStatus" resultType="com.sqlapk.medicine.module.medication.dal.dataobject.ReminderTaskDO">
+        SELECT id, today_task_id, patient_id, scheduled_time, type, status, 
+               retry_count, last_retry_time, notification_content, failure_reason,
+               creator, create_time, updater, update_time, deleted, tenant_id
+        FROM reminder_tasks
+        WHERE status = #{status}
+          AND deleted = 0
+        ORDER BY scheduled_time ASC
+    </select>
+
+    <!-- 查询待执行的提醒任务 -->
+    <select id="selectPendingTasks" resultType="com.sqlapk.medicine.module.medication.dal.dataobject.ReminderTaskDO">
+        SELECT id, today_task_id, patient_id, scheduled_time, type, status, 
+               retry_count, last_retry_time, notification_content, failure_reason,
+               creator, create_time, updater, update_time, deleted, tenant_id
+        FROM reminder_tasks
+        WHERE status = 0
+          AND scheduled_time &lt;= #{currentTime}
+          AND deleted = 0
+        ORDER BY scheduled_time ASC
+    </select>
+
+    <!-- 根据今日待办任务ID查询提醒任务 -->
+    <select id="selectByTodayTaskId" resultType="com.sqlapk.medicine.module.medication.dal.dataobject.ReminderTaskDO">
+        SELECT id, today_task_id, patient_id, scheduled_time, type, status, 
+               retry_count, last_retry_time, notification_content, failure_reason,
+               creator, create_time, updater, update_time, deleted, tenant_id
+        FROM reminder_tasks
+        WHERE today_task_id = #{todayTaskId}
+          AND deleted = 0
+        ORDER BY scheduled_time ASC
+    </select>
+
+    <!-- 根据计划提醒时间范围查询任务 -->
+    <select id="selectByScheduledTimeRange" resultType="com.sqlapk.medicine.module.medication.dal.dataobject.ReminderTaskDO">
+        SELECT id, today_task_id, patient_id, scheduled_time, type, status, 
+               retry_count, last_retry_time, notification_content, failure_reason,
+               creator, create_time, updater, update_time, deleted, tenant_id
+        FROM reminder_tasks
+        WHERE scheduled_time BETWEEN #{startTime} AND #{endTime}
+          AND deleted = 0
+        ORDER BY scheduled_time ASC
+    </select>
+
+</mapper>

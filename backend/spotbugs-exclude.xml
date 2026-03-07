@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<FindBugsFilter>
+    <!-- 排除生成的文件 -->
+    <Match>
+        <Class name="~.*\.generated\..*"/>
+    </Match>
+    
+    <!-- 排除测试文件中的一些常见问题 -->
+    <Match>
+        <Class name="~.*Test.*"/>
+        <Bug pattern="DM_EXIT"/>
+    </Match>
+    
+    <!-- 排除Lombok生成的代码 -->
+    <Match>
+        <Class name="~.*\.lombok\..*"/>
+    </Match>
+    
+    <!-- 排除MapStruct生成的代码 -->
+    <Match>
+        <Class name="~.*\.mapstruct\..*"/>
+    </Match>
+    
+    <!-- 允许在Controller中使用@Autowired -->
+    <Match>
+        <Class name="~.*Controller"/>
+        <Bug pattern="UWF_UNWRITTEN_FIELD"/>
+    </Match>
+    
+    <!-- 允许在Service中使用@Autowired -->
+    <Match>
+        <Class name="~.*Service"/>
+        <Bug pattern="UWF_UNWRITTEN_FIELD"/>
+    </Match>
+    
+    <!-- 排除测试文件中的常见问题 -->
+    <Match>
+        <Class name="~.*Test"/>
+        <Bug pattern="UWF_UNWRITTEN_FIELD"/>
+    </Match>
+    
+    <Match>
+        <Class name="~.*Test"/>
+        <Bug pattern="NP_UNWRITTEN_FIELD"/>
+    </Match>
+    
+    <Match>
+        <Class name="~.*Test"/>
+        <Bug pattern="EC_UNRELATED_TYPES"/>
+    </Match>
+    
+    <!-- 排除序列化相关的警告 -->
+    <Match>
+        <Bug pattern="SE_NO_SERIALVERSIONID"/>
+    </Match>
+    
+    <!-- 排除匿名内部类警告 -->
+    <Match>
+        <Bug pattern="SIC_INNER_SHOULD_BE_STATIC_ANON"/>
+    </Match>
+    
+    <!-- 排除字符串大小写转换警告 -->
+    <Match>
+        <Bug pattern="DM_CONVERT_CASE"/>
+    </Match>
+    
+    <!-- 排除异常捕获警告 -->
+    <Match>
+        <Bug pattern="REC_CATCH_EXCEPTION"/>
+    </Match>
+    
+    <!-- 排除未使用的私有方法警告 -->
+    <Match>
+        <Bug pattern="UPM_UNCALLED_PRIVATE_METHOD"/>
+    </Match>
+    
+    <!-- 排除重复switch语句警告 -->
+    <Match>
+        <Bug pattern="DB_DUPLICATE_SWITCH_CLAUSES"/>
+    </Match>
+    
+    <!-- 排除无用对象警告 -->
+    <Match>
+        <Bug pattern="UC_USELESS_OBJECT"/>
+    </Match>
+</FindBugsFilter>

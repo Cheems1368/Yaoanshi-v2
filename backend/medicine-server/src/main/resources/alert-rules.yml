@@ -1,0 +1,240 @@
+# 告警规则配置
+# 用于监控系统健康状态和业务指标
+
+groups:
+  - name: medicine-system-alerts
+    rules:
+      # 系统级告警
+      - alert: HighErrorRate
+        expr: rate(http_server_requests_total{status=~"5.."}[5m]) > 0.1
+        for: 2m
+        labels:
+          severity: critical
+          service: medicine-system
+        annotations:
+          summary: "高错误率告警"
+          description: "系统错误率超过10%，当前值: {{ $value }}"
+
+      - alert: HighResponseTime
+        expr: histogram_quantile(0.95, rate(http_server_requests_duration_seconds_bucket[5m])) > 0.5
+        for: 3m
+        labels:
+          severity: warning
+          service: medicine-system
+        annotations:
+          summary: "高响应时间告警"
+          description: "系统P95响应时间超过500ms，当前值: {{ $value }}s"
+
+      - alert: HighMemoryUsage
+        expr: jvm_memory_used_bytes / jvm_memory_max_bytes > 0.8
+        for: 5m
+        labels:
+          severity: warning
+          service: medicine-system
+        annotations:
+          summary: "高内存使用率告警"
+          description: "JVM内存使用率超过80%，当前值: {{ $value }}%"
+
+      - alert: HighCPUUsage
+        expr: system_cpu_usage > 0.8
+        for: 5m
+        labels:
+          severity: warning
+          service: medicine-system
+        annotations:
+          summary: "高CPU使用率告警"
+          description: "系统CPU使用率超过80%，当前值: {{ $value }}%"
+
+      # 数据库告警
+      - alert: DatabaseConnectionFailure
+        expr: up{job="medicine-database"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: medicine-database
+        annotations:
+          summary: "数据库连接失败"
+          description: "数据库连接失败，请检查数据库服务状态"
+
+      - alert: HighDatabaseConnections
+        expr: hikaricp_connections_active / hikaricp_connections_max > 0.8
+        for: 3m
+        labels:
+          severity: warning
+          service: medicine-database
+        annotations:
+          summary: "数据库连接数过高"
+          description: "数据库连接数使用率超过80%，当前值: {{ $value }}%"
+
+      # Redis告警
+      - alert: RedisConnectionFailure
+        expr: up{job="medicine-redis"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: medicine-redis
+        annotations:
+          summary: "Redis连接失败"
+          description: "Redis连接失败，请检查Redis服务状态"
+
+      - alert: HighRedisMemoryUsage
+        expr: redis_memory_used_bytes / redis_memory_max_bytes > 0.8
+        for: 5m
+        labels:
+          severity: warning
+          service: medicine-redis
+        annotations:
+          summary: "Redis内存使用率过高"
+          description: "Redis内存使用率超过80%，当前值: {{ $value }}%"
+
+  - name: medicine-business-alerts
+    rules:
+      # 业务指标告警
+      - alert: LowMedicationPlanCompletion
+        expr: rate(medicine_medication_plan_completed_total[1h]) < 0.1
+        for: 10m
+        labels:
+          severity: warning
+          service: medicine-business
+        annotations:
+          summary: "用药计划完成率过低"
+          description: "用药计划完成率低于10%，当前值: {{ $value }}"
+
+      - alert: HighCheckinFailureRate
+        expr: rate(medicine_checkin_failed_total[5m]) > 0.2
+        for: 5m
+        labels:
+          severity: warning
+          service: medicine-business
+        annotations:
+          summary: "打卡失败率过高"
+          description: "打卡失败率超过20%，当前值: {{ $value }}"
+
+      - alert: LowReportGenerationRate
+        expr: rate(medicine_report_generated_total[1h]) < 0.05
+        for: 15m
+        labels:
+          severity: warning
+          service: medicine-business
+        annotations:
+          summary: "报告生成率过低"
+          description: "报告生成率低于5%，当前值: {{ $value }}"
+
+      - alert: HighNotificationFailureRate
+        expr: rate(medicine_notification_failed_total[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          service: medicine-business
+        annotations:
+          summary: "通知发送失败率过高"
+          description: "通知发送失败率超过10%，当前值: {{ $value }}"
+
+  - name: medicine-circuit-breaker-alerts
+    rules:
+      # 熔断器告警
+      - alert: CircuitBreakerOpen
+        expr: medicine_circuit_breaker_state{state="OPEN"} == 1
+        for: 1m
+        labels:
+          severity: critical
+          service: medicine-circuit-breaker
+        annotations:
+          summary: "熔断器开启"
+          description: "服务 {{ $labels.service }} 的熔断器已开启"
+
+      - alert: CircuitBreakerHalfOpen
+        expr: medicine_circuit_breaker_state{state="HALF_OPEN"} == 1
+        for: 2m
+        labels:
+          severity: warning
+          service: medicine-circuit-breaker
+        annotations:
+          summary: "熔断器半开"
+          description: "服务 {{ $labels.service }} 的熔断器处于半开状态"
+
+      - alert: HighCircuitBreakerFailureRate
+        expr: rate(medicine_circuit_breaker_failure_total[5m]) > 0.5
+        for: 3m
+        labels:
+          severity: warning
+          service: medicine-circuit-breaker
+        annotations:
+          summary: "熔断器失败率过高"
+          description: "服务 {{ $labels.service }} 的熔断器失败率超过50%，当前值: {{ $value }}"
+
+  - name: medicine-performance-alerts
+    rules:
+      # 性能告警
+      - alert: SlowAPIRequests
+        expr: rate(medicine_api_slow_requests_total[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          service: medicine-performance
+        annotations:
+          summary: "慢API请求过多"
+          description: "慢API请求率超过10%，当前值: {{ $value }}"
+
+      - alert: HighActiveRequests
+        expr: medicine_api_active_requests > 100
+        for: 3m
+        labels:
+          severity: warning
+          service: medicine-performance
+        annotations:
+          summary: "活跃请求数过高"
+          description: "活跃请求数超过100，当前值: {{ $value }}"
+
+      - alert: LowCacheHitRate
+        expr: rate(redis_keyspace_hits_total[5m]) / (rate(redis_keyspace_hits_total[5m]) + rate(redis_keyspace_misses_total[5m])) < 0.8
+        for: 10m
+        labels:
+          severity: warning
+          service: medicine-performance
+        annotations:
+          summary: "缓存命中率过低"
+          description: "缓存命中率低于80%，当前值: {{ $value }}%"
+
+  - name: medicine-availability-alerts
+    rules:
+      # 可用性告警
+      - alert: ServiceDown
+        expr: up{job="medicine-server"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: medicine-availability
+        annotations:
+          summary: "服务不可用"
+          description: "用药打卡系统服务不可用"
+
+      - alert: HealthCheckFailure
+        expr: health_status{status="DOWN"} == 1
+        for: 2m
+        labels:
+          severity: critical
+          service: medicine-availability
+        annotations:
+          summary: "健康检查失败"
+          description: "系统健康检查失败，请检查服务状态"
+
+      - alert: DatabaseHealthCheckFailure
+        expr: health_status{component="database", status="DOWN"} == 1
+        for: 1m
+        labels:
+          severity: critical
+          service: medicine-availability
+        annotations:
+          summary: "数据库健康检查失败"
+          description: "数据库健康检查失败，请检查数据库服务"
+
+      - alert: RedisHealthCheckFailure
+        expr: health_status{component="redis", status="DOWN"} == 1
+        for: 1m
+        labels:
+          severity: critical
+          service: medicine-availability
+        annotations:
+          summary: "Redis健康检查失败"
+          description: "Redis健康检查失败，请检查Redis服务"

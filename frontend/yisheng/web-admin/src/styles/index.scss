@@ -1,0 +1,61 @@
+:root {
+  --pro-brand-primary: #2979ff;
+  --pro-brand-secondary: #dbeaff;
+  --pro-text-primary: #333333;
+  --pro-text-secondary: #556c8a;
+  --pro-bg-primary: #ffffff;
+  --pro-bg-secondary: #f5f7fa;
+  --pro-border-color: #d9e1ec;
+  --pro-success: #67c23a;
+  --pro-warning: #e6a23c;
+  --pro-danger: #f56c6c;
+  --pro-radius-sm: 8px;
+  --pro-radius-md: 12px;
+  --pro-radius-lg: 16px;
+  --pro-shadow-sm: 0 2px 12px rgba(0, 0, 0, 0.1);
+  --pro-shadow-md: 0 4px 16px rgba(0, 0, 0, 0.15);
+  --pro-body-font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", sans-serif;
+  --pro-title-font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  min-height: 100%;
+  margin: 0;
+  background: var(--pro-bg-secondary);
+  color: var(--pro-text-primary);
+  font-family: var(--pro-body-font-family);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  min-height: 100vh;
+}
+
+.el-card,
+.medical-card,
+.stats-card,
+.card {
+  border-radius: var(--pro-radius-lg);
+  box-shadow: var(--pro-shadow-sm);
+  border: 1px solid var(--pro-border-color);
+  background: var(--pro-bg-primary);
+}
+
+.el-button--primary {
+  --el-button-bg-color: var(--pro-brand-primary);
+  --el-button-border-color: var(--pro-brand-primary);
+  --el-button-hover-bg-color: #4a90ff;
+  --el-button-hover-border-color: #4a90ff;
+}
+
+.el-menu {
+  --el-menu-active-color: var(--pro-brand-primary);
+  --el-menu-hover-bg-color: var(--pro-brand-secondary);
+}

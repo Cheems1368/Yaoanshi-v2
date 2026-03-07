@@ -1,0 +1,51 @@
+-- 电子处方表
+CREATE TABLE electronic_prescriptions (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '处方ID',
+    prescription_code VARCHAR(50) NOT NULL UNIQUE COMMENT '处方编号（如：RX-6F29-****）',
+    order_id BIGINT NOT NULL COMMENT '工单ID',
+    patient_id BIGINT NOT NULL COMMENT '患者ID',
+    doctor_id BIGINT NOT NULL COMMENT '医生ID',
+    pharmacist_id BIGINT COMMENT '药师ID',
+    prescription_type VARCHAR(20) NOT NULL COMMENT '处方类型（renewal/new/adjustment）',
+    diagnosis TEXT NOT NULL COMMENT '诊断信息',
+    medications JSON NOT NULL COMMENT '处方药品信息',
+    instructions TEXT COMMENT '用法用量说明',
+    precautions TEXT COMMENT '注意事项',
+    status VARCHAR(20) DEFAULT 'draft' COMMENT '处方状态（draft/confirmed/signed/dispensed/completed/cancelled）',
+    digital_signature TEXT COMMENT '电子签名',
+    signature_time DATETIME COMMENT '签名时间',
+    signature_certificate TEXT COMMENT '签名证书',
+    pdf_url VARCHAR(500) COMMENT 'PDF文件URL',
+    validity_days INT DEFAULT 7 COMMENT '有效期（天数）',
+    expiry_time DATETIME COMMENT '过期时间',
+    review_comments TEXT COMMENT '审核意见',
+    review_time DATETIME COMMENT '审核时间',
+    dispensing_status VARCHAR(20) DEFAULT 'pending' COMMENT '配药状态（pending/dispensed/picked_up）',
+    dispensing_time DATETIME COMMENT '配药时间',
+    pickup_time DATETIME COMMENT '取药时间',
+    creator VARCHAR(64) DEFAULT '' COMMENT '创建者',
+    create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    updater VARCHAR(64) DEFAULT '' COMMENT '更新者',
+    update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    deleted BOOLEAN NOT NULL DEFAULT FALSE COMMENT '是否删除',
+    tenant_id BIGINT NOT NULL DEFAULT 0 COMMENT '租户编号',
+    
+    INDEX idx_prescription_code (prescription_code),
+    INDEX idx_order_id (order_id),
+    INDEX idx_patient_id (patient_id),
+    INDEX idx_doctor_id (doctor_id),
+    INDEX idx_pharmacist_id (pharmacist_id),
+    INDEX idx_status (status),
+    INDEX idx_expiry_time (expiry_time),
+    INDEX idx_dispensing_status (dispensing_status),
+    INDEX idx_tenant_id (tenant_id),
+    INDEX idx_create_time (create_time)
+) COMMENT '电子处方表';
+
+-- 插入测试数据
+INSERT INTO electronic_prescriptions (prescription_code, order_id, patient_id, doctor_id, pharmacist_id, prescription_type, diagnosis, medications, instructions, precautions, status, validity_days, expiry_time) VALUES
+('RX-20250110-0001', 1, 1, 1, 2, 'renewal', '高血压', 
+'[{"drugName":"氨氯地平片","specification":"5mg","dosage":"5mg","usage":"口服","frequency":"每日一次","quantity":30,"unit":"片","notes":"晚饭后服用"}]',
+'氨氯地平片 5mg，每日一次，晚饭后服用',
+'持续监测血压，若眩晕加重复诊',
+'signed', 7, '2025-01-17 23:59:59');

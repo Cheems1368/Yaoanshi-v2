@@ -1,0 +1,42 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: backend-v2
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      database: 0
+
+springdoc:
+  api-docs:
+    enabled: true
+  swagger-ui:
+    enabled: true
+
+mybatis:
+  configuration:
+    map-underscore-to-camel-case: true
+
+medicine:
+  datasource:
+    url: jdbc:mysql://localhost:3306/yaoshian_mvp
+    username: replace-me
+    password: replace-me
+  ai:
+    base-url: ${MEDICINE_AI_BASE_URL:https://api.openai.com/v1/chat/completions}
+    api-key: ${MEDICINE_AI_API_KEY:}
+    model: ${MEDICINE_AI_MODEL:gpt-4o-mini}
+    timeout-ms: ${MEDICINE_AI_TIMEOUT_MS:15000}
+  jwt:
+    issuer: backend-v2
+    secret: replace-with-secure-secret
+    access-token-seconds: 7200
+    refresh-token-seconds: 2592000
+  storage:
+    endpoint: http://localhost:9000
+    bucket: yaoshian-mvp
+    access-key: replace-access-key
+    secret-key: replace-secret-key

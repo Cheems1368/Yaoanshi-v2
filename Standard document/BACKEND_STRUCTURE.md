@@ -1,0 +1,1099 @@
+# BACKEND_STRUCTURE.md
+
+## 1. Document purpose
+
+This document is the authoritative backend structure specification for `backend-v2`.
+
+Rules:
+
+1. `Standard document/BACKEND_STRUCTURE.md` is the only source of truth for future backend design and implementation.
+2. Existing materials under `docs/` and the frozen `backend/` codebase are legacy references only.
+3. If a legacy contract, schema, or flow conflicts with this document, this document wins for `backend-v2`.
+4. This document defines structure and contracts. It does not replace SQL migration scripts, but all future SQL must be generated from this document.
+
+## 2. Backend positioning
+
+### 2.1 Service identity
+
+- Service name: `backend-v2`
+- Runtime baseline: Java 17 + Spring Boot 3.2+
+- API response envelope: `CommonResult<T>`
+- Patient and family API prefix: `/app-api/**`
+- Pharmacist and doctor API prefix: `/admin-api/**`
+
+### 2.2 Compatibility rule
+
+- `backend/` remains the frozen legacy system.
+- `backend-v2` is a clean new service and must not inherit legacy starter design.
+- Professional user identity is compatible with legacy backend user tables:
+  - user table: `system_users`
+  - role table: `system_role`
+  - user-role relation: `system_user_role`
+  - legacy auth entry: `/system/auth/*`
+- App-side patient and family identity is a new independent account system inside `backend-v2`.
+
+### 2.3 Unified conventions
+
+#### Response shape
+
+```json
+{
+  "code": 200,
+  "msg": "OK",
+  "data": {}
+}
+```
+
+#### Standard audit columns
+
+Unless explicitly marked otherwise, all business tables in `backend-v2` include these common columns:
+
+| Column | Type | Nullable | Rule |
+|---|---|---|---|
+| `id` | `BIGINT` | No | Primary key |
+| `creator` | `VARCHAR(64)` | Yes | Creator identifier |
+| `create_time` | `DATETIME` | No | Creation time |
+| `updater` | `VARCHAR(64)` | Yes | Last updater identifier |
+| `update_time` | `DATETIME` | No | Last update time |
+| `deleted` | `BIT(1)` | No | Logical delete flag, default `0` |
+| `tenant_id` | `BIGINT` | No | Tenant isolation key |
+
+Rules:
+
+1. `deleted = 1` means soft-deleted.
+2. Clinically significant records are never hard-deleted from application flows.
+3. All cross-table queries in business code must include `tenant_id`.
+
+## 3. Identity and auth
+
+### 3.1 Identity domains
+
+There are two independent identity domains:
+
+1. App identity
+   - patient
+   - family account
+2. Professional identity
+   - pharmacist
+   - doctor
+
+These two domains do not share login tables or token tables.
+
+### 3.2 App auth model
+
+- Login mode: mobile number + SMS OTP
+- Session model: `Access Token + Refresh Token`
+- Concurrent login policy: one account may log in on multiple devices at the same time
+- Device session policy: each device owns an independent refresh token
+- Refresh token storage: Redis + database
+- OTP and send rate-limit storage: Redis only
+
+### 3.3 Professional auth model
+
+- Pharmacist and doctor reuse legacy professional accounts from `system_users`
+- Role resolution remains based on `system_role` and `system_user_role`
+- `backend-v2` only stores business profile extensions in:
+  - `pharmacist_profile`
+  - `doctor_profile`
+
+### 3.4 Required auth DTOs
+
+#### `TokenPair`
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `accessToken` | `string` | Yes | JWT access token |
+| `refreshToken` | `string` | Yes | Rotating refresh token |
+| `expiresIn` | `number` | Yes | Access token TTL in seconds |
+| `refreshExpiresIn` | `number` | Yes | Refresh token TTL in seconds |
+| `deviceId` | `string` | Yes | Logical device identifier |
+
+#### App auth requests
+
+- `OtpSendRequest`
+- `AppLoginRequest`
+- `RefreshTokenRequest`
+- `BindPatientRequest`
+
+### 3.5 Required auth rules
+
+1. Patients and family accounts must log in before entering the main app flow.
+2. Patient main-gate requires:
+   - logged in
+   - bound patient identity
+   - active medication plan exists
+3. Pharmacist and doctor must log in before entering any work dashboard.
+4. Refresh token rotation must invalidate the replaced refresh token.
+5. Logout from one device only invalidates that device session.
+6. Admin can revoke all sessions of one app account.
+
+## 4. Database schema
+
+### 4.1 Identity domain
+
+#### Table: `app_account`
+
+Purpose:
+
+- independent login account for patient and family users
+
+Columns:
+
+| Column | Type | Nullable | Default | Index / Constraint | Business rule |
+|---|---|---|---|---|---|
+| `id` | `BIGINT` | No |  | PK | account id |
+| `mobile` | `VARCHAR(20)` | No |  | `UK_app_account_mobile_tenant` | unique per tenant |
+| `account_type` | `VARCHAR(20)` | No |  | `IDX_app_account_type` | `PATIENT` or `FAMILY` |
+| `status` | `VARCHAR(20)` | No | `'ACTIVE'` | `IDX_app_account_status` | `ACTIVE`, `DISABLED`, `LOCKED` |
+| `display_name` | `VARCHAR(64)` | Yes |  |  | app display name |
+| `last_login_ip` | `VARCHAR(64)` | Yes |  |  | last login ip |
+| `last_login_time` | `DATETIME` | Yes |  |  | last login time |
+| `password_hash` | `VARCHAR(255)` | Yes |  |  | reserved, not used in MVP |
+| audit columns | standard |  |  |  |  |
+
+Rules:
+
+1. MVP login uses OTP only; `password_hash` is reserved for future use.
+2. `mobile` is the app-side unique login identifier.
+
+#### Table: `app_account_device_session`
+
+Purpose:
+
+- persistent device session and refresh token audit
+
+Columns:
+
+| Column | Type | Nullable | Default | Index / Constraint | Business rule |
+|---|---|---|---|---|---|
+| `id` | `BIGINT` | No |  | PK | session id |
+| `app_account_id` | `BIGINT` | No |  | `FK_session_account` + `IDX_session_account` | owner account |
+| `device_id` | `VARCHAR(64)` | No |  | `UK_session_account_device` | one active row per account per device |
+| `device_name` | `VARCHAR(128)` | Yes |  |  | client reported device name |
+| `platform` | `VARCHAR(20)` | No |  |  | `ANDROID`, `WEB` |
+| `access_token_jti` | `VARCHAR(64)` | No |  | `IDX_session_access_jti` | current access token id |
+| `refresh_token_hash` | `VARCHAR(255)` | No |  | `UK_session_refresh_hash` | hashed refresh token |
+| `refresh_token_expires_at` | `DATETIME` | No |  | `IDX_session_refresh_expire` | refresh expiry |
+| `last_seen_at` | `DATETIME` | No |  |  | heartbeat / refresh time |
+| `revoked_at` | `DATETIME` | Yes |  |  | revoke timestamp |
+| `revoked_reason` | `VARCHAR(64)` | Yes |  |  | logout, device_kickout, admin_revoke, rotate |
+| audit columns | standard |  |  |  |  |
+
+Rules:
+
+1. Redis stores the online validation key; this table stores long-lived audit and device management.
+2. Rotating refresh token updates the same device row and archives the old token in audit logs.
+
+#### Table: `patient`
+
+Purpose:
+
+- canonical patient master record
+
+Columns:
+
+| Column | Type | Nullable | Default | Index / Constraint | Business rule |
+|---|---|---|---|---|---|
+| `id` | `BIGINT` | No |  | PK | patient id |
+| `app_account_id` | `BIGINT` | Yes |  | `UK_patient_app_account` | patient login owner after binding |
+| `hospital_patient_id` | `VARCHAR(64)` | No |  | part of `UK_patient_mobile_hospital` | current single-institution patient id |
+| `mobile` | `VARCHAR(20)` | No |  | part of `UK_patient_mobile_hospital` | binding key with hospital id |
+| `name` | `VARCHAR(64)` | No |  | `IDX_patient_name` | patient name |
+| `gender` | `VARCHAR(16)` | Yes |  |  | `MALE`, `FEMALE`, `OTHER`, `UNKNOWN` |
+| `birth_date` | `DATE` | Yes |  |  | optional |
+| `age` | `INT` | Yes |  |  | snapshot field |
+| `id_card_masked` | `VARCHAR(32)` | Yes |  |  | masked only |
+| `primary_disease_code` | `VARCHAR(32)` | Yes |  | `IDX_patient_primary_disease` | stroke pilot uses this |
+| `primary_disease_name` | `VARCHAR(64)` | Yes |  |  | display field |
+| `drug_allergy` | `TEXT` | Yes |  |  | optional but medication-relevant |
+| `food_allergy` | `TEXT` | Yes |  |  | optional |
+| `medical_history_json` | `JSON` | Yes |  |  | pharmacist-maintained structured history |
+| `binding_status` | `VARCHAR(20)` | No | `'PENDING'` | `IDX_patient_binding_status` | `PENDING`, `BOUND`, `REJECTED` |
+| `bound_by_pharmacist_id` | `BIGINT` | Yes |  |  | references `pharmacist_profile.id` |
+| `bound_at` | `DATETIME` | Yes |  |  | binding confirmation time |
+| audit columns | standard |  |  |  |  |
+
+Constraints:
+
+1. Unique key: `tenant_id + mobile + hospital_patient_id`
+2. Current pilot is single institution; do not create multi-hospital mapping table in MVP.
+3. One patient can bind to one patient-type app account.
+
+#### Table: `patient_family_binding`
+
+Purpose:
+
+- relation between one patient and family accounts
+
+Columns:
+
+| Column | Type | Nullable | Default | Index / Constraint | Business rule |
+|---|---|---|---|---|---|
+| `id` | `BIGINT` | No |  | PK | relation id |
+| `patient_id` | `BIGINT` | No |  | `IDX_binding_patient` | target patient |
+| `family_account_id` | `BIGINT` | No |  | `IDX_binding_family` | app account with `account_type = FAMILY` |
+| `relationship_type` | `VARCHAR(20)` | Yes |  |  | spouse, child, caregiver, other |
+| `status` | `VARCHAR(20)` | No | `'ACTIVE'` | `IDX_binding_status` | `ACTIVE`, `UNBOUND` |
+| `authorized_at` | `DATETIME` | No |  |  | binding authorization time |
+| `unbound_at` | `DATETIME` | Yes |  |  | unbind time |
+| `unbound_reason` | `VARCHAR(255)` | Yes |  |  | optional |
+| audit columns | standard |  |  |  |  |
+
+Constraints:
+
+1. Unique active binding: `tenant_id + patient_id + family_account_id + deleted`
+2. Maximum two active family bindings per patient is enforced by service rule.
+3. Unbound rows remain queryable for history but lose permission immediately.
+
+#### Table: `otp_login_log`
+
+Purpose:
+
+- SMS send and login audit
+
+Columns:
+
+| Column | Type | Nullable | Default | Index / Constraint | Business rule |
+|---|---|---|---|---|---|
+| `id` | `BIGINT` | No |  | PK | log id |
+| `mobile` | `VARCHAR(20)` | No |  | `IDX_otp_mobile` | target mobile |
+| `scene` | `VARCHAR(20)` | No |  | `IDX_otp_scene` | `APP_LOGIN`, `BIND_CONFIRM` |
+| `provider` | `VARCHAR(32)` | Yes |  |  | sms provider name |
+| `request_id` | `VARCHAR(64)` | Yes |  | `IDX_otp_request_id` | provider request id |
+| `send_status` | `VARCHAR(20)` | No |  |  | `SUCCESS`, `FAILED`, `RATE_LIMITED` |
+| `verify_status` | `VARCHAR(20)` | Yes |  |  | `SUCCESS`, `FAILED`, `EXPIRED`, `NOT_VERIFIED` |
+| `client_ip` | `VARCHAR(64)` | Yes |  |  | source ip |
+| `error_code` | `VARCHAR(64)` | Yes |  |  | internal error code |
+| `error_message` | `VARCHAR(255)` | Yes |  |  | short error |
+| audit columns | standard |  |  |  |  |
+
+Storage rule:
+
+- Actual OTP code value is stored in Redis only and never persisted in DB.
+
+### 4.2 Professional domain
+
+#### Table: `pharmacist_profile`
+
+Purpose:
+
+- pharmacist business extension profile mapped to legacy user identity
+
+Columns:
+
+| Column | Type | Nullable | Default | Index / Constraint | Business rule |
+|---|---|---|---|---|---|
+| `id` | `BIGINT` | No |  | PK | profile id |
+| `system_user_id` | `BIGINT` | No |  | `UK_pharmacist_system_user` | references `system_users.id` |
+| `license_no` | `VARCHAR(64)` | Yes |  |  | pharmacist license |
+| `real_name` | `VARCHAR(64)` | No |  |  | snapshot |
+| `mobile` | `VARCHAR(20)` | Yes |  |  | snapshot |
+| `service_status` | `VARCHAR(20)` | No | `'ACTIVE'` | `IDX_pharmacist_service_status` | `ACTIVE`, `OFF_DUTY`, `DISABLED` |
+| `work_hours_json` | `JSON` | Yes |  |  | service hours |
+| audit columns | standard |  |  |  |  |
+
+#### Table: `doctor_profile`
+
+Purpose:
+
+- doctor business extension profile mapped to legacy user identity
+
+Columns mirror `pharmacist_profile`, with:
+
+| Column | Type | Nullable | Default | Index / Constraint | Business rule |
+|---|---|---|---|---|---|
+| `system_user_id` | `BIGINT` | No |  | `UK_doctor_system_user` | references `system_users.id` |
+| `specialty_code` | `VARCHAR(32)` | Yes |  |  | specialty |
+| `title_name` | `VARCHAR(64)` | Yes |  |  | professional title |
+
+### 4.3 File domain
+
+#### Table: `file_asset`
+
+Purpose:
+
+- unified metadata for images and future files
+
+Columns:
+
+| Column | Type | Nullable | Default | Index / Constraint | Business rule |
+|---|---|---|---|---|---|
+| `id` | `BIGINT` | No |  | PK | file id |
+| `bucket` | `VARCHAR(64)` | No |  | `IDX_file_bucket_key` | object storage bucket |
+| `object_key` | `VARCHAR(255)` | No |  | `UK_file_object_key` | unique object key |
+| `original_filename` | `VARCHAR(255)` | No |  |  | original upload name |
+| `mime_type` | `VARCHAR(128)` | No |  | `IDX_file_mime` | MIME type |
+| `size_bytes` | `BIGINT` | No |  |  | file size |
+| `sha256` | `CHAR(64)` | Yes |  | `IDX_file_sha256` | dedupe / verification |
+| `storage_provider` | `VARCHAR(32)` | No |  |  | `S3_COMPATIBLE` |
+| `storage_region` | `VARCHAR(64)` | Yes |  |  | optional |
+| `public_url` | `VARCHAR(512)` | Yes |  |  | signed/public URL cache |
+| `uploaded_by_type` | `VARCHAR(20)` | No |  |  | `PATIENT`, `FAMILY`, `PHARMACIST`, `DOCTOR`, `SYSTEM` |
+| `uploaded_by_id` | `BIGINT` | No |  | `IDX_file_uploader` | logical uploader id |
+| `business_type` | `VARCHAR(32)` | No |  | `IDX_file_business_type` | `PRESCRIPTION`, `HELP_ORDER`, `AVATAR`, `OTHER` |
+| `scan_status` | `VARCHAR(20)` | No | `'PENDING'` |  | reserved for file scanning |
+| audit columns | standard |  |  |  |  |
+
+Rules:
+
+1. MVP only allows image attachments for work orders and prescription uploads.
+2. Binary files are stored in S3-compatible object storage only.
+3. DB stores metadata; never store image binary in DB.
+
+### 4.4 Prescription domain
+
+#### Table: `prescription`
+
+Purpose:
+
+- prescription header used for image upload, OCR, pharmacist review, and plan generation
+
+Columns:
+
+| Column | Type | Nullable | Default | Index / Constraint | Business rule |
+|---|---|---|---|---|---|
+| `id` | `BIGINT` | No |  | PK | prescription id |
+| `patient_id` | `BIGINT` | No |  | `IDX_prescription_patient` | target patient |
+| `source_type` | `VARCHAR(20)` | No |  |  | `PHOTO_UPLOAD`, `MANUAL`, `LEGACY_IMPORT` |
+| `status` | `VARCHAR(20)` | No | `'UPLOADED'` | `IDX_prescription_status` | `UPLOADED`, `OCR_DONE`, `PHARMACIST_CONFIRMED`, `PLAN_GENERATED`, `REJECTED` |
+| `ocr_confidence` | `DECIMAL(5,2)` | Yes |  |  | 0-100 |
+| `uploaded_file_asset_id` | `BIGINT` | No |  | `FK_prescription_file` | original image |
+| `submitted_by_type` | `VARCHAR(20)` | No |  |  | `PATIENT`, `FAMILY`, `PHARMACIST` |
+| `submitted_by_id` | `BIGINT` | No |  |  | logical submitter |
+| `reviewed_by_pharmacist_id` | `BIGINT` | Yes |  |  | pharmacist profile id |
+| `reviewed_at` | `DATETIME` | Yes |  |  | review timestamp |
+| `reject_reason` | `VARCHAR(255)` | Yes |  |  | reject reason |
+| `generated_medication_plan_id` | `BIGINT` | Yes |  |  | result plan id |
+| audit columns | standard |  |  |  |  |
+
+#### Table: `prescription_item`
+
+Purpose:
+
+- normalized medicine line items extracted from prescription or manually entered
+
+Columns:
+
+| Column | Type | Nullable | Default | Index / Constraint | Business rule |
+|---|---|---|---|---|---|
+| `id` | `BIGINT` | No |  | PK | item id |
+| `prescription_id` | `BIGINT` | No |  | `IDX_prescription_item_prescription` | parent prescription |
+| `drug_name` | `VARCHAR(128)` | No |  | `IDX_prescription_item_drug_name` | display name |
+| `drug_spec` | `VARCHAR(128)` | Yes |  |  | spec |
+| `dosage` | `VARCHAR(64)` | Yes |  |  | dose |
+| `frequency` | `VARCHAR(64)` | Yes |  |  | frequency text |
+| `route` | `VARCHAR(64)` | Yes |  |  | use route |
+| `duration_days` | `INT` | Yes |  |  | optional |
+| `normalized_json` | `JSON` | Yes |  |  | structured canonical fields |
+| `source` | `VARCHAR(20)` | No |  |  | `OCR`, `MANUAL`, `EDITED` |
+| `sort_order` | `INT` | No | `0` |  | display order |
+| audit columns | standard |  |  |  |  |
+
+#### Table: `prescription_attachment`
+
+Purpose:
+
+- explicit relation between prescription and uploaded file assets
+
+Columns:
+
+| Column | Type | Nullable | Default | Index / Constraint | Business rule |
+|---|---|---|---|---|---|
+| `id` | `BIGINT` | No |  | PK | relation id |
+| `prescription_id` | `BIGINT` | No |  | `IDX_prescription_attachment_prescription` | prescription |
+| `file_asset_id` | `BIGINT` | No |  | `IDX_prescription_attachment_file` | attached file |
+| `attachment_type` | `VARCHAR(20)` | No |  |  | `ORIGINAL_IMAGE`, `SUPPLEMENTARY_IMAGE` |
+| audit columns | standard |  |  |  |  |
+
+#### Table: `prescription_ocr_record`
+
+Purpose:
+
+- OCR execution history and fallback trace
+
+Columns:
+
+| Column | Type | Nullable | Default | Index / Constraint | Business rule |
+|---|---|---|---|---|---|
+| `id` | `BIGINT` | No |  | PK | ocr record id |
+| `prescription_id` | `BIGINT` | No |  | `IDX_ocr_prescription` | target prescription |
+| `provider` | `VARCHAR(64)` | No |  |  | OCR provider |
+| `request_payload_json` | `JSON` | Yes |  |  | request snapshot |
+| `response_payload_json` | `JSON` | Yes |  |  | response snapshot |
+| `confidence` | `DECIMAL(5,2)` | Yes |  |  | confidence |
+| `status` | `VARCHAR(20)` | No |  |  | `SUCCESS`, `FAILED`, `LOW_CONFIDENCE` |
+| `manual_fallback_used` | `BIT(1)` | No | `0` |  | whether pharmacist switched to manual |
+| `executed_at` | `DATETIME` | No |  |  | execution time |
+| audit columns | standard |  |  |  |  |
+
+### 4.5 Medication domain
+
+#### Table: `medication_plan`
+
+Purpose:
+
+- current authoritative medication plan for a patient
+
+Columns:
+
+| Column | Type | Nullable | Default | Index / Constraint | Business rule |
+|---|---|---|---|---|---|
+| `id` | `BIGINT` | No |  | PK | plan id |
+| `patient_id` | `BIGINT` | No |  | `IDX_plan_patient` | owner patient |
+| `plan_name` | `VARCHAR(128)` | No |  |  | plan title |
+| `version_no` | `INT` | No | `1` | `IDX_plan_patient_version` | monotonically increasing |
+| `status` | `VARCHAR(20)` | No | `'DRAFT'` | `IDX_plan_status` | `DRAFT`, `ACTIVE`, `STOPPED`, `REPLACED` |
+| `source_type` | `VARCHAR(20)` | No |  |  | `PRESCRIPTION`, `MANUAL`, `MIGRATION` |
+| `source_prescription_id` | `BIGINT` | Yes |  |  | originating prescription |
+| `effective_from` | `DATETIME` | No |  | `IDX_plan_effective_from` | active start |
+| `effective_to` | `DATETIME` | Yes |  | `IDX_plan_effective_to` | optional end |
+| `notes` | `TEXT` | Yes |  |  | pharmacist notes for patient-visible instructions |
+| `created_by_pharmacist_id` | `BIGINT` | No |  |  | creator |
+| `confirmed_at` | `DATETIME` | Yes |  |  | activation time |
+| audit columns | standard |  |  |  |  |
+
+Constraints:
+
+1. Only one `ACTIVE` plan is allowed per patient at a time.
+2. New active plan replaces the old plan by marking old row `REPLACED`.
+
+#### Table: `medication_plan_item`
+
+Purpose:
+
+- medicine-level items inside one medication plan
+
+Columns:
+
+| Column | Type | Nullable | Default | Index / Constraint | Business rule |
+|---|---|---|---|---|---|
+| `id` | `BIGINT` | No |  | PK | plan item id |
+| `plan_id` | `BIGINT` | No |  | `IDX_plan_item_plan` | parent plan |
+| `drug_name` | `VARCHAR(128)` | No |  | `IDX_plan_item_drug_name` | medicine name |
+| `drug_spec` | `VARCHAR(128)` | Yes |  |  | spec |
+| `dosage` | `VARCHAR(64)` | No |  |  | dose |
+| `frequency_code` | `VARCHAR(32)` | No |  |  | normalized frequency |
+| `time_points_json` | `JSON` | No |  |  | planned times |
+| `meal_relation` | `VARCHAR(20)` | Yes |  |  | before/after meal |
+| `route` | `VARCHAR(64)` | Yes |  |  | route |
+| `instructions` | `TEXT` | Yes |  |  | patient-visible note |
+| `sort_order` | `INT` | No | `0` |  | order |
+| audit columns | standard |  |  |  |  |
+
+#### Table: `medication_dose_task`
+
+Purpose:
+
+- physical due-dose task table used for reminders, check-ins, and adherence
+
+Columns:
+
+| Column | Type | Nullable | Default | Index / Constraint | Business rule |
+|---|---|---|---|---|---|
+| `id` | `BIGINT` | No |  | PK | task id |
+| `patient_id` | `BIGINT` | No |  | `IDX_task_patient_date` | owner patient |
+| `plan_id` | `BIGINT` | No |  | `IDX_task_plan` | source plan |
+| `plan_item_id` | `BIGINT` | No |  | `IDX_task_plan_item` | source item |
+| `task_date` | `DATE` | No |  | `IDX_task_patient_date` | scheduled date |
+| `scheduled_at` | `DATETIME` | No |  | `IDX_task_scheduled_at` | scheduled dose time |
+| `status` | `VARCHAR(20)` | No | `'PENDING'` | `IDX_task_status` | `PENDING`, `COMPLETED`, `MISSED`, `SKIPPED`, `CANCELLED` |
+| `notification_status` | `VARCHAR(20)` | No | `'PENDING'` |  | reminder pipeline snapshot |
+| `last_effective_checkin_id` | `BIGINT` | Yes |  |  | latest valid check-in |
+| `locked_after` | `DATETIME` | No |  |  | correction cutoff = scheduled_at + 24h |
+| audit columns | standard |  |  |  |  |
+
+Rules:
+
+1. Dose tasks are generated ahead of execution.
+2. When a plan changes, all future non-triggered tasks for the same day are recalculated immediately.
+3. Past tasks are never rewritten to a new plan version.
+
+#### Table: `medication_checkin_record`
+
+Purpose:
+
+- immutable check-in submissions and correction trail
+
+Columns:
+
+| Column | Type | Nullable | Default | Index / Constraint | Business rule |
+|---|---|---|---|---|---|
+| `id` | `BIGINT` | No |  | PK | record id |
+| `dose_task_id` | `BIGINT` | No |  | `IDX_checkin_task` | target task |
+| `patient_id` | `BIGINT` | No |  | `IDX_checkin_patient` | owner patient |
+| `operator_type` | `VARCHAR(20)` | No |  |  | `PATIENT`, `FAMILY`, `SYSTEM` |
+| `operator_id` | `BIGINT` | No |  |  | app account id or system id |
+| `result` | `VARCHAR(20)` | No |  | `IDX_checkin_result` | `ON_TIME`, `DELAYED`, `MISSED`, `SKIPPED` |
+| `actual_taken_at` | `DATETIME` | Yes |  |  | actual intake time |
+| `note` | `VARCHAR(255)` | Yes |  |  | short note |
+| `skip_reason` | `VARCHAR(255)` | Yes |  |  | optional |
+| `is_correction` | `BIT(1)` | No | `0` |  | correction flag |
+| `supersedes_record_id` | `BIGINT` | Yes |  |  | previous record if correction |
+| `is_effective` | `BIT(1)` | No | `1` | `IDX_checkin_effective` | only latest effective record counts |
+| audit columns | standard |  |  |  |  |
+
+Rules:
+
+1. No hard delete.
+2. Within 24 hours, the latest valid submission becomes `is_effective = 1`.
+3. Previous submissions for the same dose task remain preserved with `is_effective = 0`.
+
+#### Table: `medication_plan_event`
+
+Purpose:
+
+- plan creation, activation, replacement, and stop audit
+
+Columns:
+
+| Column | Type | Nullable | Default | Index / Constraint | Business rule |
+|---|---|---|---|---|---|
+| `id` | `BIGINT` | No |  | PK | event id |
+| `plan_id` | `BIGINT` | No |  | `IDX_plan_event_plan` | target plan |
+| `event_type` | `VARCHAR(32)` | No |  |  | `CREATED`, `UPDATED`, `ACTIVATED`, `REPLACED`, `STOPPED`, `TASK_RECALCULATED` |
+| `operator_type` | `VARCHAR(20)` | No |  |  | `PHARMACIST`, `SYSTEM` |
+| `operator_id` | `BIGINT` | No |  |  | operator id |
+| `before_snapshot_json` | `JSON` | Yes |  |  | optional |
+| `after_snapshot_json` | `JSON` | Yes |  |  | optional |
+| `remark` | `VARCHAR(255)` | Yes |  |  | optional |
+| audit columns | standard |  |  |  |  |
+
+### 4.6 Help order domain
+
+#### Table: `help_order`
+
+Purpose:
+
+- main work order entity for patient-pharmacist-doctor collaboration
+
+Columns:
+
+| Column | Type | Nullable | Default | Index / Constraint | Business rule |
+|---|---|---|---|---|---|
+| `id` | `BIGINT` | No |  | PK | order id |
+| `order_no` | `VARCHAR(32)` | No |  | `UK_help_order_no` | public identifier |
+| `patient_id` | `BIGINT` | No |  | `IDX_help_order_patient` | target patient |
+| `submitted_by_type` | `VARCHAR(20)` | No |  |  | `PATIENT`, `FAMILY` |
+| `submitted_by_id` | `BIGINT` | No |  |  | app account id |
+| `category` | `VARCHAR(32)` | No |  | `IDX_help_order_category` | `MEDICATION_CONSULTATION`, `MISSED_OR_WRONG_DOSE`, `ADVERSE_REACTION`, `PLAN_CHANGE`, `OTHER` |
+| `title` | `VARCHAR(128)` | No |  |  | short title |
+| `description` | `TEXT` | No |  |  | issue detail |
+| `status` | `VARCHAR(32)` | No | `'SUBMITTED'` | `IDX_help_order_status` | `SUBMITTED`, `PHARMACIST_IN_PROGRESS`, `WAITING_DOCTOR`, `DOCTOR_IN_PROGRESS`, `CLOSED`, `REJECTED` |
+| `priority` | `VARCHAR(16)` | No | `'NORMAL'` |  | `NORMAL`, `URGENT` |
+| `requires_offline_emergency` | `BIT(1)` | No | `0` |  | urgent offline instruction marker |
+| `current_handler_type` | `VARCHAR(20)` | Yes |  |  | `PHARMACIST`, `DOCTOR` |
+| `current_handler_id` | `BIGINT` | Yes |  |  | profile id |
+| `responsible_pharmacist_id` | `BIGINT` | Yes |  | `IDX_help_order_responsible_pharmacist` | fixed service pharmacist |
+| `assigned_doctor_id` | `BIGINT` | Yes |  | `IDX_help_order_assigned_doctor` | escalated doctor |
+| `closed_by_type` | `VARCHAR(20)` | Yes |  |  | current handler closes |
+| `closed_by_id` | `BIGINT` | Yes |  |  | closer id |
+| `closed_at` | `DATETIME` | Yes |  |  | close time |
+| `rejected_by_type` | `VARCHAR(20)` | Yes |  |  | rejector type |
+| `rejected_by_id` | `BIGINT` | Yes |  |  | rejector id |
+| `reject_reason` | `VARCHAR(255)` | Yes |  |  | mandatory on reject |
+| `first_response_due_at` | `DATETIME` | Yes |  |  | SLA due |
+| `first_response_at` | `DATETIME` | Yes |  |  | first response actual |
+| audit columns | standard |  |  |  |  |
+
+Rules:
+
+1. Work order attachments are linked through `file_asset` using `business_type = HELP_ORDER`.
+2. MVP only allows image attachments.
+3. After-hours submission is allowed and must still create the order.
+
+#### Table: `help_order_event`
+
+Purpose:
+
+- detailed work order timeline and audit event table
+
+Columns:
+
+| Column | Type | Nullable | Default | Index / Constraint | Business rule |
+|---|---|---|---|---|---|
+| `id` | `BIGINT` | No |  | PK | event id |
+| `help_order_id` | `BIGINT` | No |  | `IDX_help_order_event_order` | target order |
+| `event_type` | `VARCHAR(32)` | No |  |  | `SUBMITTED`, `ASSIGNED`, `PHARMACIST_REPLY`, `ESCALATED_TO_DOCTOR`, `DOCTOR_REPLY`, `REJECTED`, `CLOSED`, `ATTACHMENT_ADDED`, `SYSTEM_NOTICE` |
+| `from_status` | `VARCHAR(32)` | Yes |  |  | previous status |
+| `to_status` | `VARCHAR(32)` | Yes |  |  | next status |
+| `operator_type` | `VARCHAR(20)` | No |  |  | `PATIENT`, `FAMILY`, `PHARMACIST`, `DOCTOR`, `SYSTEM` |
+| `operator_id` | `BIGINT` | No |  |  | operator id |
+| `content` | `TEXT` | Yes |  |  | reply or note |
+| `attachment_file_asset_id` | `BIGINT` | Yes |  |  | optional related image |
+| `metadata_json` | `JSON` | Yes |  |  | extra event context |
+| audit columns | standard |  |  |  |  |
+
+### 4.7 Notification domain
+
+#### Table: `notification_log`
+
+Purpose:
+
+- persistent log for every reminder and work-order notification attempt
+
+Columns:
+
+| Column | Type | Nullable | Default | Index / Constraint | Business rule |
+|---|---|---|---|---|---|
+| `id` | `BIGINT` | No |  | PK | log id |
+| `target_type` | `VARCHAR(20)` | No |  | `IDX_notification_target` | `PATIENT`, `FAMILY`, `PHARMACIST`, `DOCTOR` |
+| `target_id` | `BIGINT` | No |  | `IDX_notification_target` | logical target id |
+| `channel` | `VARCHAR(20)` | No |  | `IDX_notification_channel` | `APP_PUSH`, `IN_APP`, `WEBSOCKET`, `SOUND`, `SMS` |
+| `business_type` | `VARCHAR(32)` | No |  | `IDX_notification_business_type` | `DOSE_REMINDER`, `HELP_ORDER`, `ASSESSMENT`, `SYSTEM` |
+| `business_id` | `BIGINT` | Yes |  | `IDX_notification_business_id` | related task/order/etc |
+| `scheduled_at` | `DATETIME` | Yes |  |  | planned send time |
+| `sent_at` | `DATETIME` | Yes |  |  | actual send time |
+| `delivery_status` | `VARCHAR(20)` | No |  |  | `PENDING`, `SENT`, `FAILED`, `ACKED` |
+| `failure_code` | `VARCHAR(64)` | Yes |  |  | internal failure code |
+| `failure_reason` | `VARCHAR(255)` | Yes |  |  | short reason |
+| `payload_json` | `JSON` | Yes |  |  | rendered payload snapshot |
+| audit columns | standard |  |  |  |  |
+
+### 4.8 Assessment and metrics domain
+
+#### Table: `knowledge_assessment`
+
+Purpose:
+
+- one knowledge test submission
+
+Columns:
+
+| Column | Type | Nullable | Default | Index / Constraint | Business rule |
+|---|---|---|---|---|---|
+| `id` | `BIGINT` | No |  | PK | assessment id |
+| `patient_id` | `BIGINT` | No |  | `IDX_knowledge_patient` | target patient |
+| `phase` | `VARCHAR(20)` | No |  |  | `DAY_1`, `WEEK_4`, `OTHER` |
+| `question_set_version` | `VARCHAR(32)` | No |  |  | fixed question set version |
+| `score` | `DECIMAL(5,2)` | No |  |  | result score |
+| `max_score` | `DECIMAL(5,2)` | No |  |  | max score |
+| `submitted_by_type` | `VARCHAR(20)` | No |  |  | `PATIENT`, `FAMILY` |
+| `submitted_by_id` | `BIGINT` | No |  |  | submitter |
+| `submitted_at` | `DATETIME` | No |  |  | submission time |
+| audit columns | standard |  |  |  |  |
+
+#### Table: `knowledge_assessment_answer`
+
+Purpose:
+
+- raw answer detail for each knowledge assessment
+
+Columns:
+
+| Column | Type | Nullable | Default | Index / Constraint | Business rule |
+|---|---|---|---|---|---|
+| `id` | `BIGINT` | No |  | PK | answer id |
+| `assessment_id` | `BIGINT` | No |  | `IDX_knowledge_answer_assessment` | parent assessment |
+| `question_code` | `VARCHAR(64)` | No |  |  | question identifier |
+| `question_text_snapshot` | `TEXT` | No |  |  | snapshot |
+| `selected_option` | `VARCHAR(32)` | No |  |  | user answer |
+| `correct_option` | `VARCHAR(32)` | Yes |  |  | expected answer snapshot |
+| `is_correct` | `BIT(1)` | No |  |  | correctness |
+| audit columns | standard |  |  |  |  |
+
+#### Table: `satisfaction_survey`
+
+Purpose:
+
+- post-close rating for service quality
+
+Columns:
+
+| Column | Type | Nullable | Default | Index / Constraint | Business rule |
+|---|---|---|---|---|---|
+| `id` | `BIGINT` | No |  | PK | survey id |
+| `help_order_id` | `BIGINT` | No |  | `UK_satisfaction_help_order` | one survey per closed help order |
+| `patient_id` | `BIGINT` | No |  | `IDX_satisfaction_patient` | target patient |
+| `rating` | `TINYINT` | No |  |  | 1-5 Likert |
+| `comment` | `VARCHAR(255)` | Yes |  |  | optional |
+| `submitted_by_type` | `VARCHAR(20)` | No |  |  | `PATIENT`, `FAMILY` |
+| `submitted_by_id` | `BIGINT` | No |  |  | submitter |
+| `submitted_at` | `DATETIME` | No |  |  | submit time |
+| audit columns | standard |  |  |  |  |
+
+#### Table: `abcd2_assessment`
+
+Purpose:
+
+- raw inputs and snapshot result for stroke-related risk scoring
+
+Columns:
+
+| Column | Type | Nullable | Default | Index / Constraint | Business rule |
+|---|---|---|---|---|---|
+| `id` | `BIGINT` | No |  | PK | score id |
+| `patient_id` | `BIGINT` | No |  | `IDX_abcd2_patient` | target patient |
+| `source_type` | `VARCHAR(20)` | No |  |  | `PHARMACIST_ENTRY`, `SYSTEM_RECALC` |
+| `source_ref_id` | `BIGINT` | Yes |  |  | optional related event |
+| `raw_input_json` | `JSON` | No |  |  | source inputs |
+| `score` | `INT` | No |  |  | numeric score |
+| `risk_level` | `VARCHAR(20)` | No |  |  | derived level |
+| `calculated_at` | `DATETIME` | No |  |  | result time |
+| `calculated_by_id` | `BIGINT` | Yes |  |  | pharmacist/system id |
+| audit columns | standard |  |  |  |  |
+
+### 4.9 DDI domain
+
+#### Table: `ddi_rule`
+
+Purpose:
+
+- pharmacist-maintained rule base for high-risk interaction screening
+
+Columns:
+
+| Column | Type | Nullable | Default | Index / Constraint | Business rule |
+|---|---|---|---|---|---|
+| `id` | `BIGINT` | No |  | PK | rule id |
+| `rule_code` | `VARCHAR(64)` | No |  | `UK_ddi_rule_code` | stable rule code |
+| `drug_a_name` | `VARCHAR(128)` | No |  | `IDX_ddi_drug_a` | first drug |
+| `drug_b_name` | `VARCHAR(128)` | No |  | `IDX_ddi_drug_b` | second drug |
+| `severity` | `VARCHAR(16)` | No |  | `IDX_ddi_severity` | `HIGH`, `MEDIUM`, `LOW` |
+| `message` | `VARCHAR(255)` | No |  |  | warning text |
+| `recommended_action` | `VARCHAR(255)` | Yes |  |  | suggestion |
+| `status` | `VARCHAR(20)` | No | `'ACTIVE'` |  | `ACTIVE`, `INACTIVE` |
+| `maintained_by_pharmacist_id` | `BIGINT` | Yes |  |  | owner |
+| audit columns | standard |  |  |  |  |
+
+#### Table: `ddi_screening_log`
+
+Purpose:
+
+- screening hit audit for prescription confirmation and plan save
+
+Columns:
+
+| Column | Type | Nullable | Default | Index / Constraint | Business rule |
+|---|---|---|---|---|---|
+| `id` | `BIGINT` | No |  | PK | log id |
+| `patient_id` | `BIGINT` | No |  | `IDX_ddi_log_patient` | target patient |
+| `prescription_id` | `BIGINT` | Yes |  |  | optional source prescription |
+| `medication_plan_id` | `BIGINT` | Yes |  |  | optional target plan |
+| `matched_rule_id` | `BIGINT` | No |  | `IDX_ddi_log_rule` | hit rule |
+| `severity` | `VARCHAR(16)` | No |  |  | snapshot severity |
+| `confirm_status` | `VARCHAR(20)` | No |  |  | `PENDING_CONFIRM`, `CONFIRMED_CONTINUE`, `ABORTED` |
+| `confirmed_by_pharmacist_id` | `BIGINT` | Yes |  |  | confirmer |
+| `confirmed_at` | `DATETIME` | Yes |  |  | confirm time |
+| `confirmation_note` | `VARCHAR(255)` | Yes |  |  | note |
+| audit columns | standard |  |  |  |  |
+
+## 5. Entity relationships
+
+```mermaid
+erDiagram
+    app_account ||--o| patient : binds
+    app_account ||--o{ app_account_device_session : owns
+    patient ||--o{ patient_family_binding : has
+    app_account ||--o{ patient_family_binding : acts_as_family
+    patient ||--o{ prescription : uploads_for
+    prescription ||--o{ prescription_item : contains
+    prescription ||--o{ prescription_attachment : links
+    file_asset ||--o{ prescription_attachment : stores
+    patient ||--o{ medication_plan : owns
+    medication_plan ||--o{ medication_plan_item : contains
+    medication_plan ||--o{ medication_dose_task : generates
+    medication_dose_task ||--o{ medication_checkin_record : receives
+    medication_plan ||--o{ medication_plan_event : records
+    patient ||--o{ help_order : submits
+    help_order ||--o{ help_order_event : records
+    patient ||--o{ knowledge_assessment : answers
+    knowledge_assessment ||--o{ knowledge_assessment_answer : contains
+    help_order ||--o| satisfaction_survey : rates
+    patient ||--o{ abcd2_assessment : scores
+    patient ||--o{ notification_log : receives
+    patient ||--o{ ddi_screening_log : triggers
+    ddi_rule ||--o{ ddi_screening_log : matches
+```
+
+## 6. API contracts
+
+### 6.1 App APIs
+
+#### Auth
+
+| Method | Path | Auth | Request | Response `data` | Side effects |
+|---|---|---|---|---|---|
+| `POST` | `/app-api/auth/send-otp` | No | `OtpSendRequest` | `Boolean` | write Redis OTP, write `otp_login_log` |
+| `POST` | `/app-api/auth/login` | No | `AppLoginRequest` | `TokenPair` | verify Redis OTP, upsert `app_account`, create session row, write Redis session |
+| `POST` | `/app-api/auth/refresh-token` | No | `RefreshTokenRequest` | `TokenPair` | rotate refresh token in Redis + DB |
+| `POST` | `/app-api/auth/logout` | Yes | `deviceId` | `Boolean` | revoke current device session |
+| `GET` | `/app-api/auth/me` | Yes | none | current account profile | read account and binding summary |
+
+#### Patient
+
+| Method | Path | Auth | Request | Response `data` | Side effects |
+|---|---|---|---|---|---|
+| `POST` | `/app-api/patients/bind` | Yes | `BindPatientRequest` | patient summary | update `patient` binding state |
+| `GET` | `/app-api/patients/me` | Yes | none | bound patient summary | none |
+| `GET` | `/app-api/patients/me/family-bindings` | Yes | none | family binding list | none |
+
+#### Medication plan and task
+
+| Method | Path | Auth | Request | Response `data` | Side effects |
+|---|---|---|---|---|---|
+| `GET` | `/app-api/medication-plans/active` | Yes | none | `MedicationPlanDTO` | none |
+| `GET` | `/app-api/dose-tasks/today` | Yes | date optional | list of `DoseTaskDTO` | none |
+| `GET` | `/app-api/checkins` | Yes | patient history query | paged `CheckinRecordDTO` list | none |
+| `POST` | `/app-api/checkins` | Yes | check-in submit DTO | `CheckinRecordDTO` | insert `medication_checkin_record`, update task effective record, maybe write notification/audit |
+| `PUT` | `/app-api/checkins/{id}/correct` | Yes | correction DTO | `CheckinRecordDTO` | insert correction row, switch effective row |
+
+#### Help order and file
+
+| Method | Path | Auth | Request | Response `data` | Side effects |
+|---|---|---|---|---|---|
+| `POST` | `/app-api/files/presign` | Yes | upload intent | upload token/url | none |
+| `POST` | `/app-api/help-orders` | Yes | `HelpOrderDTO` create body | created order | write `help_order`, `help_order_event`, `file_asset` link, notification |
+| `GET` | `/app-api/help-orders` | Yes | status/category query | paged list | none |
+| `GET` | `/app-api/help-orders/{id}` | Yes | none | order detail + events | none |
+| `POST` | `/app-api/prescriptions/uploads` | Yes | upload metadata | prescription summary | write `prescription`, `prescription_attachment`, `prescription_ocr_record` |
+
+#### Assessments
+
+| Method | Path | Auth | Request | Response `data` | Side effects |
+|---|---|---|---|---|---|
+| `POST` | `/app-api/assessments/knowledge` | Yes | `KnowledgeAssessmentDTO` | saved summary | write raw answers + result |
+| `POST` | `/app-api/assessments/satisfaction` | Yes | `SatisfactionSurveyDTO` | saved survey | write satisfaction row |
+
+### 6.2 Admin APIs
+
+#### Professional auth bridge
+
+- Professional login remains owned by legacy `/system/auth/*`.
+- `backend-v2` accepts professional JWT and resolves pharmacist or doctor profile through `system_users` mapping.
+
+#### Patient and profile management
+
+| Method | Path | Auth role | Request | Response `data` | Side effects |
+|---|---|---|---|---|---|
+| `GET` | `/admin-api/patients` | pharmacist | patient query | paged patient list | none |
+| `GET` | `/admin-api/patients/{id}` | pharmacist | none | patient detail | none |
+| `PUT` | `/admin-api/patients/{id}` | pharmacist | patient update DTO | updated detail | update patient medical fields, maybe trigger ABCD2 recalculation |
+
+#### Prescription and OCR
+
+| Method | Path | Auth role | Request | Response `data` | Side effects |
+|---|---|---|---|---|---|
+| `GET` | `/admin-api/prescriptions` | pharmacist | status query | paged prescriptions | none |
+| `GET` | `/admin-api/prescriptions/{id}` | pharmacist | none | `PrescriptionDTO` | none |
+| `POST` | `/admin-api/prescriptions/{id}/confirm` | pharmacist | confirmed items DTO | confirmed prescription | save items, run DDI, maybe generate plan |
+| `POST` | `/admin-api/prescriptions/{id}/reject` | pharmacist | reject DTO | result | update status, event log |
+
+#### Medication plan
+
+| Method | Path | Auth role | Request | Response `data` | Side effects |
+|---|---|---|---|---|---|
+| `POST` | `/admin-api/medication-plans` | pharmacist | `MedicationPlanDTO` | created plan | create plan/items, events |
+| `PUT` | `/admin-api/medication-plans/{id}` | pharmacist | update DTO | updated plan | create new version, replace active plan, recalc tasks |
+| `POST` | `/admin-api/medication-plans/{id}/activate` | pharmacist | none | active plan summary | activate plan, generate/recalc tasks |
+| `GET` | `/admin-api/medication-plans/{id}/tasks` | pharmacist | date range | task list | none |
+| `GET` | `/admin-api/medication-plans/{id}/adherence-report` | pharmacist | range | export metadata / report | read-only export |
+
+#### Help order
+
+| Method | Path | Auth role | Request | Response `data` | Side effects |
+|---|---|---|---|---|---|
+| `GET` | `/admin-api/help-orders` | pharmacist or doctor | status/query | paged orders | none |
+| `GET` | `/admin-api/help-orders/{id}` | pharmacist or doctor | none | `HelpOrderDTO` + events | none |
+| `POST` | `/admin-api/help-orders/{id}/claim` | pharmacist | none | claimed order | set handler |
+| `POST` | `/admin-api/help-orders/{id}/reply` | pharmacist or doctor | reply DTO | updated order | append event, update first response if empty |
+| `POST` | `/admin-api/help-orders/{id}/escalate` | pharmacist | doctor id optional | updated order | move to doctor queue, event + notification |
+| `POST` | `/admin-api/help-orders/{id}/reject` | pharmacist or doctor | reject DTO | updated order | set rejected |
+| `POST` | `/admin-api/help-orders/{id}/close` | pharmacist or doctor | close DTO | updated order | close order, trigger satisfaction reminder |
+
+#### DDI and notification
+
+| Method | Path | Auth role | Request | Response `data` | Side effects |
+|---|---|---|---|---|---|
+| `GET` | `/admin-api/ddi/rules` | pharmacist | query | rule list | none |
+| `POST` | `/admin-api/ddi/rules` | pharmacist admin | rule DTO | created rule | write `ddi_rule` |
+| `POST` | `/admin-api/ddi/screenings/{id}/confirm` | pharmacist | confirm DTO | confirm result | update `ddi_screening_log` |
+| `GET` | `/admin-api/notifications/logs` | pharmacist admin | query | paged logs | none |
+
+### 6.3 Idempotency and concurrency rules
+
+1. `send-otp`
+   - repeated requests within rate-limit window return business error code
+2. `login`
+   - OTP is single-use
+3. `refresh-token`
+   - reused refresh token after rotation returns invalid token error
+4. check-in submission
+   - duplicate submission for one dose task inside 24 hours creates a new correction row instead of overwriting the old row
+5. plan activation
+   - only one active plan per patient; concurrent activation must fail fast with business conflict
+6. work order close/reject
+   - only current handler may close or reject
+
+### 6.4 Error code baseline
+
+The document must use stable business codes. Minimum required set:
+
+| Code | Meaning |
+|---|---|
+| `APP_AUTH_OTP_RATE_LIMITED` | OTP request blocked by rate limit |
+| `APP_AUTH_OTP_INVALID` | OTP incorrect |
+| `APP_AUTH_OTP_EXPIRED` | OTP expired |
+| `APP_AUTH_REFRESH_INVALID` | refresh token invalid or rotated out |
+| `PATIENT_BIND_CONFLICT` | mobile + hospital patient id conflict |
+| `PATIENT_BIND_REQUIRES_PHARMACIST_CONFIRM` | duplicate or uncertain match |
+| `MED_PLAN_NOT_FOUND` | no plan exists |
+| `MED_PLAN_ACTIVE_CONFLICT` | another active plan already exists |
+| `DOSE_TASK_EDIT_WINDOW_EXPIRED` | correction window passed |
+| `HELP_ORDER_PERMISSION_DENIED` | non-handler action attempted |
+| `HELP_ORDER_STATUS_CONFLICT` | illegal status transition |
+| `PRESCRIPTION_OCR_LOW_CONFIDENCE` | OCR result requires manual review |
+| `DDI_CONFIRM_REQUIRED` | high-risk interaction requires pharmacist confirmation |
+| `FILE_UPLOAD_INVALID_TYPE` | unsupported file type |
+| `FILE_UPLOAD_TOO_LARGE` | file too large |
+
+## 7. Storage rules
+
+### 7.1 Redis
+
+Redis is mandatory for:
+
+1. OTP code value
+2. OTP send rate limits
+3. refresh token online validation
+4. access token blacklist or revoke marker
+5. short-lived notification dispatch state
+
+Redis is not the source of truth for:
+
+1. device session audit
+2. OTP send/verify audit
+3. work order history
+4. adherence history
+
+### 7.2 Object storage
+
+- Storage type: S3-compatible object storage
+- Binary storage unit: bucket + object key
+- DB persists file metadata in `file_asset`
+- File access from Web/App should use signed URL or controlled proxy
+
+### 7.3 Data retention
+
+Minimum retention:
+
+| Data | Retention |
+|---|---|
+| check-in records | at least 12 months |
+| work order records | at least 12 months |
+| notification logs | at least 12 months |
+| assessments | at least 12 months |
+| device sessions | at least 12 months after revoke |
+
+### 7.4 Masking
+
+Professional Web surfaces must mask sensitive patient fields by default:
+
+- mobile
+- national id fragments
+- full address if introduced later
+
+### 7.5 Audit requirement
+
+The following actions must always leave durable audit:
+
+1. patient binding and unbinding
+2. plan creation / change / activation / stop
+3. check-in correction
+4. work order submit / escalate / reject / close
+5. DDI confirm override
+6. ABCD2 recalculation
+
+## 8. Edge cases and required behavior
+
+### 8.1 Repeated dose check-in
+
+- If patient or family submits multiple results for the same dose task within 24 hours:
+  - insert a new `medication_checkin_record`
+  - mark old effective row as ineffective
+  - keep full audit trail
+
+### 8.2 Family unbind
+
+- Unbind removes authorization immediately.
+- Historical actions remain visible in audit and history.
+- Family account can no longer submit check-ins or work orders for that patient.
+
+### 8.3 No active medication plan
+
+- Patient can log in and bind.
+- Patient cannot enter medication execution flow.
+- App must show waiting state for pharmacist plan creation.
+
+### 8.4 After-hours work order
+
+- Submission is allowed.
+- The system must display service-hours notice.
+- Work order is still created and notified.
+- SLA due time is computed against working hours, not wall clock only.
+
+### 8.5 Urgent condition
+
+- Work order can still be created for traceability.
+- `requires_offline_emergency = 1`
+- Client must display offline emergency guidance and must not imply online resolution.
+
+### 8.6 OCR low confidence
+
+- Keep original image.
+- Persist OCR record with `LOW_CONFIDENCE`.
+- Pharmacist manually edits normalized prescription items.
+
+### 8.7 DDI high-risk hit
+
+- Save is not silently allowed.
+- The system must raise `DDI_CONFIRM_REQUIRED`.
+- Pharmacist must explicitly confirm continuation.
+- Confirmation is recorded in `ddi_screening_log`.
+
+### 8.8 Notification failure
+
+- If DB commit succeeds but notification dispatch fails:
+  - business write remains valid
+  - `notification_log` stores `FAILED`
+  - retry is allowed by async worker
+- If object upload succeeds but DB write fails:
+  - object is marked for cleanup by compensating job
+
+### 8.9 Work order permissions
+
+- Pharmacist sees and handles orders in pharmacist scope.
+- Doctor sees only escalated orders.
+- Only current handler can close or reject.
+
+## 9. Migration and compatibility
+
+### 9.1 Legacy reference mapping
+
+| Legacy item | backend-v2 rule |
+|---|---|
+| `system_users` | reused for professional identity mapping only |
+| `system_role` | reused for professional role resolution |
+| `system_user_role` | reused for professional role relation |
+| `/system/auth/*` | legacy professional login entry remains reference baseline |
+| legacy 9-state help order | replaced by MVP 6-result status model in this document |
+| legacy `today_tasks` style | replaced by `medication_dose_task` as authority |
+
+### 9.2 Explicit non-goals
+
+The following are not included in MVP backend structure:
+
+1. online prescribing
+2. payment
+3. medicine delivery
+4. medical insurance settlement
+5. multi-institution patient identity mapping
+6. audio attachment support for help orders
+
+## 10. Immediate implementation interpretation
+
+For any future `backend-v2` work, implementers must read this file as follows:
+
+1. Database tables and columns defined here are the target contract.
+2. New DTOs must align with the names and semantics defined in Section 6.
+3. Any new endpoint that changes route prefix, response shape, status flow, or storage target must update this file in the same change.
+4. If a later iteration needs multi-hospital identity, new tables may be added, but current single-institution rules remain valid until this file is revised.

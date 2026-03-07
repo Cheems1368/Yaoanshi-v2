@@ -1,0 +1,42 @@
+server:
+  port: 48081
+
+spring:
+  application:
+    name: medicine-app-server
+  main:
+    allow-circular-references: true
+    allow-bean-definition-overriding: true
+  datasource:
+    dynamic:
+      primary: master
+      datasource:
+        master:
+          name: medicine
+          url: jdbc:mysql://medicine-mysql:3306/medicine?useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+          driver-class-name: com.mysql.cj.jdbc.Driver
+          username: root
+          password: 123456
+  redis:
+    host: medicine-redis
+    port: 6379
+    database: 1
+    timeout: 10000
+
+medicine:
+  info:
+    version: 1.0.0
+    base-package: com.sqlapk.medicine
+  web:
+    app-api:
+      prefix: /app
+  security:
+    permit-all_urls:
+      - /actuator/health
+      - /actuator/info
+      - /app-api/**
+      - /app/**
+  tenant:
+    enable: false
+
+debug: false

@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>患者信息测试</title>
+</head>
+<body>
+    <h1>患者信息测试</h1>
+    <div id="info"></div>
+    
+    <script>
+        // 模拟localStorage中的患者信息
+        const testPatientInfo = {
+            userId: '134',
+            patientId: 5, // 使用我们知道的患者ID
+            name: 'Test Patient',
+            phone: '138****8888',
+            age: 30,
+            gender: '男',
+            idCard: '330***********1234',
+            idType: '居民身份证',
+            ethnicity: '汉族',
+            height: 175,
+            weight: 70,
+            bloodType: 'A型',
+            allergies: '青霉素过敏',
+            avatar: '/src/picture/user_avatar.png',
+            address: '测试地址',
+            patientType: 1,
+            insurance: 1,
+            emergencyContact: {
+                name: '张女士',
+                phone: '139****9999',
+                relationship: '配偶'
+            },
+            isRealNameVerified: true,
+            realNameVerifiedTime: new Date().toISOString()
+        };
+        
+        // 设置localStorage
+        localStorage.setItem('patient_user_profile', JSON.stringify(testPatientInfo));
+        
+        // 显示信息
+        document.getElementById('info').innerHTML = `
+            <p><strong>患者ID:</strong> ${testPatientInfo.patientId}</p>
+            <p><strong>姓名:</strong> ${testPatientInfo.name}</p>
+            <p><strong>是否实名认证:</strong> ${testPatientInfo.isRealNameVerified ? '是' : '否'}</p>
+            <p><strong>localStorage已设置</strong></p>
+        `;
+    </script>
+</body>
+</html>
+

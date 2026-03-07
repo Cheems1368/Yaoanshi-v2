@@ -1,0 +1,14 @@
+org.springframework.boot.autoconfigure.EnableAutoConfiguration=\
+  com.sqlapk.medicine.framework.file.config.MedicineFileAutoConfiguration
+
+
+
+
+
+
+
+
+
+
+
+

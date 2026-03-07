@@ -1,0 +1,85 @@
+﻿services:
+  mysql:
+    container_name: medicine-mysql
+    image: mysql:8
+    restart: unless-stopped
+    tty: true
+    ports:
+      - 3307:3306
+    environment:
+      MYSQL_DATABASE: medicine
+      MYSQL_ROOT_PASSWORD: 123456
+    volumes:
+      - mysql:/var/lib/mysql/
+      - ./sql/mysql/ruoyi-vue-pro.sql:/docker-entrypoint-initdb.d/01-init.sql
+      - ./sql/docker-entrypoint-apply-migrations.sh:/docker-entrypoint-initdb.d/02-apply-migrations.sh:ro
+      - ./sql/migrations:/docker-entrypoint-initdb.d/migrations:ro
+    networks:
+      - medicine-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
+
+  redis:
+    container_name: medicine-redis
+    image: redis:6-alpine
+    restart: unless-stopped
+    ports:
+      - 16379:6379
+    volumes:
+      - redis:/data
+    networks:
+      - medicine-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      timeout: 20s
+      retries: 10
+
+  server:
+    container_name: medicine-server
+    image: medicine-server:latest
+    restart: unless-stopped
+    ports:
+      - 48080:8080
+    environment:
+      SPRING_PROFILES_ACTIVE: local
+      JAVA_OPTS: -Xms1g -Xmx2g -XX:+UseG1GC
+      ARGS: --spring.datasource.dynamic.datasource.master.url=jdbc:mysql://medicine-mysql:3306/medicine?useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&nullCatalogMeansCurrent=true --spring.datasource.dynamic.datasource.master.username=root --spring.datasource.dynamic.datasource.master.password=123456 --spring.redis.host=medicine-redis --medicine.captcha.enable=false
+    networks:
+      - medicine-network
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  app:
+    container_name: medicine-app
+    image: medicine-app-server:latest
+    restart: unless-stopped
+    ports:
+      - 48081:48081
+    environment:
+      SPRING_PROFILES_ACTIVE: minimal
+      JAVA_OPTS: -Xms512m -Xmx1g -XX:+UseG1GC -Dlogging.config=/tmp/force-console.xml
+      ARGS: --spring.datasource.dynamic.datasource.master.url=jdbc:mysql://medicine-mysql:3306/medicine?useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&nullCatalogMeansCurrent=true --spring.datasource.dynamic.datasource.master.username=root --spring.datasource.dynamic.datasource.master.password=123456 --spring.redis.host=medicine-redis
+    volumes:
+      - ./scripts/logback-console.xml:/tmp/force-console.xml:ro
+    networks:
+      - medicine-network
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+networks:
+  medicine-network:
+    driver: bridge
+
+volumes:
+  mysql:
+    driver: local
+  redis:
+    driver: local

@@ -1,0 +1,89 @@
+# Docker构建上下文忽略文件
+# 减少构建上下文大小，提高构建速度
+
+# 构建产物
+target/
+*.jar
+*.war
+*.ear
+
+# 版本控制
+.git/
+.gitignore
+.gitattributes
+
+# IDE文件
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+.project
+.classpath
+.settings/
+
+# 日志文件
+*.log
+logs/
+log/
+
+# 临时文件
+tmp/
+temp/
+*.tmp
+*.temp
+
+# 文档
+docs/
+*.md
+README*
+CHANGELOG*
+
+# 测试文件
+src/test/
+test/
+*Test.java
+*Tests.java
+
+# 配置文件（敏感信息）
+application-*.yml
+application-*.properties
+*.env
+.env*
+
+# 数据库文件
+*.db
+*.sqlite
+*.h2.db
+
+# 缓存文件
+.m2/
+.gradle/
+node_modules/
+npm-debug.log*
+
+# 系统文件
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+
+# Docker相关
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# 备份文件
+*.bak
+*.backup
+backup_*
+
+# 报告文件
+reports/
+coverage/
+target/site/
+
+# 性能测试文件
+*.jmx
+performance-*
+

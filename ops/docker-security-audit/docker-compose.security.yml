@@ -1,0 +1,176 @@
+﻿# 瀹夊叏浼樺寲鐗圖ocker Compose閰嶇疆
+# 鑽绠＄悊绯荤粺 - 鐢熶骇鐜閰嶇疆
+
+version: '3.8'
+
+services:
+  mysql:
+    container_name: medicine-mysql
+    image: mysql:8.0
+    restart: unless-stopped
+    tty: true
+    ports:
+      - "13306:3306"
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-medicine}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+    volumes:
+      - mysql_data:/var/lib/mysql/
+      - ./sql/mysql/ruoyi-vue-pro.sql:/docker-entrypoint-initdb.d/01-init.sql
+      - ./mysql/conf.d:/etc/mysql/conf.d
+    networks:
+      - medicine-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}"]
+      timeout: 20s
+      retries: 10
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    security_opt:
+      - no-new-privileges:true
+    read_only: false
+    tmpfs:
+      - /tmp
+      - /var/run/mysqld
+
+  redis:
+    container_name: medicine-redis
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "16379:6379"
+    volumes:
+      - redis_data:/data
+      - ./redis/redis.conf:/usr/local/etc/redis/redis.conf
+    networks:
+      - medicine-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      timeout: 20s
+      retries: 10
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    security_opt:
+      - no-new-privileges:true
+    read_only: false
+    tmpfs:
+      - /tmp
+
+  server:
+    container_name: medicine-server
+    build:
+      context: ./medicine-server/
+      dockerfile: Dockerfile.optimized
+    image: medicine-server:latest
+    restart: unless-stopped
+    ports:
+      - "48080:48080"
+    environment:
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-prod}
+      JAVA_OPTS: ${JAVA_OPTS}
+    secrets:
+      - db_password
+      - redis_password
+    networks:
+      - medicine-network
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:48080/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+        reservations:
+          cpus: '1.0'
+          memory: 1G
+    security_opt:
+      - no-new-privileges:true
+    read_only: false
+    tmpfs:
+      - /tmp
+      - /medicine-server/logs
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # 鍓嶇绠＄悊绔?
+  admin:
+    container_name: medicine-admin
+    build:
+      context: ./pharmacist
+      dockerfile: Dockerfile
+    image: medicine-admin:latest
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    networks:
+      - medicine-network
+    depends_on:
+      - server
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    security_opt:
+      - no-new-privileges:true
+    read_only: false
+    tmpfs:
+      - /tmp
+
+# 缃戠粶閰嶇疆
+networks:
+  medicine-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+
+# 鏁版嵁鍗烽厤缃?
+volumes:
+  mysql_data:
+    driver: local
+  redis_data:
+    driver: local
+
+# 瀵嗛挜閰嶇疆
+secrets:
+  db_password:
+    file: ./secrets/db_password.txt
+  redis_password:
+    file: ./secrets/redis_password.txt
+

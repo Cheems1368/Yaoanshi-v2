@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ruleset name="Medicinal HIS Delivery PMD Rules"
+         xmlns="http://pmd.sourceforge.net/ruleset/2.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://pmd.sourceforge.net/ruleset/2.0.0 http://pmd.sourceforge.net/ruleset_2_0_0.xsd">
+
+    <description>Custom PMD rules for Medicinal HIS Delivery project</description>
+
+    <!-- 只包含最重要的规则 -->
+    <rule ref="category/java/bestpractices.xml">
+        <!-- 排除一些过于严格的规则 -->
+        <exclude name="AvoidReassigningParameters"/>
+        <exclude name="AvoidReassigningLoopVariables"/>
+    </rule>
+
+    <rule ref="category/java/codestyle.xml">
+        <!-- 排除一些过于严格的规则 -->
+        <exclude name="LongVariable"/>
+        <exclude name="MethodArgumentCouldBeFinal"/>
+        <exclude name="LocalVariableCouldBeFinal"/>
+        <exclude name="AtLeastOneConstructor"/>
+        <exclude name="ShortVariable"/>
+        <exclude name="OnlyOneReturn"/>
+    </rule>
+
+    <rule ref="category/java/design.xml">
+        <!-- 排除一些过于严格的规则 -->
+        <exclude name="LawOfDemeter"/>
+        <exclude name="ExcessiveParameterList"/>
+        <exclude name="ExcessiveMethodLength"/>
+        <exclude name="ExcessiveClassLength"/>
+    </rule>
+
+    <rule ref="category/java/errorprone.xml">
+        <!-- 排除一些过于严格的规则 -->
+        <exclude name="DataflowAnomalyAnalysis"/>
+        <exclude name="AvoidBranchingStatementAsLastInLoop"/>
+    </rule>
+
+    <rule ref="category/java/performance.xml">
+        <!-- 排除一些过于严格的规则 -->
+        <exclude name="AvoidInstantiatingObjectsInLoops"/>
+        <exclude name="UseStringBufferForStringAppends"/>
+    </rule>
+
+    <rule ref="category/java/security.xml">
+        <!-- 保留所有安全规则 -->
+    </rule>
+
+</ruleset>
+
+

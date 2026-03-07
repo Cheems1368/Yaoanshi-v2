@@ -1,0 +1,153 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <parent>
+        <groupId>com.sqlapk</groupId>
+        <artifactId>medicine-module-medication</artifactId>
+        <version>1.7.2-SNAPSHOT</version>
+    </parent>
+    <modelVersion>4.0.0</modelVersion>
+
+    <artifactId>medicine-module-medication-biz</artifactId>
+    <packaging>jar</packaging>
+
+    <name>medicine-module-medication-biz</name>
+    <description>用药计划管理模块 业务实现</description>
+
+    <dependencies>
+        <!-- 本模块API -->
+        <dependency>
+            <groupId>com.sqlapk</groupId>
+            <artifactId>medicine-module-medication-api</artifactId>
+            <version>1.7.2-SNAPSHOT</version>
+        </dependency>
+
+        <!-- 业务组件 -->
+        <dependency>
+            <groupId>com.sqlapk</groupId>
+            <artifactId>medicine-spring-boot-starter-biz-operatelog</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.sqlapk</groupId>
+            <artifactId>medicine-spring-boot-starter-biz-tenant</artifactId>
+        </dependency>
+
+        <!-- Web 相关 -->
+        <dependency>
+            <groupId>com.sqlapk</groupId>
+            <artifactId>medicine-spring-boot-starter-security</artifactId>
+        </dependency>
+
+        <!-- DB 相关 -->
+        <dependency>
+            <groupId>com.sqlapk</groupId>
+            <artifactId>medicine-spring-boot-starter-mybatis</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>com.sqlapk</groupId>
+            <artifactId>medicine-spring-boot-starter-redis</artifactId>
+        </dependency>
+
+        <!-- Test 测试相关 -->
+        <dependency>
+            <groupId>com.sqlapk</groupId>
+            <artifactId>medicine-spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        
+        <!-- Spring Security Test -->
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- 工具类相关 -->
+        <dependency>
+            <groupId>com.sqlapk</groupId>
+            <artifactId>medicine-spring-boot-starter-excel</artifactId>
+        </dependency>
+        
+        <!-- 患者模块API -->
+        <dependency>
+            <groupId>com.sqlapk</groupId>
+            <artifactId>medicine-module-patient-api</artifactId>
+            <version>1.7.2-SNAPSHOT</version>
+        </dependency>
+        
+        <!-- 系统模块API -->
+        <dependency>
+            <groupId>com.sqlapk</groupId>
+            <artifactId>medicine-module-system-api</artifactId>
+            <version>1.7.2-SNAPSHOT</version>
+        </dependency>
+
+        <!-- 药物模块API -->
+        <dependency>
+            <groupId>com.sqlapk</groupId>
+            <artifactId>medicine-module-drug-api</artifactId>
+            <version>1.7.2-SNAPSHOT</version>
+        </dependency>
+
+        <!-- 监控相关 -->
+        <dependency>
+            <groupId>com.sqlapk</groupId>
+            <artifactId>medicine-spring-boot-starter-monitor</artifactId>
+        </dependency>
+
+        <!-- Spring Boot Actuator for Health Indicators -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+            <version>2.7.18</version>
+        </dependency>
+
+        <!-- iText PDF -->
+        <dependency>
+            <groupId>com.itextpdf</groupId>
+            <artifactId>itextpdf</artifactId>
+            <version>5.5.13.3</version>
+        </dependency>
+
+        <!-- Spring Boot Mail -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-mail</artifactId>
+            <version>2.7.18</version>
+        </dependency>
+
+    </dependencies>
+
+    <build>
+        <plugins>
+            <!-- 质量门禁插件 -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-checkstyle-plugin</artifactId>
+            </plugin>
+            <plugin>
+                <groupId>com.github.spotbugs</groupId>
+                <artifactId>spotbugs-maven-plugin</artifactId>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-pmd-plugin</artifactId>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-enforcer-plugin</artifactId>
+            </plugin>
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+            </plugin>
+            <plugin>
+                <groupId>org.owasp</groupId>
+                <artifactId>dependency-check-maven</artifactId>
+            </plugin>
+        </plugins>
+    </build>
+
+</project>

@@ -1,0 +1,147 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <parent>
+        <groupId>com.sqlapk</groupId>
+        <artifactId>medicine</artifactId>
+        <version>1.7.2-SNAPSHOT</version>
+    </parent>
+    <modelVersion>4.0.0</modelVersion>
+
+    <artifactId>medicine-app-server</artifactId>
+    <packaging>jar</packaging>
+
+    <name>${project.artifactId}</name>
+    <description>
+        面向 App 端的独立启动模块，仅承载 C 端相关接口。
+    </description>
+    <url>https://github.com/sqlapk/medicine-platform</url>
+
+    <dependencies>
+
+        <dependency>
+            <groupId>com.sqlapk</groupId>
+            <artifactId>medicine-module-system-biz</artifactId>
+            <version>1.7.2-SNAPSHOT</version>
+        </dependency>
+        <dependency>
+            <groupId>com.sqlapk</groupId>
+            <artifactId>medicine-module-infra-biz</artifactId>
+            <version>1.7.2-SNAPSHOT</version>
+        </dependency>
+        <dependency>
+            <groupId>com.sqlapk</groupId>
+            <artifactId>medicine-spring-boot-starter-biz-error-code</artifactId>
+            <version>1.7.2-SNAPSHOT</version>
+        </dependency>
+
+        <!-- Redis 相关 -->
+        <dependency>
+            <groupId>com.sqlapk</groupId>
+            <artifactId>medicine-spring-boot-starter-redis</artifactId>
+            <version>1.7.2-SNAPSHOT</version>
+        </dependency>
+
+        <!-- Spring Security 相关 -->
+        <dependency>
+            <groupId>com.sqlapk</groupId>
+            <artifactId>medicine-spring-boot-starter-security</artifactId>
+            <version>1.7.2-SNAPSHOT</version>
+        </dependency>
+
+        <!-- 文件服务相关 -->
+        <dependency>
+            <groupId>com.sqlapk</groupId>
+            <artifactId>medicine-spring-boot-starter-file</artifactId>
+            <version>1.7.2-SNAPSHOT</version>
+        </dependency>
+
+        <!-- 消息队列 -->
+        <!-- 已移除：C 端应用不需要 MQ 功能 -->
+        <!--
+        <dependency>
+            <groupId>com.sqlapk</groupId>
+            <artifactId>medicine-spring-boot-starter-mq</artifactId>
+            <version>1.7.2-SNAPSHOT</version>
+        </dependency>
+        -->
+
+        <!-- 数据报表 -->
+<!--        <dependency>-->
+<!--            <groupId>com.sqlapk</groupId>-->
+<!--            <artifactId>medicine-module-report-biz</artifactId>-->
+<!--            <version>1.7.2-SNAPSHOT</version>-->
+<!--        </dependency>-->
+        <!-- 工作�?-->
+<!--        <dependency>-->
+<!--            <groupId>com.sqlapk</groupId>-->
+<!--            <artifactId>medicine-module-bpm-biz</artifactId>-->
+<!--            <version>1.7.2-SNAPSHOT</version>-->
+<!--        </dependency>-->
+<!--         药品管理-->
+        <dependency>
+            <groupId>com.sqlapk</groupId>
+            <artifactId>medicine-module-drug-biz</artifactId>
+            <version>1.7.2-SNAPSHOT</version>
+        </dependency>
+        <!--患者管理-->
+        <dependency>
+            <groupId>com.sqlapk</groupId>
+            <artifactId>medicine-module-patient-biz</artifactId>
+            <version>1.7.2-SNAPSHOT</version>
+        </dependency>
+        <!--用药计划管理-->
+        <dependency>
+            <groupId>com.sqlapk</groupId>
+            <artifactId>medicine-module-medication-biz</artifactId>
+            <version>1.7.2-SNAPSHOT</version>
+        </dependency>
+
+        
+
+        <!-- spring boot 配置所需依赖 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-configuration-processor</artifactId>
+            <optional>true</optional>
+        </dependency>
+        
+        <!-- Spring Web -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+
+        <!-- 服务保障相关 -->
+        <dependency>
+            <groupId>com.sqlapk</groupId>
+            <artifactId>medicine-spring-boot-starter-protection</artifactId>
+        </dependency>
+
+    </dependencies>
+
+    <build>
+        <!-- 设置构建�?jar 包名 -->
+        <finalName>${project.artifactId}</finalName>
+        <plugins>
+            <!-- 打包 -->
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <version>2.7.18</version> <!-- 如果 spring.boot.version 版本修改，则这里也要跟着修改 -->
+                <configuration>
+                    <fork>true</fork>
+                </configuration>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>repackage</goal> <!-- 将引入的 jar 打入其中 -->
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+
+</project>

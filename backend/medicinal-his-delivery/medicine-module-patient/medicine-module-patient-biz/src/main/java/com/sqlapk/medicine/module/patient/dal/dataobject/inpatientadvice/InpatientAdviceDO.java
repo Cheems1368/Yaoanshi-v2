@@ -1,0 +1,61 @@
+package com.sqlapk.medicine.module.patient.dal.dataobject.inpatientadvice;
+
+import com.baomidou.mybatisplus.annotation.KeySequence;
+import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.TableName;
+import com.sqlapk.medicine.framework.mybatis.core.dataobject.BaseDO;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.NoArgsConstructor;
+import lombok.ToString;
+
+import java.time.LocalDateTime;
+
+/**
+ * 住院药学不合理用药 DO
+ *
+ * @author 管理员
+ */
+@TableName("patient_inpatient_advice")
+@KeySequence("patient_inpatient_advice_seq") // 用于 Oracle、PostgreSQL、Kingbase、DB2、H2 数据库的主键自增。如果是 MySQL 等数据库，可不写。
+@Data
+@EqualsAndHashCode(callSuper = true)
+@ToString(callSuper = true)
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class InpatientAdviceDO extends BaseDO {
+
+    /**
+     * 住院医嘱ID
+     */
+    @TableId
+    private Long id;
+    /**
+     * 住院药学ID
+     */
+    private Long inpatientId;
+    /**
+     * 日期
+     */
+    private LocalDateTime adviceDate;
+    /**
+     * 医嘱内容
+     */
+    private String adviceContent;
+    /**
+     * 不合理原因
+     */
+    private String irrationalReason;
+    /**
+     * 用药建议
+     */
+    private String medicationSuggestion;
+    /**
+     * 结果
+     */
+    private String result;
+
+}

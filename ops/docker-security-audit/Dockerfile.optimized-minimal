@@ -1,0 +1,59 @@
+# 药学管理系统 - 最小化优化版Dockerfile
+# 基于现有镜像，最小化体积
+
+FROM medicine-server:latest
+
+# 安装必要的运行时工具（最小化）
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        curl \
+        dumb-init \
+        fonts-wqy-zenhei \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
+
+# 创建非root用户和组
+RUN groupadd -r appgroup && \
+    useradd -r -g appgroup -d /medicine-server -s /bin/bash appuser
+
+# 设置文件权限
+RUN chown -R appuser:appgroup /medicine-server && \
+    chmod 755 /medicine-server/app.jar
+
+# 切换到非root用户
+USER appuser
+
+# =============================================================================
+# 环境变量配置
+# =============================================================================
+# JVM容器化支持参数
+ENV JAVA_OPTS="-XX:+UseContainerSupport \
+    -XX:MaxRAMPercentage=70.0 \
+    -XX:InitialRAMPercentage=50.0 \
+    -XX:MaxMetaspaceSize=256m \
+    -XX:+HeapDumpOnOutOfMemoryError \
+    -XX:HeapDumpPath=/medicine-server/tmp/heapdump.hprof \
+    -XX:+UseG1GC \
+    -XX:MaxGCPauseMillis=200 \
+    -XX:+UseStringDeduplication \
+    -Djava.security.egd=file:/dev/./urandom \
+    -Djava.awt.headless=true \
+    -Dfile.encoding=UTF-8 \
+    -Dserver.shutdown=graceful"
+
+# Spring Boot配置
+ENV SPRING_PROFILES_ACTIVE=prod
+
+# =============================================================================
+# 健康检查
+# =============================================================================
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD curl -f http://localhost:48080/actuator/health || exit 1
+
+# =============================================================================
+# 启动命令
+# =============================================================================
+# 使用dumb-init作为PID 1，确保信号正确传递
+ENTRYPOINT ["dumb-init", "--"]
+CMD ["sh", "-c", "java $JAVA_OPTS -jar app.jar $ARGS"]
+

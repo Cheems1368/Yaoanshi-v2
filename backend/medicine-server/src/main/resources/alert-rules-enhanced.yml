@@ -1,0 +1,380 @@
+# 增强版监控告警规则配置
+# 基于健康检查的智能告警体系
+
+groups:
+  # 技术健康告警组
+  - name: technical-health
+    rules:
+      # 数据库健康告警
+      - alert: DatabaseHealthDown
+        expr: up{job="medicine-server", component="database"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: database
+          component: technical-health
+        annotations:
+          summary: "数据库健康检查失败"
+          description: "数据库连接健康检查已失败超过1分钟，服务: {{ $labels.instance }}"
+          runbook_url: "https://docs.medicine.com/runbooks/database-health"
+
+      - alert: DatabaseHealthDegraded
+        expr: up{job="medicine-server", component="database"} == 1 and 
+              rate(http_server_requests_seconds_count{uri="/actuator/health", status="200"}[5m]) < 0.1
+        for: 2m
+        labels:
+          severity: warning
+          service: database
+          component: technical-health
+        annotations:
+          summary: "数据库健康检查降级"
+          description: "数据库健康检查响应缓慢，服务: {{ $labels.instance }}"
+
+      # Redis健康告警
+      - alert: RedisHealthDown
+        expr: up{job="medicine-server", component="redis"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: redis
+          component: technical-health
+        annotations:
+          summary: "Redis健康检查失败"
+          description: "Redis连接健康检查已失败超过1分钟，服务: {{ $labels.instance }}"
+
+      - alert: RedisMemoryHigh
+        expr: redis_memory_used_bytes / redis_memory_max_bytes > 0.8
+        for: 5m
+        labels:
+          severity: warning
+          service: redis
+          component: technical-health
+        annotations:
+          summary: "Redis内存使用率过高"
+          description: "Redis内存使用率超过80%，当前: {{ $value | humanizePercentage }}"
+
+      # JVM健康告警
+      - alert: JVMMemoryHigh
+        expr: jvm_memory_used_bytes{area="heap"} / jvm_memory_max_bytes{area="heap"} > 0.85
+        for: 3m
+        labels:
+          severity: warning
+          service: jvm
+          component: technical-health
+        annotations:
+          summary: "JVM堆内存使用率过高"
+          description: "JVM堆内存使用率超过85%，当前: {{ $value | humanizePercentage }}"
+
+      - alert: JVMGCPauseHigh
+        expr: rate(jvm_gc_pause_seconds_sum[5m]) > 0.1
+        for: 2m
+        labels:
+          severity: warning
+          service: jvm
+          component: technical-health
+        annotations:
+          summary: "JVM GC暂停时间过长"
+          description: "JVM GC暂停时间过长，当前: {{ $value }}s/s"
+
+  # 外部服务健康告警组
+  - name: external-services-health
+    rules:
+      # 患者档案服务告警
+      - alert: PatientServiceHealthDown
+        expr: up{job="medicine-server", component="patient-service"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: patient-service
+          component: external-services
+        annotations:
+          summary: "患者档案服务健康检查失败"
+          description: "患者档案服务健康检查已失败超过1分钟，服务: {{ $labels.instance }}"
+
+      - alert: PatientServiceResponseSlow
+        expr: histogram_quantile(0.95, rate(http_client_requests_seconds_bucket{service="patient-service"}[5m])) > 2
+        for: 3m
+        labels:
+          severity: warning
+          service: patient-service
+          component: external-services
+        annotations:
+          summary: "患者档案服务响应缓慢"
+          description: "患者档案服务P95响应时间超过2秒，当前: {{ $value }}s"
+
+      # 药品信息服务告警
+      - alert: DrugServiceHealthDown
+        expr: up{job="medicine-server", component="drug-service"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: drug-service
+          component: external-services
+        annotations:
+          summary: "药品信息服务健康检查失败"
+          description: "药品信息服务健康检查已失败超过1分钟，服务: {{ $labels.instance }}"
+
+      # 短信服务告警
+      - alert: SmsServiceHealthDown
+        expr: up{job="medicine-server", component="sms-service"} == 0
+        for: 2m
+        labels:
+          severity: warning
+          service: sms-service
+          component: external-services
+        annotations:
+          summary: "短信服务健康检查失败"
+          description: "短信服务健康检查已失败超过2分钟，服务: {{ $labels.instance }}"
+
+      # 邮件服务告警
+      - alert: EmailServiceHealthDown
+        expr: up{job="medicine-server", component="email-service"} == 0
+        for: 2m
+        labels:
+          severity: warning
+          service: email-service
+          component: external-services
+        annotations:
+          summary: "邮件服务健康检查失败"
+          description: "邮件服务健康检查已失败超过2分钟，服务: {{ $labels.instance }}"
+
+  # 业务健康告警组
+  - name: business-health
+    rules:
+      # 工单创建业务告警
+      - alert: HelpOrderCreationFailure
+        expr: rate(business_probe_total{probe="help-order-creation", status="success"}[5m]) < 0.98
+        for: 3m
+        labels:
+          severity: critical
+          service: help-order-creation
+          component: business-health
+        annotations:
+          summary: "工单创建成功率过低"
+          description: "工单创建成功率低于98%，当前: {{ $value | humanizePercentage }}"
+
+      - alert: HelpOrderCreationSlow
+        expr: histogram_quantile(0.95, rate(business_probe_duration_seconds_bucket{probe="help-order-creation"}[5m])) > 3
+        for: 2m
+        labels:
+          severity: warning
+          service: help-order-creation
+          component: business-health
+        annotations:
+          summary: "工单创建响应缓慢"
+          description: "工单创建P95响应时间超过3秒，当前: {{ $value }}s"
+
+      # 药师建议提交告警
+      - alert: AdviceSubmissionFailure
+        expr: rate(business_probe_total{probe="advice-submission", status="success"}[5m]) < 0.99
+        for: 2m
+        labels:
+          severity: critical
+          service: advice-submission
+          component: business-health
+        annotations:
+          summary: "药师建议提交成功率过低"
+          description: "药师建议提交成功率低于99%，当前: {{ $value | humanizePercentage }}"
+
+      # 处方签发告警
+      - alert: PrescriptionSigningFailure
+        expr: rate(business_probe_total{probe="prescription-signing", status="success"}[5m]) < 0.995
+        for: 1m
+        labels:
+          severity: critical
+          service: prescription-signing
+          component: business-health
+        annotations:
+          summary: "处方签发成功率过低"
+          description: "处方签发成功率低于99.5%，当前: {{ $value | humanizePercentage }}"
+
+      - alert: PrescriptionSigningSlow
+        expr: histogram_quantile(0.95, rate(business_probe_duration_seconds_bucket{probe="prescription-signing"}[5m])) > 1
+        for: 1m
+        labels:
+          severity: warning
+          service: prescription-signing
+          component: business-health
+        annotations:
+          summary: "处方签发响应缓慢"
+          description: "处方签发P95响应时间超过1秒，当前: {{ $value }}s"
+
+      # 通知推送告警
+      - alert: NotificationPushFailure
+        expr: rate(business_probe_total{probe="notification-push", status="success"}[5m]) < 0.995
+        for: 2m
+        labels:
+          severity: warning
+          service: notification-push
+          component: business-health
+        annotations:
+          summary: "通知推送成功率过低"
+          description: "通知推送成功率低于99.5%，当前: {{ $value | humanizePercentage }}"
+
+      # 用药打卡告警
+      - alert: MedicationCheckInFailure
+        expr: rate(business_probe_total{probe="medication-checkin", status="success"}[5m]) < 0.98
+        for: 3m
+        labels:
+          severity: critical
+          service: medication-checkin
+          component: business-health
+        annotations:
+          summary: "用药打卡成功率过低"
+          description: "用药打卡成功率低于98%，当前: {{ $value | humanizePercentage }}"
+
+  # 智能健康告警组
+  - name: smart-health
+    rules:
+      # 智能异常检测告警
+      - alert: SmartAnomalyDetected
+        expr: smart_health_anomaly_score > 80
+        for: 5m
+        labels:
+          severity: warning
+          service: smart-health
+          component: anomaly-detection
+        annotations:
+          summary: "智能异常检测告警"
+          description: "检测到系统异常，异常分数: {{ $value }}，组件: {{ $labels.component }}"
+
+      # 趋势异常告警
+      - alert: SmartTrendAnomaly
+        expr: abs(smart_health_trend) > 20
+        for: 10m
+        labels:
+          severity: info
+          service: smart-health
+          component: trend-detection
+        annotations:
+          summary: "智能趋势异常告警"
+          description: "检测到异常趋势，趋势值: {{ $value }}%，组件: {{ $labels.component }}"
+
+      # 自愈策略触发告警
+      - alert: AutoHealingTriggered
+        expr: smart_health_auto_healing_triggered == 1
+        for: 0m
+        labels:
+          severity: info
+          service: smart-health
+          component: auto-healing
+        annotations:
+          summary: "自愈策略已触发"
+          description: "自愈策略已触发，组件: {{ $labels.component }}，动作: {{ $labels.action }}"
+
+  # 综合健康告警组
+  - name: overall-health
+    rules:
+      # 整体服务健康告警
+      - alert: OverallServiceDown
+        expr: up{job="medicine-server"} == 0
+        for: 30s
+        labels:
+          severity: critical
+          service: overall
+          component: service-availability
+        annotations:
+          summary: "整体服务不可用"
+          description: "整体服务已不可用超过30秒，实例: {{ $labels.instance }}"
+
+      # 关键业务功能不可用
+      - alert: CriticalBusinessFunctionDown
+        expr: (up{job="medicine-server", component="help-order-creation"} == 0 or
+               up{job="medicine-server", component="prescription-signing"} == 0) and
+               up{job="medicine-server"} == 1
+        for: 1m
+        labels:
+          severity: critical
+          service: business-critical
+          component: business-availability
+        annotations:
+          summary: "关键业务功能不可用"
+          description: "关键业务功能（工单创建或处方签发）不可用，但服务本身正常"
+
+      # 错误率过高告警
+      - alert: HighErrorRate
+        expr: rate(http_server_requests_seconds_count{status=~"5.."}[5m]) / 
+              rate(http_server_requests_seconds_count[5m]) > 0.01
+        for: 2m
+        labels:
+          severity: warning
+          service: overall
+          component: error-rate
+        annotations:
+          summary: "错误率过高"
+          description: "HTTP 5xx错误率超过1%，当前: {{ $value | humanizePercentage }}"
+
+      # 响应时间过长告警
+      - alert: HighResponseTime
+        expr: histogram_quantile(0.95, rate(http_server_requests_seconds_bucket[5m])) > 2
+        for: 3m
+        labels:
+          severity: warning
+          service: overall
+          component: response-time
+        annotations:
+          summary: "响应时间过长"
+          description: "P95响应时间超过2秒，当前: {{ $value }}s"
+
+# 告警通知配置
+route:
+  group_by: ['alertname', 'service']
+  group_wait: 10s
+  group_interval: 10s
+  repeat_interval: 1h
+  receiver: 'default'
+  routes:
+    - match:
+        severity: critical
+      receiver: 'critical-alerts'
+      group_wait: 5s
+      repeat_interval: 30m
+    - match:
+        severity: warning
+      receiver: 'warning-alerts'
+      group_wait: 10s
+      repeat_interval: 1h
+    - match:
+        component: business-health
+      receiver: 'business-alerts'
+      group_wait: 5s
+      repeat_interval: 15m
+
+receivers:
+  - name: 'default'
+    webhook_configs:
+      - url: 'http://localhost:9093/webhook'
+        send_resolved: true
+
+  - name: 'critical-alerts'
+    webhook_configs:
+      - url: 'http://localhost:9093/webhook/critical'
+        send_resolved: true
+    email_configs:
+      - to: 'ops@medicine.com'
+        subject: '[CRITICAL] {{ .GroupLabels.alertname }}'
+        body: |
+          {{ range .Alerts }}
+          告警: {{ .Annotations.summary }}
+          描述: {{ .Annotations.description }}
+          时间: {{ .StartsAt }}
+          {{ end }}
+
+  - name: 'warning-alerts'
+    webhook_configs:
+      - url: 'http://localhost:9093/webhook/warning'
+        send_resolved: true
+
+  - name: 'business-alerts'
+    webhook_configs:
+      - url: 'http://localhost:9093/webhook/business'
+        send_resolved: true
+    email_configs:
+      - to: 'business@medicine.com'
+        subject: '[BUSINESS] {{ .GroupLabels.alertname }}'
+        body: |
+          {{ range .Alerts }}
+          业务告警: {{ .Annotations.summary }}
+          描述: {{ .Annotations.description }}
+          时间: {{ .StartsAt }}
+          {{ end }}

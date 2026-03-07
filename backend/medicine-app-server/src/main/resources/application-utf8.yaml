@@ -1,0 +1,161 @@
+spring:
+  application:
+    name: medicine-app-server
+  profiles:
+    active: prod
+  main:
+    allow-circular-references: true
+    allow-bean-definition-overriding: true
+  servlet:
+    multipart:
+      max-file-size: 16MB
+      max-request-size: 32MB
+  mvc:
+    pathmatch:
+      matching-strategy: ANT_PATH_MATCHER
+  jackson:
+    serialization:
+      write-dates-as-timestamps: true
+      write-date-timestamps-as-nanoseconds: false
+      write-durations-as-timestamps: true
+      fail-on-empty-beans: false
+  cache:
+    type: REDIS
+    redis:
+      time-to-live: 1h
+
+  datasource:
+    druid:
+      web-stat-filter:
+        enabled: true
+      stat-view-servlet:
+        enabled: true
+        allow: 
+        url-pattern: /druid/*
+        login-username: admin
+        login-password: admin123
+      filter:
+        stat:
+          enabled: true
+          log-slow-sql: true
+          slow-sql-millis: 1000
+          merge-sql: true
+        wall:
+          config:
+            multi-statement-allow: true
+    dynamic:
+      druid:
+        initial-size: 10
+        min-idle: 20
+        max-active: 50
+        max-wait: 600000
+        time-between-eviction-runs-millis: 60000
+        min-evictable-idle-time-millis: 300000
+        max-evictable-idle-time-millis: 900000
+        validation-query: SELECT 1
+        test-while-idle: true
+        test-on-borrow: false
+        test-on-return: false
+      primary: master
+      datasource:
+        master:
+          name: medicine
+          url: jdbc:mysql://medicine-mysql:3306/medicine?useSSL=true&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+          driver-class-name: com.mysql.cj.jdbc.Driver
+          username: root
+          password: 123456
+        slave:
+          name: medicine
+          url: jdbc:mysql://medicine-mysql:3306/medicine?useSSL=true&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+          driver-class-name: com.mysql.cj.jdbc.Driver
+          username: root
+          password: 123456
+
+  redis:
+    host: medicine-redis
+    port: 6379
+    database: 1
+    password: 
+    timeout: 10000
+    lettuce:
+      pool:
+        max-active: 20
+        max-wait: -1
+        max-idle: 10
+        min-idle: 0
+
+server:
+  port: 48081
+
+medicine:
+  info:
+    version: 1.0.0
+    base-package: com.sqlapk.medicine
+  web:
+    admin-ui:
+      url: http://localhost:8080
+  security:
+    permit-all_urls:
+      - /admin-api/system/auth/login
+      - /admin-api/system/auth/logout
+      - /admin-api/system/auth/refresh-token
+      - /admin-api/system/captcha/get
+      - /admin-api/system/captcha/check
+      - /actuator/health
+      - /actuator/info
+      - /admin-api/system/help-order-test/**
+      - /system/help-order-test/**
+      - /admin-api/system/help-order/simple/**
+      - /app-api/**
+      - /admin-api/medication/test/**
+      - /app/help-order/**
+  websocket:
+    enable: true
+    path: /websocket/message
+    maxOnlineCount: 0
+    sessionMap: true
+  swagger:
+    title: 药学管理系统
+    description: 便捷的医患平台
+    version: 1.0.0
+    url: http://localhost:8080
+    license: MIT
+  captcha:
+    enable: true
+  tenant:
+    enable: true
+    ignore-urls:
+      - /admin-api/system/tenant/get-id-by-name
+      - /admin-api/system/captcha/get
+      - /admin-api/system/captcha/check
+      - /admin-api/infra/file/*/get/**
+      - /admin-api/system/sms/callback/*
+      - /app-api/**
+    ignore-tables:
+      - system_tenant
+      - system_tenant_package
+      - system_dict_data
+      - system_dict_type
+      - system_error_code
+      - system_menu
+      - system_sms_channel
+      - system_sms_template
+      - system_sms_log
+      - system_sensitive_word
+      - system_oauth2_client
+      - system_mail_account
+      - system_mail_template
+      - system_mail_log
+      - system_notify_template
+      - infra_codegen_column
+      - infra_codegen_table
+      - infra_test_demo
+      - infra_config
+      - infra_file_config
+      - infra_file
+      - infra_file_content
+      - infra_job
+      - infra_job_log
+      - infra_data_source_config
+
+debug: false
