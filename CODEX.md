@@ -59,37 +59,49 @@ Required behavior:
 
 ## 3. Codex Role in Dual-Agent Collaboration
 
-Codex is the **quality, testing, and compliance** agent. See `docs/DUAL_AGENT_COLLABORATION.md` for full details.
+Codex is the **construction + quality dual-core** agent. See `docs/DUAL_AGENT_COLLABORATION.md` for full details.
+
+Iron law: Codex does NOT redefine requirements. It constructs, tests, and gatekeeps quality.
 
 ### 3.1 Codex Primary Responsibilities
 
-1. **Code quality review and refactoring** — using `security-best-practices` skill
-2. **Architecture compliance checks** — using `medicine-contract-and-architecture` skill
-3. **Unit test / integration test writing and maintenance**
-4. **CI/CD pipeline debugging** — using `gh-fix-ci` skill
-5. **Code scaffolding and batch file generation**
-6. **Skill lifecycle management** — using `skill-manager` and `skill-evolution-manager`
+1. **Scaffolding and batch construction** — backend-v2 scaffolding, bulk DTO/VO/Controller/Mapper/Service generation, test skeletons, CI config skeletons
+2. **Code quality review and refactoring** — using `security-best-practices` skill
+3. **Architecture compliance checks** — using `medicine-contract-and-architecture` skill
+4. **Unit test / integration test writing and maintenance**
+5. **CI/CD pipeline debugging** — using `gh-fix-ci` skill
+6. **Debugging, testing, and maintenance** — startup errors, build failures, regression verification, missing test coverage
+7. **Skill lifecycle management** — using `skill-manager` and `skill-evolution-manager`
 
 ### 3.2 Codex Secondary Responsibilities (assisting Claude)
 
-1. Review Claude's backend implementations for security and quality
-2. Review Claude's frontend components for quality
-3. Write tests for code Claude implements
-4. Audit error handling in integration code
+1. Review Claude's frontend components for quality
+2. Write tests for code Claude implements
+3. Audit error handling in integration code
+4. Verify progress.txt consistency with actual code/test state
 
-### 3.3 Handoff Protocol
+### 3.3 Tiered Collaboration Flows
+
+1. **Design tasks**: Claude defines → Codex compliance check → Claude finalizes
+2. **Scaffold/batch tasks**: Claude defines constraints → Codex constructs → Codex self-tests → Claude reviews product alignment
+3. **Frontend tasks**: Claude implements → Claude browser verification → Codex quality review + test coverage
+4. **Debug/fix tasks**: Codex leads diagnosis and fix → Claude runtime/browser verification
+
+### 3.4 Handoff Protocol
 
 **When receiving work from Claude, expect:**
 1. Changed file list (path + brief description)
 2. Validation commands already run and their results
 3. Current progress.txt state
 4. Specific instructions (e.g., review security, add tests, check architecture compliance)
+5. Referenced formal documents/sections from `Standard document/`
 
 **When handing back to Claude, provide:**
 1. Review report or generated code files
 2. Issue list (severity + file location + suggestion)
 3. Test results (pass/fail + logs)
 4. Action items for Claude to address
+5. Referenced formal documents/sections from `Standard document/`
 
 ## 4. Project Snapshot
 

@@ -616,13 +616,125 @@ mvn -q -DskipTests compile -f D:\yaoanshi\backend-v2\pom.xml
 3. missing OCR integration
 4. missing export verification
 
-## 8. Backlog After P0
+## 8. Phase 5: DDI Enhancement (P0+ 用药助手增强)
+
+### Goal
+
+Extend the existing DDI screening from pharmacist-only prescription confirmation to patient-side real-time drug interaction alerts, drug-condition contraindication checking, and pharmacist DDI rule management.
+
+First-period scope: stroke-related drugs only (aspirin, clopidogrel, warfarin, statins, antihypertensives, antidiabetics, PPI).
+
+### Step 5.1: Stroke DDI rule library expansion
+
+Action:
+
+1. Define stroke core drug interaction rules (HIGH + MEDIUM severity).
+2. Generate SQL INSERT scripts for `ddi_rule` table with 30-50 rules covering:
+   - Antiplatelet combinations (aspirin + clopidogrel + ticagrelor)
+   - Antiplatelet + anticoagulant (aspirin + warfarin, clopidogrel + rivaroxaban)
+   - Clopidogrel + PPI (omeprazole, esomeprazole — MEDIUM)
+   - Statin interactions (atorvastatin + CYP3A4 inhibitors)
+   - Antihypertensive combinations (ACEI + potassium-sparing diuretics)
+   - NSAID + antiplatelet/anticoagulant bleeding risk
+3. Define initial `drug_contraindication` rules for stroke drugs:
+   - Anticoagulants + active bleeding history
+   - Metformin + severe renal impairment
+   - Beta-blockers + severe bradycardia
+4. Generate SQL INSERT scripts for `drug_contraindication` table.
+
+Collaboration:
+
+- Claude: define rule content (drug pairs, severity, message text) — reference `BACKEND_STRUCTURE.md` 4.9
+- Codex: batch generate SQL scripts + unit tests
+
+### Step 5.2: Patient-side DDI screening backend
+
+Action:
+
+1. Create `AppDdiScreeningService` with `screenPatientMedications(patientId, newDrugNames)` method.
+2. Implement `POST /app-api/ddi/screen` endpoint per `BACKEND_STRUCTURE.md` 6.1 contract.
+3. Screening logic:
+   - Fetch patient's ACTIVE medication plan items as existing drug set
+   - Match new drugs against existing drugs using `ddi_rule` (HIGH + MEDIUM)
+   - Fetch patient health profile from `patient_health_profile`
+   - Match new drugs against health conditions using `drug_contraindication`
+   - Return combined sorted alert list
+4. Create `drug_contraindication` table DDL in local schema bootstrap.
+5. Add unit tests for screening service.
+
+Collaboration:
+
+- Claude: define API constraints + screening logic design
+- Codex: generate service/controller/DTO skeleton + tests
+- Claude: review product alignment
+
+### Step 5.3: Patient-side DDI alert frontend
+
+Action:
+
+1. Add DDI screening call before prescription upload in patient app.
+2. Implement alert dialog component:
+   - List of alerts with severity badges (red=HIGH, orange=MEDIUM)
+   - Each alert shows drug pair/condition, message, recommended action
+   - Two buttons: "已知晓，继续提交" / "取消，咨询药师"
+3. "取消" option can navigate to help order creation with pre-filled context.
+4. Graceful degradation: if DDI screening API fails, proceed without blocking.
+
+Collaboration:
+
+- Claude: frontend implementation + browser acceptance
+- Codex: quality review + test coverage
+
+### Step 5.4: Pharmacist DDI rule management
+
+Action:
+
+1. Implement `GET /admin-api/ddi/rules` (paged, filterable by drug name and severity).
+2. Implement `PUT /admin-api/ddi/rules/{id}` for editing existing rules.
+3. Implement CRUD for `drug_contraindication` via `/admin-api/ddi/contraindications`.
+4. Create pharmacist web rule management page at `/ddi/rules`:
+   - Searchable table with drug name and severity filters
+   - Create/edit form in drawer or dialog
+   - Separate tabs for DDI rules and contraindication rules
+
+Collaboration:
+
+- Claude: define constraints + frontend implementation
+- Codex: generate backend CRUD skeleton + tests
+- Claude: browser acceptance
+
+### Validation commands
+
+```powershell
+mvn -q -DskipTests compile -f D:\yaoanshi\backend-v2\pom.xml
+mvn test -f D:\yaoanshi\backend-v2\pom.xml
+cd D:\yaoanshi\frontend\huanzhe; npm run build
+cd D:\yaoanshi\frontend\pharmacist; npm run build
+```
+
+### Done when
+
+1. Stroke DDI rule library contains at least 20 HIGH + MEDIUM rules.
+2. Patient app triggers DDI screening before prescription upload.
+3. DDI alerts display correctly with severity differentiation.
+4. Pharmacist can manage DDI rules via web interface.
+5. Drug contraindication rules work against patient health profile.
+6. All unit tests pass, all frontend builds pass.
+
+### Blockers / Dependencies
+
+1. `patient_health_profile` table must be populated (already implemented in SEC-003 closure)
+2. Stroke drug rule content requires pharmacist domain review for medical accuracy
+
+---
+
+## 9. Backlog After P0+
 
 The following are intentionally excluded from the primary execution sequence:
 
 1. science education content library
 2. content operation capability
-3. more disease-path expansion
+3. more disease-path expansion (DDI rules for hypertension, diabetes, etc.)
 4. non-MVP capability expansion
 5. any work that reopens legacy backend refactor
 

@@ -1,168 +1,155 @@
 export interface UserProfile {
-  userId: string;
-  patientId?: number;
-  name: string;
-  phone: string;
-  age: number;
-  gender: string;
-  idCard: string;
-  idType: string;
-  ethnicity: string;
-  height: number;
-  weight: number;
-  bloodType: string;
-  allergies: string;
-  avatar: string;
-  address?: string;
-  patientType?: number;
-  insurance?: number;
+  userId: string
+  patientId?: number
+  name: string
+  phone: string
+  age: number
+  gender: string
+  idCard: string
+  idType: string
+  ethnicity: string
+  height: number
+  weight: number
+  bloodType: string
+  allergies: string
+  avatar: string
+  address?: string
+  patientType?: number
+  insurance?: number
   emergencyContact: {
-    name: string;
-    phone: string;
-    relationship: string;
-  };
-  isRealNameVerified: boolean;
-  realNameVerifiedTime?: string;
+    name: string
+    phone: string
+    relationship: string
+  }
+  isRealNameVerified: boolean
+  identityMaterialArchived?: boolean
+  realNameVerifiedTime?: string
 }
 
-class UserDataService {
-  private readonly STORAGE_KEY = 'patient_user_profile';
-  private readonly listeners: Array<(profile: UserProfile) => void> = [];
+const cloneUserProfile = (profile: UserProfile): UserProfile => JSON.parse(JSON.stringify(profile)) as UserProfile
 
-  private defaultProfile: UserProfile = {
+class UserDataService {
+  private readonly listeners: Array<(profile: UserProfile) => void> = []
+
+  private readonly defaultProfile: UserProfile = {
     userId: 'P2024001',
     patientId: undefined,
-    name: '张三',
-    phone: '138****8888',
+    name: '患者',
+    phone: '13800000000',
     age: 30,
     gender: '男',
-    idCard: '330***********1234',
-    idType: '居民身份证',
+    idCard: '',
+    idType: '',
     ethnicity: '汉族',
     height: 175,
     weight: 70,
     bloodType: 'A型',
-    allergies: '青霉素过敏',
+    allergies: '无',
     avatar: '/src/picture/user_avatar.png',
     address: '',
     patientType: undefined,
     insurance: undefined,
     emergencyContact: {
-      name: '张女士',
-      phone: '139****9999',
-      relationship: '配偶'
+      name: '',
+      phone: '',
+      relationship: ''
     },
-    isRealNameVerified: false
-  };
+    isRealNameVerified: false,
+    identityMaterialArchived: false
+  }
+
+  private currentProfile: UserProfile = cloneUserProfile(this.defaultProfile)
 
   getUserProfile(): UserProfile {
-    try {
-      const data = localStorage.getItem(this.STORAGE_KEY);
-      if (data) {
-        const profile = JSON.parse(data);
-        return { ...this.defaultProfile, ...profile };
-      }
-      return this.defaultProfile;
-    } catch (error) {
-      console.error('获取用户资料失败:', error);
-      return this.defaultProfile;
-    }
+    return cloneUserProfile(this.currentProfile)
   }
 
   private saveUserProfile(profile: Partial<UserProfile>): void {
-    try {
-      const currentProfile = this.getUserProfile();
-      const updatedProfile: UserProfile = { ...currentProfile, ...profile };
-      localStorage.setItem(this.STORAGE_KEY, JSON.stringify(updatedProfile));
-      this.notifyListeners(updatedProfile);
-    } catch (error) {
-      console.error('保存用户资料失败:', error);
-      throw new Error('保存用户资料失败');
+    const updatedProfile: UserProfile = {
+      ...this.currentProfile,
+      ...profile,
+      emergencyContact: {
+        ...this.currentProfile.emergencyContact,
+        ...(profile.emergencyContact || {})
+      }
     }
+    this.currentProfile = cloneUserProfile(updatedProfile)
+    this.notifyListeners(this.currentProfile)
   }
 
   updateRealNameInfo(realNameData: {
-    realName: string;
-    idType: string;
-    idNumber: string;
-    ethnicity: string;
-    mobile: string;
-    patientId?: number;
+    realName: string
+    idType: string
+    idNumber?: string
+    ethnicity: string
+    mobile: string
+    patientId?: number
+    identityMaterialArchived?: boolean
+    realNameVerifiedTime?: string
   }): void {
     const updatedProfile: Partial<UserProfile> = {
-      patientId: realNameData.patientId ?? this.getUserProfile().patientId,
+      patientId: realNameData.patientId ?? this.currentProfile.patientId,
       name: realNameData.realName,
       idType: realNameData.idType,
-      idCard: this.maskIdCard(realNameData.idNumber),
+      idCard: '',
       ethnicity: realNameData.ethnicity,
-      phone: this.maskPhone(realNameData.mobile),
+      phone: realNameData.mobile,
       isRealNameVerified: true,
-      realNameVerifiedTime: new Date().toISOString()
-    };
-    this.saveUserProfile(updatedProfile);
+      identityMaterialArchived: realNameData.identityMaterialArchived ?? true,
+      realNameVerifiedTime: realNameData.realNameVerifiedTime ?? new Date().toISOString()
+    }
+    this.saveUserProfile(updatedProfile)
   }
 
   updateProfile(profileData: Partial<UserProfile>): void {
-    this.saveUserProfile(profileData);
+    this.saveUserProfile(profileData)
   }
 
   addListener(listener: (profile: UserProfile) => void): void {
-    this.listeners.push(listener);
+    this.listeners.push(listener)
   }
 
   removeListener(listener: (profile: UserProfile) => void): void {
-    const index = this.listeners.indexOf(listener);
+    const index = this.listeners.indexOf(listener)
     if (index > -1) {
-      this.listeners.splice(index, 1);
+      this.listeners.splice(index, 1)
     }
   }
 
   private notifyListeners(profile: UserProfile): void {
-    this.listeners.forEach(listener => {
+    this.listeners.forEach((listener) => {
       try {
-        listener(profile);
-      } catch (error) {
-        console.error('通知监听器失败:', error);
+        listener(cloneUserProfile(profile))
+      } catch {
+        // ignore listener failures so session state stays usable
       }
-    });
-  }
-
-  private maskIdCard(idCard: string): string {
-    if (idCard.length < 8) return idCard;
-    return idCard.substring(0, 3) + '*'.repeat(idCard.length - 7) + idCard.substring(idCard.length - 4);
-  }
-
-  private maskPhone(phone: string): string {
-    if (phone.length < 7) return phone;
-    return phone.substring(0, 3) + '****' + phone.substring(phone.length - 4);
+    })
   }
 
   clearUserData(): void {
-    try {
-      localStorage.removeItem(this.STORAGE_KEY);
-    } catch (error) {
-      console.error('清除用户资料失败:', error);
-    }
+    this.currentProfile = cloneUserProfile(this.defaultProfile)
+    this.notifyListeners(this.currentProfile)
   }
 
   isRealNameVerified(): boolean {
-    return this.getUserProfile().isRealNameVerified;
+    return this.currentProfile.isRealNameVerified
   }
 
   getRealNameStatus(): {
-    isVerified: boolean;
-    verifiedTime?: string;
-    name?: string;
-    patientId?: number;
+    isVerified: boolean
+    verifiedTime?: string
+    name?: string
+    patientId?: number
+    identityMaterialArchived?: boolean
   } {
-    const profile = this.getUserProfile();
     return {
-      isVerified: profile.isRealNameVerified,
-      verifiedTime: profile.realNameVerifiedTime,
-      name: profile.name,
-      patientId: profile.patientId
-    };
+      isVerified: this.currentProfile.isRealNameVerified,
+      verifiedTime: this.currentProfile.realNameVerifiedTime,
+      name: this.currentProfile.name,
+      patientId: this.currentProfile.patientId,
+      identityMaterialArchived: this.currentProfile.identityMaterialArchived
+    }
   }
 }
 
-export const userDataService = new UserDataService();
+export const userDataService = new UserDataService()

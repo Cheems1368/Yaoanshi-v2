@@ -33,6 +33,7 @@
                     v-for="item in topic.items"
                     :key="item.id"
                     button
+                    :data-testid="`rational-item-${item.id}`"
                     @click="openDetail(item.id)"
                   >
                     <ion-label>

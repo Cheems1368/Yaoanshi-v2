@@ -1,11 +1,11 @@
 <template>
-  <ion-page>
+  <ion-page data-testid="ai-assistant-page">
     <ion-header class="page-header ion-no-border">
       <ion-toolbar>
-        <ion-buttons slot="start">
+        <ion-buttons slot="start" data-testid="ai-back-button">
           <ion-button @click="handleBack">返回</ion-button>
         </ion-buttons>
-        <ion-title>AI 用药科普助手</ion-title>
+        <ion-title>用药科普助手</ion-title>
       </ion-toolbar>
     </ion-header>
 
@@ -21,17 +21,18 @@
 
     <ion-footer class="input-footer ion-no-border">
       <ion-toolbar>
-        <div class="input-row">
+        <div class="input-row" data-testid="ai-input-row">
           <ion-input
             v-model="inputText"
             class="message-input"
-            placeholder="输入你的用药问题（仅科普）"
+            data-testid="ai-input"
+            placeholder="输入用药疑问，如漏服怎么办"
             @keyup.enter="submitInput"
           />
           <ion-button :disabled="isSending || !inputText.trim()" @click="submitInput">发送</ion-button>
         </div>
-        <div v-if="lastFailedPrompt && !isSending" class="retry-row">
-          <ion-button size="small" fill="clear" @click="retryLastFailed">重试上一次问题</ion-button>
+        <div v-if="lastFailedPrompt && !isSending" class="retry-row" data-testid="ai-retry-row">
+          <ion-button size="small" fill="clear" @click="retryLastFailed">重试上一条问题</ion-button>
         </div>
       </ion-toolbar>
     </ion-footer>
@@ -73,10 +74,11 @@ const showToast = ref(false)
 const toastMessage = ref('')
 const suggestions = ref<string[]>([])
 const lastFailedPrompt = ref('')
+const initialGreeting = '你好，我是用药科普助手，可帮助说明服药时间、漏服处理、常见不良反应和何时就医。'
 const messages = ref<AiViewMessage[]>([
   {
     role: 'assistant',
-    content: '你好，我是 AI 用药科普助手。你可以咨询常见用药知识和风险提示。'
+    content: initialGreeting
   }
 ])
 
@@ -90,7 +92,7 @@ const backToHome = () => {
   messages.value = [
     {
       role: 'assistant',
-      content: '你好，我是 AI 用药科普助手。你可以咨询常见用药知识和风险提示。'
+      content: initialGreeting
     }
   ]
   suggestions.value = []
@@ -122,7 +124,7 @@ const buildSuggestions = (reply: string) => {
     suggestions.value = ['胃不舒服还能继续吃吗？', '要不要和护胃药同服？', '什么情况必须急诊？']
     return
   }
-  suggestions.value = ['如何记录每日用药？', '老年人多药联用注意什么？', '什么时候需要线下复诊？']
+  suggestions.value = ['饭前饭后吃药怎么判断？', '老年人多药联用注意什么？', '什么时候需要线下复诊？']
 }
 
 const submitMessage = async (text: string) => {

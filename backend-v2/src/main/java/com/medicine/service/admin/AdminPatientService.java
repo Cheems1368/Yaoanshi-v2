@@ -109,7 +109,6 @@ public class AdminPatientService {
         patient.setGender(textOrExisting(request.getGender(), patient.getGender()));
         patient.setBirthDate(parseDateOrExisting(request.getBirthDate(), patient.getBirthDate()));
         patient.setAge(request.getAge() == null ? patient.getAge() : request.getAge());
-        patient.setIdCardMasked(textOrExisting(request.getIdCardMasked(), patient.getIdCardMasked()));
         patient.setPrimaryDiseaseCode(textOrExisting(request.getPrimaryDiseaseCode(), patient.getPrimaryDiseaseCode()));
         patient.setPrimaryDiseaseName(textOrExisting(request.getPrimaryDiseaseName(), patient.getPrimaryDiseaseName()));
         patient.setDrugAllergy(textOrExisting(request.getDrugAllergy(), patient.getDrugAllergy()));
@@ -174,7 +173,6 @@ public class AdminPatientService {
         detail.setGender(patient.getGender());
         detail.setBirthDate(patient.getBirthDate() == null ? null : patient.getBirthDate().toString());
         detail.setAge(patient.getAge());
-        detail.setIdCardMasked(patient.getIdCardMasked());
         detail.setPrimaryDiseaseCode(patient.getPrimaryDiseaseCode());
         detail.setPrimaryDiseaseName(patient.getPrimaryDiseaseName());
         detail.setDrugAllergy(patient.getDrugAllergy());

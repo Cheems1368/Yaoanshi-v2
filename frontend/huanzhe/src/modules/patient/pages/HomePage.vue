@@ -37,8 +37,12 @@
           <ion-card-content>
             <ion-grid>
               <ion-row>
-                <ion-col size="3" v-for="item in quickActions" :key="item.id">
-                  <button class="quick-action-item" @click="router.push(item.route)">
+                <ion-col size="3" v-for="(item, index) in quickActions" :key="item.id">
+                  <button
+                    class="quick-action-item"
+                    :data-testid="quickActionTestIds[index]"
+                    @click="router.push(item.route)"
+                  >
                     <div class="icon-container" :class="`icon-${item.color}`">
                       <ion-icon :icon="item.icon" />
                     </div>
@@ -136,6 +140,14 @@ const quickActions = [
   { id: 3, label: '用药求助', icon: chatbubbles, color: 'warning', route: '/tabs/help-order' },
   { id: 4, label: '合理用药', icon: shieldCheckmark, color: 'tertiary', route: '/rational-medication' },
   { id: 5, label: 'AI助手', icon: sparkles, color: 'secondary', route: '/ai-assistant' }
+]
+
+const quickActionTestIds = [
+  'home-quick-medication-reminder',
+  'home-quick-medication-record',
+  'home-quick-help-order',
+  'home-quick-rational-medication',
+  'home-quick-ai-assistant'
 ]
 
 const completedCount = computed(() => todayTasks.value.filter((task) => task.status === 'COMPLETED').length)

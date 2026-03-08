@@ -1,8 +1,10 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
 import { ElMessage } from 'element-plus'
-import { login, logout, getUserInfo } from '@/api/auth'
+import { login, logout, getUserInfo, refreshTokenByValue } from '@/api/auth'
 import { API_SUCCESS_CODES } from '@/utils/constants'
+
+const REFRESH_TOKEN_STORAGE_KEY = 'refreshToken'
 
 const EMPTY_USER = {
   id: null,
@@ -15,9 +17,11 @@ const EMPTY_USER = {
 }
 
 const ROLE_DISPLAY_LABELS = {
-  doctor: '医生',
-  patient: '患者'
+  doctor: '鍖荤敓',
+  patient: '鎮ｈ€?'
 }
+
+const readRefreshToken = () => window.sessionStorage.getItem(REFRESH_TOKEN_STORAGE_KEY) || ''
 
 const derivePrimaryRole = (info = {}) => {
   const rawRoles = []
@@ -45,7 +49,7 @@ const derivePrimaryRole = (info = {}) => {
   }
 
   const nickname = (info.nickname || info.name || '').toString().toLowerCase()
-  if (nickname.includes('医生') || nickname.includes('医师') || nickname.includes('doctor')) {
+  if (nickname.includes('鍖荤敓') || nickname.includes('鍖诲笀') || nickname.includes('doctor')) {
     return 'doctor'
   }
 
@@ -73,11 +77,13 @@ const normalizeUserInfo = (info = {}) => {
 }
 
 export const useUserStore = defineStore('user', () => {
-  const token = ref(localStorage.getItem('token') || '')
+  const token = ref('')
+  const refreshTokenValue = ref(readRefreshToken())
   const userInfo = ref({ ...EMPTY_USER })
   const userRole = ref('')
+  let refreshPromise = null
 
-  const isLoggedIn = computed(() => Boolean(token.value))
+  const isLoggedIn = computed(() => Boolean(token.value || refreshTokenValue.value))
   const isDoctor = computed(() => userRole.value === 'doctor')
   const isPharmacist = computed(() => false)
 
@@ -88,13 +94,57 @@ export const useUserStore = defineStore('user', () => {
 
   const setToken = (newToken) => {
     token.value = newToken || ''
+  }
 
-    if (token.value) {
-      localStorage.setItem('token', token.value)
+  const setRefreshToken = (newRefreshToken) => {
+    refreshTokenValue.value = newRefreshToken || ''
+
+    if (refreshTokenValue.value) {
+      window.sessionStorage.setItem(REFRESH_TOKEN_STORAGE_KEY, refreshTokenValue.value)
       return
     }
 
-    localStorage.removeItem('token')
+    window.sessionStorage.removeItem(REFRESH_TOKEN_STORAGE_KEY)
+  }
+
+  const clearAuthState = () => {
+    setToken('')
+    setRefreshToken('')
+    resetUserState()
+  }
+
+  const refreshAccessToken = async () => {
+    if (!refreshTokenValue.value) {
+      return null
+    }
+
+    if (!refreshPromise) {
+      refreshPromise = refreshTokenByValue(refreshTokenValue.value)
+        .then((response) => {
+          if (!API_SUCCESS_CODES.includes(response.code)) {
+            throw new Error(response.msg || response.message || 'Token 刷新失败')
+          }
+
+          const nextAccessToken = response.data?.accessToken || ''
+          const nextRefreshToken = response.data?.refreshToken || ''
+          if (!nextAccessToken) {
+            throw new Error('鐧诲綍鍝嶅簲缂哄皯璁块棶浠ょ墝')
+          }
+
+          setToken(nextAccessToken)
+          setRefreshToken(nextRefreshToken)
+          return nextAccessToken
+        })
+        .catch(() => {
+          clearAuthState()
+          return null
+        })
+        .finally(() => {
+          refreshPromise = null
+        })
+    }
+
+    return refreshPromise
   }
 
   const setUserInfo = (info = {}) => {
@@ -108,62 +158,62 @@ export const useUserStore = defineStore('user', () => {
       const response = await login(loginData)
 
       if (!API_SUCCESS_CODES.includes(response.code)) {
-        ElMessage.error(response.msg || response.message || '登录失败')
+        ElMessage.error(response.msg || response.message || '鐧诲綍澶辫触')
         return false
       }
 
       const { accessToken, refreshToken } = response.data || {}
       if (!accessToken) {
-        throw new Error('登录响应缺少访问令牌')
+        throw new Error('鐧诲綍鍝嶅簲缂哄皯璁块棶浠ょ墝')
       }
 
       setToken(accessToken)
-
-      if (refreshToken) {
-        localStorage.setItem('refreshToken', refreshToken)
-      } else {
-        localStorage.removeItem('refreshToken')
-      }
+      setRefreshToken(refreshToken || '')
 
       await initUserInfo()
-      ElMessage.success('登录成功')
+      ElMessage.success('鐧诲綍鎴愬姛')
       return true
     } catch (error) {
-      console.error('登录错误:', error)
-      ElMessage.error(error.message || '登录失败')
+      console.error('鐧诲綍閿欒:', error)
+      ElMessage.error(error.message || '鐧诲綍澶辫触')
       return false
     }
   }
 
-  const logoutAction = async () => {
+  const logoutAction = async (options = {}) => {
+    const { silent = false } = options
+
     try {
       if (token.value) {
         await logout()
       }
     } catch (error) {
-      console.error('登出请求失败:', error)
+      console.error('鐧诲嚭璇锋眰澶辫触:', error)
     } finally {
-      setToken('')
-      localStorage.removeItem('refreshToken')
-      resetUserState()
-      ElMessage.success('已退出登录')
+      clearAuthState()
+      if (!silent) {
+        ElMessage.success('宸查€€鍑虹櫥褰?')
+      }
     }
   }
 
   const initUserInfo = async () => {
     if (!token.value) {
-      return
+      const restoredToken = await refreshAccessToken()
+      if (!restoredToken) {
+        return
+      }
     }
 
     try {
       const response = await getUserInfo()
       if (!API_SUCCESS_CODES.includes(response.code)) {
-        throw new Error(response.msg || response.message || '获取用户信息失败')
+        throw new Error(response.msg || response.message || '鑾峰彇鐢ㄦ埛淇℃伅澶辫触')
       }
 
       const { user, roles, permissions } = response.data || {}
       if (!user) {
-        throw new Error('未获取到用户信息')
+        throw new Error('鏈幏鍙栧埌鐢ㄦ埛淇℃伅')
       }
 
       setUserInfo({
@@ -176,8 +226,8 @@ export const useUserStore = defineStore('user', () => {
         permissions: Array.isArray(permissions) ? permissions : permissions ? Array.from(permissions) : []
       })
     } catch (error) {
-      console.error('获取用户信息失败:', error)
-      await logoutAction()
+      console.error('鑾峰彇鐢ㄦ埛淇℃伅澶辫触:', error)
+      await logoutAction({ silent: true })
     }
   }
 
@@ -187,12 +237,15 @@ export const useUserStore = defineStore('user', () => {
 
   return {
     token,
+    refreshTokenValue,
     userInfo,
     userRole,
     isLoggedIn,
     isDoctor,
     isPharmacist,
     setToken,
+    setRefreshToken,
+    refreshAccessToken,
     setUserInfo,
     loginAction,
     logoutAction,

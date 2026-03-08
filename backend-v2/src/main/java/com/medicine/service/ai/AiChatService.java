@@ -32,15 +32,19 @@ public class AiChatService {
 
     private static final int MAX_MESSAGES = 20;
     private static final int MAX_MESSAGE_CHARS = 1200;
+    private static final int MAX_REPLY_CHARS = 200;
     private static final int MAX_REQUESTS_PER_MINUTE = 15;
     private static final String LIMIT_KEY_PREFIX = "app:ai:chat:limit:";
     private static final Set<String> SUPPORTED_ROLES = Set.of("user", "assistant", "system");
-    private static final String SAFETY_DISCLAIMER = "【安全提示】本回答仅用于健康科普，不构成诊断或处方建议；如症状持续或加重，请及时线下就医。";
+    private static final String SAFETY_DISCLAIMER = "【提示】仅供用药科普，不能替代面诊；如症状加重或出现胸痛、呼吸困难、出血等，请及时就医。";
+    private static final String DEFAULT_REPLY = "请告诉我药名、用途、服用方式和你担心的问题，我会用科普方式简要说明。";
     private static final String SYSTEM_PROMPT = """
-            你是“药按时”项目中的用药科普助手。
-            回答范围仅限健康科普与用药教育，不得提供诊断、处方或个体化剂量决策。
-            如涉及急症、明显不良反应、出血、意识障碍、胸痛、呼吸困难等风险，必须提醒立即线下就医。
-            回答风格简明、清晰、分点表达，避免夸大疗效。
+            你是“药按时”项目中的用药科普助手，不是泛化闲聊助手。
+            只回答常见用药知识、服药注意事项、漏服处理、常见不良反应观察、复诊提醒和就医建议。
+            不得提供诊断、处方、个体化剂量调整、停药决定或替代医生面诊。
+            如果涉及胸痛、呼吸困难、出血、意识障碍、持续高热、严重过敏等风险，必须明确提醒尽快线下就医。
+            输出要直接、简短、易懂，优先回答用户的用药疑问，不要泛泛自我介绍。
+            正文控制在 120 字以内，最多 3 句短句或 3 个短点。
             """;
 
     private final AiProperties aiProperties;
@@ -60,11 +64,11 @@ public class AiChatService {
     public AiChatResponse chat(String accountId, AiChatRequest request) {
         validateRuntimeConfig();
         enforceRateLimit(accountId);
-        List<Map<String, String>> messages = normalizeMessages(request);
+        List<Map<String, String>> messages = buildUpstreamMessages(request);
         String reply = callUpstream(messages);
 
         AiChatResponse response = new AiChatResponse();
-        response.setReply(appendSafetyDisclaimer(reply));
+        response.setReply(formatReply(reply));
         response.setModel(aiProperties.getModel());
         response.setRequestId(UUID.randomUUID().toString());
         return response;
@@ -95,7 +99,7 @@ public class AiChatService {
         }
     }
 
-    private List<Map<String, String>> normalizeMessages(AiChatRequest request) {
+    private List<Map<String, String>> buildUpstreamMessages(AiChatRequest request) {
         if (request == null || request.getMessages() == null || request.getMessages().isEmpty()) {
             throw new BusinessException(ErrorCode.AI_CHAT_INVALID_REQUEST.getCode(), "消息不能为空");
         }
@@ -104,8 +108,7 @@ public class AiChatService {
             throw new BusinessException(ErrorCode.AI_CHAT_INVALID_REQUEST.getCode(), "消息数量超过限制");
         }
 
-        List<Map<String, String>> normalized = new ArrayList<>();
-        normalized.add(Map.of("role", "system", "content", SYSTEM_PROMPT));
+        List<Map<String, String>> conversation = new ArrayList<>();
 
         int userMessageCount = 0;
         for (AiChatMessage message : request.getMessages()) {
@@ -133,22 +136,28 @@ public class AiChatService {
             Map<String, String> record = new LinkedHashMap<>();
             record.put("role", role);
             record.put("content", content);
-            normalized.add(record);
+            conversation.add(record);
         }
 
         if (userMessageCount == 0) {
             throw new BusinessException(ErrorCode.AI_CHAT_INVALID_REQUEST.getCode(), "至少需要一条用户消息");
         }
 
+        int upstreamMaxMessages = Math.max(aiProperties.getUpstreamMaxMessages(), 2);
+        int conversationLimit = upstreamMaxMessages - 1;
+        List<Map<String, String>> trimmedConversation = conversation;
+        if (conversation.size() > conversationLimit) {
+            trimmedConversation = new ArrayList<>(conversation.subList(conversation.size() - conversationLimit, conversation.size()));
+        }
+
+        List<Map<String, String>> normalized = new ArrayList<>(trimmedConversation.size() + 1);
+        normalized.add(Map.of("role", "system", "content", SYSTEM_PROMPT));
+        normalized.addAll(trimmedConversation);
         return normalized;
     }
 
     private String callUpstream(List<Map<String, String>> messages) {
-        Map<String, Object> payload = new LinkedHashMap<>();
-        payload.put("model", aiProperties.getModel());
-        payload.put("messages", messages);
-        payload.put("stream", false);
-        payload.put("temperature", 0.3);
+        Map<String, Object> payload = buildPayload(messages);
 
         try {
             HttpRequest httpRequest = HttpRequest.newBuilder()
@@ -161,6 +170,12 @@ public class AiChatService {
 
             HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
             int statusCode = response.statusCode();
+            if (statusCode == HttpStatus.PAYMENT_REQUIRED.value() || statusCode == HttpStatus.FORBIDDEN.value()) {
+                String body = response.body();
+                if (body != null && body.contains("\"code\":30001")) {
+                    throw new BusinessException(ErrorCode.AI_UPSTREAM_UNAVAILABLE.getCode(), "AI 账户余额不足，请先充值后再试");
+                }
+            }
             if (statusCode == HttpStatus.TOO_MANY_REQUESTS.value()) {
                 throw new BusinessException(ErrorCode.AI_CHAT_RATE_LIMITED.getCode(), "AI 服务繁忙，请稍后重试");
             }
@@ -175,7 +190,7 @@ public class AiChatService {
             }
 
             JsonNode root = objectMapper.readTree(response.body());
-            JsonNode contentNode = root.path("choices").path(0).path("message").path("content");
+            JsonNode contentNode = extractContentNode(root);
             if (contentNode.isMissingNode() || !StringUtils.hasText(contentNode.asText())) {
                 throw new BusinessException(ErrorCode.AI_UPSTREAM_UNAVAILABLE.getCode(), "AI 响应格式异常");
             }
@@ -190,10 +205,73 @@ public class AiChatService {
         }
     }
 
-    private String appendSafetyDisclaimer(String answer) {
-        if (answer.contains(SAFETY_DISCLAIMER)) {
-            return answer;
+    private Map<String, Object> buildPayload(List<Map<String, String>> messages) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("model", aiProperties.getModel());
+        payload.put("messages", messages);
+
+        if (aiProperties.getProtocol() == AiProperties.Protocol.ANTHROPIC_MESSAGES) {
+            if (aiProperties.getMaxTokens() != null && aiProperties.getMaxTokens() > 0) {
+                payload.put("max_tokens", aiProperties.getMaxTokens());
+            }
+            return payload;
         }
-        return answer + "\n\n" + SAFETY_DISCLAIMER;
+
+        payload.put("stream", false);
+        payload.put("temperature", 0.3);
+        payload.put("enable_thinking", aiProperties.isEnableThinking());
+        if (aiProperties.getMaxTokens() != null && aiProperties.getMaxTokens() > 0) {
+            payload.put("max_tokens", aiProperties.getMaxTokens());
+        }
+        return payload;
+    }
+
+    private JsonNode extractContentNode(JsonNode root) {
+        if (aiProperties.getProtocol() == AiProperties.Protocol.ANTHROPIC_MESSAGES) {
+            JsonNode contentNode = root.path("content");
+            if (contentNode.isArray()) {
+                for (JsonNode item : contentNode) {
+                    if ("text".equals(item.path("type").asText()) && StringUtils.hasText(item.path("text").asText())) {
+                        return item.path("text");
+                    }
+                }
+            }
+            return root.path("content").path(0).path("text");
+        }
+        return root.path("choices").path(0).path("message").path("content");
+    }
+
+    private String formatReply(String answer) {
+        String normalized = normalizeReplyBody(answer);
+        int bodyLimit = Math.max(MAX_REPLY_CHARS - SAFETY_DISCLAIMER.length() - 2, 1);
+        return truncate(normalized, bodyLimit) + "\n\n" + SAFETY_DISCLAIMER;
+    }
+
+    private String normalizeReplyBody(String answer) {
+        if (!StringUtils.hasText(answer)) {
+            return DEFAULT_REPLY;
+        }
+
+        String normalized = answer
+                .replace(SAFETY_DISCLAIMER, "")
+                .replace("\r\n", "\n")
+                .replaceAll("[ \\t\\x0B\\f]+", " ")
+                .replaceAll("\\n{3,}", "\n\n")
+                .trim();
+
+        if (!StringUtils.hasText(normalized)) {
+            return DEFAULT_REPLY;
+        }
+        return normalized;
+    }
+
+    private String truncate(String text, int maxChars) {
+        if (text.length() <= maxChars) {
+            return text;
+        }
+        if (maxChars <= 3) {
+            return text.substring(0, maxChars);
+        }
+        return text.substring(0, maxChars - 3).trim() + "...";
     }
 }

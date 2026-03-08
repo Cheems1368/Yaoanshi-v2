@@ -16,6 +16,7 @@ import com.medicine.repository.assessment.Abcd2AssessmentMapper;
 import com.medicine.repository.identity.PharmacistProfileMapper;
 import com.medicine.repository.identity.PatientFamilyBindingMapper;
 import com.medicine.repository.identity.PatientMapper;
+import com.medicine.repository.medication.MedicationPlanMapper;
 import com.medicine.service.auth.JwtClaims;
 import com.medicine.service.auth.ProfessionalIdentityService;
 import org.junit.jupiter.api.Test;
@@ -53,6 +54,9 @@ class AdminPatientServiceTest {
 
     @Mock
     private Abcd2AssessmentMapper abcd2AssessmentMapper;
+
+    @Mock
+    private MedicationPlanMapper medicationPlanMapper;
 
     @Mock
     private ProfessionalIdentityService professionalIdentityService;
@@ -121,6 +125,7 @@ class AdminPatientServiceTest {
         when(pharmacistProfileMapper.selectById(1L, 9001L)).thenReturn(pharmacistProfile(9001L));
         when(patientFamilyBindingMapper.selectActiveByPatientId(1L, 3001L)).thenReturn(List.of(binding));
         when(abcd2AssessmentMapper.selectLatestByPatientId(1L, 3001L)).thenReturn(assessment);
+        when(medicationPlanMapper.selectLatestByPatientId(1L, 3001L)).thenReturn(null);
 
         AdminPatientDetailDTO detail = adminPatientService.getPatientDetail(claims, 3001L);
 
@@ -142,6 +147,7 @@ class AdminPatientServiceTest {
         when(pharmacistProfileMapper.selectById(1L, 9001L)).thenReturn(pharmacistProfile);
         when(patientFamilyBindingMapper.selectActiveByPatientId(1L, 3001L)).thenReturn(List.of());
         when(abcd2AssessmentMapper.selectLatestByPatientId(1L, 3001L)).thenReturn(null);
+        when(medicationPlanMapper.selectLatestByPatientId(1L, 3001L)).thenReturn(null);
         doAnswer(invocation -> {
             Abcd2Assessment assessment = invocation.getArgument(0);
             assessment.setId(7002L);

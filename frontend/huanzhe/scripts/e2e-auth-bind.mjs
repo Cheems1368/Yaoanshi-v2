@@ -45,7 +45,7 @@ try {
 
   const storageStateAfterLogin = await page.evaluate(() => ({
     accessToken: Boolean(localStorage.getItem('patient_access_token')),
-    refreshToken: Boolean(localStorage.getItem('patient_refresh_token')),
+    refreshToken: Boolean(sessionStorage.getItem('patient_refresh_token')),
     bindingStatus: localStorage.getItem('patient_binding_status'),
     activePlanStatus: localStorage.getItem('patient_has_active_plan'),
     mobile: localStorage.getItem('patient_mobile'),
@@ -59,7 +59,7 @@ try {
 
   const storageStateAfterLogout = await page.evaluate(() => ({
     accessToken: localStorage.getItem('patient_access_token'),
-    refreshToken: localStorage.getItem('patient_refresh_token'),
+    refreshToken: sessionStorage.getItem('patient_refresh_token'),
     bindingStatus: localStorage.getItem('patient_binding_status'),
     activePlanStatus: localStorage.getItem('patient_has_active_plan'),
     mobile: localStorage.getItem('patient_mobile'),

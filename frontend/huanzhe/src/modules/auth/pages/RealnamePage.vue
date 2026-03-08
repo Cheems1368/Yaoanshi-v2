@@ -79,6 +79,7 @@ import {
 import { chevronBackOutline } from 'ionicons/icons'
 import { patientSession } from '@/app/session'
 import { medicationService, patientService } from '@/modules/patient/api/mvp'
+import { patientApiService } from '@/modules/patient/api/patientApi'
 import { userDataService } from '@/services/userDataService'
 
 const router = useRouter()
@@ -105,6 +106,35 @@ const syncActivePlanState = async () => {
   } catch {
     patientSession.setActivePlanStatus(false)
   }
+}
+
+const syncLocalProfile = (payload: {
+  patientId?: number
+  name: string
+  phone: string
+  idType: string
+  identityMaterialArchived?: boolean
+  realNameVerifiedTime?: string
+}) => {
+  userDataService.updateRealNameInfo({
+    realName: payload.name,
+    idType: payload.idType,
+    ethnicity: userDataService.getUserProfile().ethnicity,
+    mobile: payload.phone,
+    patientId: payload.patientId,
+    identityMaterialArchived: payload.identityMaterialArchived,
+    realNameVerifiedTime: payload.realNameVerifiedTime
+  })
+
+  userDataService.updateProfile({
+    patientId: payload.patientId,
+    name: payload.name,
+    phone: payload.phone,
+    idType: payload.idType,
+    isRealNameVerified: true,
+    identityMaterialArchived: payload.identityMaterialArchived ?? true,
+    realNameVerifiedTime: payload.realNameVerifiedTime
+  })
 }
 
 const submitForm = async () => {
@@ -135,20 +165,46 @@ const submitForm = async () => {
       hospitalPatientId,
       name
     })
+    const bindData = (response.data ?? {}) as { id?: number }
 
     patientSession.setMobile(mobile)
     patientSession.setBindingStatus(true)
     await syncActivePlanState()
 
-    userDataService.updateRealNameInfo({
-      realName: name,
-      idType: '院内患者编号',
-      idNumber: hospitalPatientId,
-      ethnicity: userDataService.getUserProfile().ethnicity,
-      mobile
-    })
+    const verifiedAt = new Date().toISOString()
+    let successMessage = '绑定成功'
 
-    showMessage('绑定成功')
+    try {
+      const profileResponse = await patientApiService.updatePatientInfo({
+        name,
+        phone: mobile,
+        idType: '院内患者编号',
+        idCard: hospitalPatientId,
+        realNameVerified: true,
+        realNameVerifiedTime: verifiedAt
+      })
+
+      syncLocalProfile({
+        patientId: profileResponse.data?.patientId ?? bindData.id,
+        name: profileResponse.data?.name || name,
+        phone: profileResponse.data?.phone || mobile,
+        idType: profileResponse.data?.idType || '院内患者编号',
+        identityMaterialArchived: profileResponse.data?.identityMaterialArchived ?? true,
+        realNameVerifiedTime: profileResponse.data?.realNameVerifiedTime || verifiedAt
+      })
+    } catch {
+      syncLocalProfile({
+        patientId: bindData.id,
+        name,
+        phone: mobile,
+        idType: '院内患者编号',
+        identityMaterialArchived: true,
+        realNameVerifiedTime: verifiedAt
+      })
+      successMessage = '绑定成功，但档案回写失败，请稍后在个人资料页重试'
+    }
+
+    showMessage(successMessage)
     window.setTimeout(() => {
       router.replace('/tabs/home')
     }, 300)

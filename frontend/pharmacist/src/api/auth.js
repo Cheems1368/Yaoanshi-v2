@@ -1,5 +1,7 @@
 import request from '@/utils/request'
 
+const backendV2BaseURL = import.meta.env.VITE_BACKEND_V2_API_BASE_URL || ''
+
 // 登录
 export function login(data) {
   return request({
@@ -33,6 +35,24 @@ export function refreshToken() {
   })
 }
 
+export function refreshTokenByValue(refreshToken) {
+  return request({
+    url: '/admin-api/system/auth/refresh-token',
+    method: 'post',
+    params: { refreshToken },
+    skipAuthHeader: true,
+    skipAuthRefresh: true
+  })
+}
+
+export function createNotificationSocketTicket() {
+  return request({
+    baseURL: backendV2BaseURL,
+    url: '/admin-api/notifications/socket-ticket',
+    method: 'post'
+  })
+}
+
 // 修改密码
 export function changePassword(data) {
   return request({
@@ -41,6 +61,4 @@ export function changePassword(data) {
     data
   })
 }
-
-
 

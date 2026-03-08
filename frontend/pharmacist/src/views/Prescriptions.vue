@@ -1,16 +1,16 @@
 <template>
-  <section class="page-shell">
-    <header class="page-header">
-      <div>
+  <section class="page-shell pro-page-shell">
+    <header class="page-header pro-page-header">
+      <div class="pro-page-header__copy">
         <h2>处方复核</h2>
         <p>集中处理患者上传的处方图片，完成人工录入、DDI 提示确认和最终复核。</p>
       </div>
-      <div class="query-bar">
+      <div class="query-bar pro-toolbar">
         <el-input
           v-model="query.keyword"
           clearable
           placeholder="搜索患者姓名 / 院内患者 ID / 处方 ID"
-          class="query-input"
+          class="query-input pro-toolbar__grow"
           @keyup.enter="loadPrescriptions"
         />
         <el-select v-model="query.status" clearable placeholder="全部状态" class="query-select">
@@ -24,34 +24,42 @@
 
     <el-alert v-if="errorMessage" :closable="false" type="error" :title="errorMessage" show-icon />
 
-    <section class="panel">
-      <el-table v-loading="loading" :data="prescriptions" border empty-text="暂无处方待处理">
-        <el-table-column prop="id" label="处方 ID" width="120" />
-        <el-table-column prop="patientName" label="患者" min-width="140" />
-        <el-table-column prop="hospitalPatientId" label="院内患者 ID" min-width="160" />
-        <el-table-column prop="status" label="状态" width="140">
-          <template #default="{ row }">
-            <el-tag :type="statusTagType(row.status)" effect="plain">{{ statusText(row.status) }}</el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column prop="ocrStatus" label="OCR 状态" min-width="180">
-          <template #default="{ row }">
-            {{ ocrStatusText(row.ocrStatus) }}
-          </template>
-        </el-table-column>
-        <el-table-column prop="createdAt" label="提交时间" min-width="180">
-          <template #default="{ row }">
-            {{ formatDate(row.createdAt) }}
-          </template>
-        </el-table-column>
-        <el-table-column label="操作" width="120" fixed="right">
-          <template #default="{ row }">
-            <el-button link type="primary" @click="openDetail(row.id)">进入复核</el-button>
-          </template>
-        </el-table-column>
-      </el-table>
+    <section class="panel pro-table-panel">
+      <div class="table-scroll pro-table-scroll">
+        <el-table
+          v-loading="loading"
+          :data="prescriptions"
+          border
+          table-layout="auto"
+          empty-text="暂无处方待处理"
+        >
+          <el-table-column prop="id" label="处方 ID" width="120" />
+          <el-table-column prop="patientName" label="患者" min-width="160" show-overflow-tooltip />
+          <el-table-column prop="hospitalPatientId" label="院内患者 ID" min-width="180" show-overflow-tooltip />
+          <el-table-column prop="status" label="状态" width="140">
+            <template #default="{ row }">
+              <el-tag :type="statusTagType(row.status)" effect="plain">{{ statusText(row.status) }}</el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column prop="ocrStatus" label="OCR 状态" min-width="200">
+            <template #default="{ row }">
+              <span class="pro-ellipsis">{{ ocrStatusText(row.ocrStatus) }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column prop="createdAt" label="提交时间" min-width="180">
+            <template #default="{ row }">
+              {{ formatDate(row.createdAt) }}
+            </template>
+          </el-table-column>
+          <el-table-column label="操作" width="120" fixed="right">
+            <template #default="{ row }">
+              <el-button link type="primary" @click="openDetail(row.id)">进入复核</el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+      </div>
 
-      <div class="pagination-row">
+      <div class="pagination-row pro-pagination-row">
         <el-pagination
           background
           layout="total, prev, pager, next"
@@ -90,7 +98,13 @@
               <strong>{{ attachment.originalFilename }}</strong>
               <span>{{ attachment.mimeType }} / {{ formatSize(attachment.sizeBytes) }}</span>
               <span>对象键：{{ attachment.objectKey }}</span>
-              <span>{{ attachment.downloadUrl ? '对象存储待接入，可使用当前下载地址占位' : '待对象存储接入' }}</span>
+              <span>
+                {{
+                  attachment.downloadUrl
+                    ? '对象存储待接入，可使用当前下载地址占位'
+                    : '待对象存储接入'
+                }}
+              </span>
             </article>
           </div>
           <el-empty v-else description="暂无附件元数据" />
@@ -303,7 +317,7 @@ const handleConfirm = async () => {
   } catch (error) {
     if (error.message === 'DDI_CONFIRM_REQUIRED') {
       await reloadCurrentDetail()
-      ElMessage.warning('检测到高风险联用，请先确认 DDI 风险再继续提交')
+      ElMessage.warning('检测到高风险联用，请先确认 DDI 风险后再继续提交')
     }
   } finally {
     submitLoading.value = false
@@ -328,7 +342,7 @@ const handleReject = async () => {
     const { value } = await ElMessageBox.prompt('请输入驳回原因', '驳回处方', {
       confirmButtonText: '确认驳回',
       cancelButtonText: '取消',
-      inputPlaceholder: '例如：图片不清晰，需重新上传',
+      inputPlaceholder: '例如：图片不清晰，需要重新上传',
       inputValidator: (input) => Boolean(input && input.trim()),
       inputErrorMessage: '请填写驳回原因'
     })
@@ -408,19 +422,15 @@ loadPrescriptions()
 </script>
 
 <style lang="scss" scoped>
-.page-shell {
-  display: grid;
-  gap: 24px;
+.query-bar {
+  flex: 0 1 720px;
+  justify-content: flex-end;
 }
 
-.page-header {
-  display: flex;
-  align-items: end;
-  justify-content: space-between;
-  gap: 16px;
+.query-select {
+  width: 160px;
 }
 
-.page-header h2,
 .detail-section h3,
 .summary-card strong,
 .attachment-card strong,
@@ -429,40 +439,11 @@ loadPrescriptions()
   color: var(--pro-text-primary);
 }
 
-.page-header p,
 .summary-card span,
 .attachment-card span,
 .ddi-card p {
   margin: 0;
   color: var(--pro-text-secondary);
-}
-
-.query-bar {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-}
-
-.query-input {
-  width: 320px;
-}
-
-.query-select {
-  width: 160px;
-}
-
-.panel {
-  padding: 20px;
-  border: 1px solid var(--pro-border-color);
-  border-radius: var(--pro-radius-lg);
-  background: var(--pro-bg-primary);
-  box-shadow: var(--pro-shadow-sm);
-}
-
-.pagination-row {
-  display: flex;
-  justify-content: flex-end;
-  margin-top: 16px;
 }
 
 .detail-section {
@@ -517,17 +498,14 @@ loadPrescriptions()
   margin-bottom: 4px;
 }
 
-@media (max-width: 1200px) {
-  .page-header,
-  .query-bar,
+@media (max-width: 1024px) {
+  .query-select {
+    width: 100%;
+  }
+
   .summary-grid,
   .item-grid {
     display: grid;
-  }
-
-  .query-input,
-  .query-select {
-    width: 100%;
   }
 }
 </style>

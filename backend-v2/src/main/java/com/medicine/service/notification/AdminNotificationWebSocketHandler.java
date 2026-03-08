@@ -15,13 +15,16 @@ public class AdminNotificationWebSocketHandler extends TextWebSocketHandler {
     private static final CloseStatus UNAUTHORIZED_STATUS = new CloseStatus(4401, "UNAUTHORIZED");
 
     private final AdminNotificationWebSocketAuthenticator authenticator;
+    private final AdminNotificationSocketTicketService socketTicketService;
     private final AdminNotificationRealtimeService realtimeService;
 
     public AdminNotificationWebSocketHandler(
             AdminNotificationWebSocketAuthenticator authenticator,
+            AdminNotificationSocketTicketService socketTicketService,
             AdminNotificationRealtimeService realtimeService
     ) {
         this.authenticator = authenticator;
+        this.socketTicketService = socketTicketService;
         this.realtimeService = realtimeService;
     }
 
@@ -29,7 +32,8 @@ public class AdminNotificationWebSocketHandler extends TextWebSocketHandler {
     public void afterConnectionEstablished(WebSocketSession session) throws Exception {
         String token = null;
         if (session.getUri() != null) {
-            token = UriComponentsBuilder.fromUri(session.getUri()).build().getQueryParams().getFirst("access_token");
+            String ticket = UriComponentsBuilder.fromUri(session.getUri()).build().getQueryParams().getFirst("ticket");
+            token = socketTicketService.consume(ticket);
         }
         if (token == null) {
             token = session.getHandshakeHeaders().getFirst("Authorization");

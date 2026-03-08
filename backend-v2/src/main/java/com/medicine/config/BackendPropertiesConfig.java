@@ -5,6 +5,7 @@ import org.springframework.context.annotation.Configuration;
 
 @Configuration
 @EnableConfigurationProperties({
+        AdminNotificationWebSocketProperties.class,
         AiProperties.class,
         JwtProperties.class,
         LegacyAuthDataSourceProperties.class,

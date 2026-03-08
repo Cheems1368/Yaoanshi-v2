@@ -81,10 +81,6 @@
                 <el-input-number v-model="form.age" :min="0" :max="120" controls-position="right" />
               </el-form-item>
 
-              <el-form-item label="脱敏身份证号">
-                <el-input v-model="form.idCardMasked" placeholder="例如 310***********1234" />
-              </el-form-item>
-
               <el-form-item label="主要疾病编码">
                 <el-input v-model="form.primaryDiseaseCode" placeholder="请输入主要疾病编码" />
               </el-form-item>
@@ -220,7 +216,6 @@ const form = reactive({
   gender: '',
   birthDate: '',
   age: null,
-  idCardMasked: '',
   primaryDiseaseCode: '',
   primaryDiseaseName: '',
   drugAllergy: '',
@@ -253,7 +248,6 @@ const hydrateForm = (payload) => {
   form.gender = payload.gender || ''
   form.birthDate = payload.birthDate || ''
   form.age = payload.age ?? null
-  form.idCardMasked = payload.idCardMasked || ''
   form.primaryDiseaseCode = payload.primaryDiseaseCode || ''
   form.primaryDiseaseName = payload.primaryDiseaseName || ''
   form.drugAllergy = payload.drugAllergy || ''
@@ -300,7 +294,6 @@ const handleSave = async () => {
       gender: form.gender,
       birthDate: form.birthDate || null,
       age: form.age,
-      idCardMasked: form.idCardMasked,
       primaryDiseaseCode: form.primaryDiseaseCode,
       primaryDiseaseName: form.primaryDiseaseName,
       drugAllergy: form.drugAllergy,

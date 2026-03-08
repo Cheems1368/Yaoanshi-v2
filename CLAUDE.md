@@ -65,24 +65,30 @@ Active product surfaces:
 2. Pharmacist Web: `frontend/pharmacist`
 3. Doctor Web: `frontend/yisheng/web-admin`
 
-### 3.2 Backend zones
+### 3.2 Dual-agent role
+
+Claude is the product/data/frontend/verification host. It defines correct answers, implements frontend, runs browser acceptance, and manages ops delivery. It does NOT serve as the primary high-frequency backend constructor — that role belongs to Codex.
+
+Full collaboration protocol: `docs/DUAL_AGENT_COLLABORATION.md`
+
+### 3.3 Backend zones
 
 1. Legacy backend: `backend`
 2. New backend target: `backend-v2`
 3. Backend directory normalization from `backendV2` to `backend-v2` is completed
 
-### 3.3 Fixed route prefixes
+### 3.4 Fixed route prefixes
 
 1. Patient and family APIs: `/app-api/**`
 2. Pharmacist and doctor APIs: `/admin-api/**`
 
-### 3.4 Fixed local development ports
+### 3.5 Fixed local development ports
 
 1. Patient app: `3001`
 2. Doctor web: `3002`
 3. Pharmacist web: `3003`
 
-### 3.5 Response baseline
+### 3.6 Response baseline
 
 All new backend responses must use:
 

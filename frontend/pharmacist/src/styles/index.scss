@@ -26,6 +26,7 @@ html,
 body,
 #app {
   min-height: 100%;
+  min-width: 0;
   margin: 0;
   background: var(--pro-bg-secondary);
   color: var(--pro-text-primary);
@@ -36,6 +37,116 @@ body,
 
 body {
   min-height: 100vh;
+  overflow-x: hidden;
+}
+
+.pro-page-shell {
+  display: grid;
+  gap: 24px;
+  min-width: 0;
+}
+
+.pro-page-shell > * {
+  min-width: 0;
+}
+
+.pro-page-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  min-width: 0;
+}
+
+.pro-page-header > * {
+  min-width: 0;
+}
+
+.pro-page-header__copy {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.pro-page-header__copy h2 {
+  margin: 0;
+  color: var(--pro-text-primary);
+}
+
+.pro-page-header__copy p {
+  margin: 8px 0 0;
+  color: var(--pro-text-secondary);
+}
+
+.pro-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.pro-toolbar > * {
+  min-width: 0;
+}
+
+.pro-toolbar__grow {
+  flex: 1 1 320px;
+  min-width: min(320px, 100%);
+}
+
+.pro-toolbar__field {
+  width: 180px;
+  flex: 0 1 180px;
+}
+
+.pro-toolbar__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-left: auto;
+}
+
+.pro-table-panel {
+  min-width: 0;
+  display: grid;
+  gap: 16px;
+  padding: 20px;
+  border: 1px solid var(--pro-border-color);
+  border-radius: var(--pro-radius-lg);
+  background: var(--pro-bg-primary);
+  box-shadow: var(--pro-shadow-sm);
+  overflow: hidden;
+}
+
+.pro-table-scroll {
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.pro-table-scroll :where(.el-table) {
+  min-width: 100%;
+}
+
+.pro-table-scroll :where(.el-table .cell) {
+  word-break: break-word;
+}
+
+.pro-table-scroll :where(.el-button) {
+  white-space: nowrap;
+}
+
+.pro-pagination-row {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.pro-ellipsis {
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .el-card,
@@ -58,4 +169,27 @@ body {
 .el-menu {
   --el-menu-active-color: var(--pro-brand-primary);
   --el-menu-hover-bg-color: var(--pro-brand-secondary);
+}
+
+@media (max-width: 1024px) {
+  .pro-page-header {
+    align-items: stretch;
+  }
+
+  .pro-toolbar__grow,
+  .pro-toolbar__field,
+  .pro-toolbar__actions {
+    width: 100%;
+    flex-basis: 100%;
+  }
+
+  .pro-toolbar__actions {
+    margin-left: 0;
+  }
+}
+
+@media (max-width: 768px) {
+  .pro-page-header {
+    display: grid;
+  }
 }

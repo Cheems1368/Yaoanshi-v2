@@ -217,6 +217,74 @@ CREATE TABLE IF NOT EXISTS patient_family_binding (
     KEY idx_binding_family (tenant_id, family_account_id)
 );
 
+CREATE TABLE IF NOT EXISTS patient_profile (
+    id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    patient_id BIGINT NOT NULL,
+    contact_mobile VARCHAR(20) NULL,
+    id_type VARCHAR(32) NULL,
+    ethnicity VARCHAR(32) NULL,
+    height_cm INT NULL,
+    weight_kg INT NULL,
+    blood_type VARCHAR(16) NULL,
+    allergies TEXT NULL,
+    avatar_url VARCHAR(512) NULL,
+    address VARCHAR(255) NULL,
+    patient_type INT NULL,
+    insurance INT NULL,
+    emergency_contact_name VARCHAR(64) NULL,
+    emergency_contact_phone VARCHAR(20) NULL,
+    emergency_contact_relationship VARCHAR(32) NULL,
+    identity_material_hash CHAR(64) NULL,
+    real_name_verified BIT(1) NOT NULL DEFAULT b'0',
+    real_name_verified_time DATETIME NULL,
+    creator VARCHAR(64) NULL,
+    create_time DATETIME NOT NULL,
+    updater VARCHAR(64) NULL,
+    update_time DATETIME NOT NULL,
+    deleted BIT(1) NOT NULL DEFAULT b'0',
+    tenant_id BIGINT NOT NULL,
+    UNIQUE KEY uk_patient_profile_patient (tenant_id, patient_id)
+);
+
+SET @patient_profile_column_exists = (
+    SELECT COUNT(*)
+    FROM information_schema.columns
+    WHERE table_schema = DATABASE()
+      AND table_name = 'patient_profile'
+      AND column_name = 'identity_material_hash'
+);
+SET @patient_profile_column_sql = IF(
+    @patient_profile_column_exists = 0,
+    'ALTER TABLE patient_profile ADD COLUMN identity_material_hash CHAR(64) NULL AFTER emergency_contact_relationship',
+    'SELECT 1'
+);
+PREPARE patient_profile_stmt FROM @patient_profile_column_sql;
+EXECUTE patient_profile_stmt;
+DEALLOCATE PREPARE patient_profile_stmt;
+
+CREATE TABLE IF NOT EXISTS patient_health_profile (
+    id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    patient_id BIGINT NOT NULL,
+    layer1_allergy TEXT NULL,
+    layer1_diagnosis VARCHAR(255) NULL,
+    layer2_medical_history TEXT NULL,
+    layer2_smoking_drinking TEXT NULL,
+    layer2_liver_kidney TEXT NULL,
+    layer2_current_medication TEXT NULL,
+    layer3_detailed_symptoms TEXT NULL,
+    layer3_family_history TEXT NULL,
+    layer3_surgery_history TEXT NULL,
+    layer3_social_history TEXT NULL,
+    submitted_at DATETIME NULL,
+    creator VARCHAR(64) NULL,
+    create_time DATETIME NOT NULL,
+    updater VARCHAR(64) NULL,
+    update_time DATETIME NOT NULL,
+    deleted BIT(1) NOT NULL DEFAULT b'0',
+    tenant_id BIGINT NOT NULL,
+    UNIQUE KEY uk_patient_health_profile_patient (tenant_id, patient_id)
+);
+
 CREATE TABLE IF NOT EXISTS pharmacist_profile (
     id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
     system_user_id BIGINT NOT NULL,
@@ -394,6 +462,29 @@ CREATE TABLE IF NOT EXISTS ddi_rule (
     tenant_id BIGINT NOT NULL,
     UNIQUE KEY uk_ddi_rule_code (rule_code),
     KEY idx_ddi_severity (tenant_id, severity)
+);
+
+CREATE TABLE IF NOT EXISTS drug_contraindication (
+    id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    rule_code VARCHAR(64) NOT NULL,
+    drug_name VARCHAR(128) NOT NULL,
+    condition_type VARCHAR(32) NOT NULL,
+    condition_value VARCHAR(128) NOT NULL,
+    severity VARCHAR(16) NOT NULL,
+    message VARCHAR(255) NOT NULL,
+    recommended_action VARCHAR(255) NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE',
+    maintained_by_pharmacist_id BIGINT NULL,
+    creator VARCHAR(64) NULL,
+    create_time DATETIME NOT NULL,
+    updater VARCHAR(64) NULL,
+    update_time DATETIME NOT NULL,
+    deleted BIT(1) NOT NULL DEFAULT b'0',
+    tenant_id BIGINT NOT NULL,
+    UNIQUE KEY uk_contraindication_rule_code (rule_code),
+    KEY idx_contraindication_drug (tenant_id, drug_name),
+    KEY idx_contraindication_condition (tenant_id, condition_type, condition_value),
+    KEY idx_contraindication_severity (tenant_id, severity)
 );
 
 CREATE TABLE IF NOT EXISTS ddi_screening_log (

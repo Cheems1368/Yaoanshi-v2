@@ -294,22 +294,27 @@ Route: `/tabs/prescription`
 Purpose:
 
 - Show prescriptions and allow prescription image upload
+- Trigger DDI screening before submission (P0+ enhancement)
 
 Trigger:
 
 - User taps Prescription from the tab bar
 - Pharmacist asks the patient to upload a prescription photo
 
-Success:
+Success (with DDI screening):
 
-- Image is uploaded
-- Pharmacist can later review and confirm OCR result
+1. Image is selected and drug names are extracted or entered
+2. System calls DDI screening endpoint
+3. If DDI alerts exist, show alert dialog (see section 7.4.2)
+4. If user confirms or no alerts, proceed with upload
+5. Pharmacist can later review and confirm OCR result
 
 Error:
 
 - Show upload failure
 - Suggest retake if the image is unclear
-- Keep existing uploaded items visible
+- Keep existing uploaded items visible, including after page reload
+- DDI screening failure does not block upload (graceful degradation)
 
 #### Profile Screen
 
@@ -570,6 +575,7 @@ Authoritative MVP route list for pharmacist-facing navigation:
 - `/system/help-order/detail` - Help Order Detail Screen
 - `/prescription/prescriptions` - Prescription List Screen
 - `/prescription/prescriptionDetail` - Prescription Detail / OCR Review Screen
+- `/ddi/rules` - DDI Rule Management Screen (P0+ enhancement)
 - `/user/profile` - User Profile Screen
 
 Non-MVP legacy menu groups must stay hidden for trial users.
@@ -1056,14 +1062,63 @@ Behavior:
 
 ### 7.4 DDI high-risk warning
 
+#### 7.4.1 Pharmacist-side (P0)
+
 Applies to:
 
 - Pharmacist Web
 
 Behavior:
 
-- Strong warning appears during save
+- Strong warning appears during prescription confirm or plan save
 - Pharmacist must confirm before final save
+- Confirmation is recorded in screening log
+
+#### 7.4.2 Patient-side DDI alert (P0+ enhancement)
+
+Applies to:
+
+- Patient App
+
+Trigger:
+
+- Patient uploads a new prescription
+- Patient is about to add a new medication (future self-service flow)
+
+Behavior:
+
+1. Before submission, system calls `POST /app-api/ddi/screen` with the new drug names
+2. If alerts are returned (HIGH or MEDIUM severity):
+   - Show alert dialog listing each interaction/contraindication
+   - Each alert shows: drug pair or drug-condition pair, severity badge, warning message, recommended action
+   - HIGH severity alerts are shown in red
+   - MEDIUM severity alerts are shown in orange
+3. User can choose:
+   - "已知晓，继续提交" (Acknowledged, continue) — proceeds with submission
+   - "取消，咨询药师" (Cancel, consult pharmacist) — returns to the form and optionally opens help order creation
+4. If no alerts, submission proceeds normally without interruption
+
+#### 7.4.3 Pharmacist DDI rule management (P0+ enhancement)
+
+Applies to:
+
+- Pharmacist Web
+
+New route: `/ddi/rules`
+
+Purpose:
+
+- View, create, and edit DDI rules and drug contraindication rules
+
+Trigger:
+
+- Pharmacist opens DDI rule management from the navigation menu
+
+Success:
+
+- Rules are listed in a searchable table (drug name, severity filter)
+- Pharmacist can create new rules or edit existing ones
+- Changes take effect immediately for subsequent screenings
 
 ### 7.5 OCR low confidence
 

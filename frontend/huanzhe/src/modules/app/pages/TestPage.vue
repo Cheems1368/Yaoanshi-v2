@@ -21,7 +21,7 @@
               <strong>手机号:</strong> {{ userProfile.phone }}
             </div>
             <div class="info-item">
-              <strong>身份证号:</strong> {{ userProfile.idCard }}
+              <strong>实名材料:</strong> {{ userProfile.identityMaterialArchived ? '已归档' : '未归档' }}
             </div>
             <div class="info-item">
               <strong>证件类型:</strong> {{ userProfile.idType }}
@@ -76,9 +76,9 @@ const testUpdate = () => {
   userDataService.updateRealNameInfo({
     realName: '测试用户',
     idType: '身份证',
-    idNumber: '330123199001011234',
     ethnicity: '汉族',
-    mobile: '13812345678'
+    mobile: '13812345678',
+    identityMaterialArchived: true
   })
   
   // 更新本地显示

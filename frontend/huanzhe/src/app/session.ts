@@ -1,9 +1,11 @@
-const ACCESS_TOKEN_KEY = 'patient_access_token'
 const REFRESH_TOKEN_KEY = 'patient_refresh_token'
 const DEVICE_ID_KEY = 'patient_device_id'
 const MOBILE_KEY = 'patient_mobile'
 const BINDING_STATUS_KEY = 'patient_binding_status'
 const ACTIVE_PLAN_KEY = 'patient_has_active_plan'
+let accessTokenMemory = ''
+
+const getSessionStorage = () => (typeof window !== 'undefined' ? window.sessionStorage : null)
 
 const createDeviceId = () => {
   if (typeof globalThis !== 'undefined' && globalThis.crypto?.randomUUID) {
@@ -21,27 +23,35 @@ export interface PatientGateState {
 
 export const patientSession = {
   getAccessToken(): string | null {
-    return localStorage.getItem(ACCESS_TOKEN_KEY)
+    return accessTokenMemory || null
   },
 
   setAccessToken(token: string) {
-    localStorage.setItem(ACCESS_TOKEN_KEY, token)
+    accessTokenMemory = token || ''
   },
 
   clearAccessToken() {
-    localStorage.removeItem(ACCESS_TOKEN_KEY)
+    accessTokenMemory = ''
   },
 
   getRefreshToken(): string | null {
-    return localStorage.getItem(REFRESH_TOKEN_KEY)
+    return getSessionStorage()?.getItem(REFRESH_TOKEN_KEY) ?? null
   },
 
   setRefreshToken(token: string) {
-    localStorage.setItem(REFRESH_TOKEN_KEY, token)
+    const storage = getSessionStorage()
+    if (!storage) {
+      return
+    }
+    if (!token) {
+      storage.removeItem(REFRESH_TOKEN_KEY)
+      return
+    }
+    storage.setItem(REFRESH_TOKEN_KEY, token)
   },
 
   clearRefreshToken() {
-    localStorage.removeItem(REFRESH_TOKEN_KEY)
+    getSessionStorage()?.removeItem(REFRESH_TOKEN_KEY)
   },
 
   getDeviceId(): string | null {
@@ -96,7 +106,7 @@ export const patientSession = {
 
   getGateState(): PatientGateState {
     return {
-      loggedIn: Boolean(localStorage.getItem(ACCESS_TOKEN_KEY)),
+      loggedIn: Boolean(accessTokenMemory || this.getRefreshToken()),
       isBound: localStorage.getItem(BINDING_STATUS_KEY) === 'BOUND',
       hasActivePlan: localStorage.getItem(ACTIVE_PLAN_KEY) === 'true'
     }

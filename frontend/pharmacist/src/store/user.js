@@ -1,8 +1,10 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
 import { ElMessage } from 'element-plus'
-import { login, logout, getUserInfo } from '@/api/auth'
+import { login, logout, getUserInfo, refreshTokenByValue } from '@/api/auth'
 import { API_SUCCESS_CODES } from '@/utils/constants'
+
+const REFRESH_TOKEN_STORAGE_KEY = 'refreshToken'
 
 const EMPTY_USER = {
   id: null,
@@ -18,6 +20,8 @@ const ROLE_DISPLAY_LABELS = {
   pharmacist: '药师',
   patient: '患者'
 }
+
+const readRefreshToken = () => window.sessionStorage.getItem(REFRESH_TOKEN_STORAGE_KEY) || ''
 
 const derivePrimaryRole = (info = {}) => {
   const rawRoles = []
@@ -73,11 +77,13 @@ const normalizeUserInfo = (info = {}) => {
 }
 
 export const useUserStore = defineStore('user', () => {
-  const token = ref(localStorage.getItem('token') || '')
+  const token = ref('')
+  const refreshTokenValue = ref(readRefreshToken())
   const userInfo = ref({ ...EMPTY_USER })
   const userRole = ref('')
+  let refreshPromise = null
 
-  const isLoggedIn = computed(() => Boolean(token.value))
+  const isLoggedIn = computed(() => Boolean(token.value || refreshTokenValue.value))
   const isDoctor = computed(() => false)
   const isPharmacist = computed(() => userRole.value === 'pharmacist')
 
@@ -88,13 +94,57 @@ export const useUserStore = defineStore('user', () => {
 
   const setToken = (newToken) => {
     token.value = newToken || ''
+  }
 
-    if (token.value) {
-      localStorage.setItem('token', token.value)
+  const setRefreshToken = (newRefreshToken) => {
+    refreshTokenValue.value = newRefreshToken || ''
+
+    if (refreshTokenValue.value) {
+      window.sessionStorage.setItem(REFRESH_TOKEN_STORAGE_KEY, refreshTokenValue.value)
       return
     }
 
-    localStorage.removeItem('token')
+    window.sessionStorage.removeItem(REFRESH_TOKEN_STORAGE_KEY)
+  }
+
+  const clearAuthState = () => {
+    setToken('')
+    setRefreshToken('')
+    resetUserState()
+  }
+
+  const refreshAccessToken = async () => {
+    if (!refreshTokenValue.value) {
+      return null
+    }
+
+    if (!refreshPromise) {
+      refreshPromise = refreshTokenByValue(refreshTokenValue.value)
+        .then((response) => {
+          if (!API_SUCCESS_CODES.includes(response.code)) {
+            throw new Error(response.msg || response.message || 'Token 刷新失败')
+          }
+
+          const nextAccessToken = response.data?.accessToken || ''
+          const nextRefreshToken = response.data?.refreshToken || ''
+          if (!nextAccessToken) {
+            throw new Error('登录响应缺少访问令牌')
+          }
+
+          setToken(nextAccessToken)
+          setRefreshToken(nextRefreshToken)
+          return nextAccessToken
+        })
+        .catch(() => {
+          clearAuthState()
+          return null
+        })
+        .finally(() => {
+          refreshPromise = null
+        })
+    }
+
+    return refreshPromise
   }
 
   const setUserInfo = (info = {}) => {
@@ -118,12 +168,7 @@ export const useUserStore = defineStore('user', () => {
       }
 
       setToken(accessToken)
-
-      if (refreshToken) {
-        localStorage.setItem('refreshToken', refreshToken)
-      } else {
-        localStorage.removeItem('refreshToken')
-      }
+      setRefreshToken(refreshToken || '')
 
       await initUserInfo()
       ElMessage.success('登录成功')
@@ -135,24 +180,29 @@ export const useUserStore = defineStore('user', () => {
     }
   }
 
-  const logoutAction = async () => {
+  const logoutAction = async (options = {}) => {
+    const { silent = false } = options
+
     try {
       if (token.value) {
         await logout()
       }
     } catch (error) {
-      console.error('登出请求失败:', error)
+      console.error('退出请求失败:', error)
     } finally {
-      setToken('')
-      localStorage.removeItem('refreshToken')
-      resetUserState()
-      ElMessage.success('已退出登录')
+      clearAuthState()
+      if (!silent) {
+        ElMessage.success('已退出登录')
+      }
     }
   }
 
   const initUserInfo = async () => {
     if (!token.value) {
-      return
+      const restoredToken = await refreshAccessToken()
+      if (!restoredToken) {
+        return
+      }
     }
 
     try {
@@ -177,7 +227,7 @@ export const useUserStore = defineStore('user', () => {
       })
     } catch (error) {
       console.error('获取用户信息失败:', error)
-      await logoutAction()
+      await logoutAction({ silent: true })
     }
   }
 
@@ -187,12 +237,15 @@ export const useUserStore = defineStore('user', () => {
 
   return {
     token,
+    refreshTokenValue,
     userInfo,
     userRole,
     isLoggedIn,
     isDoctor,
     isPharmacist,
     setToken,
+    setRefreshToken,
+    refreshAccessToken,
     setUserInfo,
     loginAction,
     logoutAction,

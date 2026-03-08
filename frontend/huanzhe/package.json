@@ -8,6 +8,7 @@
     "build": "vue-tsc && vite build",
     "preview": "vite preview",
     "test:e2e": "cypress run",
+    "e2e:challenge-cup:live": "node scripts/e2e-challenge-cup-live.mjs",
     "test:unit": "vitest",
     "lint": "eslint ."
   },

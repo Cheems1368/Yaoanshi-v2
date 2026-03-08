@@ -10,11 +10,11 @@
     </ion-header>
 
     <ion-content class="page-content">
-      <div class="container" v-if="item">
+      <div class="container" v-if="item" data-testid="rational-detail-page">
         <ion-card class="hero-card">
           <ion-card-content>
             <p class="topic">{{ item.categoryName }} / {{ item.topicName }}</p>
-            <h2>{{ item.name }}</h2>
+            <h2 data-testid="rational-detail-title">{{ item.name }}</h2>
             <p class="generic-name">通用名：{{ item.genericName }}</p>
           </ion-card-content>
         </ion-card>

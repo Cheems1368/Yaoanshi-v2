@@ -22,8 +22,15 @@ class HttpService {
       }
     })
 
-    this.instance.interceptors.request.use((config) => {
-      const token = patientSession.getAccessToken()
+    this.instance.interceptors.request.use(async (config) => {
+      const requestUrl = String(config.url ?? '')
+      let token = patientSession.getAccessToken()
+      config.headers = config.headers ?? {}
+
+      if (!token && patientSession.getRefreshToken() && !this.shouldSkipRefresh(requestUrl)) {
+        token = await this.refreshAccessToken()
+      }
+
       if (token) {
         config.headers.Authorization = `Bearer ${token}`
       }
@@ -76,13 +83,19 @@ class HttpService {
     patientSession.clearGateState()
   }
 
+  private shouldSkipRefresh(requestUrl: string) {
+    return requestUrl.includes('/app-api/auth/login')
+      || requestUrl.includes('/app-api/auth/send-otp')
+      || requestUrl.includes('/app-api/auth/refresh-token')
+  }
+
   private async retryWithRefresh(
     config?: AxiosRequestConfig & { _retry?: boolean },
     fallbackMessage = 'Login expired'
   ) {
     const requestUrl = String(config?.url ?? '')
 
-    if (!config || config._retry || requestUrl.includes('/app-api/auth/refresh-token')) {
+    if (!config || config._retry || this.shouldSkipRefresh(requestUrl)) {
       this.clearToken()
       this.redirectToLogin()
       return Promise.reject(new Error(fallbackMessage))
@@ -112,14 +125,14 @@ class HttpService {
       return null
     }
 
-      if (!this.refreshPromise) {
-        const baseURL = this.instance.defaults.baseURL ?? ''
-        this.refreshPromise = axios
-          .post<ApiResponse<{ accessToken: string; refreshToken: string; expiresIn: number; refreshExpiresIn: number; deviceId: string }>>(
-            `${baseURL}/app-api/auth/refresh-token`,
-            {
-              refreshToken,
-              deviceId
+    if (!this.refreshPromise) {
+      const baseURL = this.instance.defaults.baseURL ?? ''
+      this.refreshPromise = axios
+        .post<ApiResponse<{ accessToken: string; refreshToken: string; expiresIn: number; refreshExpiresIn: number; deviceId: string }>>(
+          `${baseURL}/app-api/auth/refresh-token`,
+          {
+            refreshToken,
+            deviceId
           },
           {
             timeout: 10000,

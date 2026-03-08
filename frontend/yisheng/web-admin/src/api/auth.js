@@ -33,6 +33,23 @@ export function refreshToken() {
   })
 }
 
+export function refreshTokenByValue(refreshToken) {
+  return request({
+    url: '/admin-api/system/auth/refresh-token',
+    method: 'post',
+    params: { refreshToken },
+    skipAuthHeader: true,
+    skipAuthRefresh: true
+  })
+}
+
+export function createNotificationSocketTicket() {
+  return request({
+    url: '/admin-api/notifications/socket-ticket',
+    method: 'post'
+  })
+}
+
 // 修改密码
 export function changePassword(data) {
   return request({
@@ -41,6 +58,5 @@ export function changePassword(data) {
     data
   })
 }
-
 
 

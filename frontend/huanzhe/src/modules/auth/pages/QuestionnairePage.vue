@@ -102,7 +102,8 @@ import { ref, reactive, computed } from "vue"
 import { useRouter } from "vue-router"
 import { IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonButton, IonIcon, IonTextarea } from "@ionic/vue"
 import { chevronBackOutline } from "ionicons/icons"
-import { healthDataService } from "@/services/healthDataService"
+import { healthDataService, type HealthData } from "@/services/healthDataService"
+import { patientApiService } from "@/modules/patient/api/patientApi"
 
 const router = useRouter()
 
@@ -133,18 +134,19 @@ const prevStep = () => {
 
 const submitForm = async () => {
   try {
-    // 保存健康数据到本地存储
-    healthDataService.saveHealthData(formData)
-    
-    console.log('问卷数据已保存:', formData)
-    
-    // 显示成功提示
-    alert('问卷提交成功！健康信息已保存到个人资料页面。')
-    
-    // 跳转到个人资料页面
+    const response = await patientApiService.submitHealthData(formData)
+    const persistedHealthData: HealthData = response.data?.submitTime
+      ? (response.data as HealthData)
+      : {
+          ...formData,
+          submitTime: new Date().toISOString()
+        }
+    healthDataService.replaceHealthData(persistedHealthData)
+
+    alert('问卷提交成功！健康信息已保存到个人资料。')
+
     router.push('/tabs/profile')
-  } catch (error) {
-    console.error('保存问卷数据失败:', error)
+  } catch {
     alert('保存失败，请重试')
   }
 }

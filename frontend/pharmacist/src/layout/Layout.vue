@@ -1,5 +1,5 @@
 <template>
-  <div class="layout-container">
+  <div :class="['layout-container', { 'sidebar-collapsed': isCollapse }]">
     <aside :class="['sidebar', { collapsed: isCollapse }]">
       <div class="brand">
         <div class="brand-mark">药</div>
@@ -23,13 +23,13 @@
           <el-button text class="collapse-btn" @click="isCollapse = !isCollapse">
             <el-icon><Expand v-if="isCollapse" /><Fold v-else /></el-icon>
           </el-button>
-          <div>
+          <div class="header-copy-body">
             <h1>{{ currentPageTitle }}</h1>
             <p>保持登录走 legacy，患者资料维护与 ABCD2 快照由 backend-v2 承载。</p>
           </div>
         </div>
 
-        <el-dropdown @command="handleCommand">
+        <el-dropdown class="user-dropdown" @command="handleCommand">
           <div class="user-entry">
             <el-avatar :size="34" :src="userStore.userInfo.avatar">
               <el-icon><UserFilled /></el-icon>
@@ -68,7 +68,8 @@ import {
   HomeFilled,
   List,
   User,
-  UserFilled
+  UserFilled,
+  WarningFilled
 } from '@element-plus/icons-vue'
 import { useUserStore } from '@/store/user'
 
@@ -82,6 +83,7 @@ const menuItems = [
   { path: '/patient/list', title: '患者管理', icon: User },
   { path: '/prescriptions', title: '处方审核', icon: Document },
   { path: '/workorders', title: '工单处理', icon: List },
+  { path: '/ddi/rules', title: 'DDI 规则管理', icon: WarningFilled },
   { path: '/profile', title: '个人资料', icon: UserFilled }
 ]
 
@@ -125,15 +127,28 @@ const handleCommand = async (command) => {
 
 <style lang="scss" scoped>
 .layout-container {
+  --sidebar-width: 240px;
   min-height: 100vh;
-  display: grid;
-  grid-template-columns: 240px 1fr;
+  min-width: 0;
+  display: flex;
   background: var(--pro-bg-secondary);
 }
 
+.layout-container.sidebar-collapsed {
+  --sidebar-width: 88px;
+}
+
 .sidebar {
+  width: var(--sidebar-width);
+  min-width: var(--sidebar-width);
+  flex: 0 0 var(--sidebar-width);
   border-right: 1px solid var(--pro-border-color);
   background: linear-gradient(180deg, #ffffff 0%, #f5f7fa 100%);
+  overflow: hidden;
+  transition:
+    width 160ms ease,
+    min-width 160ms ease,
+    flex-basis 160ms ease;
 }
 
 .brand {
@@ -143,6 +158,11 @@ const handleCommand = async (command) => {
   align-items: center;
   gap: 12px;
   border-bottom: 1px solid var(--pro-border-color);
+}
+
+.sidebar.collapsed .brand {
+  justify-content: center;
+  padding: 0 12px;
 }
 
 .brand-mark {
@@ -180,6 +200,11 @@ const handleCommand = async (command) => {
   background: transparent;
 }
 
+.sidebar.collapsed .sidebar-menu {
+  padding-left: 8px;
+  padding-right: 8px;
+}
+
 .sidebar-menu :deep(.el-menu-item) {
   margin-bottom: 8px;
   border-radius: 12px;
@@ -193,25 +218,38 @@ const handleCommand = async (command) => {
 
 .workspace {
   min-width: 0;
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  overflow-x: hidden;
 }
 
 .header {
-  height: 72px;
+  min-width: 0;
+  min-height: 72px;
   padding: 0 24px;
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  justify-content: space-between;
+  gap: 16px;
   border-bottom: 1px solid var(--pro-border-color);
   background: rgba(255, 255, 255, 0.96);
 }
 
 .header-copy {
+  min-width: 0;
   display: flex;
   align-items: center;
   gap: 16px;
 }
 
+.header-copy-body {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
 .collapse-btn {
+  flex: 0 0 auto;
   width: 40px;
   height: 40px;
   border-radius: 12px;
@@ -222,18 +260,30 @@ const handleCommand = async (command) => {
   font-size: 20px;
   color: var(--pro-text-primary);
   font-family: var(--pro-title-font-family);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .header-copy p {
   margin: 4px 0 0;
   font-size: 12px;
   color: var(--pro-text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.user-dropdown {
+  min-width: 0;
 }
 
 .user-entry {
   display: flex;
   align-items: center;
   gap: 10px;
+  min-width: 0;
+  max-width: 240px;
   padding: 8px 12px;
   border-radius: 14px;
   cursor: pointer;
@@ -244,6 +294,7 @@ const handleCommand = async (command) => {
 }
 
 .user-meta {
+  min-width: 0;
   display: flex;
   flex-direction: column;
 }
@@ -251,25 +302,42 @@ const handleCommand = async (command) => {
 .user-meta strong {
   font-size: 14px;
   color: var(--pro-text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .user-meta span {
   font-size: 12px;
   color: var(--pro-text-secondary);
   text-transform: uppercase;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .main-content {
+  min-width: 0;
+  flex: 1 1 auto;
   padding: 24px;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 @media (max-width: 1024px) {
   .layout-container {
-    grid-template-columns: 72px 1fr;
+    --sidebar-width: 72px;
   }
 }
 
 @media (max-width: 768px) {
+  .header {
+    grid-template-columns: 1fr;
+    align-items: start;
+    padding-top: 12px;
+    padding-bottom: 12px;
+  }
+
   .header,
   .main-content {
     padding-left: 16px;
@@ -279,6 +347,10 @@ const handleCommand = async (command) => {
   .header-copy p,
   .user-meta span {
     display: none;
+  }
+
+  .user-entry {
+    max-width: none;
   }
 }
 </style>

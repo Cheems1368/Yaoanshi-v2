@@ -1,11 +1,11 @@
 <template>
-  <div class="home-container">
+  <div class="home-container" data-testid="ai-home-view">
     <section class="hero">
       <div class="icon-wrap">
         <ion-icon :icon="sparklesOutline" />
       </div>
-      <h2>AI 用药科普助手</h2>
-      <p>可咨询常见用药问题、注意事项和风险提示。</p>
+      <h2>用药科普助手</h2>
+      <p>可解答服药时间、漏服处理、常见不良反应和复诊提醒。</p>
     </section>
 
     <section class="topic-card">
@@ -26,6 +26,7 @@
           v-for="(question, index) in currentQuestions"
           :key="`${currentTab}-${question}`"
           button
+          :data-testid="`ai-home-question-${index}`"
           @click="$emit('start-chat', question)"
         >
           <div class="rank" :class="{ top: index < 3 }">{{ index + 1 }}</div>
@@ -51,7 +52,7 @@ const currentTab = ref('热门问题')
 
 const topicQuestions: Record<string, string[]> = {
   热门问题: [
-    '漏服降压药后该怎么处理？',
+    '降压药漏服后该怎么处理？',
     '阿司匹林和氯吡格雷能否同服？',
     '长期服药为什么还要复查？',
     '出现轻微头晕是否要停药？'

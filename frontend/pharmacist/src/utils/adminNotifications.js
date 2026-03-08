@@ -1,4 +1,5 @@
 import { ElNotification } from 'element-plus'
+import { createNotificationSocketTicket } from '@/api/auth'
 
 const EVENT_NAME = 'admin-notification'
 
@@ -42,6 +43,16 @@ export function createAdminNotificationClient(getToken) {
   let socket = null
   let reconnectTimer = null
   let manualClose = false
+  let connecting = false
+
+  const scheduleReconnect = () => {
+    if (!manualClose && !reconnectTimer) {
+      reconnectTimer = window.setTimeout(() => {
+        reconnectTimer = null
+        connect()
+      }, 3000)
+    }
+  }
 
   const disconnect = () => {
     manualClose = true
@@ -55,7 +66,7 @@ export function createAdminNotificationClient(getToken) {
     }
   }
 
-  const connect = () => {
+  const connect = async () => {
     const token = getToken?.()
     if (!token) {
       disconnect()
@@ -64,9 +75,28 @@ export function createAdminNotificationClient(getToken) {
     if (socket && (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING)) {
       return
     }
+    if (connecting) {
+      return
+    }
 
     manualClose = false
-    socket = new WebSocket(`${resolveWebSocketUrl()}?access_token=${encodeURIComponent(token)}`)
+    connecting = true
+
+    try {
+      const response = await createNotificationSocketTicket()
+      const ticket = response.data?.ticket
+      if (!ticket) {
+        throw new Error('Missing notification socket ticket')
+      }
+
+      socket = new WebSocket(`${resolveWebSocketUrl()}?ticket=${encodeURIComponent(ticket)}`)
+    } catch (error) {
+      console.error('Failed to create admin notification socket ticket:', error)
+      scheduleReconnect()
+      return
+    } finally {
+      connecting = false
+    }
 
     socket.onmessage = (event) => {
       try {
@@ -91,9 +121,7 @@ export function createAdminNotificationClient(getToken) {
 
     socket.onclose = () => {
       socket = null
-      if (!manualClose) {
-        reconnectTimer = window.setTimeout(connect, 3000)
-      }
+      scheduleReconnect()
     }
   }
 

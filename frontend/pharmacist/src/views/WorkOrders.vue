@@ -1,11 +1,11 @@
 <template>
-  <section class="page-shell">
-    <header class="page-header">
-      <div>
+  <section class="page-shell pro-page-shell">
+    <header class="page-header pro-page-header">
+      <div class="pro-page-header__copy">
         <h2>工单处理</h2>
         <p>承接患者求助、认领处理、必要时升级到医生，并完成关闭或驳回。</p>
       </div>
-      <div class="query-bar">
+      <div class="query-bar pro-toolbar">
         <el-select v-model="query.status" clearable placeholder="全部状态" class="query-select">
           <el-option label="待药师处理" value="SUBMITTED" />
           <el-option label="药师处理中" value="PHARMACIST_IN_PROGRESS" />
@@ -18,38 +18,42 @@
       </div>
     </header>
 
-    <section class="panel">
-      <el-table v-loading="loading" :data="orders" border empty-text="暂无工单">
-        <el-table-column prop="orderNo" label="工单号" width="180" />
-        <el-table-column prop="patientName" label="患者" min-width="120" />
-        <el-table-column prop="title" label="标题" min-width="220" />
-        <el-table-column prop="category" label="类型" width="140">
-          <template #default="{ row }">{{ categoryText(row.category) }}</template>
-        </el-table-column>
-        <el-table-column prop="priority" label="优先级" width="110">
-          <template #default="{ row }">
-            <el-tag :type="row.priority === 'URGENT' ? 'danger' : 'info'" effect="plain">
-              {{ row.priority === 'URGENT' ? '紧急' : '普通' }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column prop="status" label="状态" width="150">
-          <template #default="{ row }">
-            <el-tag :type="statusTagType(row.status)" effect="plain">{{ statusText(row.status) }}</el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column prop="createdAt" label="提交时间" min-width="180">
-          <template #default="{ row }">{{ formatDate(row.createdAt) }}</template>
-        </el-table-column>
-        <el-table-column label="操作" width="180" fixed="right">
-          <template #default="{ row }">
-            <el-button link type="primary" @click="openDetail(row.id)">详情</el-button>
-            <el-button v-if="row.status === 'SUBMITTED'" link type="success" @click="handleClaim(row.id)">认领</el-button>
-          </template>
-        </el-table-column>
-      </el-table>
+    <section class="panel pro-table-panel">
+      <div class="table-scroll pro-table-scroll">
+        <el-table v-loading="loading" :data="orders" border table-layout="auto" empty-text="暂无工单">
+          <el-table-column prop="orderNo" label="工单号" min-width="180" show-overflow-tooltip />
+          <el-table-column prop="patientName" label="患者" min-width="140" show-overflow-tooltip />
+          <el-table-column prop="title" label="标题" min-width="260" show-overflow-tooltip />
+          <el-table-column prop="category" label="类型" width="140">
+            <template #default="{ row }">{{ categoryText(row.category) }}</template>
+          </el-table-column>
+          <el-table-column prop="priority" label="优先级" width="110">
+            <template #default="{ row }">
+              <el-tag :type="row.priority === 'URGENT' ? 'danger' : 'info'" effect="plain">
+                {{ row.priority === 'URGENT' ? '紧急' : '普通' }}
+              </el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column prop="status" label="状态" width="150">
+            <template #default="{ row }">
+              <el-tag :type="statusTagType(row.status)" effect="plain">{{ statusText(row.status) }}</el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column prop="createdAt" label="提交时间" min-width="180">
+            <template #default="{ row }">{{ formatDate(row.createdAt) }}</template>
+          </el-table-column>
+          <el-table-column label="操作" width="180" fixed="right">
+            <template #default="{ row }">
+              <el-button link type="primary" @click="openDetail(row.id)">详情</el-button>
+              <el-button v-if="row.status === 'SUBMITTED'" link type="success" @click="handleClaim(row.id)">
+                认领
+              </el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+      </div>
 
-      <div class="pagination-row">
+      <div class="pagination-row pro-pagination-row">
         <el-pagination
           background
           layout="total, prev, pager, next"
@@ -299,41 +303,37 @@ onBeforeUnmount(() => {
 </script>
 
 <style lang="scss" scoped>
-.page-shell,
 .panel {
   display: grid;
   gap: 24px;
 }
 
-.page-header,
-.query-bar,
-.action-row {
-  display: flex;
-  justify-content: space-between;
-  gap: 16px;
-  align-items: center;
-}
-
-.page-header h2,
-.detail-section h3 {
-  margin: 0;
-  color: var(--pro-text-primary);
-}
-
-.page-header p,
-.detail-desc,
-.detail-note {
-  margin: 8px 0 0;
-  color: var(--pro-text-secondary);
+.query-bar {
+  flex: 0 1 220px;
+  justify-content: flex-end;
 }
 
 .query-select {
   width: 180px;
 }
 
-.pagination-row {
+.action-row {
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.detail-section h3 {
+  margin: 0;
+  color: var(--pro-text-primary);
+}
+
+.detail-desc,
+.detail-note {
+  margin: 8px 0 0;
+  color: var(--pro-text-secondary);
 }
 
 .detail-section {
@@ -360,16 +360,20 @@ onBeforeUnmount(() => {
   white-space: pre-wrap;
 }
 
-@media (max-width: 768px) {
-  .page-header,
-  .query-bar,
-  .action-row {
-    flex-direction: column;
-    align-items: stretch;
+@media (max-width: 1024px) {
+  .query-select {
+    width: 100%;
   }
 
   .summary-grid {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .action-row {
+    flex-direction: column;
+    align-items: stretch;
   }
 }
 </style>

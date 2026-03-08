@@ -114,8 +114,11 @@ import {
 } from '@ionic/vue'
 import { computed, ref } from 'vue'
 import { chatboxEllipsesOutline } from 'ionicons/icons'
+import { useRoute, useRouter } from 'vue-router'
 import { helpOrderService, type HelpOrderDTO } from '@/modules/patient/api/mvp'
 
+const route = useRoute()
+const router = useRouter()
 const loading = ref(false)
 const submitting = ref(false)
 const orders = ref<HelpOrderDTO[]>([])
@@ -134,6 +137,33 @@ const canSubmit = computed(() => Boolean(form.value.title.trim() && form.value.d
 const showMessage = (message: string) => {
   toastMessage.value = message
   showToast.value = true
+}
+
+const readQueryValue = (value: unknown) => {
+  if (Array.isArray(value)) {
+    return typeof value[0] === 'string' ? value[0] : ''
+  }
+  return typeof value === 'string' ? value : ''
+}
+
+const applyPrefillFromQuery = () => {
+  const category = readQueryValue(route.query.category)
+  const title = readQueryValue(route.query.title)
+  const description = readQueryValue(route.query.description)
+  const requiresOfflineEmergency = readQueryValue(route.query.requiresOfflineEmergency)
+
+  if (!category && !title && !description && !requiresOfflineEmergency) {
+    return
+  }
+
+  form.value = {
+    category: category || 'MEDICATION_CONSULTATION',
+    title,
+    description,
+    requiresOfflineEmergency: requiresOfflineEmergency === 'true'
+  }
+
+  void router.replace({ path: route.path, query: {} })
 }
 
 const loadOrders = async () => {
@@ -221,7 +251,10 @@ const formatDateTime = (value?: string | null) => {
   return Number.isNaN(date.getTime()) ? value : date.toLocaleString('zh-CN', { hour12: false })
 }
 
-onIonViewWillEnter(loadOrders)
+onIonViewWillEnter(async () => {
+  applyPrefillFromQuery()
+  await loadOrders()
+})
 </script>
 
 <style scoped>

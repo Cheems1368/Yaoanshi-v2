@@ -41,8 +41,7 @@ try {
   await page.waitForURL(/\/tabs\/home$/, { timeout: 15000 })
 
   const beforeRefresh = await page.evaluate(() => ({
-    accessToken: localStorage.getItem('patient_access_token'),
-    refreshToken: localStorage.getItem('patient_refresh_token'),
+    refreshToken: sessionStorage.getItem('patient_refresh_token'),
     deviceId: localStorage.getItem('patient_device_id')
   }))
 
@@ -72,8 +71,7 @@ try {
   })
 
   const afterRefresh = await page.evaluate(() => ({
-    accessToken: localStorage.getItem('patient_access_token'),
-    refreshToken: localStorage.getItem('patient_refresh_token'),
+    refreshToken: sessionStorage.getItem('patient_refresh_token'),
     deviceId: localStorage.getItem('patient_device_id'),
     bindingStatus: localStorage.getItem('patient_binding_status')
   }))
@@ -85,8 +83,7 @@ try {
   await page.waitForURL(/\/login$/, { timeout: 15000 })
 
   const afterLogout = await page.evaluate(() => ({
-    accessToken: localStorage.getItem('patient_access_token'),
-    refreshToken: localStorage.getItem('patient_refresh_token'),
+    refreshToken: sessionStorage.getItem('patient_refresh_token'),
     bindingStatus: localStorage.getItem('patient_binding_status')
   }))
 
@@ -98,7 +95,6 @@ try {
       hospitalPatientId,
       waitForExpiryMs,
       refreshProbe,
-      accessTokenRotated: Boolean(beforeRefresh.accessToken && afterRefresh.accessToken && beforeRefresh.accessToken !== afterRefresh.accessToken),
       refreshTokenRotated: Boolean(beforeRefresh.refreshToken && afterRefresh.refreshToken && beforeRefresh.refreshToken !== afterRefresh.refreshToken),
       beforeRefresh,
       afterRefresh,

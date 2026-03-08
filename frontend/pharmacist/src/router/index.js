@@ -50,6 +50,13 @@ const routes = [
         meta: { title: '工单处理' }
       },
       {
+        path: 'ddi/rules',
+        alias: ['/ddi/rules'],
+        name: 'DdiRules',
+        component: () => import('@/views/DdiRules.vue'),
+        meta: { title: 'DDI 规则管理' }
+      },
+      {
         path: 'profile',
         alias: ['/user/profile'],
         name: 'Profile',

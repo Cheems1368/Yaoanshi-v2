@@ -191,16 +191,14 @@ export async function createPrescriptionUpload(baseUrl, session, filename = 'smo
 export async function primePatientPage(page, baseUrl, session, { bound = true, hasActivePlan = false } = {}) {
   await page.goto(baseUrl, { waitUntil: 'domcontentloaded' })
   await page.evaluate(
-    ({ accessToken, refreshToken, deviceId, mobile, bound, hasActivePlan }) => {
-      localStorage.setItem('patient_access_token', accessToken)
-      localStorage.setItem('patient_refresh_token', refreshToken)
+    ({ refreshToken, deviceId, mobile, bound, hasActivePlan }) => {
+      sessionStorage.setItem('patient_refresh_token', refreshToken)
       localStorage.setItem('patient_device_id', deviceId)
       localStorage.setItem('patient_mobile', mobile)
       localStorage.setItem('patient_binding_status', bound ? 'BOUND' : 'PENDING')
       localStorage.setItem('patient_has_active_plan', hasActivePlan ? 'true' : 'false')
     },
     {
-      accessToken: session.accessToken,
       refreshToken: session.refreshToken,
       deviceId: session.deviceId,
       mobile: session.mobile,
@@ -213,14 +211,14 @@ export async function primePatientPage(page, baseUrl, session, { bound = true, h
 export async function primeProfessionalPage(page, baseUrl, session) {
   await page.goto(baseUrl, { waitUntil: 'domcontentloaded' })
   await page.evaluate(
-    ({ accessToken, refreshToken }) => {
-      localStorage.setItem('token', accessToken)
+    ({ refreshToken }) => {
       if (refreshToken) {
-        localStorage.setItem('refreshToken', refreshToken)
+        sessionStorage.setItem('refreshToken', refreshToken)
       }
     },
     session
   )
+  await page.reload({ waitUntil: 'networkidle' })
 }
 
 export async function expectCommonResultFailure(promiseFactory, expectedMessage) {

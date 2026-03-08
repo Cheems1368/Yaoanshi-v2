@@ -202,7 +202,7 @@ Columns:
 | `gender` | `VARCHAR(16)` | Yes |  |  | `MALE`, `FEMALE`, `OTHER`, `UNKNOWN` |
 | `birth_date` | `DATE` | Yes |  |  | optional |
 | `age` | `INT` | Yes |  |  | snapshot field |
-| `id_card_masked` | `VARCHAR(32)` | Yes |  |  | masked only |
+| `id_card_masked` | `VARCHAR(32)` | Yes |  |  | deprecated legacy-only snapshot, no new writes except defensive clearing, no API exposure |
 | `primary_disease_code` | `VARCHAR(32)` | Yes |  | `IDX_patient_primary_disease` | stroke pilot uses this |
 | `primary_disease_name` | `VARCHAR(64)` | Yes |  |  | display field |
 | `drug_allergy` | `TEXT` | Yes |  |  | optional but medication-relevant |
@@ -777,6 +777,35 @@ Columns:
 | `confirmation_note` | `VARCHAR(255)` | Yes |  |  | note |
 | audit columns | standard |  |  |  |  |
 
+#### Table: `drug_contraindication`
+
+Purpose:
+
+- rule base for drug-condition contraindication screening, checked against patient health profile
+
+Columns:
+
+| Column | Type | Nullable | Default | Index / Constraint | Business rule |
+|---|---|---|---|---|---|
+| `id` | `BIGINT` | No |  | PK | rule id |
+| `rule_code` | `VARCHAR(64)` | No |  | `UK_contraindication_rule_code` | stable rule code |
+| `drug_name` | `VARCHAR(128)` | No |  | `IDX_contraindication_drug` | target drug |
+| `condition_type` | `VARCHAR(32)` | No |  |  | `DISEASE`, `ALLERGY`, `ORGAN_FUNCTION` |
+| `condition_value` | `VARCHAR(128)` | No |  | `IDX_contraindication_condition` | condition keyword (e.g. glaucoma, renal_impairment) |
+| `severity` | `VARCHAR(16)` | No |  | `IDX_contraindication_severity` | `HIGH`, `MEDIUM`, `LOW` |
+| `message` | `VARCHAR(255)` | No |  |  | warning text for patient/pharmacist |
+| `recommended_action` | `VARCHAR(255)` | Yes |  |  | suggestion |
+| `status` | `VARCHAR(20)` | No | `'ACTIVE'` |  | `ACTIVE`, `INACTIVE` |
+| `maintained_by_pharmacist_id` | `BIGINT` | Yes |  |  | owner |
+| audit columns | standard |  |  |  |  |
+
+Business rules:
+
+1. condition_type + condition_value matches against patient_health_profile fields
+2. DISEASE matches against disease history in health profile
+3. ALLERGY matches against drug_allergy / food_allergy fields
+4. first-period scope: stroke-related drugs only
+
 ## 5. Entity relationships
 
 ```mermaid
@@ -803,6 +832,8 @@ erDiagram
     patient ||--o{ notification_log : receives
     patient ||--o{ ddi_screening_log : triggers
     ddi_rule ||--o{ ddi_screening_log : matches
+    drug_contraindication ||--o{ ddi_screening_log : matches_condition
+    patient_health_profile ||--o{ ddi_screening_log : checks_against
 ```
 
 ## 6. API contracts
@@ -845,7 +876,37 @@ erDiagram
 | `POST` | `/app-api/help-orders` | Yes | `HelpOrderDTO` create body | created order | write `help_order`, `help_order_event`, `file_asset` link, notification |
 | `GET` | `/app-api/help-orders` | Yes | status/category query | paged list | none |
 | `GET` | `/app-api/help-orders/{id}` | Yes | none | order detail + events | none |
+| `GET` | `/app-api/prescriptions` | Yes | status/page query | paged prescriptions | none |
 | `POST` | `/app-api/prescriptions/uploads` | Yes | upload metadata | prescription summary | write `prescription`, `prescription_attachment`, `prescription_ocr_record` |
+
+#### DDI screening (patient-side)
+
+| Method | Path | Auth | Request | Response `data` | Side effects |
+|---|---|---|---|---|---|
+| `POST` | `/app-api/ddi/screen` | Yes | `AppDdiScreenRequest` | `AppDdiScreenResult` | read-only screening, no side effects |
+
+`AppDdiScreenRequest`:
+
+- `newDrugNames`: list of drug name strings the patient is about to add
+
+`AppDdiScreenResult`:
+
+- `alerts`: list of `AppDdiAlert` objects
+  - `type`: `INTERACTION` or `CONTRAINDICATION`
+  - `severity`: `HIGH` or `MEDIUM`
+  - `drugA`: first drug (existing)
+  - `drugB`: second drug (new) or condition name
+  - `message`: warning text
+  - `recommendedAction`: suggestion text
+
+Business rules:
+
+1. Reads patient's current ACTIVE medication plan items as the "existing drugs" set
+2. Matches new drug names against existing drugs using `ddi_rule` (HIGH + MEDIUM)
+3. Matches new drug names against patient health profile using `drug_contraindication` (HIGH + MEDIUM)
+4. Returns combined alert list, sorted by severity (HIGH first)
+5. This endpoint is informational only — it does NOT block or write audit records
+6. Audit is only written when the patient confirms and proceeds (via prescription upload or plan update)
 
 #### Assessments
 
@@ -904,8 +965,12 @@ erDiagram
 
 | Method | Path | Auth role | Request | Response `data` | Side effects |
 |---|---|---|---|---|---|
-| `GET` | `/admin-api/ddi/rules` | pharmacist | query | rule list | none |
+| `GET` | `/admin-api/ddi/rules` | pharmacist | query | paged rule list | none |
 | `POST` | `/admin-api/ddi/rules` | pharmacist admin | rule DTO | created rule | write `ddi_rule` |
+| `PUT` | `/admin-api/ddi/rules/{id}` | pharmacist admin | rule update DTO | updated rule | update `ddi_rule` |
+| `GET` | `/admin-api/ddi/contraindications` | pharmacist | query | paged contraindication list | none |
+| `POST` | `/admin-api/ddi/contraindications` | pharmacist admin | contraindication DTO | created rule | write `drug_contraindication` |
+| `PUT` | `/admin-api/ddi/contraindications/{id}` | pharmacist admin | update DTO | updated rule | update `drug_contraindication` |
 | `POST` | `/admin-api/ddi/screenings/{id}/confirm` | pharmacist | confirm DTO | confirm result | update `ddi_screening_log` |
 | `GET` | `/admin-api/notifications/logs` | pharmacist admin | query | paged logs | none |
 

@@ -28,6 +28,7 @@
             v-for="category in filteredCategories"
             :key="category.id"
             class="category-card"
+            :data-testid="`rational-category-${category.id}`"
             @click="openCategory(category.id)"
           >
             <div class="category-head">

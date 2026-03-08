@@ -164,7 +164,6 @@ public interface PatientMapper {
                 gender = #{gender},
                 birth_date = #{birthDate},
                 age = #{age},
-                id_card_masked = #{idCardMasked},
                 primary_disease_code = #{primaryDiseaseCode},
                 primary_disease_name = #{primaryDiseaseName},
                 drug_allergy = #{drugAllergy},
@@ -176,4 +175,28 @@ public interface PatientMapper {
             WHERE tenant_id = #{tenantId} AND id = #{id} AND deleted = 0
             """)
     int updateForPharmacist(Patient patient);
+
+    @Update("""
+            UPDATE patient
+            SET name = #{name},
+                gender = #{gender},
+                age = #{age},
+                id_card_masked = #{idCardMasked},
+                drug_allergy = #{drugAllergy},
+                updater = #{updater},
+                update_time = #{updateTime}
+            WHERE tenant_id = #{tenantId} AND id = #{id} AND deleted = 0
+            """)
+    int updateAppProfile(Patient patient);
+
+    @Update("""
+            UPDATE patient
+            SET primary_disease_name = #{primaryDiseaseName},
+                drug_allergy = #{drugAllergy},
+                medical_history_json = #{medicalHistoryJson},
+                updater = #{updater},
+                update_time = #{updateTime}
+            WHERE tenant_id = #{tenantId} AND id = #{id} AND deleted = 0
+            """)
+    int updateAppHealthSummary(Patient patient);
 }

@@ -1,10 +1,11 @@
 <template>
-  <div class="chat-container">
+  <div class="chat-container" data-testid="ai-chat-view">
     <section
       v-for="(message, index) in messages"
       :key="`${message.role}-${index}-${message.content.slice(0, 12)}`"
       class="message-row"
       :class="message.role"
+      :data-testid="`ai-message-${message.role}-${index}`"
     >
       <div class="avatar">{{ message.role === 'assistant' ? 'AI' : '我' }}</div>
       <div class="bubble">
@@ -15,8 +16,9 @@
 
     <section v-if="suggestions.length" class="suggestions">
       <ion-chip
-        v-for="suggestion in suggestions"
+        v-for="(suggestion, index) in suggestions"
         :key="suggestion"
+        :data-testid="`ai-suggestion-${index}`"
         @click="$emit('select-suggestion', suggestion)"
       >
         {{ suggestion }}

@@ -24,7 +24,7 @@
         <span class="card-label">近 7 天任务</span>
         <strong>{{ taskRows.length }}</strong>
         <p>默认展示今天起 7 天内任务</p>
-        <p>依从报表：{{ adherenceReport ? '已生成' : '待生成' }}</p>
+        <p>依从报告：{{ adherenceReport ? '已生成' : '待生成' }}</p>
       </article>
     </div>
 
@@ -104,7 +104,9 @@
     <div class="plan-actions">
       <el-button type="primary" :loading="saving" @click="saveDraft">保存草稿</el-button>
       <el-button type="success" :loading="saving" @click="saveAndActivate">保存并启用</el-button>
-      <el-button v-if="form.id" type="warning" plain :loading="activating" @click="activateCurrentVersion">启用当前版本</el-button>
+      <el-button v-if="form.id" type="warning" plain :loading="activating" @click="activateCurrentVersion">
+        启用当前版本
+      </el-button>
     </div>
 
     <section class="tasks-section">
@@ -112,17 +114,19 @@
         <h4>未来 7 天任务</h4>
         <el-button :disabled="!form.id" @click="reloadDerivedData">刷新任务与报表</el-button>
       </div>
-      <el-table :data="taskRows" border empty-text="暂无任务">
-        <el-table-column prop="scheduledAt" label="计划时间" min-width="180">
-          <template #default="{ row }">{{ displayDate(row.scheduledAt) }}</template>
-        </el-table-column>
-        <el-table-column prop="drugName" label="药品" min-width="140" />
-        <el-table-column prop="dosage" label="剂量" min-width="100" />
-        <el-table-column prop="status" label="状态" min-width="120">
-          <template #default="{ row }">{{ taskStatusText(row.status) }}</template>
-        </el-table-column>
-        <el-table-column prop="notificationStatus" label="提醒状态" min-width="120" />
-      </el-table>
+      <div class="table-scroll pro-table-scroll">
+        <el-table :data="taskRows" border table-layout="auto" empty-text="暂无任务">
+          <el-table-column prop="scheduledAt" label="计划时间" min-width="180">
+            <template #default="{ row }">{{ displayDate(row.scheduledAt) }}</template>
+          </el-table-column>
+          <el-table-column prop="drugName" label="药品" min-width="160" show-overflow-tooltip />
+          <el-table-column prop="dosage" label="剂量" min-width="120" show-overflow-tooltip />
+          <el-table-column prop="status" label="状态" min-width="120">
+            <template #default="{ row }">{{ taskStatusText(row.status) }}</template>
+          </el-table-column>
+          <el-table-column prop="notificationStatus" label="提醒状态" min-width="140" show-overflow-tooltip />
+        </el-table>
+      </div>
     </section>
 
     <section class="report-section">
@@ -442,6 +446,7 @@ watch(
 
 <style lang="scss" scoped>
 .panel {
+  min-width: 0;
   display: grid;
   gap: 20px;
   padding: 20px;
@@ -483,6 +488,7 @@ watch(
 .item-list {
   display: grid;
   gap: 16px;
+  min-width: 0;
 }
 
 .summary-grid {
@@ -516,7 +522,7 @@ watch(
   font-family: Consolas, Monaco, monospace;
 }
 
-@media (max-width: 1100px) {
+@media (max-width: 1024px) {
   .panel-header,
   .header-actions,
   .section-header,

@@ -2,6 +2,7 @@ package com.medicine.service.app;
 
 import com.medicine.api.dto.prescription.PrescriptionDTO;
 import com.medicine.api.dto.prescription.PrescriptionUploadRequest;
+import com.medicine.common.model.PageResult;
 import com.medicine.config.ObjectStorageProperties;
 import com.medicine.domain.file.FileAsset;
 import com.medicine.domain.identity.AppAccount;
@@ -67,6 +68,9 @@ class AppPrescriptionServiceTest {
         patient.setId(201L);
         patient.setName("Test Patient");
         patient.setHospitalPatientId("HZY-1001");
+        PrescriptionOcrRecord latestOcrRecord = new PrescriptionOcrRecord();
+        latestOcrRecord.setStatus("LOW_CONFIDENCE");
+        latestOcrRecord.setConfidence(java.math.BigDecimal.ZERO);
 
         when(appAccountMapper.selectActiveByMobile(1L, "13800138000")).thenReturn(account);
         when(patientMapper.selectByAppAccountId(1L, 101L)).thenReturn(patient);
@@ -92,6 +96,7 @@ class AppPrescriptionServiceTest {
             record.setId(601L);
             return 1;
         }).when(prescriptionOcrRecordMapper).insert(any(PrescriptionOcrRecord.class));
+        when(prescriptionOcrRecordMapper.selectLatestByPrescriptionId(1L, 401L)).thenReturn(latestOcrRecord);
 
         PrescriptionUploadRequest request = new PrescriptionUploadRequest();
         request.setObjectKey("prescriptions/mock.jpg");
@@ -105,5 +110,60 @@ class AppPrescriptionServiceTest {
         assertThat(dto.getStatus()).isEqualTo("UPLOADED");
         assertThat(dto.getAttachments()).hasSize(1);
         assertThat(dto.getOcrStatus()).isEqualTo("LOW_CONFIDENCE");
+    }
+
+    @Test
+    void shouldReturnPrescriptionHistoryForBoundPatient() {
+        AppAccount account = new AppAccount();
+        account.setId(101L);
+        account.setMobile("13800138000");
+        Patient patient = new Patient();
+        patient.setId(201L);
+        patient.setName("Test Patient");
+        patient.setHospitalPatientId("HZY-1001");
+
+        Prescription prescription = new Prescription();
+        prescription.setId(401L);
+        prescription.setPatientId(201L);
+        prescription.setPatientName("Test Patient");
+        prescription.setHospitalPatientId("HZY-1001");
+        prescription.setStatus("UPLOADED");
+        prescription.setSourceType("PHOTO_UPLOAD");
+        prescription.setSubmittedByType("PATIENT");
+        prescription.setSubmittedById(101L);
+
+        PrescriptionAttachment attachment = new PrescriptionAttachment();
+        attachment.setId(501L);
+        attachment.setPrescriptionId(401L);
+        attachment.setFileAssetId(301L);
+        attachment.setAttachmentType("ORIGINAL_IMAGE");
+
+        FileAsset fileAsset = new FileAsset();
+        fileAsset.setId(301L);
+        fileAsset.setOriginalFilename("mock.jpg");
+        fileAsset.setMimeType("image/jpeg");
+        fileAsset.setSizeBytes(2048L);
+        fileAsset.setObjectKey("prescriptions/mock.jpg");
+        fileAsset.setPublicUrl("download-url");
+
+        PrescriptionOcrRecord ocrRecord = new PrescriptionOcrRecord();
+        ocrRecord.setStatus("LOW_CONFIDENCE");
+        ocrRecord.setConfidence(java.math.BigDecimal.ZERO);
+
+        when(appAccountMapper.selectActiveByMobile(1L, "13800138000")).thenReturn(account);
+        when(patientMapper.selectByAppAccountId(1L, 101L)).thenReturn(patient);
+        when(prescriptionMapper.searchForPatient(1L, 201L, null, 0, 20)).thenReturn(java.util.List.of(prescription));
+        when(prescriptionMapper.countForPatient(1L, 201L, null)).thenReturn(1L);
+        when(prescriptionAttachmentMapper.selectByPrescriptionId(1L, 401L)).thenReturn(java.util.List.of(attachment));
+        when(fileAssetMapper.selectByIdAndTenant(1L, 301L)).thenReturn(fileAsset);
+        when(prescriptionOcrRecordMapper.selectLatestByPrescriptionId(1L, 401L)).thenReturn(ocrRecord);
+
+        PageResult<PrescriptionDTO> result = appPrescriptionService.getPrescriptions("13800138000", null, 1, 20);
+
+        assertThat(result.getTotal()).isEqualTo(1L);
+        assertThat(result.getList()).hasSize(1);
+        assertThat(result.getList().get(0).getId()).isEqualTo(401L);
+        assertThat(result.getList().get(0).getAttachments()).hasSize(1);
+        assertThat(result.getList().get(0).getAttachments().get(0).getOriginalFilename()).isEqualTo("mock.jpg");
     }
 }

@@ -131,6 +131,19 @@ export interface HelpOrderDTO {
   createdAt?: string | null
 }
 
+export interface AppDdiAlert {
+  type: 'INTERACTION' | 'CONTRAINDICATION' | string
+  severity: 'HIGH' | 'MEDIUM' | string
+  drugA: string
+  drugB: string
+  message: string
+  recommendedAction?: string | null
+}
+
+export interface AppDdiScreenResult {
+  alerts: AppDdiAlert[]
+}
+
 export interface PageResult<T> {
   pageNo: number
   pageSize: number
@@ -242,7 +255,17 @@ export const assessmentService = {
   }
 }
 
+export const ddiService = {
+  screen(payload: { newDrugNames: string[] }) {
+    return httpService.post<AppDdiScreenResult>('/app-api/ddi/screen', payload)
+  }
+}
+
 export const prescriptionService = {
+  list(params?: { status?: string; pageNo?: number; pageSize?: number }) {
+    return httpService.get<PageResult<PrescriptionDTO>>('/app-api/prescriptions', params)
+  },
+
   presignUpload(payload: { filename: string; contentType: string; sizeBytes: number; businessType: 'PRESCRIPTION' }) {
     return httpService.post<FilePresignResponse>('/app-api/files/presign', payload)
   },

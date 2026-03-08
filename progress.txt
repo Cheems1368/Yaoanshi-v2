@@ -7,8 +7,8 @@ Current Branch / Work Context
 - Active surfaces: backend-v2, patient app, pharmacist web, doctor web
 
 Current Phase / Step
-- IMPLEMENTATION_PLAN.md -> Phase 4 completed (trial-run closure implemented and validated across all surfaces; remaining item is challenge-cup AI runtime E2E pending upstream config)
-- Challenge-cup special track completed at code/build level: rational-medication recovery + AI assistant backend proxy/frontend integration (non-P0 dependency)
+- IMPLEMENTATION_PLAN.md -> Phase 5 Step 5.4 completed at code/build/unit-test level (pharmacist DDI rule management is now closed; remaining item is live-upstream challenge-cup AI runtime E2E pending upstream config)
+- Challenge-cup special track completed at code/build/browser-E2E level: rational-medication recovery + AI assistant backend proxy/frontend integration + real-auth browser coverage for Home entry / rational-medication / AI assistant fallback (non-P0 dependency)
 - Dual-agent collaboration plan established: docs/DUAL_AGENT_COLLABORATION.md (Claude Opus 4.6 + GPT-5.3 Codex)
 
 Completed
@@ -72,7 +72,16 @@ Completed
 - Patient app AI assistant module added with project service-layer integration (/app-api/ai/chat) and Home quick entry /ai-assistant
 - backend-v2 AI proxy endpoint implemented: POST /app-api/ai/chat with message limits, user-window rate limit, upstream error mapping, and medical safety disclaimer
 - backend-v2 AI configuration added via medicine.ai.base-url/api-key/model/timeout-ms (env override ready)
+- backend-v2 AI upstream baseline was extended for SiliconFlow chat completions experimentation: `https://api.siliconflow.cn/v1/chat/completions` with `Qwen/Qwen3.5-122B-A10B` was validated as an alternate path, optional thinking/maxTokens env controls were added, and upstream message window is now trimmed to SiliconFlow-compatible size
+- backend-v2 AI upstream protocol support was expanded for SiliconFlow: Qwen `Qwen/Qwen3.5-122B-A10B` now defaults to `/v1/messages` (Anthropic-style) instead of `/v1/chat/completions`, with response parsing and insufficient-balance error mapping added for that protocol
+- backend-v2 AI default runtime was switched back to the currently account-verified model `Pro/zai-org/GLM-4.7` on SiliconFlow `/v1/chat/completions`, while dual-protocol support remains in code for later Qwen reactivation
+- backend-v2 AI assistant model was then tuned for patient medication Q&A / knowledge-popularization usage to `zai-org/GLM-4.5-Air`, keeping the same SiliconFlow `/v1/chat/completions` + `OPENAI_CHAT` path for lower latency and lower serving cost
+- backend-v2 / frontend AI assistant copy and guardrails were narrowed to a medication-popularization assistant: system prompt now avoids generic assistant framing, final replies are capped to 200 characters including disclaimer, and patient-side welcome/examples now focus on medication timing / missed doses / adverse-effect literacy
+- backend-v2 local secret-loading path added for AI runtime: `backend-v2/.env.local.example` now documents SiliconFlow variables and `backend-v2/scripts/run-local-with-env.ps1` loads `backend-v2/.env.local` into process env before `mvn spring-boot:run`, keeping real API keys out of Git
+- backend-v2 local AI startup script was corrected to default `SPRING_PROFILES_ACTIVE=local`, so auth/patient/AI smoke paths now inherit the same local datasource + Redis baseline as prior runtime validations
+- backend-v2 local AI startup script now auto-fills `MEDICINE_DB_PASSWORD` from `ops/docker.env`, mirrors legacy DB password, and defaults Redis port to `16379`, removing the extra manual runtime vars previously blocking local `spring-boot:run`
 - backend-v2 security response normalized for unauthorized access to 401 JSON CommonResult on protected APIs
+- Challenge-cup live-upstream AI runtime E2E closure completed at browser level: frontend/huanzhe now has a dedicated `scripts/e2e-challenge-cup-live.mjs` live script plus `npm run e2e:challenge-cup:live`, and real auth -> rational-medication -> `/app-api/ai/chat` -> AI soft-back/home navigation now pass against live SiliconFlow `zai-org/GLM-4.5-Air`
 - frontend/huanzhe AI assistant failure path now supports one-click retry of last failed prompt
 - backend-v2 app auth baseline implemented for /app-api/auth/send-otp, /app-api/auth/login, /app-api/auth/refresh-token, /app-api/auth/logout, and /app-api/auth/me
 - backend-v2 patient self-service baseline implemented for /app-api/patients/bind, /app-api/patients/me, and /app-api/patients/me/family-bindings
@@ -126,18 +135,37 @@ Completed
 - Phase 4 browser/runtime validation assets completed: patient auth 401-refresh and natural-expiry E2E split into dedicated scripts, pharmacist patient save smoke was added, and realtime notification E2E now covers submit -> escalate -> doctor reply/close
 - Phase 4 local trial-run delivery assets completed: docs/03-运维部署/phase4-local-runbook.md, docs/06-测试文档/phase4-acceptance.md, docs/06-测试文档/phase4-test-report.md, and ops/scripts/phase4-local-run.ps1 were added
 - backend-v2 local smoke now uses generated patient/family identities per run so repeated execution no longer collides with prior state
+- Codex security audit completed for backend-v2, frontend/huanzhe, frontend/pharmacist, and frontend/yisheng/web-admin; report written to security_best_practices_report.md with findings on browser token storage, WebSocket query-token auth, localStorage PHI caching, insecure default secrets, and AI upstream data egress controls
+- Codex architecture compliance audit completed for backend-v2 against Standard document/BACKEND_STRUCTURE.md; report written to backend_v2_architecture_compliance_report.md with findings on map-based app DTO drift, undocumented family-binding endpoints, and missing app/infrastructure package boundaries
+- backend-v2 unit coverage extended for AiChatService, AdminNotificationService, AdminMedicationPlanService, AppHelpOrderService, AdminNotificationWebSocketAuthenticator, and S3CompatibleObjectStorageStub; existing AdminPatientServiceTest was aligned with current MedicationPlanMapper dependency so full Maven test suite is green again
+- backend-v2 admin realtime auth was tightened from URL query access_token to short-lived one-time websocket tickets, with explicit notification websocket origin allowlist configuration under medicine.notifications.websocket.*
+- frontend/pharmacist and frontend/yisheng/web-admin professional auth storage was tightened so accessToken is memory-only, refreshToken is sessionStorage-scoped, and request bootstrap now restores access tokens through refresh on demand
+- frontend/huanzhe patient auth storage was tightened so accessToken is memory-only and refreshToken is sessionStorage-scoped, with http client bootstrap/401 retry updated to restore access tokens without localStorage persistence
+- frontend notification clients for pharmacist and doctor now request backend-v2 socket tickets before opening /ws/admin-notifications, removing bearer-token exposure from websocket URLs
+- frontend/huanzhe sensitive patient profile and health-questionnaire caching was tightened by moving userDataService and healthDataService from localStorage persistence to runtime memory only, and questionnaire/profile debug logs on PHI paths were removed
+- Dual-agent collaboration protocol revised: Claude role narrowed from "backend constructor" to "product/data/frontend/verification host"; Codex role elevated from "quality assistant" to "construction + quality dual-core host"; A2 changed from uniform flow to four tiered flows; A3 handoff now requires referenced formal documents; A4 validation reordered with architecture compliance before security; three iron laws added; CLAUDE.md and CODEX.md updated to match
+- backend-v2 SEC-003 persistence closure added additive patient self-service profile and health-profile contracts under /app-api/patients/me/profile and /app-api/patients/me/health-profile, backed by dedicated patient_profile and patient_health_profile tables plus explicit DTOs and mappers
+- frontend/huanzhe patient binding, questionnaire, and profile pages now persist real-name/profile/questionnaire data to backend-v2 first and only then refresh in-memory session cache, removing the last memory-only gap introduced by the earlier browser-storage hardening
+- backend-v2 SEC-003 follow-up tightened app-side high-sensitivity exposure: patient self-service profile DTOs no longer populate hospitalPatientId/idCard materials, real-name evidence is persisted as SHA-256 digest only in patient_profile.identity_material_hash, and new writes clear legacy patient.id_card_masked snapshots
+- backend-v2 SEC-003 closure completed for legacy masked identity material: admin patient detail/update contracts no longer expose or accept idCardMasked, pharmacist patient-detail UI no longer displays/submits masked identity numbers, and ops/sql/sec-003-clear-legacy-patient-id-card-masked.sql was added for one-off historical cleanup
+- frontend/huanzhe high-sensitivity display surface was narrowed so profile/test flows show only verification status/type/material-archived state instead of masked identity numbers, and userDataService no longer caches identity numbers in current-session memory
+- DDI enhancement (用药助手增强) formal documents updated: PRD.md section 9.10 expanded with patient-side DDI detection, drug contraindication checking, and rule management; BACKEND_STRUCTURE.md added drug_contraindication table, POST /app-api/ddi/screen endpoint, admin DDI rule CRUD expansion; APP_FLOW.md added patient-side DDI alert flow (7.4.2), pharmacist rule management flow (7.4.3), /ddi/rules route; IMPLEMENTATION_PLAN.md added Phase 5 with steps 5.1-5.4 covering stroke rule library, patient screening backend, patient alert frontend, and pharmacist rule management
+- Phase 5 Step 5.1 + 5.2 backend closure completed at code/test level: stroke DDI seed SQL added under backend-v2/src/main/resources/sql/ddi-stroke-rules-seed.sql, local schema bootstrap now creates drug_contraindication, patient-side /app-api/ddi/screen endpoint is implemented with ACTIVE medication-plan + health-profile screening, and admin DDI rule/contraindication management APIs were scaffolded in AdminDdiController/AdminDdiService with AppDdiScreeningServiceTest coverage added
+- Phase 5 Step 5.3 patient alert frontend completed at code/build level: frontend/huanzhe prescription upload now accepts optional new-drug input, calls /app-api/ddi/screen before registration, shows HIGH/MEDIUM severity alert modal with continue/consult-pharmacist actions, gracefully degrades to direct upload when screening fails, and pre-fills help-order consultation context from the alert dialog
+- Phase 5 Step 5.4 pharmacist rule management completed at code/build/unit-test level: backend-v2 now supports POST /admin-api/ddi/rules with ruleCode-aware upsert DTOs, AdminDdiServiceTest covers DDI rule + contraindication list/create/update/not-found flows, and frontend/pharmacist now exposes /ddi/rules with tabbed DDI/contraindication management, drawer forms, and navigation entry
+- Patient prescription-history follow-up closure completed after formal contract review: Standard document now explicitly defines patient-side prescription history visibility and `GET /app-api/prescriptions`, backend-v2 app prescription service/controller now return paged historical uploads for the bound patient, and frontend/huanzhe prescription page now loads real history from backend instead of only showing in-session registration results
 
 In Progress
-- Challenge-cup AI runtime E2E verification (real JWT login + upstream AI key) pending environment readiness
+- None
 
 Next
-- Run challenge-cup integration checks after auth endpoints are available: /rational-medication flow + /ai-assistant chat + Home entry fallback behavior
-- Continue non-P0 follow-up items after Phase 4 local runtime closure: challenge-cup AI runtime verification and optional patient prescription-history follow-up only after contract review
+- Continue non-P0 follow-up items after Phase 4 local runtime closure: optional patient prescription-history follow-up only after contract review
 
 Blockers
 - Phase 3.3 upload flow intentionally does not perform real object-storage PUT yet; current patient page only completes metadata registration and local preview, so attachment replay still depends on later storage integration
-- AI upstream provider key/base-url is not configured in this workspace session, so live upstream chat verification is not yet executable
 - Current local P0 runtime still depends on mixed machine services: local MySQL on 3306, Dockerized legacy MySQL/Redis/server on 13306/16379/48080, backend-v2 on 8080, and three manually started Vite dev servers on 3001/3002/3003
+- Browser auth risk has been reduced by removing token persistence from localStorage, but refresh/session material is still browser-managed; a full HttpOnly-cookie migration remains a follow-up item if SEC-002 is to be fully closed
+- Historical `patient.id_card_masked` rows now have an explicit one-off cleanup script at `ops/sql/sec-003-clear-legacy-patient-id-card-masked.sql`; cleanup execution is still an ops step and has not been run automatically by application startup
 
 Open Decisions
 - None
@@ -160,11 +188,54 @@ Recent Validation
 - npm run build passed in D:/yaoanshi/frontend/yisheng/web-admin
 - mvn -q "-Dtest=JwtTokenServiceTest,NotificationDispatchServiceTest,AdminHelpOrderServiceTest" test -f D:/yaoanshi/backend-v2/pom.xml passed
 - mvn -q "-Dtest=AdminNotificationRealtimeServiceTest,NotificationDispatchServiceTest,AdminHelpOrderServiceTest" test -f D:/yaoanshi/backend-v2/pom.xml passed
+- mvn -q "-Dtest=AiChatServiceTest,AdminNotificationServiceTest,AdminMedicationPlanServiceTest,AppHelpOrderServiceTest,AdminNotificationWebSocketAuthenticatorTest,S3CompatibleObjectStorageStubTest" test -f D:/yaoanshi/backend-v2/pom.xml passed
+- mvn -q test -f D:/yaoanshi/backend-v2/pom.xml passed
 - node --check passed for frontend/huanzhe/scripts/e2e-auth-refresh.mjs, e2e-auth-expiry.mjs, e2e-pharmacist-patient.mjs, and e2e-admin-notifications.mjs
 - powershell -ExecutionPolicy Bypass -File D:/yaoanshi/ops/scripts/phase4-local-run.ps1 -SkipBuild -SkipExpiryE2E passed with backend smoke, patient 401 refresh E2E, pharmacist patient smoke, and realtime notification E2E
 - node D:/yaoanshi/frontend/huanzhe/scripts/e2e-admin-notifications.mjs passed with pharmacist realtime queue refresh, doctor realtime queue refresh, doctor reply/close, and closed notification status=SENT
 - powershell -ExecutionPolicy Bypass -File D:/yaoanshi/ops/scripts/phase4-local-run.ps1 -SkipBuild -JwtAccessTokenSeconds 2 passed with backend smoke, short-TTL patient refresh/logout E2E, and realtime-notification E2E skipped by design under expiry mode
+- mvn "-Dtest=AdminNotificationSocketTicketServiceTest,AdminNotificationWebSocketAuthenticatorTest" test -f D:/yaoanshi/backend-v2/pom.xml passed
+- mvn -DskipTests compile -f D:/yaoanshi/backend-v2/pom.xml passed after websocket ticket/origin hardening edits
+- npm run build passed in D:/yaoanshi/frontend/pharmacist after token-storage tightening and websocket ticket handshake changes
+- npm run build passed in D:/yaoanshi/frontend/yisheng/web-admin after token-storage tightening and websocket ticket handshake changes
+- npm run build passed in D:/yaoanshi/frontend/huanzhe after patient access-token memory/sessionStorage tightening and E2E script alignment
+- npm run build passed in D:/yaoanshi/frontend/huanzhe after SEC-003 hardening edits that removed patient profile/health localStorage persistence and PHI-path debug logging
+- mvn "-Dtest=AppPatientProfileServiceTest,AppPatientServiceTest" test -f D:/yaoanshi/backend-v2/pom.xml passed after adding patient profile/health-profile persistence service coverage
+- npm run build passed in D:/yaoanshi/frontend/huanzhe after rewiring real-name bind, questionnaire submit, and profile save/load flows to backend-v2 patient profile/health-profile persistence APIs
+- mvn "-Dtest=AppPatientProfileServiceTest" test -f D:/yaoanshi/backend-v2/pom.xml passed after identity-material digest storage and DTO exposure tightening
+- npm run build passed in D:/yaoanshi/frontend/huanzhe after removing patient identity-number display/edit surfaces and session-cache retention of identity numbers
+- mvn -q "-Dtest=AppPatientProfileServiceTest,AdminPatientServiceTest" test -f D:/yaoanshi/backend-v2/pom.xml passed after SEC-003 admin contract cleanup edits
+- mvn -q -DskipTests compile -f D:/yaoanshi/backend-v2/pom.xml passed after SEC-003 admin contract cleanup edits
+- npm run build passed in D:/yaoanshi/frontend/pharmacist after removing pharmacist patient-detail masked-id field
+- mvn -q -DskipTests compile -f D:/yaoanshi/backend-v2/pom.xml passed after Phase 5 Step 5.1 + 5.2 DDI backend implementation
+- mvn -q "-Dtest=AppDdiScreeningServiceTest" test -f D:/yaoanshi/backend-v2/pom.xml passed
+- mvn -q test -f D:/yaoanshi/backend-v2/pom.xml passed after Phase 5 DDI backend additions
+- npm run build passed in D:/yaoanshi/frontend/huanzhe after Phase 5 Step 5.3 patient-side DDI alert modal, help-order prefill, and screening-failure graceful degradation edits
+- node --check passed for D:/yaoanshi/frontend/huanzhe/scripts/e2e-prescription-review.mjs after adding patient-side DDI modal + graceful-degradation coverage
+- node D:/yaoanshi/frontend/huanzhe/scripts/e2e-prescription-review.mjs could not run in this session because backend-v2 was not listening on http://127.0.0.1:8080 (ECONNREFUSED during app login bootstrap)
+- powershell -ExecutionPolicy Bypass -File D:/yaoanshi/backend-v2/scripts/smoke-core-flows-local.ps1 passed again with medication plan create/activate/tasks, patient/family check-in, help-order collaboration, knowledge assessment, satisfaction survey, adherence report, and post-unbind PATIENT_BIND_CONFLICT
+- powershell -ExecutionPolicy Bypass -File D:/yaoanshi/backend-v2/scripts/smoke-prescription-local.ps1 passed again with DDI_CONFIRM_REQUIRED -> screening confirm -> PHARMACIST_CONFIRMED plus reject-reason round-trip
+- node D:/yaoanshi/frontend/huanzhe/scripts/e2e-prescription-review.mjs passed after Step 5.3 frontend edits with patient-side DDI alert modal visibility, continue-submit branch, screening-failure graceful degradation upload, pharmacist DDI confirm, final confirm, and reject-reason verification
+- mvn -q "-Dtest=AdminDdiServiceTest,AppDdiScreeningServiceTest" test -f D:/yaoanshi/backend-v2/pom.xml passed
+- mvn -q -DskipTests compile -f D:/yaoanshi/backend-v2/pom.xml passed after Phase 5 Step 5.4 backend DDI rule create-path completion
+- npm run build passed in D:/yaoanshi/frontend/pharmacist after adding /ddi/rules tabbed DDI + contraindication rule management
+- npm run build passed in D:/yaoanshi/frontend/pharmacist after pharmacist shell/table responsive fix covering layout min-width shrink, local table scroll wrappers, toolbar wrap, and overflow tooltip strategy
+- node --check passed for D:/yaoanshi/frontend/huanzhe/scripts/e2e-challenge-cup.mjs
+- npm run build passed in D:/yaoanshi/frontend/huanzhe after adding challenge-cup test selectors for Home quick entries, rational-medication pages, and AI assistant views
+- node D:/yaoanshi/frontend/huanzhe/scripts/e2e-challenge-cup.mjs passed with real app auth/bootstrap, Home quick-entry navigation to /rational-medication, cardiovascular -> aspirin detail drilldown, AI assistant success/failure/retry branches, and in-page AI back-to-home fallback before returning to /tabs/home
+- mvn -q "-Dtest=AiChatServiceTest" test -f D:/yaoanshi/backend-v2/pom.xml passed after SiliconFlow/Qwen AI upstream compatibility updates
+- mvn -q -DskipTests compile -f D:/yaoanshi/backend-v2/pom.xml passed after SiliconFlow/Qwen AI upstream compatibility updates
+- live SiliconFlow probing confirmed: `/v1/chat/completions` works for `Pro/zai-org/GLM-4.7`, while `Qwen/Qwen3.5-122B-A10B` requires `/v1/messages` on this account path and currently returns provider code `30001` (insufficient balance)
+- live end-to-end verification against restarted local backend confirmed auth/bind -> `/app-api/ai/chat` now reaches SiliconFlow successfully and surfaces a precise provider-state error (`AI 账户余额不足，请先充值后再试`) instead of the previous generic network failure
+- powershell -ExecutionPolicy Bypass -File D:/yaoanshi/backend-v2/scripts/run-local-with-env.ps1 -EnvFile D:/yaoanshi/backend-v2/.env.local.example -NoStart passed, confirming local `.env.local` parsing and process-env injection for backend-v2 startup
+- mvn -q "-Dtest=AiChatServiceTest" test -f D:/yaoanshi/backend-v2/pom.xml passed after adding live-upstream challenge-cup closure support
+- npm run build passed in D:/yaoanshi/frontend/huanzhe after adding `e2e:challenge-cup:live` and the dedicated live upstream E2E script
+- node D:/yaoanshi/frontend/huanzhe/scripts/e2e-challenge-cup-live.mjs passed with real app auth/bootstrap, Home quick-entry navigation to /rational-medication, cardiovascular -> aspirin detail drilldown, `/app-api/ai/chat` live success on prompt `长期服药为什么还要复查？`, model=`zai-org/GLM-4.5-Air`, safety disclaimer rendered, and in-page AI soft-back before returning to /tabs/home
+- npm run e2e:challenge-cup:live passed in D:/yaoanshi/frontend/huanzhe, revalidating the package.json entry against live SiliconFlow `zai-org/GLM-4.5-Air`
+- mvn -q "-Dtest=AppPrescriptionServiceTest" test -f D:/yaoanshi/backend-v2/pom.xml passed after adding patient prescription-history list coverage
+- mvn -q -DskipTests compile -f D:/yaoanshi/backend-v2/pom.xml passed after adding `GET /app-api/prescriptions`
+- npm run build passed in D:/yaoanshi/frontend/huanzhe after wiring `/tabs/prescription` to backend history list
 
 Last Updated
-- 2026-03-07 Asia/Shanghai
-- Reason: Phase 4 trial-run closure completed with pharmacist medication-plan UI, professional realtime notifications, local orchestrator/runbook assets, repeatable smoke scripts, and normal/short-TTL runtime validations passing
+- 2026-03-08 Asia/Shanghai
+- Reason: Codex read the formal docs, completed the deferred patient prescription-history follow-up by adding the formal contract plus backend/frontend history query path, and revalidated the affected backend test and patient build

@@ -4,6 +4,8 @@ import { API_ENDPOINTS } from '@/config/api'
 // 患者信息接口
 export interface PatientInfo {
   id?: number
+  patientId?: number
+  hospitalPatientId?: string
   name: string
   realName?: string
   phone?: string
@@ -23,6 +25,8 @@ export interface PatientInfo {
     phone: string
     relationship: string
   }
+  identityMaterialArchived?: boolean
+  realNameVerified?: boolean
   isRealNameVerified?: boolean
   realNameVerifiedTime?: string
   createdAt?: string
@@ -37,6 +41,27 @@ export interface PatientInfo {
   patientType?: number
   insurance?: number
   birthday?: string
+}
+
+export interface PatientHealthData {
+  patientId?: number
+  layer1: {
+    allergy: string
+    diagnosis: string
+  }
+  layer2: {
+    medicalHistory: string
+    smokingDrinking: string
+    liverKidney: string
+    currentMedication: string
+  }
+  layer3: {
+    detailedSymptoms: string
+    familyHistory: string
+    surgeryHistory: string
+    socialHistory: string
+  }
+  submitTime?: string
 }
 
 export interface PatientCreatePayload extends Partial<PatientInfo> {
@@ -150,13 +175,13 @@ class PatientApiService {
 
   // 获取患者信息
   async getPatientInfo(patientId?: number): Promise<ApiResponse<PatientInfo>> {
-    const params = patientId ? { patientId } : undefined
-    return httpService.get(API_ENDPOINTS.APP.PATIENT.PROFILE, params)
+    void patientId
+    return httpService.get('/app-api/patients/me/profile')
   }
 
   // 更新患者信息
-  async updatePatientInfo(patientInfo: Partial<PatientInfo>): Promise<ApiResponse<void>> {
-    return httpService.put(API_ENDPOINTS.PATIENT.UPDATE, patientInfo)
+  async updatePatientInfo(patientInfo: Partial<PatientInfo>): Promise<ApiResponse<PatientInfo>> {
+    return httpService.put('/app-api/patients/me/profile', patientInfo)
   }
 
   // 创建患者信息，使用患者端专用接口
@@ -220,14 +245,15 @@ class PatientApiService {
   // ========== 健康数据 ==========
 
   // 提交健康数据
-  async submitHealthData(healthData: any): Promise<ApiResponse<void>> {
+  async submitHealthData(healthData: PatientHealthData): Promise<ApiResponse<PatientHealthData>> {
     // 这里可以根据实际 API 接口调整
-    return httpService.post('/admin-api/patient/health-data', healthData)
+    return httpService.put('/app-api/patients/me/health-profile', healthData)
   }
 
   // 获取健康数据
-  async getHealthData(patientId: number): Promise<ApiResponse<any>> {
-    return httpService.get(`/admin-api/patient/health-data?patientId=${patientId}`)
+  async getHealthData(patientId?: number): Promise<ApiResponse<PatientHealthData>> {
+    void patientId
+    return httpService.get('/app-api/patients/me/health-profile')
   }
 
   // ========== App 端专用接口 ==========

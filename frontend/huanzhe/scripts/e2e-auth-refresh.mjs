@@ -40,14 +40,11 @@ try {
   await page.waitForURL(/\/tabs\/home$/, { timeout: 15000 })
 
   const beforeRefresh = await page.evaluate(() => ({
-    accessToken: localStorage.getItem('patient_access_token'),
-    refreshToken: localStorage.getItem('patient_refresh_token'),
+    refreshToken: sessionStorage.getItem('patient_refresh_token'),
     deviceId: localStorage.getItem('patient_device_id')
   }))
 
-  await page.evaluate(() => {
-    localStorage.setItem('patient_access_token', 'invalid-access-token-for-refresh-probe')
-  })
+  await page.reload({ waitUntil: 'networkidle' })
 
   const refreshProbe = await page.evaluate(async () => {
     const runtimeWindow = window
@@ -73,8 +70,7 @@ try {
   })
 
   const afterRefresh = await page.evaluate(() => ({
-    accessToken: localStorage.getItem('patient_access_token'),
-    refreshToken: localStorage.getItem('patient_refresh_token'),
+    refreshToken: sessionStorage.getItem('patient_refresh_token'),
     deviceId: localStorage.getItem('patient_device_id')
   }))
 
@@ -85,7 +81,6 @@ try {
       mobile,
       hospitalPatientId,
       refreshProbe,
-      accessTokenRotated: Boolean(beforeRefresh.accessToken && afterRefresh.accessToken && beforeRefresh.accessToken !== afterRefresh.accessToken),
       refreshTokenRotated: Boolean(beforeRefresh.refreshToken && afterRefresh.refreshToken && beforeRefresh.refreshToken !== afterRefresh.refreshToken),
       beforeRefresh,
       afterRefresh

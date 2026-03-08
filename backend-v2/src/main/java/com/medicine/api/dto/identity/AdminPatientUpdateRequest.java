@@ -8,7 +8,6 @@ public class AdminPatientUpdateRequest {
     private String gender;
     private String birthDate;
     private Integer age;
-    private String idCardMasked;
     private String primaryDiseaseCode;
     private String primaryDiseaseName;
     private String drugAllergy;
@@ -46,14 +45,6 @@ public class AdminPatientUpdateRequest {
 
     public void setAge(Integer age) {
         this.age = age;
-    }
-
-    public String getIdCardMasked() {
-        return idCardMasked;
-    }
-
-    public void setIdCardMasked(String idCardMasked) {
-        this.idCardMasked = idCardMasked;
     }
 
     public String getPrimaryDiseaseCode() {

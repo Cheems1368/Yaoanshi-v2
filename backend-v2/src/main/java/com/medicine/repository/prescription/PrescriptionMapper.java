@@ -92,6 +92,46 @@ public interface PrescriptionMapper {
             """)
     long countForAdmin(@Param("tenantId") Long tenantId, @Param("keyword") String keyword, @Param("status") String status);
 
+    @Select("""
+            <script>
+            SELECT pr.id, pr.patient_id, pr.source_type, pr.status, pr.ocr_confidence, pr.uploaded_file_asset_id, pr.submitted_by_type, pr.submitted_by_id,
+                   pr.reviewed_by_pharmacist_id, pr.reviewed_at, pr.reject_reason, pr.generated_medication_plan_id,
+                   pr.creator, pr.create_time, pr.updater, pr.update_time, pr.deleted, pr.tenant_id,
+                   p.name AS patient_name, p.hospital_patient_id AS hospital_patient_id
+            FROM prescription pr
+            INNER JOIN patient p ON p.id = pr.patient_id AND p.deleted = 0
+            WHERE pr.tenant_id = #{tenantId}
+              AND pr.patient_id = #{patientId}
+              AND pr.deleted = 0
+            <if test="status != null and status != ''">
+              AND pr.status = #{status}
+            </if>
+            ORDER BY pr.create_time DESC, pr.id DESC
+            LIMIT #{offset}, #{pageSize}
+            </script>
+            """)
+    List<Prescription> searchForPatient(
+            @Param("tenantId") Long tenantId,
+            @Param("patientId") Long patientId,
+            @Param("status") String status,
+            @Param("offset") int offset,
+            @Param("pageSize") int pageSize
+    );
+
+    @Select("""
+            <script>
+            SELECT COUNT(1)
+            FROM prescription
+            WHERE tenant_id = #{tenantId}
+              AND patient_id = #{patientId}
+              AND deleted = 0
+            <if test="status != null and status != ''">
+              AND status = #{status}
+            </if>
+            </script>
+            """)
+    long countForPatient(@Param("tenantId") Long tenantId, @Param("patientId") Long patientId, @Param("status") String status);
+
     @Update("""
             UPDATE prescription
             SET status = #{status},

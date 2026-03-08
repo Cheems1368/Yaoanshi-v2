@@ -4,6 +4,7 @@ import com.medicine.api.dto.prescription.PrescriptionDTO;
 import com.medicine.api.dto.prescription.PrescriptionUploadRequest;
 import com.medicine.common.exception.BusinessException;
 import com.medicine.common.exception.ErrorCode;
+import com.medicine.common.model.PageResult;
 import com.medicine.config.ObjectStorageProperties;
 import com.medicine.domain.common.BaseEntity;
 import com.medicine.domain.file.FileAsset;
@@ -23,6 +24,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
@@ -64,6 +66,21 @@ public class AppPrescriptionService {
         this.objectStorageProperties = objectStorageProperties;
     }
 
+    public PageResult<PrescriptionDTO> getPrescriptions(String subject, String status, int pageNo, int pageSize) {
+        Patient patient = requireBoundPatient(subject);
+        int normalizedPageNo = Math.max(pageNo, 1);
+        int normalizedPageSize = Math.min(Math.max(pageSize, 1), 50);
+        int offset = (normalizedPageNo - 1) * normalizedPageSize;
+        String normalizedStatus = normalize(status);
+        List<PrescriptionDTO> list = prescriptionMapper
+                .searchForPatient(DEFAULT_TENANT_ID, patient.getId(), normalizedStatus, offset, normalizedPageSize)
+                .stream()
+                .map(this::toSummaryDto)
+                .toList();
+        long total = prescriptionMapper.countForPatient(DEFAULT_TENANT_ID, patient.getId(), normalizedStatus);
+        return new PageResult<>(normalizedPageNo, normalizedPageSize, total, list);
+    }
+
     public PrescriptionDTO registerUpload(String subject, PrescriptionUploadRequest request) {
         if (request == null || !StringUtils.hasText(request.getObjectKey()) || !StringUtils.hasText(request.getOriginalFilename())
                 || !StringUtils.hasText(request.getContentType()) || request.getSizeBytes() == null || request.getSizeBytes() <= 0) {
@@ -77,14 +94,8 @@ public class AppPrescriptionService {
             throw new BusinessException(ErrorCode.FILE_UPLOAD_TOO_LARGE.getCode(), ErrorCode.FILE_UPLOAD_TOO_LARGE.getMessage());
         }
 
-        AppAccount account = appAccountMapper.selectActiveByMobile(DEFAULT_TENANT_ID, subject);
-        if (account == null) {
-            throw new BusinessException(401, "UNAUTHORIZED");
-        }
-        Patient patient = patientMapper.selectByAppAccountId(DEFAULT_TENANT_ID, account.getId());
-        if (patient == null) {
-            throw new BusinessException(400, "PATIENT_NOT_BOUND");
-        }
+        AppAccount account = requireAccount(subject);
+        Patient patient = requireBoundPatient(account);
 
         LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
         FileAsset fileAsset = new FileAsset();
@@ -142,22 +153,82 @@ public class AppPrescriptionService {
         attachmentDTO.setObjectKey(fileAsset.getObjectKey());
         attachmentDTO.setDownloadUrl(fileAsset.getPublicUrl());
 
+        prescription.setPatientName(patient.getName());
+        prescription.setHospitalPatientId(patient.getHospitalPatientId());
+        PrescriptionDTO dto = toSummaryDto(prescription);
+        dto.setAttachments(List.of(attachmentDTO));
+        return dto;
+    }
+
+    private AppAccount requireAccount(String subject) {
+        AppAccount account = appAccountMapper.selectActiveByMobile(DEFAULT_TENANT_ID, subject);
+        if (account == null) {
+            throw new BusinessException(401, "UNAUTHORIZED");
+        }
+        return account;
+    }
+
+    private Patient requireBoundPatient(String subject) {
+        return requireBoundPatient(requireAccount(subject));
+    }
+
+    private Patient requireBoundPatient(AppAccount account) {
+        Patient patient = patientMapper.selectByAppAccountId(DEFAULT_TENANT_ID, account.getId());
+        if (patient == null) {
+            throw new BusinessException(400, "PATIENT_NOT_BOUND");
+        }
+        return patient;
+    }
+
+    private PrescriptionDTO toSummaryDto(Prescription prescription) {
         PrescriptionDTO dto = new PrescriptionDTO();
         dto.setId(prescription.getId());
-        dto.setPatientId(patient.getId());
-        dto.setPatientName(patient.getName());
-        dto.setHospitalPatientId(patient.getHospitalPatientId());
+        dto.setPatientId(prescription.getPatientId());
+        dto.setPatientName(prescription.getPatientName());
+        dto.setHospitalPatientId(prescription.getHospitalPatientId());
         dto.setStatus(prescription.getStatus());
         dto.setSourceType(prescription.getSourceType());
         dto.setSubmittedByType(prescription.getSubmittedByType());
         dto.setSubmittedById(prescription.getSubmittedById());
-        dto.setCreatedAt(now.toInstant(ZoneOffset.UTC).toString());
-        dto.setOcrStatus("LOW_CONFIDENCE");
-        dto.setOcrConfidence("0.00");
-        dto.setAttachments(List.of(attachmentDTO));
+        dto.setReviewedByPharmacistId(prescription.getReviewedByPharmacistId());
+        dto.setReviewedAt(formatDateTime(prescription.getReviewedAt()));
+        dto.setCreatedAt(formatDateTime(prescription.getCreateTime()));
+        dto.setRejectReason(prescription.getRejectReason());
+        PrescriptionOcrRecord ocrRecord = prescriptionOcrRecordMapper.selectLatestByPrescriptionId(DEFAULT_TENANT_ID, prescription.getId());
+        dto.setOcrStatus(ocrRecord == null ? null : ocrRecord.getStatus());
+        dto.setOcrConfidence(ocrRecord == null || ocrRecord.getConfidence() == null
+                ? null
+                : ocrRecord.getConfidence().setScale(2, RoundingMode.HALF_UP).toPlainString());
+        dto.setAttachments(loadAttachments(prescription.getId()));
         dto.setItems(List.of());
         dto.setPendingDdiScreenings(List.of());
         return dto;
+    }
+
+    private List<PrescriptionDTO.AttachmentDTO> loadAttachments(Long prescriptionId) {
+        return prescriptionAttachmentMapper.selectByPrescriptionId(DEFAULT_TENANT_ID, prescriptionId).stream().map(attachment -> {
+            FileAsset fileAsset = fileAssetMapper.selectByIdAndTenant(DEFAULT_TENANT_ID, attachment.getFileAssetId());
+            PrescriptionDTO.AttachmentDTO dto = new PrescriptionDTO.AttachmentDTO();
+            dto.setId(attachment.getId());
+            dto.setFileAssetId(attachment.getFileAssetId());
+            dto.setAttachmentType(attachment.getAttachmentType());
+            if (fileAsset != null) {
+                dto.setOriginalFilename(fileAsset.getOriginalFilename());
+                dto.setMimeType(fileAsset.getMimeType());
+                dto.setSizeBytes(fileAsset.getSizeBytes());
+                dto.setObjectKey(fileAsset.getObjectKey());
+                dto.setDownloadUrl(fileAsset.getPublicUrl());
+            }
+            return dto;
+        }).toList();
+    }
+
+    private String formatDateTime(LocalDateTime value) {
+        return value == null ? null : value.toInstant(ZoneOffset.UTC).toString();
+    }
+
+    private String normalize(String value) {
+        return StringUtils.hasText(value) ? value.trim() : null;
     }
 
     private void applyAudit(BaseEntity entity, LocalDateTime now, String operator) {

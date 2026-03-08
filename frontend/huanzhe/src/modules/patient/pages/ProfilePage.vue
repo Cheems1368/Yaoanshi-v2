@@ -61,12 +61,16 @@
                 <div class="info-value">{{ profileData.gender }}</div>
               </div>
               <div class="info-item">
-                <div class="info-label">身份证号</div>
-                <div class="info-value">{{ profileData.idCard }}</div>
+                <div class="info-label">实名材料</div>
+                <div class="info-value">{{ profileData.identityMaterialArchived ? '已归档' : '未归档' }}</div>
               </div>
               <div class="info-item">
                 <div class="info-label">证件类型</div>
                 <div class="info-value">{{ profileData.idType }}</div>
+              </div>
+              <div v-if="profileData.realNameVerifiedTime" class="info-item">
+                <div class="info-label">认证时间</div>
+                <div class="info-value">{{ formatDate(profileData.realNameVerifiedTime) }}</div>
               </div>
               <div class="info-item">
                 <div class="info-label">民族</div>
@@ -103,11 +107,7 @@
                 <div v-if="errors.gender" class="error-message">{{ errors.gender }}</div>
               </ion-item>
 
-              <ion-item class="edit-item">
-                <ion-label position="stacked">身份证号 *</ion-label>
-                <ion-input v-model="editForm.idCard" placeholder="请输入身份证号" :class="{ 'ion-invalid': errors.idCard }"></ion-input>
-                <div v-if="errors.idCard" class="error-message">{{ errors.idCard }}</div>
-              </ion-item>
+              <div class="info-tip">实名材料已做后台归档，当前页面不展示也不重新收集件号。</div>
             </div>
           </ion-card-content>
         </ion-card>
@@ -308,78 +308,74 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted, onUnmounted } from 'vue';
-import { useRouter } from 'vue-router';
-import { 
-  IonPage, 
-  IonHeader, 
-  IonToolbar, 
-  IonTitle, 
-  IonContent, 
-  IonCard, 
-  IonCardHeader, 
-  IonCardTitle, 
-  IonCardContent, 
-  IonItem, 
-  IonLabel,
+import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
+import { useRouter } from 'vue-router'
+import {
+  IonButton,
+  IonButtons,
+  IonCard,
+  IonCardContent,
+  IonCardHeader,
+  IonCardTitle,
+  IonContent,
+  IonHeader,
+  IonIcon,
   IonInput,
+  IonItem,
+  IonLabel,
+  IonPage,
   IonSelect,
   IonSelectOption,
   IonTextarea,
-  IonButton,
-  IonButtons,
-  IonIcon,
+  IonTitle,
+  IonToolbar,
   toastController
-} from '@ionic/vue';
-import { createOutline, cameraOutline, checkmarkCircleOutline, documentTextOutline } from 'ionicons/icons';
-import { patientSession } from '@/app/session';
-import { appAuthService } from '@/modules/patient/api/mvp';
-import { healthDataService, type HealthData } from '@/services/healthDataService';
-import { userDataService, type UserProfile } from '@/services/userDataService';
-import { patientApiService } from '@/modules/patient/api/patientApi';
-import { httpService } from '@/shared/http/client';
+} from '@ionic/vue'
+import { cameraOutline, checkmarkCircleOutline, createOutline, documentTextOutline } from 'ionicons/icons'
+import { patientSession } from '@/app/session'
+import { appAuthService } from '@/modules/patient/api/mvp'
+import { patientApiService, type PatientHealthData, type PatientInfo } from '@/modules/patient/api/patientApi'
+import { healthDataService, type HealthData } from '@/services/healthDataService'
+import { userDataService, type UserProfile } from '@/services/userDataService'
 
-const router = useRouter();
+const router = useRouter()
 
-// 响应式数据
-const isEditing = ref(false);
-const logoutLoading = ref(false);
-const healthData = ref<HealthData | null>(null);
+const isEditing = ref(false)
+const logoutLoading = ref(false)
+const healthData = ref<HealthData | null>(null)
 
-// 用户资料数据 - 从用户数据服务获取
 const profileData = reactive<UserProfile>({
   userId: 'P2024001',
   patientId: undefined,
   name: '张患者',
-  phone: '138****8888',
+  phone: '13800000000',
   age: 30,
   gender: '男',
-  idCard: '330***********1234',
+  idCard: '',
   idType: '身份证',
   ethnicity: '汉族',
   height: 175,
   weight: 70,
   bloodType: 'A型',
-  allergies: '青霉素过敏',
+  allergies: '无',
   avatar: '/src/picture/user_avatar.png',
   address: '',
   patientType: 0,
   insurance: 0,
   emergencyContact: {
-    name: '李女士',
-    phone: '139****9999',
-    relationship: '配偶'
+    name: '',
+    phone: '',
+    relationship: ''
   },
-  isRealNameVerified: false
-});
+  isRealNameVerified: false,
+  identityMaterialArchived: false
+})
 
-// 编辑表单数据
 const editForm = reactive({
   name: '',
   phone: '',
   age: 0,
   gender: '',
-  idCard: '',
   height: 0,
   weight: 0,
   bloodType: '',
@@ -389,308 +385,282 @@ const editForm = reactive({
     phone: '',
     relationship: ''
   }
-});
+})
 
-// 表单验证错误
 const errors = reactive({
   name: '',
   phone: '',
   age: '',
-  gender: '',
-  idCard: ''
-});
+  gender: ''
+})
 
-// 表单验证
 const isFormValid = computed(() => {
-  return editForm.name && 
-         editForm.phone && 
-         editForm.age > 0 && 
-         editForm.gender && 
-         editForm.idCard &&
-         !errors.name &&
-         !errors.phone &&
-         !errors.age &&
-         !errors.gender &&
-         !errors.idCard;
-});
+  return editForm.name
+    && editForm.phone
+    && editForm.age > 0
+    && editForm.gender
+    && !errors.name
+    && !errors.phone
+    && !errors.age
+    && !errors.gender
+})
 
-// 格式化日期
 const formatDate = (dateString: string) => {
-  const date = new Date(dateString);
+  const date = new Date(dateString)
   return date.toLocaleString('zh-CN', {
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
     hour: '2-digit',
     minute: '2-digit'
-  });
-};
+  })
+}
 
-// 跳转到问卷页面
 const goToQuestionnaire = () => {
-  router.push('/questionnaire');
-};
+  router.push('/questionnaire')
+}
 
-// 开始编辑
 const startEdit = () => {
-  isEditing.value = true;
-  // 复制当前数据到编辑表单
+  isEditing.value = true
   Object.assign(editForm, {
     name: profileData.name,
     phone: profileData.phone,
     age: profileData.age,
     gender: profileData.gender,
-    idCard: profileData.idCard,
     height: profileData.height,
     weight: profileData.weight,
     bloodType: profileData.bloodType,
     allergies: profileData.allergies,
     emergencyContact: { ...profileData.emergencyContact }
-  });
-  clearErrors();
-};
+  })
+  clearErrors()
+}
 
-// 取消编辑
 const cancelEdit = () => {
-  isEditing.value = false;
-  clearErrors();
-};
+  isEditing.value = false
+  clearErrors()
+}
 
-// 同步患者信息
+const toHealthData = (serverData: PatientHealthData): HealthData => ({
+  layer1: {
+    allergy: serverData.layer1?.allergy || '',
+    diagnosis: serverData.layer1?.diagnosis || ''
+  },
+  layer2: {
+    medicalHistory: serverData.layer2?.medicalHistory || '',
+    smokingDrinking: serverData.layer2?.smokingDrinking || '',
+    liverKidney: serverData.layer2?.liverKidney || '',
+    currentMedication: serverData.layer2?.currentMedication || ''
+  },
+  layer3: {
+    detailedSymptoms: serverData.layer3?.detailedSymptoms || '',
+    familyHistory: serverData.layer3?.familyHistory || '',
+    surgeryHistory: serverData.layer3?.surgeryHistory || '',
+    socialHistory: serverData.layer3?.socialHistory || ''
+  },
+  submitTime: serverData.submitTime || new Date().toISOString()
+})
+
+const applyProfileSnapshot = (serverData: PatientInfo) => {
+  const emergencyContact = {
+    name: serverData.emergencyContact?.name || profileData.emergencyContact.name,
+    phone: serverData.emergencyContact?.phone || profileData.emergencyContact.phone,
+    relationship: serverData.emergencyContact?.relationship || profileData.emergencyContact.relationship
+  }
+  const nextProfile: Partial<UserProfile> = {
+    userId: serverData.patientId ? `PAT-${serverData.patientId}` : profileData.userId,
+    patientId: serverData.patientId ?? serverData.id ?? profileData.patientId,
+    name: serverData.name || profileData.name,
+    phone: serverData.phone || serverData.mobile || profileData.phone,
+    age: serverData.age ?? profileData.age,
+    gender: serverData.gender || profileData.gender,
+    idCard: '',
+    idType: serverData.idType || profileData.idType,
+    ethnicity: serverData.ethnicity || profileData.ethnicity,
+    height: serverData.height ?? profileData.height,
+    weight: serverData.weight ?? profileData.weight,
+    bloodType: serverData.bloodType || profileData.bloodType,
+    allergies: serverData.allergies || profileData.allergies,
+    avatar: serverData.avatar || profileData.avatar,
+    address: serverData.address || profileData.address,
+    patientType: serverData.patientType ?? profileData.patientType,
+    insurance: serverData.insurance ?? profileData.insurance,
+    emergencyContact,
+    identityMaterialArchived: Boolean(serverData.identityMaterialArchived ?? profileData.identityMaterialArchived),
+    isRealNameVerified: Boolean((serverData as any).realNameVerified ?? serverData.isRealNameVerified ?? profileData.isRealNameVerified),
+    realNameVerifiedTime: serverData.realNameVerifiedTime || profileData.realNameVerifiedTime
+  }
+
+  Object.assign(profileData, nextProfile)
+  userDataService.updateProfile(nextProfile)
+}
+
+const applyHealthSnapshot = (serverData: PatientHealthData | null | undefined) => {
+  if (!serverData?.submitTime) {
+    healthData.value = null
+    healthDataService.replaceHealthData(null)
+    return
+  }
+
+  const nextHealthData = toHealthData(serverData)
+  healthData.value = nextHealthData
+  healthDataService.replaceHealthData(nextHealthData)
+}
+
 const syncPatientInfo = async () => {
-  const token = httpService.getToken();
-  if (!token) {
-    console.warn('同步患者信息失败: 未找到 Token');
-    return;
+  const response = await patientApiService.getPatientInfo()
+  if (response.data) {
+    applyProfileSnapshot(response.data)
   }
-  
-  try {
-    console.log('开始同步患者信息，Token 存在:', !!token);
-    const response = await patientApiService.getPatientInfo(profileData.patientId ?? undefined);
-    if (response.code === 0 && response.data) {
-      const serverData: any = response.data;
-      const emergencyContact = {
-        name: serverData.emergencyContact?.name ?? serverData.emergencyContact ?? profileData.emergencyContact.name,
-        phone: serverData.emergencyContact?.phone ?? serverData.emergencyContactPhone ?? profileData.emergencyContact.phone,
-        relationship: serverData.emergencyContact?.relationship ?? serverData.emergencyContactRelationship ?? profileData.emergencyContact.relationship
-      };
-      Object.assign(profileData, {
-        patientId: serverData.patientId ?? profileData.patientId,
-        name: serverData.name || profileData.name,
-        phone: serverData.phone || serverData.mobile || profileData.phone,
-        age: serverData.age ?? profileData.age,
-        gender: serverData.gender || profileData.gender,
-        idCard: serverData.idCard || profileData.idCard,
-        idType: serverData.idType || profileData.idType,
-        ethnicity: serverData.ethnicity || profileData.ethnicity,
-        height: serverData.height ?? profileData.height,
-        weight: serverData.weight ?? profileData.weight,
-        bloodType: serverData.bloodType || profileData.bloodType,
-        allergies: serverData.allergies || profileData.allergies,
-        avatar: serverData.avatar || profileData.avatar,
-        emergencyContact,
-        address: serverData.address || profileData.address,
-        patientType: serverData.patientType ?? profileData.patientType,
-        insurance: serverData.insurance ?? profileData.insurance,
-        isRealNameVerified: (serverData.realNameVerified ?? serverData.isRealNameVerified) ?? profileData.isRealNameVerified,
-        realNameVerifiedTime: serverData.realNameVerifiedTime || profileData.realNameVerifiedTime
-      });
-      console.log('患者信息同步成功');
-    }
-  } catch (error: any) {
-    console.error('同步患者信息失败:', error);
-    if (error.message?.includes('权限') || error.message?.includes('登录') || error.message?.includes('未授权')) {
-      console.warn('权限错误，可能需要重新登录');
-      // 不在这里跳转，让用户知道问题即可
-    }
-  }
-};
+}
 
-// 保存资料
+const syncHealthProfile = async () => {
+  const response = await patientApiService.getHealthData()
+  applyHealthSnapshot(response.data)
+}
+
 const saveProfile = async () => {
   if (!validateForm()) {
-    return;
+    return
   }
 
   try {
-    // 更新本地数据
-    userDataService.updateProfile({
+    const response = await patientApiService.updatePatientInfo({
       name: editForm.name,
       phone: editForm.phone,
       age: editForm.age,
       gender: editForm.gender,
-      idCard: editForm.idCard,
       height: editForm.height,
       weight: editForm.weight,
       bloodType: editForm.bloodType,
       allergies: editForm.allergies,
       emergencyContact: { ...editForm.emergencyContact }
-    });
+    })
 
-    // 同步到服务器
-    try {
-      await patientApiService.updatePatientInfo({
-        name: editForm.name,
-        phone: editForm.phone,
-        age: editForm.age,
-        gender: editForm.gender,
-        idCard: editForm.idCard,
-        height: editForm.height,
-        weight: editForm.weight,
-        bloodType: editForm.bloodType,
-        allergies: editForm.allergies,
-        emergencyContact: { ...editForm.emergencyContact }
-      });
-    } catch (apiError) {
-      console.error('同步到服务器失败:', apiError);
-      // 即使服务器同步失败，本地保存仍然成功
+    if (response.data) {
+      applyProfileSnapshot(response.data)
+    } else {
+      await syncPatientInfo()
     }
 
-    isEditing.value = false;
-    
+    isEditing.value = false
+
     const toast = await toastController.create({
-      message: '资料保存成功！',
+      message: '资料保存成功',
       duration: 2000,
       position: 'top',
       color: 'success'
-    });
-    await toast.present();
-  } catch (error) {
+    })
+    await toast.present()
+  } catch {
     const toast = await toastController.create({
       message: '保存失败，请重试',
       duration: 2000,
       position: 'top',
       color: 'danger'
-    });
-    await toast.present();
+    })
+    await toast.present()
   }
-};
+}
 
-// 表单验证
 const validateForm = () => {
-  clearErrors();
-  let isValid = true;
+  clearErrors()
+  let valid = true
 
-  // 姓名验证
   if (!editForm.name.trim()) {
-    errors.name = '请输入姓名';
-    isValid = false;
+    errors.name = '请输入姓名'
+    valid = false
   }
 
-  // 手机号验证
-  const phoneRegex = /^1[3-9]\d{9}$/;
-  if (!editForm.phone.trim()) {
-    errors.phone = '请输入手机号';
-    isValid = false;
-  } else if (!phoneRegex.test(editForm.phone)) {
-    errors.phone = '请输入正确的手机号';
-    isValid = false;
+  if (!/^1[3-9]\d{9}$/.test(editForm.phone.trim())) {
+    errors.phone = '请输入正确的手机号'
+    valid = false
   }
 
-  // 年龄验证
   if (!editForm.age || editForm.age < 1 || editForm.age > 150) {
-    errors.age = '请输入正确的年龄';
-    isValid = false;
+    errors.age = '请输入正确的年龄'
+    valid = false
   }
 
-  // 性别验证
   if (!editForm.gender) {
-    errors.gender = '请选择性别';
-    isValid = false;
+    errors.gender = '请选择性别'
+    valid = false
   }
 
-  // 身份证验证
-  const idCardRegex = /^[1-9]\d{5}(18|19|20)\d{2}((0[1-9])|(1[0-2]))(([0-2][1-9])|10|20|30|31)\d{3}[0-9Xx]$/;
-  if (!editForm.idCard.trim()) {
-    errors.idCard = '请输入身份证号';
-    isValid = false;
-  } else if (!idCardRegex.test(editForm.idCard)) {
-    errors.idCard = '请输入正确的身份证号';
-    isValid = false;
-  }
+  return valid
+}
 
-  return isValid;
-};
-
-// 清除错误信息
 const clearErrors = () => {
-  (Object.keys(errors) as Array<keyof typeof errors>).forEach(key => {
-    errors[key] = '';
-  });
-};
+  ;(Object.keys(errors) as Array<keyof typeof errors>).forEach((key) => {
+    errors[key] = ''
+  })
+}
 
-// 选择头像
 const selectAvatar = () => {
-  // 这里可以实现头像选择功能
-  console.log('选择头像');
-};
+  // 头像上传未在本次安全收敛范围内，暂不实现。
+}
 
-// 加载健康数据
 const loadHealthData = () => {
-  healthData.value = healthDataService.getHealthData();
-};
+  healthData.value = healthDataService.getHealthData()
+}
 
-// 加载用户数据
 const loadUserData = () => {
-  const userProfile = userDataService.getUserProfile();
-  Object.assign(profileData, userProfile);
-};
+  const userProfile = userDataService.getUserProfile()
+  Object.assign(profileData, userProfile)
+}
 
 const clearLocalSession = () => {
-  patientSession.clearAuthState();
-  patientSession.clearGateState();
-  userDataService.clearUserData();
-  healthDataService.clearHealthData();
-};
+  patientSession.clearAuthState()
+  patientSession.clearGateState()
+  userDataService.clearUserData()
+  healthDataService.clearHealthData()
+}
 
 const handleLogout = async () => {
   if (logoutLoading.value) {
-    return;
+    return
   }
 
-  logoutLoading.value = true;
+  logoutLoading.value = true
 
   try {
-    const deviceId = patientSession.getDeviceId();
+    const deviceId = patientSession.getDeviceId()
     if (deviceId) {
-      await appAuthService.logout(deviceId);
+      await appAuthService.logout(deviceId)
     }
-  } catch (error) {
-    console.error('退出登录失败，执行本地收口:', error);
+  } catch {
+    // ignore logout network failure and close local session
   } finally {
-    clearLocalSession();
-    logoutLoading.value = false;
-    await router.replace('/login');
+    clearLocalSession()
+    logoutLoading.value = false
+    await router.replace('/login')
   }
-};
+}
 
-// 用户数据变化监听器
 const onUserDataChange = (newProfile: UserProfile) => {
-  Object.assign(profileData, newProfile);
-};
+  Object.assign(profileData, newProfile)
+}
 
-// 检查登录状态
 onMounted(async () => {
-  const token = httpService.getToken();
-  if (!token) {
-    router.push('/login');
-    return;
+  if (!patientSession.getGateState().loggedIn) {
+    router.push('/login')
+    return
   }
-  
-  loadUserData();
-  loadHealthData();
-  
-  // 添加用户数据变化监听器
-  userDataService.addListener(onUserDataChange);
-  
-  // 尝试从服务器同步患者信息
-  await syncPatientInfo();
-});
 
-// 组件卸载时清理
+  loadUserData()
+  loadHealthData()
+  userDataService.addListener(onUserDataChange)
+
+  try {
+    await Promise.all([syncPatientInfo(), syncHealthProfile()])
+  } catch {
+    // keep current session cache when sync fails
+  }
+})
+
 onUnmounted(() => {
-  userDataService.removeListener(onUserDataChange);
-});
+  userDataService.removeListener(onUserDataChange)
+})
 </script>
 
 <style scoped>
@@ -725,6 +695,16 @@ ion-content {
   --background: #2979FF !important;
   --color: white !important;
   box-shadow: 0 2px 8px rgba(41, 121, 255, 0.15);
+}
+
+.info-tip {
+  margin: 8px 0 0;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: rgba(41, 121, 255, 0.08);
+  color: #4b5563;
+  font-size: 13px;
+  line-height: 1.6;
 }
 
 .app-title {
