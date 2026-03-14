@@ -4,6 +4,7 @@ import com.medicine.domain.identity.AppAccount;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Options;
+import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
 
@@ -25,7 +26,7 @@ public interface AppAccountMapper {
             WHERE tenant_id = #{tenantId} AND mobile = #{mobile} AND deleted = 0
             LIMIT 1
             """)
-    AppAccount selectActiveByMobile(Long tenantId, String mobile);
+    AppAccount selectActiveByMobile(@Param("tenantId") Long tenantId, @Param("mobile") String mobile);
 
     @Select("""
             SELECT id, mobile, account_type, status, display_name, last_login_ip, last_login_time,
@@ -34,7 +35,7 @@ public interface AppAccountMapper {
             WHERE tenant_id = #{tenantId} AND id = #{id} AND deleted = 0
             LIMIT 1
             """)
-    AppAccount selectByIdAndTenant(Long tenantId, Long id);
+    AppAccount selectByIdAndTenant(@Param("tenantId") Long tenantId, @Param("id") Long id);
 
     @Insert("""
             INSERT INTO app_account (

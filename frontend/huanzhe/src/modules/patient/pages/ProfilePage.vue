@@ -333,8 +333,7 @@ import {
 } from '@ionic/vue'
 import { cameraOutline, checkmarkCircleOutline, createOutline, documentTextOutline } from 'ionicons/icons'
 import { patientSession } from '@/app/session'
-import { appAuthService } from '@/modules/patient/api/mvp'
-import { patientApiService, type PatientHealthData, type PatientInfo } from '@/modules/patient/api/patientApi'
+import { appAuthService, patientService, type PatientProfileDTO, type PatientHealthProfileDTO } from '@/modules/patient/api/mvp'
 import { healthDataService, type HealthData } from '@/services/healthDataService'
 import { userDataService, type UserProfile } from '@/services/userDataService'
 
@@ -441,7 +440,7 @@ const cancelEdit = () => {
   clearErrors()
 }
 
-const toHealthData = (serverData: PatientHealthData): HealthData => ({
+const toHealthData = (serverData: PatientHealthProfileDTO): HealthData => ({
   layer1: {
     allergy: serverData.layer1?.allergy || '',
     diagnosis: serverData.layer1?.diagnosis || ''
@@ -461,7 +460,7 @@ const toHealthData = (serverData: PatientHealthData): HealthData => ({
   submitTime: serverData.submitTime || new Date().toISOString()
 })
 
-const applyProfileSnapshot = (serverData: PatientInfo) => {
+const applyProfileSnapshot = (serverData: PatientProfileDTO) => {
   const emergencyContact = {
     name: serverData.emergencyContact?.name || profileData.emergencyContact.name,
     phone: serverData.emergencyContact?.phone || profileData.emergencyContact.phone,
@@ -469,9 +468,9 @@ const applyProfileSnapshot = (serverData: PatientInfo) => {
   }
   const nextProfile: Partial<UserProfile> = {
     userId: serverData.patientId ? `PAT-${serverData.patientId}` : profileData.userId,
-    patientId: serverData.patientId ?? serverData.id ?? profileData.patientId,
+    patientId: serverData.patientId ?? profileData.patientId,
     name: serverData.name || profileData.name,
-    phone: serverData.phone || serverData.mobile || profileData.phone,
+    phone: serverData.phone || profileData.phone,
     age: serverData.age ?? profileData.age,
     gender: serverData.gender || profileData.gender,
     idCard: '',
@@ -487,7 +486,7 @@ const applyProfileSnapshot = (serverData: PatientInfo) => {
     insurance: serverData.insurance ?? profileData.insurance,
     emergencyContact,
     identityMaterialArchived: Boolean(serverData.identityMaterialArchived ?? profileData.identityMaterialArchived),
-    isRealNameVerified: Boolean((serverData as any).realNameVerified ?? serverData.isRealNameVerified ?? profileData.isRealNameVerified),
+    isRealNameVerified: Boolean(serverData.realNameVerified ?? profileData.isRealNameVerified),
     realNameVerifiedTime: serverData.realNameVerifiedTime || profileData.realNameVerifiedTime
   }
 
@@ -495,7 +494,7 @@ const applyProfileSnapshot = (serverData: PatientInfo) => {
   userDataService.updateProfile(nextProfile)
 }
 
-const applyHealthSnapshot = (serverData: PatientHealthData | null | undefined) => {
+const applyHealthSnapshot = (serverData: PatientHealthProfileDTO | null | undefined) => {
   if (!serverData?.submitTime) {
     healthData.value = null
     healthDataService.replaceHealthData(null)
@@ -507,15 +506,15 @@ const applyHealthSnapshot = (serverData: PatientHealthData | null | undefined) =
   healthDataService.replaceHealthData(nextHealthData)
 }
 
-const syncPatientInfo = async () => {
-  const response = await patientApiService.getPatientInfo()
+const syncPatientProfileDTO = async () => {
+  const response = await patientService.getProfile()
   if (response.data) {
     applyProfileSnapshot(response.data)
   }
 }
 
 const syncHealthProfile = async () => {
-  const response = await patientApiService.getHealthData()
+  const response = await patientService.getHealthProfile()
   applyHealthSnapshot(response.data)
 }
 
@@ -525,7 +524,7 @@ const saveProfile = async () => {
   }
 
   try {
-    const response = await patientApiService.updatePatientInfo({
+    const response = await patientService.updateProfile({
       name: editForm.name,
       phone: editForm.phone,
       age: editForm.age,
@@ -540,7 +539,7 @@ const saveProfile = async () => {
     if (response.data) {
       applyProfileSnapshot(response.data)
     } else {
-      await syncPatientInfo()
+      await syncPatientProfileDTO()
     }
 
     isEditing.value = false
@@ -652,7 +651,7 @@ onMounted(async () => {
   userDataService.addListener(onUserDataChange)
 
   try {
-    await Promise.all([syncPatientInfo(), syncHealthProfile()])
+    await Promise.all([syncPatientProfileDTO(), syncHealthProfile()])
   } catch {
     // keep current session cache when sync fails
   }

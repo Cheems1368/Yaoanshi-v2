@@ -6,7 +6,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 public class JwtProperties {
 
     private String issuer = "backend-v2";
-    private String secret = "replace-with-secure-secret";
+    private String secret = "";
     private long accessTokenSeconds = 7200;
     private long refreshTokenSeconds = 2592000;
 

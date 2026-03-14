@@ -17,8 +17,8 @@ const EMPTY_USER = {
 }
 
 const ROLE_DISPLAY_LABELS = {
-  doctor: '鍖荤敓',
-  patient: '鎮ｈ€?'
+  doctor: '医生',
+  patient: '患者'
 }
 
 const readRefreshToken = () => window.sessionStorage.getItem(REFRESH_TOKEN_STORAGE_KEY) || ''
@@ -49,7 +49,7 @@ const derivePrimaryRole = (info = {}) => {
   }
 
   const nickname = (info.nickname || info.name || '').toString().toLowerCase()
-  if (nickname.includes('鍖荤敓') || nickname.includes('鍖诲笀') || nickname.includes('doctor')) {
+  if (nickname.includes('医生') || nickname.includes('医师') || nickname.includes('doctor')) {
     return 'doctor'
   }
 
@@ -128,7 +128,7 @@ export const useUserStore = defineStore('user', () => {
           const nextAccessToken = response.data?.accessToken || ''
           const nextRefreshToken = response.data?.refreshToken || ''
           if (!nextAccessToken) {
-            throw new Error('鐧诲綍鍝嶅簲缂哄皯璁块棶浠ょ墝')
+            throw new Error('登录响应缺少访问令牌')
           }
 
           setToken(nextAccessToken)
@@ -158,24 +158,24 @@ export const useUserStore = defineStore('user', () => {
       const response = await login(loginData)
 
       if (!API_SUCCESS_CODES.includes(response.code)) {
-        ElMessage.error(response.msg || response.message || '鐧诲綍澶辫触')
+        ElMessage.error(response.msg || response.message || '登录失败')
         return false
       }
 
       const { accessToken, refreshToken } = response.data || {}
       if (!accessToken) {
-        throw new Error('鐧诲綍鍝嶅簲缂哄皯璁块棶浠ょ墝')
+        throw new Error('登录响应缺少访问令牌')
       }
 
       setToken(accessToken)
       setRefreshToken(refreshToken || '')
 
       await initUserInfo()
-      ElMessage.success('鐧诲綍鎴愬姛')
+      ElMessage.success('登录成功')
       return true
     } catch (error) {
-      console.error('鐧诲綍閿欒:', error)
-      ElMessage.error(error.message || '鐧诲綍澶辫触')
+      console.error('登录错误:', error)
+      ElMessage.error(error.message || '登录失败')
       return false
     }
   }
@@ -188,11 +188,11 @@ export const useUserStore = defineStore('user', () => {
         await logout()
       }
     } catch (error) {
-      console.error('鐧诲嚭璇锋眰澶辫触:', error)
+      console.error('登出请求失败:', error)
     } finally {
       clearAuthState()
       if (!silent) {
-        ElMessage.success('宸查€€鍑虹櫥褰?')
+        ElMessage.success('已退出登录')
       }
     }
   }
@@ -208,12 +208,12 @@ export const useUserStore = defineStore('user', () => {
     try {
       const response = await getUserInfo()
       if (!API_SUCCESS_CODES.includes(response.code)) {
-        throw new Error(response.msg || response.message || '鑾峰彇鐢ㄦ埛淇℃伅澶辫触')
+        throw new Error(response.msg || response.message || '获取用户信息失败')
       }
 
       const { user, roles, permissions } = response.data || {}
       if (!user) {
-        throw new Error('鏈幏鍙栧埌鐢ㄦ埛淇℃伅')
+        throw new Error('未获取到用户信息')
       }
 
       setUserInfo({
@@ -226,7 +226,7 @@ export const useUserStore = defineStore('user', () => {
         permissions: Array.isArray(permissions) ? permissions : permissions ? Array.from(permissions) : []
       })
     } catch (error) {
-      console.error('鑾峰彇鐢ㄦ埛淇℃伅澶辫触:', error)
+      console.error('获取用户信息失败:', error)
       await logoutAction({ silent: true })
     }
   }

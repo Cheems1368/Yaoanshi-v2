@@ -12,24 +12,36 @@ import java.util.Set;
 @Service
 public class NotificationDispatchService {
 
-    private static final Set<String> REALTIME_BUSINESS_TYPES = Set.of(
+    private static final Set<String> ADMIN_REALTIME_BUSINESS_TYPES = Set.of(
             "HELP_ORDER_SUBMITTED",
+            "HELP_ORDER_PATIENT_REPLY",
             "HELP_ORDER_ESCALATED",
             "HELP_ORDER_REPLY",
             "HELP_ORDER_CLOSED"
     );
 
+    private static final Set<String> APP_REALTIME_BUSINESS_TYPES = Set.of(
+            "HELP_ORDER_CLAIMED",
+            "HELP_ORDER_REPLY",
+            "HELP_ORDER_ESCALATED",
+            "HELP_ORDER_REJECTED",
+            "HELP_ORDER_CLOSED"
+    );
+
     private final NotificationLogMapper notificationLogMapper;
-    private final AdminNotificationRealtimeService realtimeService;
+    private final AdminNotificationRealtimeService adminRealtimeService;
+    private final AppNotificationRealtimeService appRealtimeService;
     private final ObjectMapper objectMapper;
 
     public NotificationDispatchService(
             NotificationLogMapper notificationLogMapper,
-            AdminNotificationRealtimeService realtimeService,
+            AdminNotificationRealtimeService adminRealtimeService,
+            AppNotificationRealtimeService appRealtimeService,
             ObjectMapper objectMapper
     ) {
         this.notificationLogMapper = notificationLogMapper;
-        this.realtimeService = realtimeService;
+        this.adminRealtimeService = adminRealtimeService;
+        this.appRealtimeService = appRealtimeService;
         this.objectMapper = objectMapper;
     }
 
@@ -63,8 +75,14 @@ public class NotificationDispatchService {
 
     private void updateDispatchResult(NotificationLog log, LocalDateTime now) {
         DispatchResult result = "WEBSOCKET".equals(log.getChannel())
-                ? realtimeService.dispatch(log)
+                ? dispatchRealtime(log)
                 : DispatchResult.sent();
+        // Patient WS dispatch failure degrades to SENT: the notification is persisted
+        // and the patient client will pick it up via polling fallback.
+        if (!result.success() && "PATIENT".equals(log.getTargetType())) {
+            result = DispatchResult.sent();
+            log.setChannel("IN_APP");
+        }
         log.setDeliveryStatus(result.success() ? "SENT" : "FAILED");
         log.setSentAt(result.success() ? now : null);
         log.setFailureCode(result.success() ? null : result.failureCode());
@@ -76,10 +94,20 @@ public class NotificationDispatchService {
 
     private String resolveChannel(String targetType, String businessType) {
         if (("PHARMACIST".equals(targetType) || "DOCTOR".equals(targetType))
-                && REALTIME_BUSINESS_TYPES.contains(businessType)) {
+                && ADMIN_REALTIME_BUSINESS_TYPES.contains(businessType)) {
+            return "WEBSOCKET";
+        }
+        if ("PATIENT".equals(targetType) && APP_REALTIME_BUSINESS_TYPES.contains(businessType)) {
             return "WEBSOCKET";
         }
         return "IN_APP";
+    }
+
+    private DispatchResult dispatchRealtime(NotificationLog log) {
+        if ("PATIENT".equals(log.getTargetType())) {
+            return appRealtimeService.dispatch(log);
+        }
+        return adminRealtimeService.dispatch(log);
     }
 
     private String writeJson(Map<String, Object> payload) {

@@ -103,7 +103,7 @@ import { useRouter } from "vue-router"
 import { IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonButton, IonIcon, IonTextarea } from "@ionic/vue"
 import { chevronBackOutline } from "ionicons/icons"
 import { healthDataService, type HealthData } from "@/services/healthDataService"
-import { patientApiService } from "@/modules/patient/api/patientApi"
+import { patientService } from "@/modules/patient/api/mvp"
 
 const router = useRouter()
 
@@ -134,7 +134,7 @@ const prevStep = () => {
 
 const submitForm = async () => {
   try {
-    const response = await patientApiService.submitHealthData(formData)
+    const response = await patientService.updateHealthProfile(formData)
     const persistedHealthData: HealthData = response.data?.submitTime
       ? (response.data as HealthData)
       : {

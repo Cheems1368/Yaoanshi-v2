@@ -107,6 +107,7 @@ if ([string]::IsNullOrWhiteSpace($dbPassword)) {
 Set-EnvIfMissing -Name "MEDICINE_DB_PASSWORD" -Value $dbPassword
 Set-EnvIfMissing -Name "MEDICINE_LEGACY_DB_PASSWORD" -Value (Get-EnvValue "MEDICINE_DB_PASSWORD")
 Set-EnvIfMissing -Name "MEDICINE_REDIS_PORT" -Value "16379"
+Set-EnvIfMissing -Name "MEDICINE_JWT_SECRET" -Value "local-dev-jwt-secret-change-me"
 
 if (-not [string]::IsNullOrWhiteSpace($SpringProfile)) {
     [System.Environment]::SetEnvironmentVariable("SPRING_PROFILES_ACTIVE", $SpringProfile, 'Process')

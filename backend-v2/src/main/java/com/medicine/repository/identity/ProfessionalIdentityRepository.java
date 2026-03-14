@@ -43,7 +43,7 @@ public class ProfessionalIdentityRepository {
     public SystemUser selectActiveSystemUser(Long tenantId, Long userId) {
         List<SystemUser> rows = jdbcTemplate.query(
                 """
-                SELECT id, username, nickname, mobile, status, deleted, tenant_id
+                SELECT id, username, password, nickname, avatar, mobile, status, deleted, tenant_id
                 FROM system_users
                 WHERE tenant_id = ?
                   AND id = ?
@@ -54,6 +54,25 @@ public class ProfessionalIdentityRepository {
                 (rs, rowNum) -> mapSystemUser(rs),
                 tenantId,
                 userId
+        );
+        return rows.isEmpty() ? null : rows.get(0);
+    }
+
+    public SystemUser selectActiveSystemUserByUsername(Long tenantId, String username) {
+        List<SystemUser> rows = jdbcTemplate.query(
+                """
+                SELECT id, username, password, nickname, avatar, mobile, status, deleted, tenant_id
+                FROM system_users
+                WHERE tenant_id = ?
+                  AND username = ?
+                  AND status = 0
+                  AND deleted = 0
+                ORDER BY id ASC
+                LIMIT 1
+                """,
+                (rs, rowNum) -> mapSystemUser(rs),
+                tenantId,
+                username
         );
         return rows.isEmpty() ? null : rows.get(0);
     }
@@ -80,6 +99,38 @@ public class ProfessionalIdentityRepository {
         );
     }
 
+    public List<String> selectPermissionCodesByUserId(Long tenantId, Long userId) {
+        return jdbcTemplate.query(
+                """
+                SELECT DISTINCT m.permission
+                FROM system_menu m
+                INNER JOIN system_role_menu rm
+                        ON rm.menu_id = m.id
+                       AND rm.deleted = 0
+                       AND rm.tenant_id = ?
+                INNER JOIN system_user_role ur
+                        ON ur.role_id = rm.role_id
+                       AND ur.deleted = 0
+                       AND ur.tenant_id = ?
+                INNER JOIN system_role r
+                        ON r.id = ur.role_id
+                       AND r.deleted = 0
+                       AND r.status = 0
+                       AND r.tenant_id = ?
+                WHERE ur.user_id = ?
+                  AND m.deleted = 0
+                  AND m.status = 0
+                  AND m.permission <> ''
+                ORDER BY m.permission ASC
+                """,
+                (rs, rowNum) -> rs.getString("permission"),
+                tenantId,
+                tenantId,
+                tenantId,
+                userId
+        );
+    }
+
     private ProfessionalTokenRecord mapTokenRecord(ResultSet rs) throws SQLException {
         ProfessionalTokenRecord record = new ProfessionalTokenRecord();
         record.setId(rs.getLong("id"));
@@ -99,7 +150,9 @@ public class ProfessionalIdentityRepository {
         SystemUser user = new SystemUser();
         user.setId(rs.getLong("id"));
         user.setUsername(rs.getString("username"));
+        user.setPassword(rs.getString("password"));
         user.setNickname(rs.getString("nickname"));
+        user.setAvatar(rs.getString("avatar"));
         user.setMobile(rs.getString("mobile"));
         user.setStatus(rs.getObject("status", Integer.class));
         user.setDeleted(rs.getBoolean("deleted"));

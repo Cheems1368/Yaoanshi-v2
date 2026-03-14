@@ -2,6 +2,7 @@ package com.medicine.service.app;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.medicine.api.dto.helporder.HelpOrderDTO;
+import com.medicine.api.dto.helporder.HelpOrderReplyRequest;
 import com.medicine.common.exception.BusinessException;
 import com.medicine.common.exception.ErrorCode;
 import com.medicine.common.model.PageResult;
@@ -73,7 +74,7 @@ public class AppHelpOrderService {
         order.setSubmittedById(context.appAccount().getId());
         order.setCategory(normalizeCategory(request.getCategory()));
         order.setTitle(requireText(request.getTitle()));
-        order.setDescription(requireText(request.getDescription()));
+        order.setDescription(blankToNull(request.getDescription()));
         order.setStatus("SUBMITTED");
         order.setPriority(normalizePriority(request.getPriority()));
         order.setRequiresOfflineEmergency(Boolean.TRUE.equals(request.getRequiresOfflineEmergency()));
@@ -88,7 +89,7 @@ public class AppHelpOrderService {
         applyAudit(order, "app-help-order", now);
         helpOrderMapper.insert(order);
 
-        appendEvent(order.getId(), "SUBMITTED", null, "SUBMITTED", context.operatorType(), context.appAccount().getId(), order.getDescription(), now);
+        appendEvent(order.getId(), "SUBMITTED", null, "SUBMITTED", context.operatorType(), context.appAccount().getId(), blankToNull(request.getDescription()), now);
         createNotification(
                 "PHARMACIST",
                 patient.getBoundByPharmacistId(),
@@ -98,6 +99,43 @@ public class AppHelpOrderService {
                 now
         );
         return getDetail(subject, order.getId());
+    }
+
+    public HelpOrderDTO reply(String subject, Long id, HelpOrderReplyRequest request) {
+        AppPatientService.AccessContext context = appPatientService.requireAccessContext(subject);
+        HelpOrder order = helpOrderMapper.selectById(DEFAULT_TENANT_ID, id);
+        if (order == null || !context.patient().getId().equals(order.getPatientId())) {
+            throw new BusinessException(ErrorCode.HELP_ORDER_NOT_FOUND.getCode(), ErrorCode.HELP_ORDER_NOT_FOUND.getMessage());
+        }
+        if ("CLOSED".equals(order.getStatus()) || "REJECTED".equals(order.getStatus())) {
+            throw new BusinessException(ErrorCode.HELP_ORDER_STATUS_CONFLICT.getCode(), ErrorCode.HELP_ORDER_STATUS_CONFLICT.getMessage());
+        }
+
+        LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
+        String content = requireText(request == null ? null : request.getContent());
+        appendEvent(
+                order.getId(),
+                "PATIENT_REPLY",
+                order.getStatus(),
+                order.getStatus(),
+                context.operatorType(),
+                context.appAccount().getId(),
+                content,
+                now
+        );
+        createNotification(
+                resolveReplyTargetType(order),
+                resolveReplyTargetId(order),
+                "HELP_ORDER_PATIENT_REPLY",
+                order.getId(),
+                Map.of(
+                        "status", order.getStatus(),
+                        "patientId", order.getPatientId(),
+                        "operatorType", context.operatorType()
+                ),
+                now
+        );
+        return getDetail(subject, id);
     }
 
     public PageResult<HelpOrderDTO> list(String subject, String status, String category, int pageNo, int pageSize) {
@@ -240,6 +278,25 @@ public class AppHelpOrderService {
         return "SYSTEM";
     }
 
+    private String resolveReplyTargetType(HelpOrder order) {
+        if (StringUtils.hasText(order.getCurrentHandlerType())) {
+            return order.getCurrentHandlerType().trim().toUpperCase();
+        }
+        return "PHARMACIST";
+    }
+
+    private Long resolveReplyTargetId(HelpOrder order) {
+        if (StringUtils.hasText(order.getCurrentHandlerType())
+                && order.getCurrentHandlerId() != null
+                && order.getCurrentHandlerId() > 0) {
+            return order.getCurrentHandlerId();
+        }
+        if (order.getResponsiblePharmacistId() != null && order.getResponsiblePharmacistId() > 0) {
+            return order.getResponsiblePharmacistId();
+        }
+        return null;
+    }
+
     private String generateOrderNo() {
         return "HO" + System.currentTimeMillis() + ThreadLocalRandom.current().nextInt(1000, 10000);
     }
@@ -269,14 +326,6 @@ public class AppHelpOrderService {
 
     private String formatDateTime(LocalDateTime value) {
         return value == null ? null : value.toInstant(ZoneOffset.UTC).toString();
-    }
-
-    private String writeJson(Map<String, Object> payload) {
-        try {
-            return objectMapper.writeValueAsString(payload == null ? Map.of() : payload);
-        } catch (Exception ex) {
-            return "{}";
-        }
     }
 
     private void applyAudit(com.medicine.domain.common.BaseEntity entity, String operator, LocalDateTime now) {

@@ -1,20 +1,25 @@
 server:
-  port: 8080
+  port: ${SERVER_PORT:8080}
 
 spring:
   application:
     name: backend-v2
   data:
     redis:
-      host: localhost
-      port: 6379
-      database: 0
+      host: ${MEDICINE_REDIS_HOST:127.0.0.1}
+      port: ${MEDICINE_REDIS_PORT:16379}
+      database: ${MEDICINE_REDIS_DATABASE:0}
+      password: ${MEDICINE_REDIS_PASSWORD:}
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    locations: classpath:db/migration
 
 springdoc:
   api-docs:
-    enabled: true
+    enabled: false
   swagger-ui:
-    enabled: true
+    enabled: false
 
 mybatis:
   configuration:
@@ -22,9 +27,13 @@ mybatis:
 
 medicine:
   datasource:
-    url: jdbc:mysql://localhost:3306/yaoshian_mvp
-    username: replace-me
-    password: replace-me
+    url: ${MEDICINE_DB_URL:jdbc:mysql://127.0.0.1:13306/medicine?useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true}
+    username: ${MEDICINE_DB_USERNAME:root}
+    password: ${MEDICINE_DB_PASSWORD:}
+  legacy-auth-datasource:
+    url: ${MEDICINE_LEGACY_DB_URL:jdbc:mysql://127.0.0.1:13306/medicine?useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true}
+    username: ${MEDICINE_LEGACY_DB_USERNAME:${MEDICINE_DB_USERNAME:root}}
+    password: ${MEDICINE_LEGACY_DB_PASSWORD:${MEDICINE_DB_PASSWORD:}}
   ai:
     base-url: ${MEDICINE_AI_BASE_URL:https://api.siliconflow.cn/v1/chat/completions}
     api-key: ${MEDICINE_AI_API_KEY:}
@@ -36,15 +45,19 @@ medicine:
     upstream-max-messages: ${MEDICINE_AI_UPSTREAM_MAX_MESSAGES:10}
   jwt:
     issuer: backend-v2
-    secret: replace-with-secure-secret
+    secret: ${MEDICINE_JWT_SECRET:local-dev-jwt-secret-change-me}
     access-token-seconds: 7200
     refresh-token-seconds: 2592000
   notifications:
     websocket:
-      allowed-origins: ${MEDICINE_ADMIN_WS_ALLOWED_ORIGINS:http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174,http://localhost:5175,http://127.0.0.1:5175}
+      allowed-origins: ${MEDICINE_ADMIN_WS_ALLOWED_ORIGINS:http://localhost:3001,http://127.0.0.1:3001,http://localhost:3002,http://127.0.0.1:3002,http://localhost:3003,http://127.0.0.1:3003,http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174,http://localhost:5175,http://127.0.0.1:5175}
       ticket-ttl-seconds: ${MEDICINE_ADMIN_WS_TICKET_TTL_SECONDS:30}
+  app-notifications:
+    websocket:
+      allowed-origins: ${MEDICINE_APP_WS_ALLOWED_ORIGINS:http://localhost:3001,http://127.0.0.1:3001,http://localhost:5173,http://127.0.0.1:5173}
+      ticket-ttl-seconds: ${MEDICINE_APP_WS_TICKET_TTL_SECONDS:30}
   storage:
-    endpoint: http://localhost:9000
-    bucket: yaoshian-mvp
-    access-key: replace-access-key
-    secret-key: replace-secret-key
+    endpoint: ${MEDICINE_STORAGE_ENDPOINT:http://127.0.0.1:9000}
+    bucket: ${MEDICINE_STORAGE_BUCKET:yaoshian-mvp}
+    access-key: ${MEDICINE_STORAGE_ACCESS_KEY:}
+    secret-key: ${MEDICINE_STORAGE_SECRET_KEY:}

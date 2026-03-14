@@ -4,6 +4,7 @@ import com.medicine.domain.identity.PharmacistProfile;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Options;
+import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 
 @Mapper
@@ -16,7 +17,7 @@ public interface PharmacistProfileMapper {
             WHERE tenant_id = #{tenantId} AND system_user_id = #{systemUserId} AND deleted = 0
             LIMIT 1
             """)
-    PharmacistProfile selectBySystemUserId(Long tenantId, Long systemUserId);
+    PharmacistProfile selectBySystemUserId(@Param("tenantId") Long tenantId, @Param("systemUserId") Long systemUserId);
 
     @Select("""
             SELECT id, system_user_id, license_no, real_name, mobile, service_status, work_hours_json,
@@ -25,7 +26,7 @@ public interface PharmacistProfileMapper {
             WHERE tenant_id = #{tenantId} AND id = #{id} AND deleted = 0
             LIMIT 1
             """)
-    PharmacistProfile selectById(Long tenantId, Long id);
+    PharmacistProfile selectById(@Param("tenantId") Long tenantId, @Param("id") Long id);
 
     @Insert("""
             INSERT INTO pharmacist_profile (

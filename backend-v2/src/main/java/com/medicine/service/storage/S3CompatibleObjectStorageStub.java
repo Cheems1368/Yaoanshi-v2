@@ -14,11 +14,19 @@ public class S3CompatibleObjectStorageStub implements S3CompatibleObjectStorage 
 
     @Override
     public String createPresignedUploadUrl(String objectKey) {
-        return properties.getEndpoint() + "/" + properties.getBucket() + "/" + objectKey + "?action=upload";
+        return baseObjectUrl(objectKey) + "?action=upload";
     }
 
     @Override
     public String createPresignedDownloadUrl(String objectKey) {
-        return properties.getEndpoint() + "/" + properties.getBucket() + "/" + objectKey + "?action=download";
+        return baseObjectUrl(objectKey) + "?action=download";
+    }
+
+    private String baseObjectUrl(String objectKey) {
+        String endpoint = properties.getEndpoint();
+        if (endpoint.endsWith("/")) {
+            endpoint = endpoint.substring(0, endpoint.length() - 1);
+        }
+        return endpoint + "/" + properties.getBucket() + "/" + objectKey;
     }
 }

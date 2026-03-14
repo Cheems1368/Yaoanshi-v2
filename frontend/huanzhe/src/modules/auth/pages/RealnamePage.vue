@@ -79,7 +79,6 @@ import {
 import { chevronBackOutline } from 'ionicons/icons'
 import { patientSession } from '@/app/session'
 import { medicationService, patientService } from '@/modules/patient/api/mvp'
-import { patientApiService } from '@/modules/patient/api/patientApi'
 import { userDataService } from '@/services/userDataService'
 
 const router = useRouter()
@@ -175,11 +174,10 @@ const submitForm = async () => {
     let successMessage = '绑定成功'
 
     try {
-      const profileResponse = await patientApiService.updatePatientInfo({
+      const profileResponse = await patientService.updateProfile({
         name,
         phone: mobile,
         idType: '院内患者编号',
-        idCard: hospitalPatientId,
         realNameVerified: true,
         realNameVerifiedTime: verifiedAt
       })

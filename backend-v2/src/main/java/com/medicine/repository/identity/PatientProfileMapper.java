@@ -4,6 +4,7 @@ import com.medicine.domain.identity.PatientProfile;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Options;
+import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 
 @Mapper
@@ -18,7 +19,7 @@ public interface PatientProfileMapper {
             WHERE tenant_id = #{tenantId} AND patient_id = #{patientId} AND deleted = 0
             LIMIT 1
             """)
-    PatientProfile selectByPatientId(Long tenantId, Long patientId);
+    PatientProfile selectByPatientId(@Param("tenantId") Long tenantId, @Param("patientId") Long patientId);
 
     @Insert("""
             INSERT INTO patient_profile (

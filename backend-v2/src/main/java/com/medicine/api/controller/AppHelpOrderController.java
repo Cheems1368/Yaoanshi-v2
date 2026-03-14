@@ -1,6 +1,7 @@
 package com.medicine.api.controller;
 
 import com.medicine.api.dto.helporder.HelpOrderDTO;
+import com.medicine.api.dto.helporder.HelpOrderReplyRequest;
 import com.medicine.common.model.CommonResult;
 import com.medicine.common.model.PageResult;
 import com.medicine.service.app.AppHelpOrderService;
@@ -43,5 +44,14 @@ public class AppHelpOrderController {
     @GetMapping("/{id}")
     public CommonResult<HelpOrderDTO> detail(@PathVariable("id") Long id, Principal principal) {
         return CommonResult.ok(appHelpOrderService.getDetail(principal.getName(), id));
+    }
+
+    @PostMapping("/{id}/reply")
+    public CommonResult<HelpOrderDTO> reply(
+            @PathVariable("id") Long id,
+            @RequestBody HelpOrderReplyRequest request,
+            Principal principal
+    ) {
+        return CommonResult.ok(appHelpOrderService.reply(principal.getName(), id, request));
     }
 }

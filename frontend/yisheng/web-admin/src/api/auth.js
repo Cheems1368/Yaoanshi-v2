@@ -46,7 +46,8 @@ export function refreshTokenByValue(refreshToken) {
 export function createNotificationSocketTicket() {
   return request({
     url: '/admin-api/notifications/socket-ticket',
-    method: 'post'
+    method: 'post',
+    skipErrorToast: true
   })
 }
 

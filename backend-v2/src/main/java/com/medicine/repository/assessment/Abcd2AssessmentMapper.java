@@ -4,6 +4,7 @@ import com.medicine.domain.assessment.Abcd2Assessment;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Options;
+import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 
 @Mapper
@@ -17,7 +18,7 @@ public interface Abcd2AssessmentMapper {
             ORDER BY calculated_at DESC, id DESC
             LIMIT 1
             """)
-    Abcd2Assessment selectLatestByPatientId(Long tenantId, Long patientId);
+    Abcd2Assessment selectLatestByPatientId(@Param("tenantId") Long tenantId, @Param("patientId") Long patientId);
 
     @Insert("""
             INSERT INTO abcd2_assessment (

@@ -41,11 +41,51 @@ public class JwtTokenService {
     }
 
     public String generateAccessToken(String subject, String domain, String deviceId, List<String> roles) {
-        return generateToken(subject, domain, deviceId, roles, jwtProperties.getAccessTokenSeconds());
+        return generateToken(subject, domain, "APP", deviceId, null, null, null, roles, jwtProperties.getAccessTokenSeconds());
     }
 
     public String generateRefreshToken(String subject, String domain, String deviceId, List<String> roles) {
-        return generateToken(subject, domain, deviceId, roles, jwtProperties.getRefreshTokenSeconds());
+        return generateToken(subject, domain, "APP", deviceId, null, null, null, roles, jwtProperties.getRefreshTokenSeconds());
+    }
+
+    public String generateProfessionalAccessToken(
+            String subject,
+            Long userId,
+            Long tenantId,
+            String displayName,
+            List<String> roles
+    ) {
+        return generateToken(
+                subject,
+                "admin",
+                "PROFESSIONAL",
+                null,
+                userId,
+                tenantId,
+                displayName,
+                roles,
+                jwtProperties.getAccessTokenSeconds()
+        );
+    }
+
+    public String generateProfessionalRefreshToken(
+            String subject,
+            Long userId,
+            Long tenantId,
+            String displayName,
+            List<String> roles
+    ) {
+        return generateToken(
+                subject,
+                "admin",
+                "PROFESSIONAL",
+                null,
+                userId,
+                tenantId,
+                displayName,
+                roles,
+                jwtProperties.getRefreshTokenSeconds()
+        );
     }
 
     public JwtClaims parse(String token) {
@@ -77,6 +117,9 @@ public class JwtTokenService {
             claims.setJti((String) payload.get("jti"));
             claims.setRoles(objectMapper.convertValue(payload.get("roles"), new TypeReference<>() {
             }));
+            claims.setUserId(asLong(payload.get("userId")));
+            claims.setTenantId(asLong(payload.get("tenantId")));
+            claims.setDisplayName((String) payload.get("displayName"));
             claims.setIssuedAt(Instant.ofEpochSecond(((Number) payload.get("iat")).longValue()));
             claims.setExpiresAt(Instant.ofEpochSecond(exp));
             return claims;
@@ -118,7 +161,17 @@ public class JwtTokenService {
         return roles == null ? Collections.emptyList() : roles;
     }
 
-    private String generateToken(String subject, String domain, String deviceId, List<String> roles, long ttlSeconds) {
+    private String generateToken(
+            String subject,
+            String domain,
+            String accountType,
+            String deviceId,
+            Long userId,
+            Long tenantId,
+            String displayName,
+            List<String> roles,
+            long ttlSeconds
+    ) {
         try {
             Instant now = Instant.now();
             Map<String, Object> header = Map.of("alg", "HS256", "typ", "JWT");
@@ -126,8 +179,19 @@ public class JwtTokenService {
             payload.put("iss", jwtProperties.getIssuer());
             payload.put("sub", subject);
             payload.put("domain", domain);
-            payload.put("accountType", "APP");
-            payload.put("deviceId", deviceId);
+            payload.put("accountType", accountType);
+            if (deviceId != null) {
+                payload.put("deviceId", deviceId);
+            }
+            if (userId != null) {
+                payload.put("userId", userId);
+            }
+            if (tenantId != null) {
+                payload.put("tenantId", tenantId);
+            }
+            if (displayName != null) {
+                payload.put("displayName", displayName);
+            }
             payload.put("roles", roles);
             payload.put("jti", UUID.randomUUID().toString());
             payload.put("iat", now.getEpochSecond());
@@ -140,6 +204,13 @@ public class JwtTokenService {
         } catch (Exception ex) {
             throw new IllegalStateException("Failed to generate JWT token", ex);
         }
+    }
+
+    private Long asLong(Object value) {
+        if (value instanceof Number number) {
+            return number.longValue();
+        }
+        return null;
     }
 
     private String sign(String content) throws Exception {

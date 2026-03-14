@@ -2,6 +2,7 @@ package com.medicine.service.app;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.medicine.api.dto.helporder.HelpOrderDTO;
+import com.medicine.api.dto.helporder.HelpOrderReplyRequest;
 import com.medicine.common.exception.BusinessException;
 import com.medicine.common.exception.ErrorCode;
 import com.medicine.domain.helporder.HelpOrder;
@@ -29,6 +30,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.catchThrowableOfType;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyMap;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -64,7 +66,7 @@ class AppHelpOrderServiceTest {
     private AppHelpOrderService appHelpOrderService;
 
     @Test
-    void shouldCreateHelpOrderAndDispatchNotification() {
+    void shouldCreateHelpOrderWithoutDescriptionAndDispatchNotification() {
         AppPatientService.AccessContext context = accessContext();
         AtomicReference<HelpOrder> insertedOrder = new AtomicReference<>();
         when(appPatientService.requireAccessContext("13800138000")).thenReturn(context);
@@ -80,7 +82,6 @@ class AppHelpOrderServiceTest {
         HelpOrderDTO request = new HelpOrderDTO();
         request.setCategory("medication");
         request.setTitle("Need help");
-        request.setDescription("Question about dosing");
         request.setPriority("urgent");
 
         HelpOrderDTO result = appHelpOrderService.create("13800138000", request);
@@ -89,6 +90,7 @@ class AppHelpOrderServiceTest {
         assertThat(result.getCategory()).isEqualTo("MEDICATION");
         assertThat(result.getPriority()).isEqualTo("URGENT");
         assertThat(result.getStatus()).isEqualTo("SUBMITTED");
+        assertThat(result.getDescription()).isNull();
         verify(notificationDispatchService).createAndDispatch(
                 eq(1L),
                 eq("app-help-order"),
@@ -115,6 +117,57 @@ class AppHelpOrderServiceTest {
         assertThat(exception.getCode()).isEqualTo(ErrorCode.HELP_ORDER_NOT_FOUND.getCode());
     }
 
+    @Test
+    void shouldAppendPatientReplyAndNotifyCurrentHandler() {
+        AppPatientService.AccessContext context = accessContext();
+        HelpOrder order = ownOrder();
+        order.setStatus("PHARMACIST_IN_PROGRESS");
+        order.setCurrentHandlerType("PHARMACIST");
+        order.setCurrentHandlerId(301L);
+
+        when(appPatientService.requireAccessContext("13800138000")).thenReturn(context);
+        when(helpOrderMapper.selectById(1L, 902L)).thenReturn(order);
+        when(helpOrderEventMapper.selectByHelpOrderId(1L, 902L)).thenReturn(List.of());
+
+        HelpOrderReplyRequest request = new HelpOrderReplyRequest();
+        request.setContent("follow-up question");
+
+        HelpOrderDTO result = appHelpOrderService.reply("13800138000", 902L, request);
+
+        assertThat(result.getId()).isEqualTo(902L);
+        verify(notificationDispatchService).createAndDispatch(
+                eq(1L),
+                eq("app-help-order"),
+                eq("PHARMACIST"),
+                eq(301L),
+                eq("HELP_ORDER_PATIENT_REPLY"),
+                eq(902L),
+                anyMap(),
+                any(LocalDateTime.class)
+        );
+    }
+
+    @Test
+    void shouldRejectPatientReplyWhenOrderClosed() {
+        AppPatientService.AccessContext context = accessContext();
+        HelpOrder order = ownOrder();
+        order.setStatus("CLOSED");
+
+        when(appPatientService.requireAccessContext("13800138000")).thenReturn(context);
+        when(helpOrderMapper.selectById(1L, 903L)).thenReturn(order);
+
+        HelpOrderReplyRequest request = new HelpOrderReplyRequest();
+        request.setContent("follow-up question");
+
+        BusinessException exception = catchThrowableOfType(
+                () -> appHelpOrderService.reply("13800138000", 903L, request),
+                BusinessException.class
+        );
+
+        assertThat(exception).isNotNull();
+        assertThat(exception.getCode()).isEqualTo(ErrorCode.HELP_ORDER_STATUS_CONFLICT.getCode());
+    }
+
     private AppPatientService.AccessContext accessContext() {
         AppAccount account = new AppAccount();
         account.setId(101L);
@@ -132,6 +185,19 @@ class AppHelpOrderServiceTest {
         HelpOrder order = new HelpOrder();
         order.setId(901L);
         order.setPatientId(999L);
+        return order;
+    }
+
+    private HelpOrder ownOrder() {
+        HelpOrder order = new HelpOrder();
+        order.setId(902L);
+        order.setPatientId(201L);
+        order.setSubmittedByType("PATIENT");
+        order.setSubmittedById(101L);
+        order.setCategory("MEDICATION_CONSULTATION");
+        order.setTitle("Need help");
+        order.setStatus("SUBMITTED");
+        order.setPriority("NORMAL");
         return order;
     }
 }

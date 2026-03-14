@@ -3,6 +3,18 @@ import { ElMessage } from 'element-plus'
 import { useUserStore } from '@/store/user'
 import { API_SUCCESS_CODES } from '@/utils/constants'
 
+const DEFAULT_ERROR_MESSAGE = '请求失败'
+
+const extractMessage = (payload, fallback = DEFAULT_ERROR_MESSAGE) => {
+  if (!payload || typeof payload !== 'object') {
+    return fallback
+  }
+
+  const candidates = [payload.msg, payload.message, payload.error, payload.detail]
+  const firstReadable = candidates.find((item) => typeof item === 'string' && item.trim())
+  return firstReadable || fallback
+}
+
 const service = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || '',
   timeout: 15000
@@ -31,19 +43,22 @@ service.interceptors.response.use(
   (response) => {
     const payload = response.data || {}
     const code = payload.code
-    const message = payload.msg || payload.message || '璇锋眰澶辫触'
+    const message = extractMessage(payload)
 
     if (API_SUCCESS_CODES.includes(code)) {
       return payload
     }
 
-    ElMessage.error(message)
+    if (!response.config?.skipErrorToast) {
+      ElMessage.error(message)
+    }
     return Promise.reject(new Error(message))
   },
   async (error) => {
     const status = error.response?.status
     const payload = error.response?.data || {}
-    const message = payload.msg || payload.message || '璇锋眰澶辫触'
+    const message = extractMessage(payload)
+    const skipToast = error.config?.skipErrorToast
 
     if (status === 401) {
       const originalRequest = error.config || {}
@@ -63,18 +78,22 @@ service.interceptors.response.use(
       }
 
       await userStore.logoutAction({ silent: true })
-      ElMessage.error('鐧诲綍宸茶繃鏈燂紝璇烽噸鏂扮櫥褰?')
+      if (!skipToast) {
+        ElMessage.error('登录已过期，请重新登录')
+      }
       return Promise.reject(error)
     }
 
-    if (status === 403) {
-      ElMessage.error('娌℃湁鏉冮檺璁块棶璇ヨ祫婧?')
-    } else if (status === 404) {
-      ElMessage.error('璇锋眰鐨勮祫婧愪笉瀛樺湪')
-    } else if (status >= 500) {
-      ElMessage.error('鏈嶅姟绔彂鐢熼敊璇?')
-    } else {
-      ElMessage.error(message)
+    if (!skipToast) {
+      if (status === 403) {
+        ElMessage.error('没有权限访问该资源')
+      } else if (status === 404) {
+        ElMessage.error('请求的资源不存在')
+      } else if (status >= 500) {
+        ElMessage.error(message === DEFAULT_ERROR_MESSAGE ? '服务端发生错误' : message)
+      } else {
+        ElMessage.error(message)
+      }
     }
 
     return Promise.reject(error)

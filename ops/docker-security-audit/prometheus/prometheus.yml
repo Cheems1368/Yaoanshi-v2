@@ -1,42 +1,8 @@
-# Prometheus配置文件
 global:
   scrape_interval: 15s
   evaluation_interval: 15s
 
-rule_files:
-  # - "first_rules.yml"
-  # - "second_rules.yml"
-
 scrape_configs:
-  # Prometheus自身监控
-  - job_name: 'prometheus'
+  - job_name: "prometheus"
     static_configs:
-      - targets: ['localhost:9090']
-
-  # 药学管理系统后端监控
-  - job_name: 'medicine-server'
-    static_configs:
-      - targets: ['medicine-server-prod:48080']
-    metrics_path: '/actuator/prometheus'
-    scrape_interval: 30s
-    scrape_timeout: 10s
-
-  # Nginx监控
-  - job_name: 'nginx'
-    static_configs:
-      - targets: ['medicine-admin-prod:80']
-    metrics_path: '/nginx_status'
-    scrape_interval: 30s
-
-  # MySQL监控（如果配置了exporter）
-  - job_name: 'mysql'
-    static_configs:
-      - targets: ['mysql-exporter:9104']
-    scrape_interval: 30s
-
-  # Redis监控（如果配置了exporter）
-  - job_name: 'redis'
-    static_configs:
-      - targets: ['redis-exporter:9121']
-    scrape_interval: 30s
-
+      - targets: ["localhost:9090"]

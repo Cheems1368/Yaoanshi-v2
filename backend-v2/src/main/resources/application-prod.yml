@@ -1,0 +1,38 @@
+spring:
+  data:
+    redis:
+      host: ${MEDICINE_REDIS_HOST}
+      port: ${MEDICINE_REDIS_PORT:6379}
+      database: ${MEDICINE_REDIS_DATABASE:0}
+      password: ${MEDICINE_REDIS_PASSWORD:}
+  flyway:
+    enabled: true
+
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+
+medicine:
+  datasource:
+    url: ${MEDICINE_DB_URL}
+    username: ${MEDICINE_DB_USERNAME}
+    password: ${MEDICINE_DB_PASSWORD}
+  legacy-auth-datasource:
+    url: ${MEDICINE_LEGACY_DB_URL}
+    username: ${MEDICINE_LEGACY_DB_USERNAME}
+    password: ${MEDICINE_LEGACY_DB_PASSWORD}
+  jwt:
+    secret: ${MEDICINE_JWT_SECRET}
+    access-token-seconds: ${MEDICINE_JWT_ACCESS_TOKEN_SECONDS:7200}
+    refresh-token-seconds: ${MEDICINE_JWT_REFRESH_TOKEN_SECONDS:2592000}
+  notifications:
+    websocket:
+      allowed-origins: ${MEDICINE_ADMIN_WS_ALLOWED_ORIGINS}
+      ticket-ttl-seconds: ${MEDICINE_ADMIN_WS_TICKET_TTL_SECONDS:30}
+  storage:
+    endpoint: ${MEDICINE_STORAGE_ENDPOINT}
+    bucket: ${MEDICINE_STORAGE_BUCKET}
+    access-key: ${MEDICINE_STORAGE_ACCESS_KEY}
+    secret-key: ${MEDICINE_STORAGE_SECRET_KEY}

@@ -73,14 +73,15 @@ Current MVP route list for the patient app:
 - `/questionnaire` - Knowledge or survey task screen, not a hard gate
 - `/tabs/home` - Home Screen
 - `/tabs/help-order` - Help Order List / Entry Screen
+- `/help-order/:id` - Help Order Detail / Conversation Screen
 - `/tabs/prescription` - Prescription Screen
 - `/tabs/profile` - Profile Screen
 - `/medication-reminder` - Reminder Task Screen
 - `/medication-record` - Medication Record Screen
-- `/medication-consultation` - Medication Consultation Screen
 - `/drug-detail/:id` - Drug Detail Screen
 - `/drug-category/:id` - Drug Category Screen
 - `/rational-medication` - Rational Medication Education Screen
+- `/ai-assistant` - AI Medication Assistant Screen
 
 ### 4.3 Patient App screen list
 
@@ -278,14 +279,39 @@ Available categories:
 Success:
 
 - Create the help order
-- Show current status
+- After successful submit, enter the help order detail conversation
 - Show that the pharmacist will handle it during service hours if submitted after hours
 
 Error:
 
-- Show validation message if content is incomplete
+- Show validation message when the title is missing
 - Show upload failure if an image fails
 - Allow retry
+
+#### Help Order Detail / Conversation Screen
+
+Route: `/help-order/:id`
+
+Purpose:
+
+- Show the full help order event stream
+- Let patient or family append follow-up messages in the same order thread
+
+Trigger:
+
+- User submits a new help order successfully
+- User taps an existing help order from the list
+
+Success:
+
+- Load the latest event stream
+- Show new pharmacist or doctor replies
+- Allow text follow-up while the order is still open
+
+Error:
+
+- Show detail load failure and retry
+- If realtime update is unavailable, keep the page usable with polling refresh
 
 #### Prescription Screen
 
@@ -417,6 +443,27 @@ Error:
 
 - Show load failure
 
+#### AI Medication Assistant Screen
+
+Route: `/ai-assistant`
+
+Purpose:
+
+- Provide AI-powered medication knowledge Q&A for patients
+- Answer questions about medication timing, missed doses, adverse effects, and general medication literacy
+
+Trigger:
+
+- User taps "AI 用药助手" quick entry on Home page
+
+Success:
+
+- AI responds with concise medication guidance including safety disclaimer
+
+Error:
+
+- Show AI service failure with one-click retry
+
 ### 4.4 Patient App primary flow
 
 #### Flow A: First-time patient entry
@@ -507,10 +554,10 @@ Steps:
 
 1. Open `/tabs/help-order`
 2. Choose category
-3. Enter text
-4. Optionally upload images
-5. Submit
-6. System creates the help order
+3. Enter title and optionally add detail
+4. Submit
+5. Enter `/help-order/:id`
+6. Optionally continue the conversation in the same thread
 7. Pharmacist is notified
 
 Decision point:
@@ -520,6 +567,7 @@ Decision point:
 Success:
 
 - Help order enters the pharmacist queue
+- Patient can continue to append messages in the same order thread
 
 Error:
 

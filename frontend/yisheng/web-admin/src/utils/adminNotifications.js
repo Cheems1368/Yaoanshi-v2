@@ -15,25 +15,25 @@ function resolveWebSocketUrl() {
 
 function notificationTitle(businessType) {
   const map = {
-    HELP_ORDER_SUBMITTED: '鏂板伐鍗曞埌杈?',
-    HELP_ORDER_ESCALATED: '宸ュ崟宸插崌绾?',
-    HELP_ORDER_REPLY: '宸ュ崟鏈夋柊鍥炲',
-    HELP_ORDER_CLOSED: '宸ュ崟宸插叧闂?'
+    HELP_ORDER_SUBMITTED: '新工单到达',
+    HELP_ORDER_ESCALATED: '工单已升级',
+    HELP_ORDER_REPLY: '工单有新回复',
+    HELP_ORDER_CLOSED: '工单已关闭'
   }
-  return map[businessType] || '鏂伴€氱煡'
+  return map[businessType] || '新通知'
 }
 
 function notificationMessage(payload) {
   if (payload.businessType === 'HELP_ORDER_ESCALATED') {
-    return '鏈夊伐鍗曞凡鍗囩骇鍒板尰鐢熼槦鍒楋紝璇峰敖蹇鐞嗐€?'
+    return '有工单已升级到医生队列，请尽快处理。'
   }
   if (payload.businessType === 'HELP_ORDER_REPLY') {
-    return '宸ュ崟閾捐矾鍑虹幇鏂扮殑鍥炲銆?'
+    return '工单链路出现新的回复。'
   }
   if (payload.businessType === 'HELP_ORDER_CLOSED') {
-    return '鏈夊伐鍗曞凡缁忓叧闂紝鍙埛鏂版煡鐪嬬粨鏋溿€?'
+    return '有工单已经关闭，可刷新查看结果。'
   }
-  return '鏀跺埌鏂扮殑涓氬姟閫氱煡銆?'
+  return '收到新的业务通知。'
 }
 
 export function createAdminNotificationClient(getToken) {

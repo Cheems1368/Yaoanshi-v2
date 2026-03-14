@@ -4,6 +4,7 @@ import com.medicine.domain.identity.AppAccountDeviceSession;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Options;
+import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
 
@@ -18,7 +19,11 @@ public interface AppAccountDeviceSessionMapper {
             WHERE tenant_id = #{tenantId} AND app_account_id = #{appAccountId} AND device_id = #{deviceId} AND deleted = 0
             LIMIT 1
             """)
-    AppAccountDeviceSession selectByAccountIdAndDeviceId(Long tenantId, Long appAccountId, String deviceId);
+    AppAccountDeviceSession selectByAccountIdAndDeviceId(
+            @Param("tenantId") Long tenantId,
+            @Param("appAccountId") Long appAccountId,
+            @Param("deviceId") String deviceId
+    );
 
     @Insert("""
             INSERT INTO app_account_device_session (

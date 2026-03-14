@@ -1,44 +1,25 @@
-﻿# 瀹夊叏浼樺寲鐗圖ocker Compose閰嶇疆
-# 鑽绠＄悊绯荤粺 - 鐢熶骇鐜閰嶇疆
-
-version: '3.8'
-
 services:
   mysql:
     container_name: medicine-mysql
     image: mysql:8.0
     restart: unless-stopped
-    tty: true
     ports:
       - "13306:3306"
     environment:
       MYSQL_DATABASE: ${MYSQL_DATABASE:-medicine}
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_ROOT_PASSWORD_FILE: /run/secrets/db_password
     volumes:
       - mysql_data:/var/lib/mysql/
-      - ./sql/mysql/ruoyi-vue-pro.sql:/docker-entrypoint-initdb.d/01-init.sql
-      - ./mysql/conf.d:/etc/mysql/conf.d
+      - ./mysql/conf.d:/etc/mysql/conf.d:ro
+    secrets:
+      - db_password
     networks:
       - medicine-network
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}"]
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u root -p$$(cat /run/secrets/db_password)"]
       timeout: 20s
       retries: 10
       start_period: 30s
-    deploy:
-      resources:
-        limits:
-          cpus: '1.0'
-          memory: 1G
-        reservations:
-          cpus: '0.5'
-          memory: 512M
-    security_opt:
-      - no-new-privileges:true
-    read_only: false
-    tmpfs:
-      - /tmp
-      - /var/run/mysqld
 
   redis:
     container_name: medicine-redis
@@ -46,9 +27,10 @@ services:
     restart: unless-stopped
     ports:
       - "16379:6379"
+    command: ["redis-server", "/usr/local/etc/redis/redis.conf"]
     volumes:
       - redis_data:/data
-      - ./redis/redis.conf:/usr/local/etc/redis/redis.conf
+      - ./redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
     networks:
       - medicine-network
     healthcheck:
@@ -56,32 +38,33 @@ services:
       timeout: 20s
       retries: 10
       start_period: 30s
-    deploy:
-      resources:
-        limits:
-          cpus: '0.5'
-          memory: 512M
-        reservations:
-          cpus: '0.25'
-          memory: 256M
-    security_opt:
-      - no-new-privileges:true
-    read_only: false
-    tmpfs:
-      - /tmp
 
   server:
-    container_name: medicine-server
+    container_name: medicine-backend-v2-security
     build:
-      context: ./medicine-server/
-      dockerfile: Dockerfile.optimized
-    image: medicine-server:latest
+      context: ../..
+      dockerfile: backend-v2/Dockerfile
+    image: medicine-backend-v2:security
     restart: unless-stopped
     ports:
-      - "48080:48080"
+      - "18080:8080"
     environment:
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-prod}
-      JAVA_OPTS: ${JAVA_OPTS}
+      JAVA_OPTS: ${JAVA_OPTS:-"-Xms512m -Xmx1024m -XX:+UseG1GC"}
+      MEDICINE_DB_URL: ${MEDICINE_DB_URL:-jdbc:mysql://mysql:3306/${MYSQL_DATABASE:-medicine}?useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true}
+      MEDICINE_DB_USERNAME: ${MEDICINE_DB_USERNAME:-root}
+      MEDICINE_DB_PASSWORD: ${MEDICINE_DB_PASSWORD:-replace-me}
+      MEDICINE_LEGACY_DB_URL: ${MEDICINE_LEGACY_DB_URL:-jdbc:mysql://mysql:3306/${MYSQL_DATABASE:-medicine}?useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true}
+      MEDICINE_LEGACY_DB_USERNAME: ${MEDICINE_LEGACY_DB_USERNAME:-root}
+      MEDICINE_LEGACY_DB_PASSWORD: ${MEDICINE_LEGACY_DB_PASSWORD:-replace-me}
+      MEDICINE_REDIS_HOST: redis
+      MEDICINE_REDIS_PORT: 6379
+      MEDICINE_JWT_SECRET: ${MEDICINE_JWT_SECRET:-replace-with-secure-secret}
+      MEDICINE_ADMIN_WS_ALLOWED_ORIGINS: ${MEDICINE_ADMIN_WS_ALLOWED_ORIGINS:-https://admin.medicine.local}
+      MEDICINE_STORAGE_ENDPOINT: ${MEDICINE_STORAGE_ENDPOINT:-http://minio:9000}
+      MEDICINE_STORAGE_BUCKET: ${MEDICINE_STORAGE_BUCKET:-yaoshian-mvp}
+      MEDICINE_STORAGE_ACCESS_KEY: ${MEDICINE_STORAGE_ACCESS_KEY:-replace-access-key}
+      MEDICINE_STORAGE_SECRET_KEY: ${MEDICINE_STORAGE_SECRET_KEY:-replace-secret-key}
     secrets:
       - db_password
       - redis_password
@@ -93,66 +76,33 @@ services:
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:48080/actuator/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 60s
-    deploy:
-      resources:
-        limits:
-          cpus: '2.0'
-          memory: 2G
-        reservations:
-          cpus: '1.0'
-          memory: 1G
+      start_period: 45s
     security_opt:
       - no-new-privileges:true
-    read_only: false
+    read_only: true
     tmpfs:
       - /tmp
-      - /medicine-server/logs
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
+      - /app/logs
+      - /app/tmp
 
-  # 鍓嶇绠＄悊绔?
   admin:
     container_name: medicine-admin
-    build:
-      context: ./pharmacist
-      dockerfile: Dockerfile
-    image: medicine-admin:latest
+    image: nginx:alpine
     restart: unless-stopped
     ports:
       - "8080:80"
+    volumes:
+      - ../../frontend/pharmacist/dist:/usr/share/nginx/html:ro
+      - ./nginx-dev.conf:/etc/nginx/nginx.conf:ro
     networks:
       - medicine-network
     depends_on:
       - server
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:80/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 30s
-    deploy:
-      resources:
-        limits:
-          cpus: '0.5'
-          memory: 512M
-        reservations:
-          cpus: '0.25'
-          memory: 256M
-    security_opt:
-      - no-new-privileges:true
-    read_only: false
-    tmpfs:
-      - /tmp
 
-# 缃戠粶閰嶇疆
 networks:
   medicine-network:
     driver: bridge
@@ -160,17 +110,14 @@ networks:
       config:
         - subnet: 172.20.0.0/16
 
-# 鏁版嵁鍗烽厤缃?
 volumes:
   mysql_data:
     driver: local
   redis_data:
     driver: local
 
-# 瀵嗛挜閰嶇疆
 secrets:
   db_password:
-    file: ./secrets/db_password.txt
+    file: ./secrets/db_password.txt.example
   redis_password:
-    file: ./secrets/redis_password.txt
-
+    file: ./secrets/redis_password.txt.example

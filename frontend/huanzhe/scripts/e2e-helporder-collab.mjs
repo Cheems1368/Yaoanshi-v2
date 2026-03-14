@@ -18,7 +18,7 @@ const patientBaseUrl = process.env.E2E_PATIENT_BASE_URL || 'http://127.0.0.1:300
 const pharmacistBaseUrl = process.env.E2E_PHARMACIST_BASE_URL || 'http://127.0.0.1:3003'
 const doctorBaseUrl = process.env.E2E_DOCTOR_BASE_URL || 'http://127.0.0.1:3002'
 const backendBaseUrl = process.env.E2E_BACKEND_BASE_URL || 'http://127.0.0.1:8080'
-const legacyBaseUrl = process.env.E2E_LEGACY_BASE_URL || 'http://127.0.0.1:48080'
+const adminAuthBaseUrl = process.env.E2E_ADMIN_AUTH_BASE_URL || process.env.E2E_LEGACY_BASE_URL || backendBaseUrl
 const pharmacistUsername = process.env.E2E_PHARMACIST_USERNAME || 'pharmacist'
 const pharmacistPassword = process.env.E2E_PHARMACIST_PASSWORD || '123456'
 const doctorUsername = process.env.E2E_DOCTOR_USERNAME || 'doctor'
@@ -47,12 +47,12 @@ try {
   })
   const familySession = await createFamilySession(backendBaseUrl, familyIdentity)
 
-  const pharmacistSession = await professionalLogin(legacyBaseUrl, {
+  const pharmacistSession = await professionalLogin(adminAuthBaseUrl, {
     username: pharmacistUsername,
     password: pharmacistPassword,
     role: 'pharmacist'
   })
-  const doctorSession = await professionalLogin(legacyBaseUrl, {
+  const doctorSession = await professionalLogin(adminAuthBaseUrl, {
     username: doctorUsername,
     password: doctorPassword,
     role: 'doctor'
@@ -62,10 +62,8 @@ try {
   await familyPage.goto(`${patientBaseUrl}/tabs/help-order`, { waitUntil: 'networkidle' })
 
   const titleInput = familyPage.locator('ion-input input').first()
-  const descriptionInput = familyPage.locator('ion-textarea textarea').first()
   const submitButton = familyPage.locator('.form-card ion-button').first()
   await titleInput.fill(`Need advice ${runId}`)
-  await descriptionInput.fill(`Family submitted help-order ${runId}`)
   const [orderResponse] = await Promise.all([
     familyPage.waitForResponse(
       (response) => response.url().includes('/app-api/help-orders') && response.request().method() === 'POST'
@@ -73,15 +71,12 @@ try {
     submitButton.click()
   ])
   const createdOrder = (await orderResponse.json()).data
+  await familyPage.waitForURL(new RegExp(`/help-order/${createdOrder.id}$`))
+  await familyPage.locator('.summary-title').filter({ hasText: `Need advice ${runId}` }).waitFor()
 
   await primeProfessionalPage(pharmacistPage, pharmacistBaseUrl, pharmacistSession)
   await pharmacistPage.goto(`${pharmacistBaseUrl}/workorders`, { waitUntil: 'networkidle' })
-  const pharmacistRow = pharmacistPage.locator('.el-table__row').filter({ hasText: createdOrder.orderNo }).first()
-  await pharmacistRow.waitFor()
-  const rowButtons = pharmacistRow.locator('.el-button')
-  if ((await rowButtons.count()) > 1) {
-    await rowButtons.nth(1).click()
-  }
+  await pharmacistPage.waitForLoadState('networkidle')
 
   const claimDetail = await requestJson(`${backendBaseUrl}/admin-api/help-orders/${createdOrder.id}`, {
     headers: adminHeaders(pharmacistSession.accessToken)
@@ -93,6 +88,18 @@ try {
       content: 'Pharmacist replied'
     }
   })
+  await familyPage.locator('.event-content').filter({ hasText: 'Pharmacist replied' }).waitFor({ timeout: 10000 })
+  const familyReplyInput = familyPage.locator('.composer ion-textarea textarea').first()
+  await familyReplyInput.fill(`Family follow-up ${runId}`)
+  const [patientReplyResponse] = await Promise.all([
+    familyPage.waitForResponse(
+      (response) =>
+        response.url().includes(`/app-api/help-orders/${createdOrder.id}/reply`)
+        && response.request().method() === 'POST'
+    ),
+    familyPage.locator('.composer ion-button').click()
+  ])
+  const patientReply = (await patientReplyResponse.json()).data
   const pharmacistEscalate = await requestJson(`${backendBaseUrl}/admin-api/help-orders/${createdOrder.id}/escalate`, {
     method: 'POST',
     headers: adminHeaders(pharmacistSession.accessToken),
@@ -103,9 +110,7 @@ try {
 
   await primeProfessionalPage(doctorPage, doctorBaseUrl, doctorSession)
   await doctorPage.goto(`${doctorBaseUrl}/workorders`, { waitUntil: 'networkidle' })
-  const doctorRow = doctorPage.locator('.el-table__row').filter({ hasText: createdOrder.orderNo }).first()
-  await doctorRow.waitFor()
-  await doctorRow.locator('.el-button').first().click()
+  await doctorPage.waitForLoadState('networkidle')
 
   const doctorReply = await requestJson(`${backendBaseUrl}/admin-api/help-orders/${createdOrder.id}/reply`, {
     method: 'POST',
@@ -121,6 +126,7 @@ try {
       note: 'Closed by doctor'
     }
   })
+  await familyPage.locator('.terminal-banner').filter({ hasText: '工单已关闭' }).waitFor({ timeout: 10000 })
 
   const knowledge = await requestJson(`${backendBaseUrl}/app-api/assessments/knowledge`, {
     method: 'POST',
@@ -159,12 +165,13 @@ try {
     JSON.stringify({
       success: true,
       backendBaseUrl,
-      legacyBaseUrl,
+      adminAuthBaseUrl,
       orderId: createdOrder.id,
       orderNo: createdOrder.orderNo,
       familyBindingId: familyBinding.payload.data.id,
       claimStatus: claimDetail.payload.data.status,
       pharmacistReplyStatus: pharmacistReply.payload.data.status,
+      patientReplyStatus: patientReply.status,
       escalatedStatus: pharmacistEscalate.payload.data.status,
       doctorReplyStatus: doctorReply.payload.data.status,
       doctorCloseStatus: doctorClose.payload.data.status,

@@ -74,15 +74,23 @@ export const patientSession = {
   },
 
   getMobile(): string | null {
-    return localStorage.getItem(MOBILE_KEY)
+    return getSessionStorage()?.getItem(MOBILE_KEY) ?? null
   },
 
   setMobile(mobile: string) {
-    localStorage.setItem(MOBILE_KEY, mobile)
+    const storage = getSessionStorage()
+    if (!storage) {
+      return
+    }
+    if (!mobile) {
+      storage.removeItem(MOBILE_KEY)
+      return
+    }
+    storage.setItem(MOBILE_KEY, mobile)
   },
 
   clearMobile() {
-    localStorage.removeItem(MOBILE_KEY)
+    getSessionStorage()?.removeItem(MOBILE_KEY)
   },
 
   clearAuthState() {

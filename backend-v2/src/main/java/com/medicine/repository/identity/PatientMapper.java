@@ -5,6 +5,7 @@ import com.medicine.domain.identity.Patient;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Options;
+import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
 
@@ -32,7 +33,7 @@ public interface PatientMapper {
             WHERE tenant_id = #{tenantId} AND id = #{id} AND deleted = 0
             LIMIT 1
             """)
-    Patient selectByIdAndTenant(Long tenantId, Long id);
+    Patient selectByIdAndTenant(@Param("tenantId") Long tenantId, @Param("id") Long id);
 
     @Select("""
             SELECT id, app_account_id, hospital_patient_id, mobile, name, gender, birth_date, age, id_card_masked,
@@ -43,7 +44,7 @@ public interface PatientMapper {
             WHERE tenant_id = #{tenantId} AND app_account_id = #{appAccountId} AND deleted = 0
             LIMIT 1
             """)
-    Patient selectByAppAccountId(Long tenantId, Long appAccountId);
+    Patient selectByAppAccountId(@Param("tenantId") Long tenantId, @Param("appAccountId") Long appAccountId);
 
     @Select("""
             SELECT id, app_account_id, hospital_patient_id, mobile, name, gender, birth_date, age, id_card_masked,
@@ -54,7 +55,11 @@ public interface PatientMapper {
             WHERE tenant_id = #{tenantId} AND mobile = #{mobile} AND hospital_patient_id = #{hospitalPatientId} AND deleted = 0
             LIMIT 1
             """)
-    Patient selectByMobileAndHospitalPatientId(Long tenantId, String mobile, String hospitalPatientId);
+    Patient selectByMobileAndHospitalPatientId(
+            @Param("tenantId") Long tenantId,
+            @Param("mobile") String mobile,
+            @Param("hospitalPatientId") String hospitalPatientId
+    );
 
     @Select("""
             SELECT id, app_account_id, hospital_patient_id, mobile, name, gender, birth_date, age, id_card_masked,
@@ -65,7 +70,7 @@ public interface PatientMapper {
             WHERE tenant_id = #{tenantId} AND hospital_patient_id = #{hospitalPatientId} AND deleted = 0
             LIMIT 1
             """)
-    Patient selectByHospitalPatientId(Long tenantId, String hospitalPatientId);
+    Patient selectByHospitalPatientId(@Param("tenantId") Long tenantId, @Param("hospitalPatientId") String hospitalPatientId);
 
     @Select("""
             <script>
@@ -108,7 +113,13 @@ public interface PatientMapper {
             LIMIT #{offset}, #{pageSize}
             </script>
             """)
-    List<PatientAdminListRow> searchForPharmacist(Long tenantId, Long pharmacistProfileId, String keyword, int offset, int pageSize);
+    List<PatientAdminListRow> searchForPharmacist(
+            @Param("tenantId") Long tenantId,
+            @Param("pharmacistProfileId") Long pharmacistProfileId,
+            @Param("keyword") String keyword,
+            @Param("offset") int offset,
+            @Param("pageSize") int pageSize
+    );
 
     @Select("""
             <script>
@@ -126,7 +137,11 @@ public interface PatientMapper {
             </if>
             </script>
             """)
-    long countForPharmacist(Long tenantId, Long pharmacistProfileId, String keyword);
+    long countForPharmacist(
+            @Param("tenantId") Long tenantId,
+            @Param("pharmacistProfileId") Long pharmacistProfileId,
+            @Param("keyword") String keyword
+    );
 
     @Insert("""
             INSERT INTO patient (

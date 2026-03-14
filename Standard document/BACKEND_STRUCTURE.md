@@ -577,7 +577,7 @@ Columns:
 | `submitted_by_id` | `BIGINT` | No |  |  | app account id |
 | `category` | `VARCHAR(32)` | No |  | `IDX_help_order_category` | `MEDICATION_CONSULTATION`, `MISSED_OR_WRONG_DOSE`, `ADVERSE_REACTION`, `PLAN_CHANGE`, `OTHER` |
 | `title` | `VARCHAR(128)` | No |  |  | short title |
-| `description` | `TEXT` | No |  |  | issue detail |
+| `description` | `TEXT` | Yes |  |  | optional issue detail, title-only submit is allowed |
 | `status` | `VARCHAR(32)` | No | `'SUBMITTED'` | `IDX_help_order_status` | `SUBMITTED`, `PHARMACIST_IN_PROGRESS`, `WAITING_DOCTOR`, `DOCTOR_IN_PROGRESS`, `CLOSED`, `REJECTED` |
 | `priority` | `VARCHAR(16)` | No | `'NORMAL'` |  | `NORMAL`, `URGENT` |
 | `requires_offline_emergency` | `BIT(1)` | No | `0` |  | urgent offline instruction marker |
@@ -613,7 +613,7 @@ Columns:
 |---|---|---|---|---|---|
 | `id` | `BIGINT` | No |  | PK | event id |
 | `help_order_id` | `BIGINT` | No |  | `IDX_help_order_event_order` | target order |
-| `event_type` | `VARCHAR(32)` | No |  |  | `SUBMITTED`, `ASSIGNED`, `PHARMACIST_REPLY`, `ESCALATED_TO_DOCTOR`, `DOCTOR_REPLY`, `REJECTED`, `CLOSED`, `ATTACHMENT_ADDED`, `SYSTEM_NOTICE` |
+| `event_type` | `VARCHAR(32)` | No |  |  | `SUBMITTED`, `PATIENT_REPLY`, `ASSIGNED`, `PHARMACIST_REPLY`, `ESCALATED_TO_DOCTOR`, `DOCTOR_REPLY`, `REJECTED`, `CLOSED`, `ATTACHMENT_ADDED`, `SYSTEM_NOTICE` |
 | `from_status` | `VARCHAR(32)` | Yes |  |  | previous status |
 | `to_status` | `VARCHAR(32)` | Yes |  |  | next status |
 | `operator_type` | `VARCHAR(20)` | No |  |  | `PATIENT`, `FAMILY`, `PHARMACIST`, `DOCTOR`, `SYSTEM` |
@@ -856,7 +856,13 @@ erDiagram
 |---|---|---|---|---|---|
 | `POST` | `/app-api/patients/bind` | Yes | `BindPatientRequest` | patient summary | update `patient` binding state |
 | `GET` | `/app-api/patients/me` | Yes | none | bound patient summary | none |
+| `GET` | `/app-api/patients/me/profile` | Yes | none | `PatientProfileDTO` | none |
+| `PUT` | `/app-api/patients/me/profile` | Yes | `PatientProfileUpdateRequest` | `PatientProfileDTO` | update `patient_profile`, hash identity material |
+| `GET` | `/app-api/patients/me/health-profile` | Yes | none | `PatientHealthProfileDTO` | none |
+| `PUT` | `/app-api/patients/me/health-profile` | Yes | `PatientHealthProfileUpdateRequest` | `PatientHealthProfileDTO` | upsert `patient_health_profile` |
 | `GET` | `/app-api/patients/me/family-bindings` | Yes | none | family binding list | none |
+| `POST` | `/app-api/patients/me/family-bindings` | Yes | family binding request | created binding | write `patient_family_binding` |
+| `DELETE` | `/app-api/patients/me/family-bindings/{id}` | Yes | none | none | soft-delete binding, revoke permissions |
 
 #### Medication plan and task
 
@@ -876,6 +882,7 @@ erDiagram
 | `POST` | `/app-api/help-orders` | Yes | `HelpOrderDTO` create body | created order | write `help_order`, `help_order_event`, `file_asset` link, notification |
 | `GET` | `/app-api/help-orders` | Yes | status/category query | paged list | none |
 | `GET` | `/app-api/help-orders/{id}` | Yes | none | order detail + events | none |
+| `POST` | `/app-api/help-orders/{id}/reply` | Yes | `{ content }` | updated order detail | write `help_order_event`, notify current handler |
 | `GET` | `/app-api/prescriptions` | Yes | status/page query | paged prescriptions | none |
 | `POST` | `/app-api/prescriptions/uploads` | Yes | upload metadata | prescription summary | write `prescription`, `prescription_attachment`, `prescription_ocr_record` |
 
@@ -907,6 +914,12 @@ Business rules:
 4. Returns combined alert list, sorted by severity (HIGH first)
 5. This endpoint is informational only — it does NOT block or write audit records
 6. Audit is only written when the patient confirms and proceeds (via prescription upload or plan update)
+
+#### AI assistant
+
+| Method | Path | Auth | Request | Response `data` | Side effects |
+|---|---|---|---|---|---|
+| `POST` | `/app-api/ai/chat` | Yes | `{ messages, model? }` | `{ reply, model, disclaimer }` | proxy to upstream AI provider, no persistent side effects |
 
 #### Assessments
 
@@ -943,6 +956,7 @@ Business rules:
 
 | Method | Path | Auth role | Request | Response `data` | Side effects |
 |---|---|---|---|---|---|
+| `GET` | `/admin-api/medication-plans/{id}` | pharmacist | none | `MedicationPlanDTO` | none |
 | `POST` | `/admin-api/medication-plans` | pharmacist | `MedicationPlanDTO` | created plan | create plan/items, events |
 | `PUT` | `/admin-api/medication-plans/{id}` | pharmacist | update DTO | updated plan | create new version, replace active plan, recalc tasks |
 | `POST` | `/admin-api/medication-plans/{id}/activate` | pharmacist | none | active plan summary | activate plan, generate/recalc tasks |
@@ -972,7 +986,14 @@ Business rules:
 | `POST` | `/admin-api/ddi/contraindications` | pharmacist admin | contraindication DTO | created rule | write `drug_contraindication` |
 | `PUT` | `/admin-api/ddi/contraindications/{id}` | pharmacist admin | update DTO | updated rule | update `drug_contraindication` |
 | `POST` | `/admin-api/ddi/screenings/{id}/confirm` | pharmacist | confirm DTO | confirm result | update `ddi_screening_log` |
+| `POST` | `/admin-api/notifications/socket-ticket` | pharmacist or doctor | none | `{ ticket }` | generate one-time WebSocket ticket in Redis |
 | `GET` | `/admin-api/notifications/logs` | pharmacist admin | query | paged logs | none |
+
+#### Health check
+
+| Method | Path | Auth | Request | Response `data` | Side effects |
+|---|---|---|---|---|---|
+| `GET` | `/health` | No | none | `{ status: "UP" }` | none |
 
 ### 6.3 Idempotency and concurrency rules
 

@@ -19,4 +19,15 @@ class S3CompatibleObjectStorageStubTest {
         assertThat(storage.createPresignedDownloadUrl("prescriptions/a.png"))
                 .isEqualTo("http://localhost:9000/yaoshian-mvp/prescriptions/a.png?action=download");
     }
+
+    @Test
+    void shouldTrimTrailingSlashFromEndpoint() {
+        ObjectStorageProperties properties = new ObjectStorageProperties();
+        properties.setEndpoint("http://localhost:9000/");
+        properties.setBucket("yaoshian-mvp");
+        S3CompatibleObjectStorageStub storage = new S3CompatibleObjectStorageStub(properties);
+
+        assertThat(storage.createPresignedUploadUrl("prescriptions/b.png"))
+                .isEqualTo("http://localhost:9000/yaoshian-mvp/prescriptions/b.png?action=upload");
+    }
 }

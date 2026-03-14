@@ -48,7 +48,7 @@ try {
     refreshToken: Boolean(sessionStorage.getItem('patient_refresh_token')),
     bindingStatus: localStorage.getItem('patient_binding_status'),
     activePlanStatus: localStorage.getItem('patient_has_active_plan'),
-    mobile: localStorage.getItem('patient_mobile'),
+    mobile: sessionStorage.getItem('patient_mobile'),
     deviceId: localStorage.getItem('patient_device_id')
   }))
 
@@ -62,7 +62,7 @@ try {
     refreshToken: sessionStorage.getItem('patient_refresh_token'),
     bindingStatus: localStorage.getItem('patient_binding_status'),
     activePlanStatus: localStorage.getItem('patient_has_active_plan'),
-    mobile: localStorage.getItem('patient_mobile'),
+    mobile: sessionStorage.getItem('patient_mobile'),
     deviceId: localStorage.getItem('patient_device_id'),
     userProfile: localStorage.getItem('patient_user_profile'),
     healthData: localStorage.getItem('patient_health_data')

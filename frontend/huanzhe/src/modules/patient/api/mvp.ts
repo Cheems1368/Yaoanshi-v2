@@ -114,7 +114,7 @@ export interface HelpOrderDTO {
   submittedById: number
   category: string
   title: string
-  description: string
+  description?: string | null
   status: string
   priority: string
   requiresOfflineEmergency?: boolean
@@ -129,6 +129,20 @@ export interface HelpOrderDTO {
   rejectReason?: string | null
   serviceNotice?: string | null
   createdAt?: string | null
+  events?: HelpOrderEventDTO[]
+}
+
+export interface HelpOrderEventDTO {
+  id: number
+  eventType: string
+  fromStatus?: string | null
+  toStatus?: string | null
+  operatorType: string
+  operatorId: number
+  operatorName?: string | null
+  content?: string | null
+  attachmentFileAssetId?: number | null
+  eventAt?: string | null
 }
 
 export interface AppDdiAlert {
@@ -149,6 +163,56 @@ export interface PageResult<T> {
   pageSize: number
   total: number
   list: T[]
+}
+
+export interface PatientProfileDTO {
+  patientId?: number
+  hospitalPatientId?: string
+  name?: string
+  phone?: string
+  age?: number
+  gender?: string
+  idType?: string
+  ethnicity?: string
+  height?: number
+  weight?: number
+  bloodType?: string
+  allergies?: string
+  avatar?: string
+  address?: string
+  patientType?: number
+  insurance?: number
+  identityMaterialArchived?: boolean
+  realNameVerified?: boolean
+  realNameVerifiedTime?: string
+  createdAt?: string
+  updatedAt?: string
+  emergencyContact?: {
+    name?: string
+    phone?: string
+    relationship?: string
+  }
+}
+
+export interface PatientHealthProfileDTO {
+  patientId?: number
+  submitTime?: string
+  layer1?: {
+    allergy?: string
+    diagnosis?: string
+  }
+  layer2?: {
+    medicalHistory?: string
+    smokingDrinking?: string
+    liverKidney?: string
+    currentMedication?: string
+  }
+  layer3?: {
+    detailedSymptoms?: string
+    familyHistory?: string
+    surgeryHistory?: string
+    socialHistory?: string
+  }
 }
 
 export const appAuthService = {
@@ -192,6 +256,22 @@ export const patientService = {
 
   deleteFamilyBinding(id: number) {
     return httpService.delete(`/app-api/patients/me/family-bindings/${id}`)
+  },
+
+  getProfile() {
+    return httpService.get<PatientProfileDTO>('/app-api/patients/me/profile')
+  },
+
+  updateProfile(payload: Partial<PatientProfileDTO>) {
+    return httpService.put<PatientProfileDTO>('/app-api/patients/me/profile', payload)
+  },
+
+  getHealthProfile() {
+    return httpService.get<PatientHealthProfileDTO>('/app-api/patients/me/health-profile')
+  },
+
+  updateHealthProfile(payload: Partial<PatientHealthProfileDTO>) {
+    return httpService.put<PatientHealthProfileDTO>('/app-api/patients/me/health-profile', payload)
   }
 }
 
@@ -242,6 +322,16 @@ export const helpOrderService = {
 
   createHelpOrder(payload: Record<string, unknown>) {
     return httpService.post<HelpOrderDTO>('/app-api/help-orders', payload)
+  },
+
+  replyHelpOrder(id: number, payload: { content: string }) {
+    return httpService.post<HelpOrderDTO>(`/app-api/help-orders/${id}/reply`, payload)
+  }
+}
+
+export const appNotificationService = {
+  createSocketTicket() {
+    return httpService.post<{ ticket: string; expiresInSeconds: number }>('/app-api/notifications/socket-ticket')
   }
 }
 

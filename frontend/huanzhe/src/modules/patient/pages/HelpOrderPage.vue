@@ -32,7 +32,11 @@
 
             <ion-item>
               <ion-label position="stacked">详细说明</ion-label>
-              <ion-textarea v-model="form.description" auto-grow placeholder="请描述当前症状、药名、时间点以及希望获得的帮助" />
+              <ion-textarea
+                v-model="form.description"
+                auto-grow
+                placeholder="可选填写：当前症状、药名、时间点以及希望获得的帮助"
+              />
             </ion-item>
 
             <ion-item lines="none">
@@ -61,7 +65,13 @@
             </div>
 
             <div v-else class="order-list">
-              <div v-for="order in orders" :key="order.id" class="order-item">
+              <button
+                v-for="order in orders"
+                :key="order.id"
+                class="order-item"
+                type="button"
+                @click="openDetail(order.id)"
+              >
                 <div class="order-top">
                   <div>
                     <div class="order-title">{{ order.title }}</div>
@@ -69,13 +79,13 @@
                   </div>
                   <ion-badge :color="statusColor(order.status)">{{ statusText(order.status) }}</ion-badge>
                 </div>
-                <p class="order-desc">{{ order.description }}</p>
+                <p class="order-desc">{{ order.description || order.title }}</p>
                 <div class="order-meta">
                   当前处理：{{ order.currentHandlerName || handlerText(order.currentHandlerType) || '待分配' }}
                 </div>
                 <div v-if="order.rejectReason" class="order-meta">驳回原因：{{ order.rejectReason }}</div>
                 <div v-if="order.serviceNotice" class="order-meta">服务说明：{{ order.serviceNotice }}</div>
-              </div>
+              </button>
             </div>
           </ion-card-content>
         </ion-card>
@@ -132,7 +142,7 @@ const form = ref({
   requiresOfflineEmergency: false
 })
 
-const canSubmit = computed(() => Boolean(form.value.title.trim() && form.value.description.trim()))
+const canSubmit = computed(() => Boolean(form.value.title.trim()))
 
 const showMessage = (message: string) => {
   toastMessage.value = message
@@ -146,7 +156,7 @@ const readQueryValue = (value: unknown) => {
   return typeof value === 'string' ? value : ''
 }
 
-const applyPrefillFromQuery = () => {
+const applyPrefillFromQuery = async () => {
   const category = readQueryValue(route.query.category)
   const title = readQueryValue(route.query.title)
   const description = readQueryValue(route.query.description)
@@ -163,7 +173,7 @@ const applyPrefillFromQuery = () => {
     requiresOfflineEmergency: requiresOfflineEmergency === 'true'
   }
 
-  void router.replace({ path: route.path, query: {} })
+  await router.replace({ path: route.path, query: {} })
 }
 
 const loadOrders = async () => {
@@ -179,26 +189,39 @@ const loadOrders = async () => {
   }
 }
 
+const resetForm = () => {
+  form.value = {
+    category: 'MEDICATION_CONSULTATION',
+    title: '',
+    description: '',
+    requiresOfflineEmergency: false
+  }
+}
+
+const openDetail = (id: number) => {
+  void router.push(`/help-order/${id}`)
+}
+
 const submitOrder = async () => {
   if (!canSubmit.value) {
-    showMessage('请补全标题和详细说明')
+    showMessage('请填写标题')
     return
   }
 
   submitting.value = true
   try {
-    await helpOrderService.createHelpOrder({
+    const response = await helpOrderService.createHelpOrder({
       category: form.value.category,
       title: form.value.title.trim(),
-      description: form.value.description.trim(),
+      description: form.value.description.trim() || undefined,
       priority: form.value.requiresOfflineEmergency ? 'URGENT' : 'NORMAL',
       requiresOfflineEmergency: form.value.requiresOfflineEmergency
     })
-    form.value = {
-      category: 'MEDICATION_CONSULTATION',
-      title: '',
-      description: '',
-      requiresOfflineEmergency: false
+    const createdId = response.data?.id
+    resetForm()
+    if (createdId) {
+      void router.push(`/help-order/${createdId}`)
+      return
     }
     showMessage('工单已提交')
     await loadOrders()
@@ -252,7 +275,7 @@ const formatDateTime = (value?: string | null) => {
 }
 
 onIonViewWillEnter(async () => {
-  applyPrefillFromQuery()
+  await applyPrefillFromQuery()
   await loadOrders()
 })
 </script>
@@ -282,9 +305,12 @@ onIonViewWillEnter(async () => {
 }
 
 .order-item {
+  width: 100%;
   padding: 14px;
+  border: 0;
   border-radius: 14px;
   background: #f8fafc;
+  text-align: left;
 }
 
 .order-top {

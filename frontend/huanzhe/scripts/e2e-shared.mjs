@@ -194,7 +194,7 @@ export async function primePatientPage(page, baseUrl, session, { bound = true, h
     ({ refreshToken, deviceId, mobile, bound, hasActivePlan }) => {
       sessionStorage.setItem('patient_refresh_token', refreshToken)
       localStorage.setItem('patient_device_id', deviceId)
-      localStorage.setItem('patient_mobile', mobile)
+      sessionStorage.setItem('patient_mobile', mobile)
       localStorage.setItem('patient_binding_status', bound ? 'BOUND' : 'PENDING')
       localStorage.setItem('patient_has_active_plan', hasActivePlan ? 'true' : 'false')
     },

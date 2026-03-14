@@ -24,11 +24,6 @@ const routes: Array<RouteRecordRaw> = [
     meta: { requiresAuth: true, requiresBinding: true }
   },
   {
-    path: '/test',
-    component: () => import('@/modules/app/pages/TestPage.vue'),
-    meta: { public: true }
-  },
-  {
     path: '/tabs/',
     component: TabsPage,
     meta: { requiresAuth: true },
@@ -65,6 +60,11 @@ const routes: Array<RouteRecordRaw> = [
     meta: { requiresAuth: true, requiresBinding: true }
   },
   {
+    path: '/help-order/:id',
+    component: () => import('@/modules/patient/pages/HelpOrderDetailPage.vue'),
+    meta: { requiresAuth: true, requiresBinding: true }
+  },
+  {
     path: '/medication-record',
     component: () => import('@/modules/patient/pages/MedicationRecordPage.vue'),
     meta: { requiresAuth: true, requiresBinding: true }
@@ -73,11 +73,6 @@ const routes: Array<RouteRecordRaw> = [
     path: '/rational-medication',
     component: () => import('@/modules/patient/pages/RationalMedicationPage.vue'),
     meta: { requiresAuth: true }
-  },
-  {
-    path: '/medication-consultation',
-    component: () => import('@/modules/patient/pages/MedicationConsultationPage.vue'),
-    meta: { requiresAuth: true, requiresBinding: true }
   },
   {
     path: '/drug-detail/:id',
@@ -114,7 +109,6 @@ router.beforeEach((to, _from, next) => {
   const isPublicRoute = Boolean(to.meta?.public)
   const requiresAuth = Boolean(to.meta?.requiresAuth)
   const requiresBinding = Boolean(to.meta?.requiresBinding)
-  const requiresActivePlan = Boolean(to.meta?.requiresActivePlan)
 
   if (to.path === '/login' && gateState.loggedIn) {
     next(resolveAuthenticatedHome())
@@ -133,11 +127,6 @@ router.beforeEach((to, _from, next) => {
 
   if (requiresBinding && !gateState.isBound) {
     next('/realname')
-    return
-  }
-
-  if (requiresActivePlan && !gateState.hasActivePlan) {
-    next('/tabs/home')
     return
   }
 

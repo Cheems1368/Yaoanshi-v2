@@ -29,6 +29,9 @@ class NotificationDispatchServiceTest {
     @Mock
     private AdminNotificationRealtimeService realtimeService;
 
+    @Mock
+    private AppNotificationRealtimeService appRealtimeService;
+
     @Spy
     private ObjectMapper objectMapper = new ObjectMapper();
 
@@ -100,6 +103,7 @@ class NotificationDispatchServiceTest {
             log.setId(9003L);
             return 1;
         }).when(notificationLogMapper).insert(any(NotificationLog.class));
+        when(appRealtimeService.dispatch(any(NotificationLog.class))).thenReturn(NotificationDispatchService.DispatchResult.sent());
 
         notificationDispatchService.createAndDispatch(
                 1L,
@@ -115,7 +119,7 @@ class NotificationDispatchServiceTest {
         ArgumentCaptor<NotificationLog> captor = ArgumentCaptor.forClass(NotificationLog.class);
         verify(notificationLogMapper).updateDelivery(captor.capture());
         NotificationLog updated = captor.getValue();
-        assertThat(updated.getChannel()).isEqualTo("IN_APP");
+        assertThat(updated.getChannel()).isEqualTo("WEBSOCKET");
         assertThat(updated.getDeliveryStatus()).isEqualTo("SENT");
         assertThat(updated.getSentAt()).isNotNull();
     }

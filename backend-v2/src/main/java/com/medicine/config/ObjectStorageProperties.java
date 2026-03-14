@@ -7,8 +7,8 @@ public class ObjectStorageProperties {
 
     private String endpoint = "http://localhost:9000";
     private String bucket = "yaoshian-mvp";
-    private String accessKey = "replace-access-key";
-    private String secretKey = "replace-secret-key";
+    private String accessKey = "";
+    private String secretKey = "";
 
     public String getEndpoint() {
         return endpoint;

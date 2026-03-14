@@ -8,6 +8,7 @@ export default defineConfig(({ mode }) => {
   const legacyApiTarget = env.VITE_API_BASE_URL || 'http://localhost:48080'
   const backendV2Target = env.VITE_BACKEND_V2_TARGET || 'http://127.0.0.1:8080'
   const backendV2AdminPrefixes = [
+    '/admin-api/system',
     '/admin-api/patients',
     '/admin-api/prescriptions',
     '/admin-api/ddi',

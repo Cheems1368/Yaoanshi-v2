@@ -10,6 +10,13 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [vue()],
+    css: {
+      preprocessorOptions: {
+        scss: {
+          silenceDeprecations: ['legacy-js-api']
+        }
+      }
+    },
     resolve: {
       alias: {
         '@': resolve(__dirname, 'src')
@@ -20,6 +27,16 @@ export default defineConfig(({ mode }) => {
       strictPort: true,
       open: true,
       proxy: {
+        '/admin-api/system/auth': {
+          target: backendV2Target,
+          changeOrigin: true,
+          secure: false
+        },
+        '/admin-api/notifications': {
+          target: backendV2Target,
+          changeOrigin: true,
+          secure: false
+        },
         '/ws/admin-notifications': {
           target: backendV2Target,
           changeOrigin: true,

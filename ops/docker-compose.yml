@@ -1,0 +1,83 @@
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: yaoshian-mysql
+    restart: unless-stopped
+    ports:
+      - "13306:3306"
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-yaoshian_mvp}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-123456}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-123456}"]
+      timeout: 20s
+      retries: 10
+      start_period: 30s
+
+  redis:
+    image: redis:7-alpine
+    container_name: yaoshian-redis
+    restart: unless-stopped
+    ports:
+      - "16379:6379"
+    command: ["redis-server", "/usr/local/etc/redis/redis.conf"]
+    volumes:
+      - redis_data:/data
+      - ./docker-security-audit/redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      timeout: 20s
+      retries: 10
+      start_period: 30s
+
+  backend-v2:
+    container_name: yaoshian-backend-v2
+    build:
+      context: ..
+      dockerfile: backend-v2/Dockerfile
+    image: medicine-backend-v2:local
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_PROFILES_ACTIVE: local
+      MEDICINE_DB_URL: jdbc:mysql://mysql:3306/${MYSQL_DATABASE:-yaoshian_mvp}?useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+      MEDICINE_DB_USERNAME: root
+      MEDICINE_DB_PASSWORD: ${MYSQL_ROOT_PASSWORD:-123456}
+      MEDICINE_LEGACY_DB_URL: jdbc:mysql://mysql:3306/${MYSQL_DATABASE:-yaoshian_mvp}?useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+      MEDICINE_LEGACY_DB_USERNAME: root
+      MEDICINE_LEGACY_DB_PASSWORD: ${MYSQL_ROOT_PASSWORD:-123456}
+      MEDICINE_REDIS_HOST: redis
+      MEDICINE_REDIS_PORT: 6379
+      MEDICINE_JWT_SECRET: local-dev-jwt-secret-change-me
+      MEDICINE_STORAGE_ACCESS_KEY: local-access-key
+      MEDICINE_STORAGE_SECRET_KEY: local-secret-key
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 45s
+
+  admin:
+    image: nginx:alpine
+    container_name: yaoshian-pharmacist-admin
+    restart: unless-stopped
+    ports:
+      - "8081:80"
+    volumes:
+      - ../frontend/pharmacist/dist:/usr/share/nginx/html:ro
+      - ./docker-security-audit/nginx-dev.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - backend-v2
+
+volumes:
+  mysql_data:
+  redis_data:
