@@ -3,7 +3,9 @@
     <ion-header class="page-header ion-no-border">
       <ion-toolbar>
         <ion-buttons slot="start" data-testid="ai-back-button">
-          <ion-button @click="handleBack">返回</ion-button>
+          <ion-button @click="handleBack">
+            <ion-icon slot="icon-only" :icon="chevronBackOutline" />
+          </ion-button>
         </ion-buttons>
         <ion-title>用药科普助手</ion-title>
       </ion-toolbar>
@@ -21,15 +23,26 @@
 
     <ion-footer class="input-footer ion-no-border">
       <ion-toolbar>
+        <div class="disclaimer-row">
+          仅供用药科普参考，不能替代医生面诊。如症状加重请及时就医。
+        </div>
         <div class="input-row" data-testid="ai-input-row">
-          <ion-input
-            v-model="inputText"
-            class="message-input"
-            data-testid="ai-input"
-            placeholder="输入用药疑问，如漏服怎么办"
-            @keyup.enter="submitInput"
-          />
-          <ion-button :disabled="isSending || !inputText.trim()" @click="submitInput">发送</ion-button>
+          <div class="input-wrap">
+            <ion-input
+              v-model="inputText"
+              class="message-input"
+              data-testid="ai-input"
+              placeholder="输入用药疑问，如漏服怎么办"
+              @keyup.enter="submitInput"
+            />
+          </div>
+          <ion-button
+            class="send-button"
+            :disabled="isSending || !inputText.trim()"
+            @click="submitInput"
+          >
+            发送
+          </ion-button>
         </div>
         <div v-if="lastFailedPrompt && !isSending" class="retry-row" data-testid="ai-retry-row">
           <ion-button size="small" fill="clear" @click="retryLastFailed">重试上一条问题</ion-button>
@@ -55,12 +68,14 @@ import {
   IonContent,
   IonFooter,
   IonHeader,
+  IonIcon,
   IonInput,
   IonPage,
   IonTitle,
   IonToast,
   IonToolbar
 } from '@ionic/vue'
+import { chevronBackOutline } from 'ionicons/icons'
 import AiHomeView from '@/modules/patient/components/ai/AiHomeView.vue'
 import AiChatView, { type AiViewMessage } from '@/modules/patient/components/ai/AiChatView.vue'
 import { aiAssistantService, type AiChatMessage } from '@/modules/patient/api/aiAssistant'
@@ -115,18 +130,6 @@ const scrollToBottom = async () => {
   }
 }
 
-const buildSuggestions = (reply: string) => {
-  if (reply.includes('降压') || reply.includes('血压')) {
-    suggestions.value = ['漏服降压药怎么处理？', '需要早晚都量血压吗？', '头晕时是否停药？']
-    return
-  }
-  if (reply.includes('出血') || reply.includes('阿司匹林')) {
-    suggestions.value = ['胃不舒服还能继续吃吗？', '要不要和护胃药同服？', '什么情况必须急诊？']
-    return
-  }
-  suggestions.value = ['饭前饭后吃药怎么判断？', '老年人多药联用注意什么？', '什么时候需要线下复诊？']
-}
-
 const submitMessage = async (text: string) => {
   const content = text.trim()
   if (!content || isSending.value) {
@@ -159,7 +162,7 @@ const submitMessage = async (text: string) => {
       content: response.data.reply
     }
     lastFailedPrompt.value = ''
-    buildSuggestions(response.data.reply)
+    suggestions.value = response.data.suggestions || []
   } catch (error: any) {
     messages.value[messages.value.length - 1] = {
       role: 'assistant',
@@ -195,39 +198,81 @@ const retryLastFailed = () => {
 
 <style scoped>
 .page-header {
-  --background: #2979ff;
-  --color: #ffffff;
+  --background: #ffffff;
+  --color: #1E293B;
+}
+
+.page-header ion-toolbar {
+  --background: #ffffff;
+  --color: #1E293B;
+}
+
+.page-header ion-button {
+  --color: #1E293B;
 }
 
 .page-content {
-  --background: linear-gradient(180deg, #eff6ff 0%, #ffffff 42%, #f8fafc 100%);
+  --background: linear-gradient(180deg, #EBF4FF 0%, #F0F7FF 30%, #F8FAFC 100%);
 }
 
 .input-footer {
   --background: #ffffff;
-  box-shadow: 0 -2px 12px rgba(15, 23, 42, 0.08);
+  box-shadow: 0 -1px 8px rgba(0, 0, 0, 0.06);
+}
+
+.input-footer ion-toolbar {
+  --background: #ffffff;
+  --padding-top: 0;
+  --padding-bottom: 0;
+}
+
+.disclaimer-row {
+  text-align: center;
+  font-size: 11px;
+  color: #94A3B8;
+  padding: 6px 16px 2px;
+  line-height: 1.4;
 }
 
 .input-row {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 10px;
+  display: flex;
+  gap: 8px;
   align-items: center;
-  padding: 6px 10px calc(8px + env(safe-area-inset-bottom));
+  padding: 6px 12px calc(8px + env(safe-area-inset-bottom));
+}
+
+.input-wrap {
+  flex: 1;
+  background: #F1F5F9;
+  border-radius: 22px;
+  overflow: hidden;
+}
+
+.message-input {
+  --background: transparent;
+  --padding-start: 16px;
+  --padding-end: 16px;
+  --placeholder-color: #94A3B8;
+  font-size: 14px;
+}
+
+.send-button {
+  --background: #3B82F6;
+  --border-radius: 20px;
+  --padding-start: 16px;
+  --padding-end: 16px;
+  font-size: 14px;
+  font-weight: 600;
+  height: 36px;
+}
+
+.send-button[disabled] {
+  --background: #CBD5E1;
 }
 
 .retry-row {
   display: flex;
   justify-content: flex-end;
   padding: 0 10px calc(4px + env(safe-area-inset-bottom));
-}
-
-.message-input {
-  --background: #f8fafc;
-  --border-radius: 22px;
-  --padding-start: 14px;
-  --padding-end: 14px;
-  border: 1px solid #dbeafe;
-  border-radius: 22px;
 }
 </style>

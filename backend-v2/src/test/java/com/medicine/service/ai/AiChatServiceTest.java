@@ -65,7 +65,7 @@ class AiChatServiceTest {
     }
 
     @Test
-    void shouldAppendSafetyDisclaimerWhenUpstreamCallSucceeds() throws Exception {
+    void shouldReturnReplyWithSuggestionsWhenUpstreamCallSucceeds() throws Exception {
         AiProperties properties = new AiProperties();
         properties.setBaseUrl("https://api.siliconflow.cn/v1/messages");
         properties.setApiKey("test-key");
@@ -75,12 +75,14 @@ class AiChatServiceTest {
         properties.setMaxTokens(1024);
         properties.setUpstreamMaxMessages(4);
 
+        String upstreamReply = "safe reply\\n---SUGGESTIONS---\\n漏服后该怎么办？\\n需要复诊吗？\\n有哪些不良反应？";
+
         when(stringRedisTemplate.opsForValue()).thenReturn(valueOperations);
         when(valueOperations.increment("app:ai:chat:limit:acct-1")).thenReturn(1L);
         when(stringRedisTemplate.expire("app:ai:chat:limit:acct-1", 1, TimeUnit.MINUTES)).thenReturn(true);
         when(httpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class))).thenReturn(httpResponse);
         when(httpResponse.statusCode()).thenReturn(200);
-        when(httpResponse.body()).thenReturn("{\"content\":[{\"type\":\"text\",\"text\":\"safe reply\"}]}");
+        when(httpResponse.body()).thenReturn("{\"content\":[{\"type\":\"text\",\"text\":\"" + upstreamReply + "\"}]}");
 
         AiChatService service = new AiChatService(properties, new ObjectMapper(), stringRedisTemplate);
         ReflectionTestUtils.setField(service, "httpClient", httpClient);
@@ -89,9 +91,10 @@ class AiChatServiceTest {
 
         assertThat(response.getModel()).isEqualTo("Qwen/Qwen3.5-122B-A10B");
         assertThat(response.getRequestId()).isNotBlank();
-        assertThat(response.getReply()).startsWith("safe reply");
-        assertThat(response.getReply()).contains("仅供用药科普");
-        assertThat(response.getReply()).contains("\n\n");
+        assertThat(response.getReply()).isEqualTo("safe reply");
+        assertThat(response.getReply()).doesNotContain("仅供用药科普");
+        assertThat(response.getSuggestions()).hasSize(3);
+        assertThat(response.getSuggestions().get(0)).isEqualTo("漏服后该怎么办？");
 
         ArgumentCaptor<HttpRequest> requestCaptor = ArgumentCaptor.forClass(HttpRequest.class);
         verify(httpClient).send(requestCaptor.capture(), any(HttpResponse.BodyHandler.class));
@@ -102,7 +105,7 @@ class AiChatServiceTest {
     }
 
     @Test
-    void shouldLimitFinalReplyToTwoHundredChars() throws Exception {
+    void shouldLimitReplyBodyToTwoHundredChars() throws Exception {
         AiProperties properties = new AiProperties();
         properties.setBaseUrl("https://api.siliconflow.cn/v1/chat/completions");
         properties.setApiKey("test-key");
@@ -130,8 +133,10 @@ class AiChatServiceTest {
         AiChatResponse response = service.chat("acct-1b", request(newMessage("user", "降压药漏服后怎么办？")));
 
         assertThat(response.getReply().length()).isLessThanOrEqualTo(200);
-        assertThat(response.getReply()).contains("仅供用药科普");
-        assertThat(response.getReply()).endsWith("请及时就医。");
+        assertThat(response.getReply()).doesNotContain("仅供用药科普");
+        assertThat(response.getReply()).endsWith("...");
+        assertThat(response.getSuggestions()).isNotNull();
+        assertThat(response.getSuggestions()).isNotEmpty();
     }
 
     @Test

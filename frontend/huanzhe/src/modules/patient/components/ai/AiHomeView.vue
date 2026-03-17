@@ -18,29 +18,30 @@
           @click="currentTab = tab"
         >
           {{ tab }}
+          <span v-if="currentTab === tab" class="tab-indicator" />
         </button>
       </div>
 
-      <ion-list lines="none">
-        <ion-item
+      <div class="question-list">
+        <div
           v-for="(question, index) in currentQuestions"
           :key="`${currentTab}-${question}`"
-          button
+          class="question-item"
           :data-testid="`ai-home-question-${index}`"
           @click="$emit('start-chat', question)"
         >
-          <div class="rank" :class="{ top: index < 3 }">{{ index + 1 }}</div>
-          <ion-label>{{ question }}</ion-label>
-          <ion-icon slot="end" :icon="chevronForwardOutline" />
-        </ion-item>
-      </ion-list>
+          <span class="rank" :class="{ top: index < 3 }">{{ index + 1 }}</span>
+          <span class="question-text">{{ question }}</span>
+          <ion-icon class="arrow" :icon="chevronForwardOutline" />
+        </div>
+      </div>
     </section>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { IonIcon, IonItem, IonLabel, IonList } from '@ionic/vue'
+import { IonIcon } from '@ionic/vue'
 import { chevronForwardOutline, sparklesOutline } from 'ionicons/icons'
 
 defineEmits<{
@@ -77,78 +78,135 @@ const currentQuestions = computed(() => topicQuestions[currentTab.value] || [])
   padding: 16px;
 }
 
+/* Hero section */
 .hero {
   background: #ffffff;
-  border-radius: 16px;
-  padding: 20px 16px;
+  border-radius: 20px;
+  padding: 28px 20px 24px;
   text-align: center;
-  box-shadow: 0 2px 12px rgba(15, 23, 42, 0.08);
-  margin-bottom: 14px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+  margin-bottom: 16px;
 }
 
 .icon-wrap {
-  width: 56px;
-  height: 56px;
-  margin: 0 auto 10px;
+  width: 64px;
+  height: 64px;
+  margin: 0 auto 14px;
   border-radius: 50%;
-  background: #dbeafe;
+  background: linear-gradient(135deg, #EBF4FF 0%, #DBEAFE 100%);
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
 .icon-wrap ion-icon {
-  color: #2563eb;
-  font-size: 28px;
+  color: #3B82F6;
+  font-size: 32px;
 }
 
 .hero h2 {
   margin: 0 0 8px;
-  color: #0f172a;
+  font-size: 20px;
+  font-weight: 700;
+  color: #1E293B;
 }
 
 .hero p {
   margin: 0;
-  color: #64748b;
+  color: #64748B;
+  font-size: 14px;
   line-height: 1.6;
 }
 
+/* Topic card */
 .topic-card {
   background: #ffffff;
-  border-radius: 14px;
-  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.06);
+  border-radius: 16px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
   overflow: hidden;
 }
 
 .topic-header {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  border-bottom: 1px solid #e2e8f0;
+  display: flex;
+  padding: 0 4px;
+  border-bottom: 1px solid #F1F5F9;
 }
 
 .tab-button {
+  flex: 1;
+  position: relative;
   border: none;
-  background: #ffffff;
-  padding: 12px 8px;
-  color: #64748b;
+  background: transparent;
+  padding: 14px 8px 12px;
+  color: #94A3B8;
   font-weight: 600;
   font-size: 14px;
+  transition: color 0.2s ease;
 }
 
 .tab-button.active {
-  color: #1d4ed8;
-  background: #eff6ff;
+  color: #3B82F6;
+}
+
+.tab-indicator {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 24px;
+  height: 3px;
+  border-radius: 2px;
+  background: #3B82F6;
+}
+
+/* Question list */
+.question-list {
+  padding: 4px 0;
+}
+
+.question-item {
+  display: flex;
+  align-items: center;
+  padding: 14px 16px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.question-item:active {
+  background: #F8FAFC;
 }
 
 .rank {
-  width: 20px;
-  text-align: center;
-  color: #94a3b8;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
   font-weight: 700;
-  margin-right: 10px;
+  margin-right: 12px;
+  flex-shrink: 0;
+  background: #F1F5F9;
+  color: #94A3B8;
 }
 
 .rank.top {
-  color: #f59e0b;
+  background: #ECFDF5;
+  color: #10B981;
+}
+
+.question-text {
+  flex: 1;
+  font-size: 14px;
+  color: #334155;
+  line-height: 1.5;
+}
+
+.arrow {
+  color: #CBD5E1;
+  font-size: 14px;
+  margin-left: 8px;
+  flex-shrink: 0;
 }
 </style>

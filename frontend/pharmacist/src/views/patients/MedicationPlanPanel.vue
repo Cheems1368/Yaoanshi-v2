@@ -77,14 +77,14 @@
             <el-input v-model="item.drugSpec" placeholder="规格" />
             <el-input v-model="item.dosage" placeholder="剂量" />
             <el-select v-model="item.frequencyCode" placeholder="频次">
-              <el-option label="QD" value="QD" />
-              <el-option label="BID" value="BID" />
-              <el-option label="TID" value="TID" />
-              <el-option label="QID" value="QID" />
-              <el-option label="HS" value="HS" />
-              <el-option label="PRN" value="PRN" />
+              <el-option label="QD (每日一次)" value="QD" />
+              <el-option label="BID (每日两次)" value="BID" />
+              <el-option label="TID (每日三次)" value="TID" />
+              <el-option label="QID (每日四次)" value="QID" />
+              <el-option label="HS (睡前)" value="HS" />
+              <el-option label="PRN (必要时)" value="PRN" />
             </el-select>
-            <el-input v-model="item.timePointsText" placeholder="例如 08:00,20:00" />
+            <el-input v-model="item.timePointsText" placeholder="服药时间，多个用逗号分隔，如 08:00,14:00,20:00" />
             <el-select v-model="item.mealRelation" placeholder="与进餐关系">
               <el-option label="餐后" value="AFTER_MEAL" />
               <el-option label="餐前" value="BEFORE_MEAL" />
@@ -322,6 +322,7 @@ const buildPayload = (status) => {
   if (items.some((item) => !item.dosage || !item.frequencyCode || item.timePoints.length === 0)) {
     throw new Error('每条药品项都需要填写剂量、频次和服药时间')
   }
+  validateAllTimePoints(form.items)
 
   return {
     patientId: props.patientId,
@@ -404,11 +405,32 @@ const taskStatusText = (status) => {
   return map[status] || status || '--'
 }
 
+const HH_MM_RE = /^([01]\d|2[0-3]):[0-5]\d$/
+
 const splitTimePoints = (value) =>
   (value || '')
+    .replace(/，/g, ',')
     .split(',')
     .map((entry) => entry.trim())
     .filter(Boolean)
+
+const validateAllTimePoints = (items) => {
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i]
+    if (!item.drugName?.trim()) continue
+    const points = splitTimePoints(item.timePointsText)
+    if (points.length === 0) {
+      throw new Error(`药品项 #${i + 1}「${item.drugName}」缺少服药时间`)
+    }
+    for (const tp of points) {
+      if (!HH_MM_RE.test(tp)) {
+        throw new Error(
+          `药品项 #${i + 1}「${item.drugName}」的服药时间「${tp}」格式错误，需为 HH:mm（24小时制），如 08:00、20:00`
+        )
+      }
+    }
+  }
+}
 
 const toIsoString = (value) => {
   if (!value) {
