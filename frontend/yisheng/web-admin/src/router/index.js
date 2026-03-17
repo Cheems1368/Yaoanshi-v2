@@ -18,7 +18,7 @@ const routes = [
         path: 'workorders',
         alias: ['/doctor-dashboard'],
         name: 'WorkOrders',
-        component: () => import('@/views/WorkOrders.vue'),
+        component: () => import('@/views/workorders/WorkOrders.vue'),
         meta: { title: '升级工单' }
       },
       {

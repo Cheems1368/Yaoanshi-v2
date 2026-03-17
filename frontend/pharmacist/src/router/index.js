@@ -46,7 +46,7 @@ const routes = [
         path: 'workorders',
         alias: ['/system/help-order', '/system/help-order/detail'],
         name: 'WorkOrders',
-        component: () => import('@/views/WorkOrders.vue'),
+        component: () => import('@/views/workorders/WorkOrders.vue'),
         meta: { title: '工单处理' }
       },
       {
