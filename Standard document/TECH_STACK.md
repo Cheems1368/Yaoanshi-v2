@@ -347,7 +347,7 @@ Build and dev dependencies resolved from `package-lock.json`:
 | `@typescript-eslint/eslint-plugin` | `5.62.0` |
 | `@typescript-eslint/parser` | `5.62.0` |
 | `@vitejs/plugin-legacy` | `4.1.1` |
-| `@vitejs/plugin-vue` | `4.6.2` |
+| `@vitejs/plugin-vue` | `5.2.4` |
 | `@vitejs/plugin-vue-jsx` | `3.1.0` |
 | `autoprefixer` | `10.4.21` |
 | `bpmn-js` | `8.10.0` |
@@ -365,7 +365,7 @@ Build and dev dependencies resolved from `package-lock.json`:
 | `prettier` | `2.8.8` |
 | `rimraf` | `5.0.10` |
 | `rollup` | `3.29.5` |
-| `sass` | `1.92.0` |
+| `sass` | `1.98.0` |
 | `stylelint` | `15.11.0` |
 | `stylelint-config-recommended` | `12.0.0` |
 | `stylelint-config-recommended-vue` | `1.6.1` |
@@ -376,7 +376,7 @@ Build and dev dependencies resolved from `package-lock.json`:
 | `unplugin-auto-import` | `0.16.7` |
 | `unplugin-element-plus` | `0.7.2` |
 | `unplugin-vue-components` | `0.25.2` |
-| `vite` | `4.3.9` |
+| `vite` | `6.4.1` |
 | `vite-plugin-compression` | `0.5.1` |
 | `vite-plugin-ejs` | `1.7.0` |
 | `vite-plugin-eslint` | `1.8.1` |
@@ -423,9 +423,9 @@ Build and dev dependencies resolved from `package-lock.json`:
 
 | Package | Exact version |
 |---|---|
-| `@vitejs/plugin-vue` | `4.6.2` |
-| `vite` | `4.5.14` |
-| `sass` | `1.92.1` |
+| `@vitejs/plugin-vue` | `5.2.4` |
+| `vite` | `6.4.1` |
+| `sass` | `1.98.0` |
 
 Standard route/API binding:
 

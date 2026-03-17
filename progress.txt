@@ -171,6 +171,22 @@ In Progress
 - None
 
 Completed (this session)
+- Vite 4 → 6 upgrade completed for frontend/pharmacist and frontend/yisheng/web-admin: vite 4.5.14 → 6.4.1, @vitejs/plugin-vue 4.6.2 → 5.2.4, sass 1.92.1 → 1.98.0; silenceDeprecations legacy-js-api config removed from both vite.config.js (Vite 6 uses modern Sass API by default); npm run build passed in both projects
+- Standard document/TECH_STACK.md sections 6.2 and 6.3 updated with new vite/plugin-vue/sass resolved versions
+
+Previous session completed
+- Pharmacist and doctor work-order pages upgraded from "table + drawer + popup dialog" to "dual-column workstation" (双栏处理台) with inline reply/action area replacing ElMessageBox popups
+- Work-order page refactored into modular component architecture: WorkOrders.vue (dual-column shell) + OrderQueue.vue + OrderQueueCard.vue + OrderDetail.vue + OrderSummary.vue + OrderTimeline.vue + OrderActionBar.vue + useWorkOrders.js composable
+- Component boundaries designed for future "independent detail page" migration: OrderDetail and its children accept orderId prop and are shell-agnostic, so a future WorkOrderDetailPage.vue route can wrap them directly with zero component changes
+- Inline action bar replaces all 4 popup dialogs (reply/escalate/reject/close) with toggle-to-expand textarea inputs inside the detail panel
+- Draft preservation added: switching between work orders auto-saves textarea input and restores it when returning
+- WebSocket unread markers added: new notifications for non-selected orders show blue dot indicator on queue cards
+- Responsive layout: 360px queue + flex detail at >=1280px, 300px at 1024-1279px, single-column with back-button at <1024px
+- Route query parameter `?id=xxx` support added for deep-linking to specific work orders from notification toasts or browser refresh
+- Old single-file WorkOrders.vue deleted from both pharmacist and doctor frontends; router imports updated to new directory structure
+- npm run build passed in both frontend/pharmacist and frontend/yisheng/web-admin after dual-column workstation refactor
+
+Earlier session completed
 - Work-order recovery + patient conversation enhancement: formal contract docs updated for nullable `help_order.description` and `PATIENT_REPLY` event type; patient app reserves `/help-order/:id` as post-submit conversation route
 - backend-v2 V5 schema recovery migration applied: `V5__patch_remaining_baseline_tables.sql` backfills all 17 baseline-skipped business tables (`file_asset`, prescription, ddi, medication, help_order, notification, assessment domains); previously-500 APIs (`/app-api/medication-plans/active`, `/app-api/dose-tasks/today`, `/app-api/help-orders`) now return 200
 - backend-v2 help-order app-side reply: patient `POST /app-api/help-orders/{id}/reply` added, help-order submit accepts title-only payloads, professional realtime notifications recognize `HELP_ORDER_PATIENT_REPLY`
@@ -300,4 +316,4 @@ Recent Validation
 
 Last Updated
 - 2026-03-14 Asia/Shanghai
-- Reason: Full verification session completed — V5 migration applied and confirmed 500s resolved, NotificationDispatchService patient WS degradation fix applied, all unit tests + three frontend builds + auth/core-flows smoke + help-order E2E passed; prescription smoke DDI screening confirm failure identified as pre-existing non-related issue
+- Reason: Pharmacist and doctor work-order pages upgraded to dual-column workstation with modular component architecture, inline action bar, draft preservation, WS unread markers, and responsive layout; both frontend builds passed

@@ -10,13 +10,6 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [vue()],
-    css: {
-      preprocessorOptions: {
-        scss: {
-          silenceDeprecations: ['legacy-js-api']
-        }
-      }
-    },
     resolve: {
       alias: {
         '@': resolve(__dirname, 'src')
