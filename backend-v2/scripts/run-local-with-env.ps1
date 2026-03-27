@@ -113,6 +113,9 @@ Set-EnvIfMissing -Name "MEDICINE_STORAGE_ACCESS_KEY" -Value "minioadmin"
 Set-EnvIfMissing -Name "MEDICINE_STORAGE_SECRET_KEY" -Value "minioadmin"
 Set-EnvIfMissing -Name "MEDICINE_STORAGE_BUCKET" -Value "yaoanshi-mvp"
 Set-EnvIfMissing -Name "MEDICINE_STORAGE_REGION" -Value "us-east-1"
+Set-EnvIfMissing -Name "MEDICINE_OCR_BASE_URL" -Value "https://api.siliconflow.cn/v1/chat/completions"
+Set-EnvIfMissing -Name "MEDICINE_OCR_MODEL" -Value "deepseek-ai/deepseek-vl2"
+Set-EnvIfMissing -Name "MEDICINE_OCR_TIMEOUT_MS" -Value "30000"
 
 if (-not [string]::IsNullOrWhiteSpace($SpringProfile)) {
     [System.Environment]::SetEnvironmentVariable("SPRING_PROFILES_ACTIVE", $SpringProfile, 'Process')

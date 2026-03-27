@@ -19,6 +19,7 @@ import com.medicine.repository.identity.PatientMapper;
 import com.medicine.repository.prescription.PrescriptionAttachmentMapper;
 import com.medicine.repository.prescription.PrescriptionMapper;
 import com.medicine.repository.prescription.PrescriptionOcrRecordMapper;
+import com.medicine.service.ocr.OcrService;
 import com.medicine.service.storage.S3CompatibleObjectStorage;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
@@ -45,6 +46,7 @@ public class AppPrescriptionService {
     private final PrescriptionOcrRecordMapper prescriptionOcrRecordMapper;
     private final S3CompatibleObjectStorage objectStorage;
     private final ObjectStorageProperties objectStorageProperties;
+    private final OcrService ocrService;
 
     public AppPrescriptionService(
             AppAccountMapper appAccountMapper,
@@ -54,7 +56,8 @@ public class AppPrescriptionService {
             PrescriptionAttachmentMapper prescriptionAttachmentMapper,
             PrescriptionOcrRecordMapper prescriptionOcrRecordMapper,
             S3CompatibleObjectStorage objectStorage,
-            ObjectStorageProperties objectStorageProperties
+            ObjectStorageProperties objectStorageProperties,
+            OcrService ocrService
     ) {
         this.appAccountMapper = appAccountMapper;
         this.patientMapper = patientMapper;
@@ -64,6 +67,7 @@ public class AppPrescriptionService {
         this.prescriptionOcrRecordMapper = prescriptionOcrRecordMapper;
         this.objectStorage = objectStorage;
         this.objectStorageProperties = objectStorageProperties;
+        this.ocrService = ocrService;
     }
 
     public PageResult<PrescriptionDTO> getPrescriptions(String subject, String status, int pageNo, int pageSize) {
@@ -133,12 +137,22 @@ public class AppPrescriptionService {
         applyAudit(attachment, now, "app-prescription");
         prescriptionAttachmentMapper.insert(attachment);
 
+        OcrService.OcrResult ocrResult = ocrService.performOcr(fileAsset.getPublicUrl());
         PrescriptionOcrRecord ocrRecord = new PrescriptionOcrRecord();
         ocrRecord.setPrescriptionId(prescription.getId());
-        ocrRecord.setProvider("MANUAL_REVIEW_REQUIRED");
-        ocrRecord.setConfidence(BigDecimal.ZERO);
-        ocrRecord.setStatus("LOW_CONFIDENCE");
-        ocrRecord.setManualFallbackUsed(false);
+        if (ocrResult.isSuccess()) {
+            ocrRecord.setProvider("DEEPSEEK_OCR");
+            ocrRecord.setConfidence(ocrResult.getConfidence());
+            ocrRecord.setStatus(ocrResult.getConfidence().compareTo(new BigDecimal("0.80")) >= 0
+                    ? "HIGH_CONFIDENCE" : "LOW_CONFIDENCE");
+            ocrRecord.setResponsePayloadJson(ocrResult.getResponseJson());
+            ocrRecord.setManualFallbackUsed(false);
+        } else {
+            ocrRecord.setProvider("MANUAL_REVIEW_REQUIRED");
+            ocrRecord.setConfidence(BigDecimal.ZERO);
+            ocrRecord.setStatus("LOW_CONFIDENCE");
+            ocrRecord.setManualFallbackUsed(true);
+        }
         ocrRecord.setExecutedAt(now);
         applyAudit(ocrRecord, now, "app-prescription");
         prescriptionOcrRecordMapper.insert(ocrRecord);
