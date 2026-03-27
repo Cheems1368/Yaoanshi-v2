@@ -58,6 +58,7 @@ medicine:
       ticket-ttl-seconds: ${MEDICINE_APP_WS_TICKET_TTL_SECONDS:30}
   storage:
     endpoint: ${MEDICINE_STORAGE_ENDPOINT:http://127.0.0.1:9000}
-    bucket: ${MEDICINE_STORAGE_BUCKET:yaoshian-mvp}
-    access-key: ${MEDICINE_STORAGE_ACCESS_KEY:}
-    secret-key: ${MEDICINE_STORAGE_SECRET_KEY:}
+    bucket: ${MEDICINE_STORAGE_BUCKET:yaoanshi-mvp}
+    access-key: ${MEDICINE_STORAGE_ACCESS_KEY:minioadmin}
+    secret-key: ${MEDICINE_STORAGE_SECRET_KEY:minioadmin}
+    region: ${MEDICINE_STORAGE_REGION:us-east-1}

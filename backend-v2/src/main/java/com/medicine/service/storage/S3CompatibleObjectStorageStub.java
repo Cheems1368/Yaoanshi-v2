@@ -1,9 +1,11 @@
 package com.medicine.service.storage;
 
 import com.medicine.config.ObjectStorageProperties;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
 
 @Service
+@Profile("test")
 public class S3CompatibleObjectStorageStub implements S3CompatibleObjectStorage {
 
     private final ObjectStorageProperties properties;

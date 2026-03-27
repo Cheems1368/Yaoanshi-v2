@@ -6,9 +6,10 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 public class ObjectStorageProperties {
 
     private String endpoint = "http://localhost:9000";
-    private String bucket = "yaoshian-mvp";
+    private String bucket = "yaoanshi-mvp";
     private String accessKey = "";
     private String secretKey = "";
+    private String region = "us-east-1";
 
     public String getEndpoint() {
         return endpoint;
@@ -40,5 +41,13 @@ public class ObjectStorageProperties {
 
     public void setSecretKey(String secretKey) {
         this.secretKey = secretKey;
+    }
+
+    public String getRegion() {
+        return region;
+    }
+
+    public void setRegion(String region) {
+        this.region = region;
     }
 }

@@ -108,6 +108,11 @@ Set-EnvIfMissing -Name "MEDICINE_DB_PASSWORD" -Value $dbPassword
 Set-EnvIfMissing -Name "MEDICINE_LEGACY_DB_PASSWORD" -Value (Get-EnvValue "MEDICINE_DB_PASSWORD")
 Set-EnvIfMissing -Name "MEDICINE_REDIS_PORT" -Value "16379"
 Set-EnvIfMissing -Name "MEDICINE_JWT_SECRET" -Value "local-dev-jwt-secret-change-me"
+Set-EnvIfMissing -Name "MEDICINE_STORAGE_ENDPOINT" -Value "http://127.0.0.1:9000"
+Set-EnvIfMissing -Name "MEDICINE_STORAGE_ACCESS_KEY" -Value "minioadmin"
+Set-EnvIfMissing -Name "MEDICINE_STORAGE_SECRET_KEY" -Value "minioadmin"
+Set-EnvIfMissing -Name "MEDICINE_STORAGE_BUCKET" -Value "yaoanshi-mvp"
+Set-EnvIfMissing -Name "MEDICINE_STORAGE_REGION" -Value "us-east-1"
 
 if (-not [string]::IsNullOrWhiteSpace($SpringProfile)) {
     [System.Environment]::SetEnvironmentVariable("SPRING_PROFILES_ACTIVE", $SpringProfile, 'Process')
