@@ -4,6 +4,7 @@ import com.medicine.api.dto.auth.AppLoginRequest;
 import com.medicine.api.dto.auth.OtpSendRequest;
 import com.medicine.api.dto.auth.RefreshTokenRequest;
 import com.medicine.api.dto.auth.TokenPair;
+import com.medicine.api.dto.identity.AppCurrentAccountDTO;
 import com.medicine.common.exception.BusinessException;
 import com.medicine.common.exception.ErrorCode;
 import com.medicine.config.JwtProperties;
@@ -24,9 +25,7 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.HexFormat;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
@@ -181,21 +180,21 @@ public class AppAuthService {
         return true;
     }
 
-    public Map<String, Object> getCurrentAccount(String subject, String deviceId) {
+    public AppCurrentAccountDTO getCurrentAccount(String subject, String deviceId) {
         AppAccount appAccount = appAccountMapper.selectActiveByMobile(DEFAULT_TENANT_ID, subject);
-        Map<String, Object> patientSummary = appPatientService.getCurrentPatient(subject);
+        var patientSummary = appPatientService.getCurrentPatient(subject);
 
-        Map<String, Object> response = new LinkedHashMap<>();
-        response.put("mobile", subject);
-        response.put("displayName", appAccount == null ? null : appAccount.getDisplayName());
-        response.put("accountType", appAccount == null ? null : appAccount.getAccountType());
-        response.put("bound", patientSummary != null);
-        response.put("deviceId", deviceId);
-        response.put("patient", patientSummary);
-        response.put("lastLoginAt", appAccount == null || appAccount.getLastLoginTime() == null
+        AppCurrentAccountDTO dto = new AppCurrentAccountDTO();
+        dto.setMobile(subject);
+        dto.setDisplayName(appAccount == null ? null : appAccount.getDisplayName());
+        dto.setAccountType(appAccount == null ? null : appAccount.getAccountType());
+        dto.setBound(patientSummary != null);
+        dto.setDeviceId(deviceId);
+        dto.setPatient(patientSummary);
+        dto.setLastLoginAt(appAccount == null || appAccount.getLastLoginTime() == null
                 ? null
                 : appAccount.getLastLoginTime().toInstant(ZoneOffset.UTC).toString());
-        return response;
+        return dto;
     }
 
     private AppAccount upsertPatientAccount(String mobile) {

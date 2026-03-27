@@ -1,10 +1,12 @@
 package com.medicine.api.controller;
 
 import com.medicine.api.dto.auth.BindPatientRequest;
+import com.medicine.api.dto.identity.AppFamilyBindingDTO;
 import com.medicine.api.dto.identity.AppPatientHealthProfileDTO;
 import com.medicine.api.dto.identity.AppPatientHealthProfileUpdateRequest;
 import com.medicine.api.dto.identity.AppPatientProfileDTO;
 import com.medicine.api.dto.identity.AppPatientProfileUpdateRequest;
+import com.medicine.api.dto.identity.AppPatientSummaryDTO;
 import com.medicine.api.dto.identity.CreateFamilyBindingRequest;
 import com.medicine.common.model.CommonResult;
 import com.medicine.service.app.AppPatientProfileService;
@@ -20,7 +22,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
-import java.util.Map;
 
 @RestController
 @RequestMapping("/app-api/patients")
@@ -35,12 +36,12 @@ public class AppPatientController {
     }
 
     @PostMapping("/bind")
-    public CommonResult<Map<String, Object>> bindPatient(@RequestBody BindPatientRequest request, Authentication authentication) {
+    public CommonResult<AppPatientSummaryDTO> bindPatient(@RequestBody BindPatientRequest request, Authentication authentication) {
         return CommonResult.ok(appPatientService.bindPatient(authentication.getName(), request));
     }
 
     @GetMapping("/me")
-    public CommonResult<Map<String, Object>> me(Authentication authentication) {
+    public CommonResult<AppPatientSummaryDTO> me(Authentication authentication) {
         return CommonResult.ok(appPatientService.getCurrentPatient(authentication.getName()));
     }
 
@@ -71,12 +72,12 @@ public class AppPatientController {
     }
 
     @GetMapping("/me/family-bindings")
-    public CommonResult<List<Map<String, Object>>> familyBindings(Authentication authentication) {
+    public CommonResult<List<AppFamilyBindingDTO>> familyBindings(Authentication authentication) {
         return CommonResult.ok(appPatientService.getFamilyBindings(authentication.getName()));
     }
 
     @PostMapping("/me/family-bindings")
-    public CommonResult<Map<String, Object>> createFamilyBinding(
+    public CommonResult<AppFamilyBindingDTO> createFamilyBinding(
             @RequestBody CreateFamilyBindingRequest request,
             Authentication authentication
     ) {

@@ -1,6 +1,7 @@
 package com.medicine.service.admin;
 
 import com.medicine.api.dto.medication.SelfReportedMedicationDTO;
+import com.medicine.api.dto.medication.TransferPrefillDTO;
 import com.medicine.common.exception.BusinessException;
 import com.medicine.common.exception.ErrorCode;
 import com.medicine.domain.helporder.HelpOrder;
@@ -110,15 +111,15 @@ public class AdminSelfReportedMedicationService {
         return toDto(srm);
     }
 
-    public Map<String, Object> getTransferPrefill(JwtClaims claims, Long id) {
+    public TransferPrefillDTO getTransferPrefill(JwtClaims claims, Long id) {
         Long tenantId = resolveTenantId(claims);
         SelfReportedMedication srm = requireById(tenantId, id);
-        return Map.of(
-                "drugName", srm.getDrugName() != null ? srm.getDrugName() : "",
-                "dosage", srm.getDosage() != null ? srm.getDosage() : "",
-                "patientId", srm.getPatientId(),
-                "selfReportedMedicationId", srm.getId()
-        );
+        TransferPrefillDTO dto = new TransferPrefillDTO();
+        dto.setDrugName(srm.getDrugName() != null ? srm.getDrugName() : "");
+        dto.setDosage(srm.getDosage() != null ? srm.getDosage() : "");
+        dto.setPatientId(srm.getPatientId());
+        dto.setSelfReportedMedicationId(srm.getId());
+        return dto;
     }
 
     @Transactional

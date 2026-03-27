@@ -7,6 +7,7 @@ import com.medicine.api.dto.helporder.HelpOrderRejectRequest;
 import com.medicine.api.dto.helporder.HelpOrderReplyRequest;
 import com.medicine.api.dto.medication.SelfReportedMedicationDTO;
 import com.medicine.api.dto.medication.SelfReportedMedicationRejectRequest;
+import com.medicine.api.dto.medication.TransferPrefillDTO;
 import com.medicine.common.model.CommonResult;
 import com.medicine.common.model.PageResult;
 import com.medicine.service.admin.AdminHelpOrderService;
@@ -22,7 +23,6 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
-import java.util.Map;
 
 @RestController
 @RequestMapping("/admin-api/help-orders")
@@ -124,7 +124,7 @@ public class AdminHelpOrderController {
     }
 
     @GetMapping("/{id}/self-reported-medications/{srmId}/transfer-prefill")
-    public CommonResult<Map<String, Object>> getSelfReportedMedicationTransferPrefill(
+    public CommonResult<TransferPrefillDTO> getSelfReportedMedicationTransferPrefill(
             @PathVariable("id") Long id,
             @PathVariable("srmId") Long srmId,
             Authentication authentication

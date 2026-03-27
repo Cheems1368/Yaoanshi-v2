@@ -1,6 +1,8 @@
 package com.medicine.service.auth;
 
 import com.medicine.api.dto.auth.BindPatientRequest;
+import com.medicine.api.dto.identity.AppFamilyBindingDTO;
+import com.medicine.api.dto.identity.AppPatientSummaryDTO;
 import com.medicine.api.dto.identity.CreateFamilyBindingRequest;
 import com.medicine.common.exception.BusinessException;
 import com.medicine.common.exception.ErrorCode;
@@ -15,9 +17,7 @@ import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 
 @Service
 public class AppPatientService {
@@ -38,7 +38,7 @@ public class AppPatientService {
         this.patientFamilyBindingMapper = patientFamilyBindingMapper;
     }
 
-    public Map<String, Object> bindPatient(String subject, BindPatientRequest request) {
+    public AppPatientSummaryDTO bindPatient(String subject, BindPatientRequest request) {
         String mobile = normalize(request.getMobile());
         String hospitalPatientId = normalize(request.getHospitalPatientId());
         String name = normalize(request.getName());
@@ -98,7 +98,7 @@ public class AppPatientService {
         return toPatientSummary(patient);
     }
 
-    public Map<String, Object> getCurrentPatient(String subject) {
+    public AppPatientSummaryDTO getCurrentPatient(String subject) {
         AppAccount appAccount = appAccountMapper.selectActiveByMobile(DEFAULT_TENANT_ID, subject);
         if (appAccount == null) {
             return null;
@@ -112,7 +112,7 @@ public class AppPatientService {
         return toPatientSummary(patient);
     }
 
-    public List<Map<String, Object>> getFamilyBindings(String subject) {
+    public List<AppFamilyBindingDTO> getFamilyBindings(String subject) {
         AppAccount appAccount = appAccountMapper.selectActiveByMobile(DEFAULT_TENANT_ID, subject);
         if (appAccount == null) {
             return List.of();
@@ -135,7 +135,7 @@ public class AppPatientService {
                 .toList();
     }
 
-    public Map<String, Object> createFamilyBinding(String subject, CreateFamilyBindingRequest request) {
+    public AppFamilyBindingDTO createFamilyBinding(String subject, CreateFamilyBindingRequest request) {
         AppAccount ownerAccount = requireAppAccount(subject);
         if (!"PATIENT".equalsIgnoreCase(ownerAccount.getAccountType())) {
             throw new BusinessException(400, "BAD_REQUEST");
@@ -227,26 +227,26 @@ public class AppPatientService {
         return appAccount;
     }
 
-    private Map<String, Object> toPatientSummary(Patient patient) {
-        Map<String, Object> summary = new LinkedHashMap<>();
-        summary.put("id", patient.getId());
-        summary.put("name", patient.getName());
-        summary.put("mobile", patient.getMobile());
-        summary.put("hospitalPatientId", patient.getHospitalPatientId());
-        summary.put("bindingStatus", patient.getBindingStatus());
-        summary.put("bound", "BOUND".equals(patient.getBindingStatus()));
-        summary.put("boundAt", patient.getBoundAt() == null ? null : patient.getBoundAt().toInstant(ZoneOffset.UTC).toString());
-        return summary;
+    private AppPatientSummaryDTO toPatientSummary(Patient patient) {
+        AppPatientSummaryDTO dto = new AppPatientSummaryDTO();
+        dto.setId(patient.getId());
+        dto.setName(patient.getName());
+        dto.setMobile(patient.getMobile());
+        dto.setHospitalPatientId(patient.getHospitalPatientId());
+        dto.setBindingStatus(patient.getBindingStatus());
+        dto.setBound("BOUND".equals(patient.getBindingStatus()));
+        dto.setBoundAt(patient.getBoundAt() == null ? null : patient.getBoundAt().toInstant(ZoneOffset.UTC).toString());
+        return dto;
     }
 
-    private Map<String, Object> toFamilyBindingSummary(PatientFamilyBinding binding) {
-        Map<String, Object> summary = new LinkedHashMap<>();
-        summary.put("id", binding.getId());
-        summary.put("familyAccountId", binding.getFamilyAccountId());
-        summary.put("relationshipType", binding.getRelationshipType());
-        summary.put("status", binding.getStatus());
-        summary.put("authorizedAt", binding.getAuthorizedAt() == null ? null : binding.getAuthorizedAt().toInstant(ZoneOffset.UTC).toString());
-        return summary;
+    private AppFamilyBindingDTO toFamilyBindingSummary(PatientFamilyBinding binding) {
+        AppFamilyBindingDTO dto = new AppFamilyBindingDTO();
+        dto.setId(binding.getId());
+        dto.setFamilyAccountId(binding.getFamilyAccountId());
+        dto.setRelationshipType(binding.getRelationshipType());
+        dto.setStatus(binding.getStatus());
+        dto.setAuthorizedAt(binding.getAuthorizedAt() == null ? null : binding.getAuthorizedAt().toInstant(ZoneOffset.UTC).toString());
+        return dto;
     }
 
     private Patient resolvePatientForAccount(AppAccount appAccount) {
