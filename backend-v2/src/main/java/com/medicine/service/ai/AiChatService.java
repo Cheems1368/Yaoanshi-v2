@@ -83,7 +83,7 @@ public class AiChatService {
 
     public AiChatResponse chat(String accountId, AiChatRequest request) {
         Long accountIdLong = Long.parseLong(accountId);
-        if (appAccountMapper.selectAiConsentGrantedAt(accountIdLong) == null) {
+        if (!checkConsentStatus(accountIdLong)) {
             throw new BusinessException(ErrorCode.AI_CONSENT_REQUIRED.getCode(), "请先同意AI助手数据共享声明后再使用");
         }
         validateRuntimeConfig();

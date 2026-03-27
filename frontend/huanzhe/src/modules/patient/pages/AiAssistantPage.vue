@@ -96,6 +96,8 @@ const viewMode = ref<'home' | 'chat'>('home')
 const showConsentDialog = ref(false)
 const consentMessage =
   'AI 助手功能需要将您的问题发送至第三方 AI 服务（硅基流动）进行处理。您的问题内容将按照隐私协议处理，不会与您的身份信息绑定存储。'
+const AI_CONSENT_KEY = 'ai_consent_granted'
+
 const consentButtons = [
   {
     text: '不同意',
@@ -109,17 +111,23 @@ const consentButtons = [
     handler: async () => {
       try {
         await aiConsentService.grantConsent()
+        localStorage.setItem(AI_CONSENT_KEY, 'true')
       } catch {
-        // 忽略错误，下次进入时会再次检查
+        showError('同意操作失败，请检查网络后重试')
       }
     }
   }
 ]
 
 onIonViewWillEnter(async () => {
+  if (localStorage.getItem(AI_CONSENT_KEY) === 'true') {
+    return
+  }
   try {
     const res = await aiConsentService.getConsentStatus()
-    if (!res.data) {
+    if (res.data) {
+      localStorage.setItem(AI_CONSENT_KEY, 'true')
+    } else {
       showConsentDialog.value = true
     }
   } catch {
