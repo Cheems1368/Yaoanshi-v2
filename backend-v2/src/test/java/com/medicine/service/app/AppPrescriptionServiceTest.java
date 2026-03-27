@@ -16,6 +16,7 @@ import com.medicine.repository.identity.PatientMapper;
 import com.medicine.repository.prescription.PrescriptionAttachmentMapper;
 import com.medicine.repository.prescription.PrescriptionMapper;
 import com.medicine.repository.prescription.PrescriptionOcrRecordMapper;
+import com.medicine.service.ocr.OcrService;
 import com.medicine.service.storage.S3CompatibleObjectStorage;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -53,6 +54,9 @@ class AppPrescriptionServiceTest {
     @Mock
     private S3CompatibleObjectStorage objectStorage;
 
+    @Mock
+    private OcrService ocrService;
+
     @Spy
     private ObjectStorageProperties objectStorageProperties = new ObjectStorageProperties();
 
@@ -75,6 +79,7 @@ class AppPrescriptionServiceTest {
         when(appAccountMapper.selectActiveByMobile(1L, "13800138000")).thenReturn(account);
         when(patientMapper.selectByAppAccountId(1L, 101L)).thenReturn(patient);
         when(objectStorage.createPresignedDownloadUrl("prescriptions/mock.jpg")).thenReturn("download-url");
+        when(ocrService.performOcr(any())).thenReturn(OcrService.OcrResult.failure(""));
 
         doAnswer(invocation -> {
             FileAsset fileAsset = invocation.getArgument(0);

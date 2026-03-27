@@ -8,6 +8,8 @@ import com.medicine.api.dto.ai.AiChatResponse;
 import com.medicine.common.exception.BusinessException;
 import com.medicine.common.exception.ErrorCode;
 import com.medicine.config.AiProperties;
+import com.medicine.repository.identity.AppAccountMapper;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -24,6 +26,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Flow;
@@ -32,11 +35,14 @@ import java.util.concurrent.TimeUnit;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.catchThrowableOfType;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class AiChatServiceTest {
+
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Mock
     private StringRedisTemplate stringRedisTemplate;
@@ -45,19 +51,27 @@ class AiChatServiceTest {
     private ValueOperations<String, String> valueOperations;
 
     @Mock
+    private AppAccountMapper appAccountMapper;
+
+    @Mock
     private HttpClient httpClient;
 
     @Mock
     private HttpResponse<String> httpResponse;
 
+    @BeforeEach
+    void setUp() {
+        when(appAccountMapper.selectAiConsentGrantedAt(anyLong())).thenReturn(LocalDateTime.now());
+    }
+
     @Test
     void shouldRejectRequestWhenAiRuntimeConfigMissing() {
         AiProperties properties = new AiProperties();
         properties.setApiKey("");
-        AiChatService service = new AiChatService(properties, new ObjectMapper(), stringRedisTemplate);
+        AiChatService service = new AiChatService(properties, objectMapper, stringRedisTemplate, appAccountMapper);
 
         BusinessException exception = catchThrowableOfType(
-                () -> service.chat("acct-1", request(newMessage("user", "hello"))),
+                () -> service.chat("1001", request(newMessage("user", "hello"))),
                 BusinessException.class
         );
 
@@ -79,16 +93,16 @@ class AiChatServiceTest {
         String upstreamReply = "safe reply\\n---SUGGESTIONS---\\n漏服后该怎么办？\\n需要复诊吗？\\n有哪些不良反应？";
 
         when(stringRedisTemplate.opsForValue()).thenReturn(valueOperations);
-        when(valueOperations.increment("app:ai:chat:limit:acct-1")).thenReturn(1L);
-        when(stringRedisTemplate.expire("app:ai:chat:limit:acct-1", 1, TimeUnit.MINUTES)).thenReturn(true);
+        when(valueOperations.increment("app:ai:chat:limit:1001")).thenReturn(1L);
+        when(stringRedisTemplate.expire("app:ai:chat:limit:1001", 1, TimeUnit.MINUTES)).thenReturn(true);
         when(httpClient.send(any(HttpRequest.class), ArgumentMatchers.<HttpResponse.BodyHandler<String>>any())).thenReturn(httpResponse);
         when(httpResponse.statusCode()).thenReturn(200);
         when(httpResponse.body()).thenReturn("{\"content\":[{\"type\":\"text\",\"text\":\"" + upstreamReply + "\"}]}");
 
-        AiChatService service = new AiChatService(properties, new ObjectMapper(), stringRedisTemplate);
+        AiChatService service = new AiChatService(properties, objectMapper, stringRedisTemplate, appAccountMapper);
         ReflectionTestUtils.setField(service, "httpClient", httpClient);
 
-        AiChatResponse response = service.chat("acct-1", request(newMessage("system", "ignored"), newMessage("user", "hello")));
+        AiChatResponse response = service.chat("1001", request(newMessage("system", "ignored"), newMessage("user", "hello")));
 
         assertThat(response.getModel()).isEqualTo("Qwen/Qwen3.5-122B-A10B");
         assertThat(response.getRequestId()).isNotBlank();
@@ -99,7 +113,7 @@ class AiChatServiceTest {
 
         ArgumentCaptor<HttpRequest> requestCaptor = ArgumentCaptor.forClass(HttpRequest.class);
         verify(httpClient).send(requestCaptor.capture(), ArgumentMatchers.<HttpResponse.BodyHandler<String>>any());
-        JsonNode payload = new ObjectMapper().readTree(extractBody(requestCaptor.getValue()));
+        JsonNode payload = objectMapper.readTree(extractBody(requestCaptor.getValue()));
         assertThat(payload.path("model").asText()).isEqualTo("Qwen/Qwen3.5-122B-A10B");
         assertThat(payload.path("max_tokens").asInt()).isEqualTo(1024);
         assertThat(payload.path("messages")).hasSize(2);
@@ -120,18 +134,18 @@ class AiChatServiceTest {
                 .repeat(8);
 
         when(stringRedisTemplate.opsForValue()).thenReturn(valueOperations);
-        when(valueOperations.increment("app:ai:chat:limit:acct-1b")).thenReturn(1L);
-        when(stringRedisTemplate.expire("app:ai:chat:limit:acct-1b", 1, TimeUnit.MINUTES)).thenReturn(true);
+        when(valueOperations.increment("app:ai:chat:limit:1002")).thenReturn(1L);
+        when(stringRedisTemplate.expire("app:ai:chat:limit:1002", 1, TimeUnit.MINUTES)).thenReturn(true);
         when(httpClient.send(any(HttpRequest.class), ArgumentMatchers.<HttpResponse.BodyHandler<String>>any())).thenReturn(httpResponse);
         when(httpResponse.statusCode()).thenReturn(200);
         when(httpResponse.body()).thenReturn("""
                 {"choices":[{"message":{"content":"%s"}}]}
                 """.formatted(longReply));
 
-        AiChatService service = new AiChatService(properties, new ObjectMapper(), stringRedisTemplate);
+        AiChatService service = new AiChatService(properties, objectMapper, stringRedisTemplate, appAccountMapper);
         ReflectionTestUtils.setField(service, "httpClient", httpClient);
 
-        AiChatResponse response = service.chat("acct-1b", request(newMessage("user", "降压药漏服后怎么办？")));
+        AiChatResponse response = service.chat("1002", request(newMessage("user", "降压药漏服后怎么办？")));
 
         assertThat(response.getReply().length()).isLessThanOrEqualTo(200);
         assertThat(response.getReply()).doesNotContain("仅供用药科普");
@@ -152,16 +166,16 @@ class AiChatServiceTest {
         properties.setUpstreamMaxMessages(4);
 
         when(stringRedisTemplate.opsForValue()).thenReturn(valueOperations);
-        when(valueOperations.increment("app:ai:chat:limit:acct-2")).thenReturn(1L);
-        when(stringRedisTemplate.expire("app:ai:chat:limit:acct-2", 1, TimeUnit.MINUTES)).thenReturn(true);
+        when(valueOperations.increment("app:ai:chat:limit:1003")).thenReturn(1L);
+        when(stringRedisTemplate.expire("app:ai:chat:limit:1003", 1, TimeUnit.MINUTES)).thenReturn(true);
         when(httpClient.send(any(HttpRequest.class), ArgumentMatchers.<HttpResponse.BodyHandler<String>>any())).thenReturn(httpResponse);
         when(httpResponse.statusCode()).thenReturn(200);
         when(httpResponse.body()).thenReturn("{\"content\":[{\"type\":\"text\",\"text\":\"trimmed reply\"}]}");
 
-        AiChatService service = new AiChatService(properties, new ObjectMapper(), stringRedisTemplate);
+        AiChatService service = new AiChatService(properties, objectMapper, stringRedisTemplate, appAccountMapper);
         ReflectionTestUtils.setField(service, "httpClient", httpClient);
 
-        service.chat("acct-2", request(
+        service.chat("1003", request(
                 newMessage("system", "ignored"),
                 newMessage("user", "u1"),
                 newMessage("assistant", "a1"),
@@ -173,7 +187,7 @@ class AiChatServiceTest {
         ArgumentCaptor<HttpRequest> requestCaptor = ArgumentCaptor.forClass(HttpRequest.class);
         verify(httpClient).send(requestCaptor.capture(), ArgumentMatchers.<HttpResponse.BodyHandler<String>>any());
         String body = extractBody(requestCaptor.getValue());
-        JsonNode payload = new ObjectMapper().readTree(body);
+        JsonNode payload = objectMapper.readTree(body);
 
         assertThat(payload.path("model").asText()).isEqualTo("Qwen/Qwen3.5-122B-A10B");
         assertThat(payload.path("max_tokens").asInt()).isEqualTo(1024);
@@ -195,17 +209,17 @@ class AiChatServiceTest {
         properties.setMaxTokens(1024);
 
         when(stringRedisTemplate.opsForValue()).thenReturn(valueOperations);
-        when(valueOperations.increment("app:ai:chat:limit:acct-3")).thenReturn(1L);
-        when(stringRedisTemplate.expire("app:ai:chat:limit:acct-3", 1, TimeUnit.MINUTES)).thenReturn(true);
+        when(valueOperations.increment("app:ai:chat:limit:1004")).thenReturn(1L);
+        when(stringRedisTemplate.expire("app:ai:chat:limit:1004", 1, TimeUnit.MINUTES)).thenReturn(true);
         when(httpClient.send(any(HttpRequest.class), ArgumentMatchers.<HttpResponse.BodyHandler<String>>any())).thenReturn(httpResponse);
         when(httpResponse.statusCode()).thenReturn(403);
         when(httpResponse.body()).thenReturn("{\"code\":30001,\"message\":\"Sorry, your account balance is insufficient\",\"data\":null}");
 
-        AiChatService service = new AiChatService(properties, new ObjectMapper(), stringRedisTemplate);
+        AiChatService service = new AiChatService(properties, objectMapper, stringRedisTemplate, appAccountMapper);
         ReflectionTestUtils.setField(service, "httpClient", httpClient);
 
         BusinessException exception = catchThrowableOfType(
-                () -> service.chat("acct-3", request(newMessage("user", "hello"))),
+                () -> service.chat("1004", request(newMessage("user", "hello"))),
                 BusinessException.class
         );
 

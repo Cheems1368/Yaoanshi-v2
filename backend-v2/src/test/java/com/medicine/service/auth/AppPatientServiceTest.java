@@ -1,6 +1,8 @@
 package com.medicine.service.auth;
 
 import com.medicine.api.dto.auth.BindPatientRequest;
+import com.medicine.api.dto.identity.AppFamilyBindingDTO;
+import com.medicine.api.dto.identity.AppPatientSummaryDTO;
 import com.medicine.common.exception.BusinessException;
 import com.medicine.domain.identity.AppAccount;
 import com.medicine.domain.identity.Patient;
@@ -16,7 +18,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -54,10 +55,10 @@ class AppPatientServiceTest {
             return 1;
         }).when(patientMapper).insert(any(Patient.class));
 
-        Map<String, Object> result = appPatientService.bindPatient("13800138000", bindRequest("HZY-1001"));
+        AppPatientSummaryDTO result = appPatientService.bindPatient("13800138000", bindRequest("HZY-1001"));
 
-        assertThat(result.get("id")).isEqualTo(3001L);
-        assertThat(result.get("bound")).isEqualTo(true);
+        assertThat(result.getId()).isEqualTo(3001L);
+        assertThat(result.isBound()).isEqualTo(true);
         verify(patientMapper).insert(any(Patient.class));
     }
 
@@ -105,13 +106,13 @@ class AppPatientServiceTest {
         when(patientMapper.selectByAppAccountId(1L, 1001L)).thenReturn(patient);
         when(patientFamilyBindingMapper.selectActiveByPatientId(1L, 3001L)).thenReturn(List.of(binding));
 
-        Map<String, Object> currentPatient = appPatientService.getCurrentPatient("13800138000");
-        List<Map<String, Object>> familyBindings = appPatientService.getFamilyBindings("13800138000");
+        AppPatientSummaryDTO currentPatient = appPatientService.getCurrentPatient("13800138000");
+        List<AppFamilyBindingDTO> familyBindings = appPatientService.getFamilyBindings("13800138000");
 
-        assertThat(currentPatient.get("hospitalPatientId")).isEqualTo("HZY-1001");
-        assertThat(currentPatient.get("bound")).isEqualTo(true);
+        assertThat(currentPatient.getHospitalPatientId()).isEqualTo("HZY-1001");
+        assertThat(currentPatient.isBound()).isEqualTo(true);
         assertThat(familyBindings).hasSize(1);
-        assertThat(familyBindings.get(0).get("familyAccountId")).isEqualTo(5001L);
+        assertThat(familyBindings.get(0).getFamilyAccountId()).isEqualTo(5001L);
     }
 
     private AppAccount appAccount(Long id, String mobile) {

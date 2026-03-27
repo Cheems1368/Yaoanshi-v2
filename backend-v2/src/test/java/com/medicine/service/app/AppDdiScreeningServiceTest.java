@@ -15,6 +15,7 @@ import com.medicine.repository.ddi.DrugContraindicationMapper;
 import com.medicine.repository.identity.PatientHealthProfileMapper;
 import com.medicine.repository.medication.MedicationPlanItemMapper;
 import com.medicine.repository.medication.MedicationPlanMapper;
+import com.medicine.repository.medication.SelfReportedMedicationMapper;
 import com.medicine.service.auth.AppPatientService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -49,6 +50,9 @@ class AppDdiScreeningServiceTest {
 
     @Mock
     private PatientHealthProfileMapper patientHealthProfileMapper;
+
+    @Mock
+    private SelfReportedMedicationMapper selfReportedMedicationMapper;
 
     @InjectMocks
     private AppDdiScreeningService appDdiScreeningService;
