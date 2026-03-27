@@ -513,7 +513,11 @@ const openContraindicationDrawer = (row = null) => {
 }
 
 const submitRuleForm = async () => {
-  await ruleFormRef.value?.validate()
+  try {
+    await ruleFormRef.value?.validate()
+  } catch {
+    return
+  }
   ruleSubmitting.value = true
   try {
     const payload = {
@@ -540,6 +544,8 @@ const submitRuleForm = async () => {
 
     ruleDrawerVisible.value = false
     await loadRules()
+  } catch (error) {
+    ElMessage.error(error.message || 'DDI 规则保存失败，请稍后重试')
   } finally {
     ruleSubmitting.value = false
   }
@@ -570,6 +576,8 @@ const submitContraindicationForm = async () => {
 
     contraindicationDrawerVisible.value = false
     await loadContraindications()
+  } catch (error) {
+    ElMessage.error(error.message || '禁忌规则保存失败，请稍后重试')
   } finally {
     contraindicationSubmitting.value = false
   }

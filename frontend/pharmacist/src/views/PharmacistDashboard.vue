@@ -60,6 +60,12 @@
 
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+
+let dashboardDebounceTimer = null
+const debouncedLoadDashboard = () => {
+  clearTimeout(dashboardDebounceTimer)
+  dashboardDebounceTimer = setTimeout(loadDashboard, 300)
+}
 import { getPatients } from '@/modules/pharmacist/api/patients'
 import { getPrescriptions } from '@/modules/pharmacist/api/prescriptions'
 import { getWorkOrders } from '@/modules/pharmacist/api/workorders'
@@ -109,7 +115,7 @@ const handleAdminNotification = (event) => {
   if (!event?.detail?.businessType?.startsWith('HELP_ORDER_')) {
     return
   }
-  loadDashboard()
+  debouncedLoadDashboard()
 }
 
 const statusText = (status) => {

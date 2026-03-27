@@ -15,10 +15,7 @@ In Progress
 - None
 
 Next
-- Phase B: MinIO S3 object storage integration (replace S3CompatibleObjectStorageStub)
-- Phase C: DeepSeek-OCR integration (replace MANUAL_REVIEW_REQUIRED stub) — depends on Phase B
-- Phase G: Patient app UI/UX polish (hardcoded colors → CSS tokens, avatar fix, pull-to-refresh)
-- Phase H: Pharmacist/doctor minor fixes (DDI form error handling, WS debounce, doctor layout)
+- Integration testing, end-to-end demo walkthrough, bug fixes (Week 4)
 
 Completed This Sprint
 
@@ -47,8 +44,7 @@ Phase F — CI/CD GitHub Actions (2026-03-27, commit f285037)
 - Triggers on push/PR to main; Maven + npm cache enabled
 
 Blockers (active)
-- S3 integration requires MinIO to be added to docker-compose (Phase B)
-- OCR integration requires real S3 URLs (depends on Phase B)
+- MEDICINE_OCR_API_KEY must be set in .env.local to enable live OCR (graceful fallback if omitted)
 - SEC-002 partially open: refresh tokens remain sessionStorage-managed (future follow-up)
 - Historical patient.id_card_masked rows need ops cleanup: ops/sql/sec-003-clear-legacy-patient-id-card-masked.sql
 
@@ -67,6 +63,36 @@ Infrastructure Notes
 - S3 stub: S3CompatibleObjectStorageStub still active (Phase B pending)
 - OCR stub: MANUAL_REVIEW_REQUIRED still active (Phase C pending)
 
+Phase B — MinIO S3 Integration (2026-03-27, commit e6178c9)
+- docker-compose.yml: MinIO service (9000/9001) + backend-v2 storage env vars + depends_on
+- pom.xml: software.amazon.awssdk:s3:2.25.60
+- S3CompatibleObjectStorageImpl: real AWS SDK v2 impl, @Profile(!test), PostConstruct bucket init
+- S3CompatibleObjectStorageStub: demoted to @Profile(test)
+- ObjectStorageProperties: region field added
+- application.yml: medicine.storage config block with env var placeholders
+- run-local-with-env.ps1 + .env.local.example: MEDICINE_STORAGE_* vars documented
+
+Phase G — Patient App UI/UX Polish (2026-03-27, commit c5feb36)
+- variables.css: 12 semantic --patient-* color tokens added
+- HomePage/MedicationReminderPage/HelpOrderPage/SelfReportedMedicationPage: hardcoded hex → CSS tokens
+- All four pages: IonRefresher pull-to-refresh added
+- ProfilePage: avatar path fixed (/src/picture/ → @/shared/assets/images/ via Vite import)
+- G.4: all catch blocks already had toast handling — no changes needed
+
+Phase H — Pharmacist/Doctor Minor Fixes (2026-03-27)
+- DdiRules.vue: submitRuleForm + submitContraindicationForm — added catch block with ElMessage.error on API failure
+- PharmacistDashboard.vue: WS-triggered loadDashboard() debounced 300ms (debouncedLoadDashboard)
+- Layout.vue (doctor): removed "Phase 2" subtitle from header; .workspace overflow-x: hidden added
+- index.scss (doctor): body overflow-x: hidden added
+- Both frontends build cleanly (pharmacist + doctor)
+
+Phase C — DeepSeek-OCR Integration (2026-03-27, commit 201525c)
+- OcrProperties: @ConfigurationProperties for medicine.ocr.* (baseUrl/apiKey/model/timeoutMs)
+- OcrService interface + OcrResult (success/extractedText/confidence/responseJson)
+- DeepSeekOcrService: SiliconFlow vision API (deepseek-ai/deepseek-vl2), graceful fallback if key missing
+- AppPrescriptionService: replaced MANUAL_REVIEW_REQUIRED stub; DEEPSEEK_OCR on success, MANUAL_REVIEW_REQUIRED+manualFallbackUsed=true on failure
+- application.yml: medicine.ocr.* config block; run-local-with-env.ps1 + .env.local.example updated
+
 Last Updated
 - 2026-03-27 Asia/Shanghai
-- Reason: Phase A–F (commit baseline, AI consent, DTO migration, CI/CD) completed
+- Reason: Phase H (pharmacist/doctor minor fixes) completed — all 8 phases done

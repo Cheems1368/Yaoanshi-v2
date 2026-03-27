@@ -25,7 +25,6 @@
           </el-button>
           <div>
             <h1>{{ currentPageTitle }}</h1>
-            <p>Phase 2 仅提供升级工单处理与账号信息，不保留其他管理菜单。</p>
           </div>
         </div>
 
@@ -175,6 +174,7 @@ const handleCommand = async (command) => {
 
 .workspace {
   min-width: 0;
+  overflow-x: hidden;
 }
 
 .header {
