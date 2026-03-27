@@ -31,6 +31,7 @@ import java.util.concurrent.TimeUnit;
 @Service
 public class AiChatService {
 
+    private static final long DEFAULT_TENANT_ID = 1L;
     private static final int MAX_MESSAGES = 20;
     private static final int MAX_MESSAGE_CHARS = 1200;
     private static final int MAX_REPLY_CHARS = 600;
@@ -73,21 +74,25 @@ public class AiChatService {
         this.httpClient = HttpClient.newBuilder().connectTimeout(Duration.ofMillis(aiProperties.getTimeoutMs())).build();
     }
 
-    public boolean checkConsentStatus(Long accountId) {
-        return appAccountMapper.selectAiConsentGrantedAt(accountId) != null;
+    public boolean checkConsentStatus(String mobile) {
+        com.medicine.domain.identity.AppAccount account = appAccountMapper.selectActiveByMobile(DEFAULT_TENANT_ID, mobile);
+        if (account == null) return false;
+        return appAccountMapper.selectAiConsentGrantedAt(account.getId()) != null;
     }
 
-    public void grantConsent(Long accountId) {
-        appAccountMapper.updateAiConsent(accountId, java.time.LocalDateTime.now());
+    public void grantConsent(String mobile) {
+        com.medicine.domain.identity.AppAccount account = appAccountMapper.selectActiveByMobile(DEFAULT_TENANT_ID, mobile);
+        if (account != null) {
+            appAccountMapper.updateAiConsent(account.getId(), java.time.LocalDateTime.now());
+        }
     }
 
-    public AiChatResponse chat(String accountId, AiChatRequest request) {
-        Long accountIdLong = Long.parseLong(accountId);
-        if (!checkConsentStatus(accountIdLong)) {
+    public AiChatResponse chat(String mobile, AiChatRequest request) {
+        if (!checkConsentStatus(mobile)) {
             throw new BusinessException(ErrorCode.AI_CONSENT_REQUIRED.getCode(), "请先同意AI助手数据共享声明后再使用");
         }
         validateRuntimeConfig();
-        enforceRateLimit(accountId);
+        enforceRateLimit(mobile);
         List<Map<String, String>> messages = buildUpstreamMessages(request);
         String reply = callUpstream(messages);
 

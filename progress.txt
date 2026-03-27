@@ -12,10 +12,10 @@ Current State
 - Last session (2026-03-27): Phase A–F completed (see below)
 
 In Progress
-- None
+- Phase 4: Integration testing — runtime integration complete
 
 Next
-- Integration testing, end-to-end demo walkthrough, bug fixes (Week 4)
+- End-to-end demo walkthrough (browser-level, manual UI testing)
 
 Completed This Sprint
 
@@ -93,6 +93,32 @@ Phase C — DeepSeek-OCR Integration (2026-03-27, commit 201525c)
 - AppPrescriptionService: replaced MANUAL_REVIEW_REQUIRED stub; DEEPSEEK_OCR on success, MANUAL_REVIEW_REQUIRED+manualFallbackUsed=true on failure
 - application.yml: medicine.ocr.* config block; run-local-with-env.ps1 + .env.local.example updated
 
+Phase 4 — Integration Testing (2026-03-27, commit 4fc16db + runtime session)
+Build validation:
+- backend-v2: mvn compile ✅, mvn test 97/97 ✅ (fixed 4 broken test files)
+- frontend/huanzhe: npm run build ✅
+- frontend/pharmacist: npm run build ✅
+- frontend/yisheng/web-admin: npm run build ✅
+
+Runtime integration (2026-03-27, Docker stack):
+Infrastructure fixes applied (not committed yet):
+- ops/docker-security-audit/redis/redis.conf: protected-mode yes → no (blocked cross-container connection)
+- ops/docker-security-audit/nginx-dev.conf: upstream medicine-backend-v2-dev → backend-v2
+- ops/sql/mysql/ruoyi-vue-pro.sql imported: system_users + system_role + system_user_role tables created
+
+Bug fixed and committed:
+- AiChatService.checkConsentStatus/grantConsent: was using JWT sub (mobile string parsed as Long) as account ID;
+  changed to resolve account by mobile via selectActiveByMobile first — consent now writes to DB correctly
+- AiChatServiceTest: setUp mocks selectActiveByMobile; 97/97 still pass
+
+API integration test results (all 200 unless noted):
+Patient: send-otp ✅, login ✅, auth/me ✅, bind-patient ✅, medication-plans/active ✅,
+  dose-tasks/today ✅, ai/consent GET+POST ✅ (bug fixed), self-reported-medications ✅,
+  prescriptions list ✅, prescriptions/uploads ✅, ddi/screen ✅, assessments/knowledge ✅
+Admin: system/auth/login ✅, patients ✅, drugs/search ✅, help-orders ✅, ddi/rules ✅ (27 rules)
+
+Remaining: browser-level UI testing (manual walk-through of all 3 frontends)
+
 Last Updated
 - 2026-03-27 Asia/Shanghai
-- Reason: Phase H (pharmacist/doctor minor fixes) completed — all 8 phases done
+- Reason: Runtime integration tests passed; AI consent bug fixed; 97/97 tests pass

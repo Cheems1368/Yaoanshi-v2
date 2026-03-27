@@ -23,14 +23,12 @@ public class AiChatController {
 
     @GetMapping("/consent")
     public CommonResult<Boolean> getConsentStatus(Authentication authentication) {
-        Long accountId = Long.parseLong(authentication.getName());
-        return CommonResult.ok(aiChatService.checkConsentStatus(accountId));
+        return CommonResult.ok(aiChatService.checkConsentStatus(authentication.getName()));
     }
 
     @PostMapping("/consent")
     public CommonResult<Boolean> grantConsent(Authentication authentication) {
-        Long accountId = Long.parseLong(authentication.getName());
-        aiChatService.grantConsent(accountId);
+        aiChatService.grantConsent(authentication.getName());
         return CommonResult.ok(true);
     }
 
