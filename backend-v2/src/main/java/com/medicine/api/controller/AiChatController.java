@@ -5,6 +5,7 @@ import com.medicine.api.dto.ai.AiChatResponse;
 import com.medicine.common.model.CommonResult;
 import com.medicine.service.ai.AiChatService;
 import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -18,6 +19,19 @@ public class AiChatController {
 
     public AiChatController(AiChatService aiChatService) {
         this.aiChatService = aiChatService;
+    }
+
+    @GetMapping("/consent")
+    public CommonResult<Boolean> getConsentStatus(Authentication authentication) {
+        Long accountId = Long.parseLong(authentication.getName());
+        return CommonResult.ok(aiChatService.checkConsentStatus(accountId));
+    }
+
+    @PostMapping("/consent")
+    public CommonResult<Boolean> grantConsent(Authentication authentication) {
+        Long accountId = Long.parseLong(authentication.getName());
+        aiChatService.grantConsent(accountId);
+        return CommonResult.ok(true);
     }
 
     @PostMapping("/chat")

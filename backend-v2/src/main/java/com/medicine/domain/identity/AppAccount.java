@@ -13,6 +13,7 @@ public class AppAccount extends BaseEntity {
     private String lastLoginIp;
     private LocalDateTime lastLoginTime;
     private String passwordHash;
+    private LocalDateTime aiConsentGrantedAt;
 
     public String getMobile() {
         return mobile;
@@ -68,5 +69,13 @@ public class AppAccount extends BaseEntity {
 
     public void setPasswordHash(String passwordHash) {
         this.passwordHash = passwordHash;
+    }
+
+    public LocalDateTime getAiConsentGrantedAt() {
+        return aiConsentGrantedAt;
+    }
+
+    public void setAiConsentGrantedAt(LocalDateTime aiConsentGrantedAt) {
+        this.aiConsentGrantedAt = aiConsentGrantedAt;
     }
 }

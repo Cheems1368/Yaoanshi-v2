@@ -8,6 +8,7 @@ import com.medicine.api.dto.ai.AiChatResponse;
 import com.medicine.common.exception.BusinessException;
 import com.medicine.common.exception.ErrorCode;
 import com.medicine.config.AiProperties;
+import com.medicine.repository.identity.AppAccountMapper;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -58,18 +59,33 @@ public class AiChatService {
     private final AiProperties aiProperties;
     private final ObjectMapper objectMapper;
     private final StringRedisTemplate stringRedisTemplate;
+    private final AppAccountMapper appAccountMapper;
     private final HttpClient httpClient;
 
     public AiChatService(AiProperties aiProperties,
                          ObjectMapper objectMapper,
-                         StringRedisTemplate stringRedisTemplate) {
+                         StringRedisTemplate stringRedisTemplate,
+                         AppAccountMapper appAccountMapper) {
         this.aiProperties = aiProperties;
         this.objectMapper = objectMapper;
         this.stringRedisTemplate = stringRedisTemplate;
+        this.appAccountMapper = appAccountMapper;
         this.httpClient = HttpClient.newBuilder().connectTimeout(Duration.ofMillis(aiProperties.getTimeoutMs())).build();
     }
 
+    public boolean checkConsentStatus(Long accountId) {
+        return appAccountMapper.selectAiConsentGrantedAt(accountId) != null;
+    }
+
+    public void grantConsent(Long accountId) {
+        appAccountMapper.updateAiConsent(accountId, java.time.LocalDateTime.now());
+    }
+
     public AiChatResponse chat(String accountId, AiChatRequest request) {
+        Long accountIdLong = Long.parseLong(accountId);
+        if (appAccountMapper.selectAiConsentGrantedAt(accountIdLong) == null) {
+            throw new BusinessException(ErrorCode.AI_CONSENT_REQUIRED.getCode(), "请先同意AI助手数据共享声明后再使用");
+        }
         validateRuntimeConfig();
         enforceRateLimit(accountId);
         List<Map<String, String>> messages = buildUpstreamMessages(request);

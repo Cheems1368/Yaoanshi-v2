@@ -397,6 +397,16 @@ export const drugCatalogService = {
   }
 }
 
+export const aiConsentService = {
+  getConsentStatus() {
+    return httpService.get<boolean>('/app-api/ai/consent')
+  },
+
+  grantConsent() {
+    return httpService.post<boolean>('/app-api/ai/consent', {})
+  }
+}
+
 export const selfReportedMedicationService = {
   create(payload: SelfReportedMedicationCreateRequest, priority = 'NORMAL') {
     return httpService.post<SelfReportedMedicationDTO[]>(

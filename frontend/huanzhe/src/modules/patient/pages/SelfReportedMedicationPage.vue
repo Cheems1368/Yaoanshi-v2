@@ -303,7 +303,7 @@ const doCreate = async (priority: string) => {
   try {
     await selfReportedMedicationService.create({ drugs: validDrugs, notes: notes.value.trim() || undefined }, priority)
     toast('已提交，药师将在工作时间内处理')
-    drugs.value = [{ drugName: '', dosage: '' }]
+    drugs.value = [{ drugName: '', dosage: '', suggestions: [] as DrugCatalogDTO[] }]
     notes.value = ''
     await loadList()
   } catch (e: any) {

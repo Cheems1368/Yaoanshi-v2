@@ -50,6 +50,14 @@
       </ion-toolbar>
     </ion-footer>
 
+    <ion-alert
+      :is-open="showConsentDialog"
+      header="数据共享声明"
+      :message="consentMessage"
+      :buttons="consentButtons"
+      @didDismiss="showConsentDialog = false"
+    />
+
     <ion-toast
       :is-open="showToast"
       :message="toastMessage"
@@ -63,6 +71,7 @@
 import { nextTick, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import {
+  IonAlert,
   IonButton,
   IonButtons,
   IonContent,
@@ -73,15 +82,50 @@ import {
   IonPage,
   IonTitle,
   IonToast,
-  IonToolbar
+  IonToolbar,
+  onIonViewWillEnter
 } from '@ionic/vue'
 import { chevronBackOutline } from 'ionicons/icons'
 import AiHomeView from '@/modules/patient/components/ai/AiHomeView.vue'
 import AiChatView, { type AiViewMessage } from '@/modules/patient/components/ai/AiChatView.vue'
 import { aiAssistantService, type AiChatMessage } from '@/modules/patient/api/aiAssistant'
+import { aiConsentService } from '@/modules/patient/api/mvp'
 
 const router = useRouter()
 const viewMode = ref<'home' | 'chat'>('home')
+const showConsentDialog = ref(false)
+const consentMessage =
+  'AI 助手功能需要将您的问题发送至第三方 AI 服务（硅基流动）进行处理。您的问题内容将按照隐私协议处理，不会与您的身份信息绑定存储。'
+const consentButtons = [
+  {
+    text: '不同意',
+    role: 'cancel',
+    handler: () => {
+      router.push('/tabs/home')
+    }
+  },
+  {
+    text: '同意并继续',
+    handler: async () => {
+      try {
+        await aiConsentService.grantConsent()
+      } catch {
+        // 忽略错误，下次进入时会再次检查
+      }
+    }
+  }
+]
+
+onIonViewWillEnter(async () => {
+  try {
+    const res = await aiConsentService.getConsentStatus()
+    if (!res.data) {
+      showConsentDialog.value = true
+    }
+  } catch {
+    // 网络错误时不阻断使用
+  }
+})
 const contentRef = ref<any>(null)
 const inputText = ref('')
 const isSending = ref(false)
