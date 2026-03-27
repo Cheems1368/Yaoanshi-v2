@@ -3,142 +3,70 @@ Project
 
 Branch / Context
 - Branch: main (origin: https://github.com/Cheems1368/Yaoanshi-v2.git)
-- Active workstream: Post-P0+ cleanup complete; ready for commit + deployment / Phase 8 integrations
+- Active workstream: Post-P0+ optimization sprint (trial/demo readiness, ~1 month)
 - Active surfaces: backend-v2, frontend/huanzhe, frontend/pharmacist, frontend/yisheng/web-admin
 
 Current State
-- All P0/P0+ phases (Phase 0–7) completed at code/build/test level
-- 30+ modified files and 20+ new files are uncommitted (see Uncommitted Work below)
-- Last session (2026-03-19): Vite 6 upgrade (patient app 5→6.4.1); AiChatServiceTest unchecked warning fixed
-- CLAUDE.md and progress.txt restructured (2026-03-20)
-
-Uncommitted Work
-Backend (backend-v2):
-- pom.xml (pinyin4j 2.5.1 added)
-- AdminHelpOrderController, AdminMedicationPlanController (self-reported med + DDI check endpoints)
-- AdminDdiRuleDTO, AdminDdiRuleUpsertRequest, AppDdiAlert (4-field extension: mechanismDesc, alternativeRecommendation, referenceSource, patientSummary)
-- AppPatientProfileDTO (operatorType field), AppPatientProfileService (operatorType fill)
-- DdiRule domain, DdiRuleMapper SQL (new fields SELECT/INSERT/UPDATE)
-- AdminDdiService, AdminMedicationPlanService, AppDdiScreeningService, NotificationDispatchService (self-reported med notification types)
-- AiChatServiceTest (unchecked warning fix)
-- New: AdminDrugCatalogController, AppDrugCatalogController, AppSelfReportedMedicationController
-- New: drug/ domain+DTO+mapper, medication/SelfReportedMedication domain+DTO+mapper
-- New: common/util/PinyinUtils.java
-- New: AdminSelfReportedMedicationService, AppSelfReportedMedicationService
-- New: V6__self_reported_medication_and_ddi_rule_extension.sql, V7__drug_catalog.sql
-- New: AdminSelfReportedMedicationServiceTest (5 test cases, all passing)
-
-Frontend (frontend/huanzhe):
-- package.json / package-lock.json (Vite 6.4.1 upgrade)
-- mvp.ts (SelfReportedMedicationDTO, selfReportedMedicationService, operatorType, MedicationPlanDTO.items)
-- HomePage.vue (6th quick entry: 记录新药品)
-- router/index.ts (/self-reported-medications route)
-- New: SelfReportedMedicationPage.vue
-
-Frontend (frontend/pharmacist):
-- medicationPlans.js (getMedicationPlanDdiCheck)
-- workorders.js (5 self-reported med APIs)
-- DdiRules.vue (4-field form + el-autocomplete drug search)
-- MedicationPlanPanel.vue (DDI check + confirm dialog before activate)
-- OrderDetail.vue (NEW_MEDICATION_REVIEW panel embed)
-- useWorkOrders.js (NEW_MEDICATION_REVIEW type label)
-- New: drugs.js, SelfReportedMedicationsPanel.vue
-
-Standard documents:
-- APP_FLOW.md, BACKEND_STRUCTURE.md, IMPLEMENTATION_PLAN.md, PRD.md (Phase 6-7 sync)
+- All P0/P0+ phases (Phase 0–7) committed (2026-03-27, commit f9274e5)
+- Post-P0 optimization plan approved; Week 1 work complete
+- Last session (2026-03-27): Phase A–F completed (see below)
 
 In Progress
 - None
 
 Next
-- Commit all Phase 6+7 uncommitted work to main
-- Integrate real S3 object storage (replace S3CompatibleObjectStorageStub)
-- Integrate real OCR engine (replace MANUAL_REVIEW_REQUIRED stub)
-- Add AI consent gate (SEC-005 closure)
-- Configure CI/CD pipeline (GitHub Actions)
-- ARC-001/003: Migrate map-based controller responses to explicit DTOs
+- Phase B: MinIO S3 object storage integration (replace S3CompatibleObjectStorageStub)
+- Phase C: DeepSeek-OCR integration (replace MANUAL_REVIEW_REQUIRED stub) — depends on Phase B
+- Phase G: Patient app UI/UX polish (hardcoded colors → CSS tokens, avatar fix, pull-to-refresh)
+- Phase H: Pharmacist/doctor minor fixes (DDI form error handling, WS debounce, doctor layout)
+
+Completed This Sprint
+
+Phase A — Commit Baseline (2026-03-27)
+- Committed all Phase 6+7 work to main (57 files, commit f9274e5)
+- Working tree clean
+
+Phase D — SEC-005 AI Consent Gate (2026-03-27, commit 5f69a4d)
+- V8 migration: ai_consent_granted_at added to app_account
+- AppAccount domain: aiConsentGrantedAt field
+- AppAccountMapper: selectAiConsentGrantedAt + updateAiConsent
+- ErrorCode: AI_CONSENT_REQUIRED (40031)
+- AiChatService: consent check before upstream call; checkConsentStatus/grantConsent methods
+- AiChatController: GET/POST /app-api/ai/consent endpoints
+- Patient app: aiConsentService in mvp.ts; IonAlert consent dialog on AiAssistantPage first entry
+- SelfReportedMedicationPage.vue: fixed pre-existing TS error (suggestions field on reset)
+
+Phase E — ARC-001/003 Map→DTO Migration (2026-03-27, commit 036a39f)
+- New DTOs: AppPatientSummaryDTO, AppCurrentAccountDTO, AppFamilyBindingDTO, AppLogoutRequest, TransferPrefillDTO
+- AppPatientService, AppAuthService, AdminSelfReportedMedicationService: return typed DTOs
+- AppAuthController, AppPatientController, AdminHelpOrderController: typed controller signatures
+- Response field names preserved; backward-compatible
+
+Phase F — CI/CD GitHub Actions (2026-03-27, commit f285037)
+- .github/workflows/build.yml: 4 parallel jobs (backend compile+test, 3 frontend builds)
+- Triggers on push/PR to main; Maven + npm cache enabled
 
 Blockers (active)
-- File upload is metadata-only; real object-storage PUT not yet wired (requires S3 integration)
-- Local dev runtime requires manual stack start: Docker MySQL/Redis/legacy on 13306/16379/48080, backend-v2 on 8080, three Vite dev servers on 3001/3002/3003
-- SEC-002 partially open: refresh tokens remain sessionStorage-managed; HttpOnly-cookie migration is a future follow-up
-- SEC-005 open: AI upstream data egress to SiliconFlow has no patient consent gate
-- ARC-001/003 open: some controller endpoints still return Map<> instead of explicit DTOs
-- No CI/CD pipeline (no GitHub Actions / GitLab CI)
-- OCR engine returns MANUAL_REVIEW_REQUIRED (stub only)
-- Historical patient.id_card_masked rows need one-off cleanup: ops/sql/sec-003-clear-legacy-patient-id-card-masked.sql
+- S3 integration requires MinIO to be added to docker-compose (Phase B)
+- OCR integration requires real S3 URLs (depends on Phase B)
+- SEC-002 partially open: refresh tokens remain sessionStorage-managed (future follow-up)
+- Historical patient.id_card_masked rows need ops cleanup: ops/sql/sec-003-clear-legacy-patient-id-card-masked.sql
 
 Completed Phases (durable record)
 
-Phase 0 — Foundation
-- All six formal Standard documents created and version-controlled
-- backend-v2 Maven project initialized; com.medicine package structure; CommonResult + JWT security baseline
-- Three frontend shells aligned to their ports (3001/3003/3002)
-- Initial DTO/entity/mapper skeletons for all P0 domains
-
-Phase 1–2 — Frontend Shells & Build Validation
-- All three surfaces npm run build green
-- Patient OTP login + binding page; HTTP baseline with TokenPair contract
-- Pharmacist/doctor web MVP-only professional shells (Element Plus theme)
-- Legacy frontend (frontend/medicinal-his-web-delivery) retired
-
-Phase 3 — Core Patient Flows (Auth / Prescription / Medication / Help Order)
-- App auth: OTP login, refresh-token rotation, logout, /app-api/auth/me
-- Patient self-service: bind, /me, family-bindings, prescription upload + history
-- Prescription loop: presign, upload registration, pharmacist confirm/reject, DDI screening
-- Medication plan: active plan, dose tasks, check-in, correction, adherence report
-- Help order: patient submit/reply, pharmacist/doctor claim/reply/escalate/close
-- Knowledge assessment + satisfaction survey
-- Flyway V1–V4 applied; MyBatis @Param bindings hardened across all mappers
-
-Phase 4 — Professional Realtime Notifications & Security Hardening
-- WebSocket /ws/admin-notifications + /ws/app-notifications with one-time socket tickets
-- Pharmacist + doctor dual-column workstation (OrderQueue + OrderDetail + inline action bar)
-- SEC-001/002/003: memory-only accessToken, sessionStorage refreshToken, identity digest only
-- Patient app: /help-order/:id conversation page + app notification websocket client
-- backend-v2 prod profile: blocks placeholder secrets, Swagger local-only
-
-Phase 5 — DDI Enhancement (用药助手增强)
-- Patient-side POST /app-api/ddi/screen with ACTIVE plan + health-profile context
-- Admin DDI rule CRUD with ruleCode-aware upsert
-- Patient DDI alert modal (HIGH/MEDIUM severity, continue/consult-pharmacist)
-- Pharmacist DDI rule management UI with tabbed DDI/contraindication management
-- Flyway V5: backfilled all 17 business tables (file_asset, prescription, ddi, medication, help_order, notification, assessment domains)
-
-Phase 6 — 自报用药域 (Self-Reported Medication)
-- SelfReportedMedication domain/DTO/mapper/service (app + admin)
-- Patient: POST/GET/withdraw/stop /app-api/self-reported-medications
-- Admin: 5 workorder-level endpoints (list/acknowledge/reject/transfer-prefill/mark-transferred)
-- DDI screening extended to include ACTIVE self-reported medications + patientSummary field
-- Notifications: SELF_MEDICATION_ACKNOWLEDGED / SELF_MEDICATION_REJECTED via WebSocket
-- Patient SelfReportedMedicationPage.vue with DDI alert modal + list/withdraw/stop
-- Pharmacist SelfReportedMedicationsPanel.vue in NEW_MEDICATION_REVIEW work orders
-- ddi_rule 4-field extension; MedicationPlanPanel DDI-check before activate
-- Flyway V6: self_reported_medication table + DDI field extensions
-- AdminSelfReportedMedicationServiceTest: 5 unit tests passing
-
-Phase 7 — Drug Catalog (药品目录)
-- drug_catalog table with pinyin initials index; 41 pre-seeded drugs (V7 migration)
-- GET /app-api/drugs/search + GET /admin-api/drugs/search (pinyin prefix + Chinese name fuzzy match)
-- PinyinUtils (pinyin4j 2.5.1) for auto-pinyin on admin drug creation
-- Patient drug autocomplete on SelfReportedMedicationPage (debounce)
-- Pharmacist DDI rule form drug A/B/contraindication autocomplete via /admin-api/drugs/search
-- Vite 6 upgrade: patient app 5.2.0→6.4.1, @vitejs/plugin-vue 4→5, @vitejs/plugin-legacy 5→6
-
-AI Assistant (cross-phase)
-- POST /app-api/ai/chat: SiliconFlow GLM-4.5-Air, rate limiting, 200-char cap, medical disclaimer
-- Patient /ai-assistant route: retry, medication-popularization focus, medication Q&A examples
-- Local key management: backend-v2/.env.local + run-local-with-env.ps1
+Phase 0–7 — see git history from 2026-03-19 sessions
 
 Infrastructure Notes
-- Flyway current latest: V7 (V7__drug_catalog.sql); location: backend-v2/src/main/resources/db/migration/
-- Never modify already-applied migrations V1–V7; next new migration must be V8
+- Flyway current latest: V8 (V8__ai_consent.sql); next new migration must be V9
+- Never modify already-applied migrations V1–V8
 - WebSocket /ws/admin-notifications and /ws/app-notifications both use one-time socket tickets
 - AI provider: SiliconFlow /v1/chat/completions, model zai-org/GLM-4.5-Air
 - AI config: medicine.ai.base-url / medicine.ai.api-key / medicine.ai.model / medicine.ai.timeout-ms
 - Local dev secrets: backend-v2/.env.local (gitignored), startup via run-local-with-env.ps1
-- Local mixed stack: Docker MySQL 13306 (medicine + legacy yaoshian), Redis 16379, legacy server 48080
+- Local mixed stack: Docker MySQL 13306, Redis 16379, legacy server 48080
+- S3 stub: S3CompatibleObjectStorageStub still active (Phase B pending)
+- OCR stub: MANUAL_REVIEW_REQUIRED still active (Phase C pending)
 
 Last Updated
-- 2026-03-20 Asia/Shanghai
-- Reason: CLAUDE.md updated for Phase 5-7 domains; progress.txt restructured (360→~130 lines)
+- 2026-03-27 Asia/Shanghai
+- Reason: Phase A–F (commit baseline, AI consent, DTO migration, CI/CD) completed
