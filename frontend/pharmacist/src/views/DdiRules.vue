@@ -552,7 +552,11 @@ const submitRuleForm = async () => {
 }
 
 const submitContraindicationForm = async () => {
-  await contraindicationFormRef.value?.validate()
+  try {
+    await contraindicationFormRef.value?.validate()
+  } catch {
+    return
+  }
   contraindicationSubmitting.value = true
   try {
     const payload = {

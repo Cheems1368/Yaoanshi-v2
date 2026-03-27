@@ -60,16 +60,16 @@
 
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { getPatients } from '@/modules/pharmacist/api/patients'
+import { getPrescriptions } from '@/modules/pharmacist/api/prescriptions'
+import { getWorkOrders } from '@/modules/pharmacist/api/workorders'
+import { ADMIN_NOTIFICATION_EVENT } from '@/utils/adminNotifications'
 
 let dashboardDebounceTimer = null
 const debouncedLoadDashboard = () => {
   clearTimeout(dashboardDebounceTimer)
   dashboardDebounceTimer = setTimeout(loadDashboard, 300)
 }
-import { getPatients } from '@/modules/pharmacist/api/patients'
-import { getPrescriptions } from '@/modules/pharmacist/api/prescriptions'
-import { getWorkOrders } from '@/modules/pharmacist/api/workorders'
-import { ADMIN_NOTIFICATION_EVENT } from '@/utils/adminNotifications'
 
 const loading = ref(false)
 const errorMessage = ref('')
@@ -150,6 +150,7 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  clearTimeout(dashboardDebounceTimer)
   window.removeEventListener(ADMIN_NOTIFICATION_EVENT, handleAdminNotification)
 })
 </script>
