@@ -10,6 +10,9 @@
     </ion-header>
 
     <ion-content class="page-content">
+      <ion-refresher slot="fixed" @ionRefresh="handleRefresh($event)">
+        <ion-refresher-content></ion-refresher-content>
+      </ion-refresher>
       <!-- 家属代录提示 -->
       <div v-if="isProxyMode" class="proxy-banner">
         您正在代替 <strong>{{ proxyPatientName }}</strong> 操作
@@ -167,6 +170,8 @@ import {
   IonLabel,
   IonModal,
   IonPage,
+  IonRefresher,
+  IonRefresherContent,
   IonSpinner,
   IonTextarea,
   IonTitle,
@@ -359,6 +364,14 @@ const formatDate = (val?: string | null) => {
   return Number.isNaN(d.getTime()) ? val : d.toLocaleDateString('zh-CN')
 }
 
+async function handleRefresh(event: CustomEvent) {
+  try {
+    await loadList()
+  } finally {
+    ;(event.target as HTMLIonRefresherElement).complete()
+  }
+}
+
 onIonViewWillEnter(async () => {
   try {
     const profile = await patientService.getProfile()
@@ -378,7 +391,7 @@ onIonViewWillEnter(async () => {
 
 <style scoped>
 .page-content {
-  --background: #f6f8fb;
+  --background: var(--patient-bg-page);
 }
 
 .proxy-banner {
@@ -406,7 +419,7 @@ onIonViewWillEnter(async () => {
 }
 
 .drug-entry {
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--patient-border);
   border-radius: 12px;
   padding: 12px;
   margin-bottom: 12px;
@@ -422,13 +435,13 @@ onIonViewWillEnter(async () => {
 .drug-entry-label {
   font-size: 13px;
   font-weight: 600;
-  color: #475569;
+  color: var(--patient-text-secondary);
 }
 
 .remove-btn {
   border: none;
   background: none;
-  color: #ef4444;
+  color: var(--patient-danger);
   font-size: 13px;
   cursor: pointer;
 }
@@ -442,8 +455,8 @@ onIonViewWillEnter(async () => {
   top: 100%;
   left: 0;
   right: 0;
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
+  background: var(--patient-bg-card);
+  border: 1px solid var(--patient-border);
   border-radius: 10px;
   box-shadow: 0 4px 16px rgba(15, 23, 42, 0.10);
   z-index: 100;
@@ -458,7 +471,7 @@ onIonViewWillEnter(async () => {
   align-items: center;
   padding: 10px 14px;
   cursor: pointer;
-  border-bottom: 1px solid #f1f5f9;
+  border-bottom: 1px solid var(--patient-bg-page);
   font-size: 14px;
 }
 
@@ -467,18 +480,18 @@ onIonViewWillEnter(async () => {
 }
 
 .suggestion-item:active {
-  background: #f1f5f9;
+  background: var(--patient-bg-page);
 }
 
 .suggestion-name {
   font-weight: 500;
-  color: #0f172a;
+  color: var(--patient-text-primary);
 }
 
 .suggestion-category {
   font-size: 11px;
-  color: #94a3b8;
-  background: #f1f5f9;
+  color: var(--patient-text-muted);
+  background: var(--patient-bg-page);
   padding: 2px 6px;
   border-radius: 4px;
 }
@@ -494,7 +507,7 @@ onIonViewWillEnter(async () => {
 }
 
 .required {
-  color: #ef4444;
+  color: var(--patient-danger);
 }
 
 .add-drug-btn {
@@ -502,9 +515,9 @@ onIonViewWillEnter(async () => {
   width: 100%;
   padding: 10px;
   background: none;
-  border: 1px dashed #94a3b8;
+  border: 1px dashed var(--patient-text-muted);
   border-radius: 10px;
-  color: #64748b;
+  color: var(--patient-text-secondary);
   font-size: 14px;
   margin: 8px 0;
   cursor: pointer;
@@ -525,7 +538,7 @@ onIonViewWillEnter(async () => {
   align-items: flex-start;
   gap: 12px;
   padding: 12px 0;
-  border-bottom: 1px solid #e2e8f0;
+  border-bottom: 1px solid var(--patient-border);
 }
 
 .med-item:last-child {
@@ -535,12 +548,12 @@ onIonViewWillEnter(async () => {
 
 .med-name {
   font-weight: 600;
-  color: #0f172a;
+  color: var(--patient-text-primary);
 }
 
 .med-meta {
   font-size: 12px;
-  color: #64748b;
+  color: var(--patient-text-secondary);
   margin-top: 2px;
 }
 
@@ -565,13 +578,13 @@ onIonViewWillEnter(async () => {
 }
 
 .withdraw-btn {
-  background: #fee2e2;
+  background: rgba(239, 68, 68, 0.1);
   color: #b91c1c;
 }
 
 .stop-btn {
-  background: #f1f5f9;
-  color: #475569;
+  background: var(--patient-bg-page);
+  color: var(--patient-text-secondary);
 }
 
 .empty-state {
@@ -580,7 +593,7 @@ onIonViewWillEnter(async () => {
 }
 
 .empty-text {
-  color: #94a3b8;
+  color: var(--patient-text-muted);
   font-size: 14px;
 }
 
@@ -604,35 +617,35 @@ onIonViewWillEnter(async () => {
 
 .ddi-high {
   background: #fef2f2;
-  border-left: 4px solid #ef4444;
+  border-left: 4px solid var(--patient-danger);
 }
 
 .ddi-medium {
   background: #fffbeb;
-  border-left: 4px solid #f59e0b;
+  border-left: 4px solid var(--patient-warning);
 }
 
 .alert-severity {
   font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
-  color: #64748b;
+  color: var(--patient-text-secondary);
   margin-bottom: 4px;
 }
 
 .alert-drugs {
   font-weight: 600;
-  color: #0f172a;
+  color: var(--patient-text-primary);
   margin-bottom: 4px;
 }
 
 .alert-message {
   font-size: 13px;
-  color: #475569;
+  color: var(--patient-text-secondary);
 }
 
 .plan-drugs-section {
-  background: #f8fafc;
+  background: var(--patient-bg-page);
   border-radius: 10px;
   padding: 12px;
   margin-bottom: 16px;
@@ -641,18 +654,18 @@ onIonViewWillEnter(async () => {
 .plan-drugs-title {
   font-size: 12px;
   font-weight: 600;
-  color: #64748b;
+  color: var(--patient-text-secondary);
   margin-bottom: 6px;
 }
 
 .plan-drugs-list {
   font-size: 13px;
-  color: #334155;
+  color: var(--patient-text-primary);
 }
 
 .disclaimer {
   font-size: 12px;
-  color: #94a3b8;
+  color: var(--patient-text-muted);
   text-align: center;
   padding: 8px 0 16px;
 }

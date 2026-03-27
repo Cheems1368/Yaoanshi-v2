@@ -7,6 +7,9 @@
     </ion-header>
 
     <ion-content class="custom-content">
+      <ion-refresher slot="fixed" @ionRefresh="handleRefresh($event)">
+        <ion-refresher-content></ion-refresher-content>
+      </ion-refresher>
       <div class="container">
         <section class="welcome-section">
           <h2 class="welcome-title">今日用药</h2>
@@ -113,6 +116,8 @@ import {
   IonHeader,
   IonIcon,
   IonPage,
+  IonRefresher,
+  IonRefresherContent,
   IonRow,
   IonSpinner,
   IonTitle,
@@ -199,12 +204,20 @@ const statusText = (status: string) => {
   return map[status] || status
 }
 
+async function handleRefresh(event: CustomEvent) {
+  try {
+    await loadDashboard()
+  } finally {
+    ;(event.target as HTMLIonRefresherElement).complete()
+  }
+}
+
 onIonViewWillEnter(loadDashboard)
 </script>
 
 <style scoped>
 .custom-content {
-  --background: #f6f8fb;
+  --background: var(--patient-bg-page);
 }
 
 .container {
@@ -216,7 +229,7 @@ onIonViewWillEnter(loadDashboard)
   margin-bottom: 16px;
   border-radius: 20px;
   color: #fff;
-  background: linear-gradient(135deg, #1d4ed8, #0f766e);
+  background: linear-gradient(135deg, var(--patient-primary), #0f766e);
 }
 
 .welcome-title,
@@ -256,14 +269,14 @@ onIonViewWillEnter(loadDashboard)
 .overview-number {
   font-size: 28px;
   font-weight: 700;
-  color: #1d4ed8;
+  color: var(--patient-primary);
 }
 
 .overview-label,
 .action-label,
 .task-meta,
 .empty-text {
-  color: #64748b;
+  color: var(--patient-text-secondary);
 }
 
 .card-title {
@@ -287,9 +300,9 @@ onIonViewWillEnter(loadDashboard)
   justify-content: center;
 }
 
-.icon-primary { background: rgba(29, 78, 216, 0.12); color: #1d4ed8; }
-.icon-success { background: rgba(22, 163, 74, 0.12); color: #16a34a; }
-.icon-warning { background: rgba(245, 158, 11, 0.16); color: #d97706; }
+.icon-primary { background: rgba(37, 99, 235, 0.12); color: var(--patient-primary); }
+.icon-success { background: rgba(16, 185, 129, 0.12); color: var(--patient-success); }
+.icon-warning { background: rgba(245, 158, 11, 0.16); color: var(--patient-warning); }
 .icon-tertiary { background: rgba(14, 165, 233, 0.12); color: #0284c7; }
 .icon-secondary { background: rgba(99, 102, 241, 0.12); color: #4f46e5; }
 .icon-rose { background: rgba(225, 29, 72, 0.10); color: #e11d48; }
@@ -307,7 +320,7 @@ onIonViewWillEnter(loadDashboard)
   padding: 14px 0;
   border: 0;
   background: transparent;
-  border-bottom: 1px solid #e2e8f0;
+  border-bottom: 1px solid var(--patient-border);
 }
 
 .task-item:last-child {
@@ -317,7 +330,7 @@ onIonViewWillEnter(loadDashboard)
 
 .task-title {
   font-weight: 600;
-  color: #0f172a;
+  color: var(--patient-text-primary);
 }
 
 .empty-state {
@@ -327,6 +340,6 @@ onIonViewWillEnter(loadDashboard)
 
 .empty-icon {
   font-size: 36px;
-  color: #94a3b8;
+  color: var(--patient-text-muted);
 }
 </style>

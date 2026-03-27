@@ -36,6 +36,20 @@
   --patient-radius-xl: 24px;
   --patient-shadow-sm: 0 2px 12px rgba(0, 0, 0, 0.1);
   --patient-shadow-md: 0 4px 16px rgba(0, 0, 0, 0.15);
+
+  /* Color semantic tokens — used for hardcoded color migration */
+  --patient-primary: #2563eb;
+  --patient-primary-dark: #1e40af;
+  --patient-primary-light: #eff6ff;
+  --patient-text-primary: #0f172a;
+  --patient-text-secondary: #64748b;
+  --patient-text-muted: #94a3b8;
+  --patient-bg-page: #f6f8fb;
+  --patient-bg-card: #ffffff;
+  --patient-border: #e2e8f0;
+  --patient-success: #10b981;
+  --patient-danger: #ef4444;
+  --patient-warning: #f59e0b;
 }
 
 html,

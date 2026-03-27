@@ -7,6 +7,9 @@
     </ion-header>
 
     <ion-content class="page-content">
+      <ion-refresher slot="fixed" @ionRefresh="handleRefresh($event)">
+        <ion-refresher-content></ion-refresher-content>
+      </ion-refresher>
       <div class="page-container">
         <ion-card class="form-card">
           <ion-card-header>
@@ -113,6 +116,8 @@ import {
   IonItem,
   IonLabel,
   IonPage,
+  IonRefresher,
+  IonRefresherContent,
   IonSelect,
   IonSelectOption,
   IonSpinner,
@@ -274,6 +279,14 @@ const formatDateTime = (value?: string | null) => {
   return Number.isNaN(date.getTime()) ? value : date.toLocaleString('zh-CN', { hour12: false })
 }
 
+async function handleRefresh(event: CustomEvent) {
+  try {
+    await loadOrders()
+  } finally {
+    ;(event.target as HTMLIonRefresherElement).complete()
+  }
+}
+
 onIonViewWillEnter(async () => {
   await applyPrefillFromQuery()
   await loadOrders()
@@ -282,7 +295,7 @@ onIonViewWillEnter(async () => {
 
 <style scoped>
 .page-content {
-  --background: #f6f8fb;
+  --background: var(--patient-bg-page);
 }
 
 .page-container {
@@ -309,7 +322,7 @@ onIonViewWillEnter(async () => {
   padding: 14px;
   border: 0;
   border-radius: 14px;
-  background: #f8fafc;
+  background: var(--patient-bg-page);
   text-align: left;
 }
 
@@ -323,13 +336,13 @@ onIonViewWillEnter(async () => {
 .order-title {
   font-size: 16px;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--patient-text-primary);
 }
 
 .order-meta,
 .order-desc,
 .empty-text {
-  color: #64748b;
+  color: var(--patient-text-secondary);
 }
 
 .order-desc {
@@ -344,6 +357,6 @@ onIonViewWillEnter(async () => {
 
 .empty-icon {
   font-size: 36px;
-  color: #94a3b8;
+  color: var(--patient-text-muted);
 }
 </style>

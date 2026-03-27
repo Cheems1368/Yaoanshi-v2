@@ -10,6 +10,9 @@
     </ion-header>
 
     <ion-content class="page-content">
+      <ion-refresher slot="fixed" @ionRefresh="handleRefresh($event)">
+        <ion-refresher-content></ion-refresher-content>
+      </ion-refresher>
       <div class="container">
         <ion-card class="overview-card">
           <ion-card-content class="overview-grid">
@@ -109,6 +112,8 @@ import {
   IonHeader,
   IonIcon,
   IonPage,
+  IonRefresher,
+  IonRefresherContent,
   IonSpinner,
   IonTitle,
   IonToast,
@@ -208,12 +213,20 @@ const statusColor = (status: string) => {
   return 'medium'
 }
 
+async function handleRefresh(event: CustomEvent) {
+  try {
+    await loadTasks()
+  } finally {
+    ;(event.target as HTMLIonRefresherElement).complete()
+  }
+}
+
 onIonViewWillEnter(loadTasks)
 </script>
 
 <style scoped>
 .page-content {
-  --background: #f6f8fb;
+  --background: var(--patient-bg-page);
 }
 
 .container {
@@ -237,14 +250,14 @@ onIonViewWillEnter(loadTasks)
 .overview-number {
   font-size: 28px;
   font-weight: 700;
-  color: #1d4ed8;
+  color: var(--patient-primary);
 }
 
 .overview-label,
 .task-meta,
 .task-extra,
 .empty-text {
-  color: #64748b;
+  color: var(--patient-text-secondary);
 }
 
 .task-header {
@@ -257,7 +270,7 @@ onIonViewWillEnter(loadTasks)
 .task-title {
   font-size: 18px;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--patient-text-primary);
 }
 
 .task-actions {
@@ -273,6 +286,6 @@ onIonViewWillEnter(loadTasks)
 
 .empty-icon {
   font-size: 36px;
-  color: #94a3b8;
+  color: var(--patient-text-muted);
 }
 </style>

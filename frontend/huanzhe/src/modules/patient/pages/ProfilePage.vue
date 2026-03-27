@@ -22,7 +22,7 @@
         <!-- 头像区域 -->
         <div class="avatar-section">
           <div class="avatar-container" @click="isEditing ? selectAvatar() : null">
-            <img :src="profileData.avatar || '/src/picture/user_avatar.png'" alt="用户头像" class="avatar" :class="{ 'editable': isEditing }">
+            <img :src="profileData.avatar || defaultAvatarImg" alt="用户头像" class="avatar" :class="{ 'editable': isEditing }">
             <div v-if="isEditing" class="avatar-overlay">
               <ion-icon :icon="cameraOutline" class="camera-icon"></ion-icon>
             </div>
@@ -332,6 +332,7 @@ import {
   toastController
 } from '@ionic/vue'
 import { cameraOutline, checkmarkCircleOutline, createOutline, documentTextOutline } from 'ionicons/icons'
+import defaultAvatarImg from '@/shared/assets/images/user_avatar.png'
 import { patientSession } from '@/app/session'
 import { appAuthService, patientService, type PatientProfileDTO, type PatientHealthProfileDTO } from '@/modules/patient/api/mvp'
 import { healthDataService, type HealthData } from '@/services/healthDataService'
@@ -357,7 +358,7 @@ const profileData = reactive<UserProfile>({
   weight: 70,
   bloodType: 'A型',
   allergies: '无',
-  avatar: '/src/picture/user_avatar.png',
+  avatar: defaultAvatarImg,
   address: '',
   patientType: 0,
   insurance: 0,
