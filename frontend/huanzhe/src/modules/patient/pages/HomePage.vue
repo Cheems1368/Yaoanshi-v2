@@ -120,7 +120,7 @@ import {
   IonToolbar,
   onIonViewWillEnter
 } from '@ionic/vue'
-import { chatbubbles, clipboard, documentTextOutline, notifications, shieldCheckmark, sparkles, checkmarkCircleOutline } from 'ionicons/icons'
+import { chatbubbles, clipboard, documentTextOutline, medkit, notifications, shieldCheckmark, sparkles, checkmarkCircleOutline } from 'ionicons/icons'
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { medicationService, type DoseTaskDTO, type MedicationPlanDTO } from '@/modules/patient/api/mvp'
@@ -139,7 +139,8 @@ const quickActions = [
   { id: 2, label: '服药记录', icon: clipboard, color: 'success', route: '/medication-record' },
   { id: 3, label: '用药求助', icon: chatbubbles, color: 'warning', route: '/tabs/help-order' },
   { id: 4, label: '合理用药', icon: shieldCheckmark, color: 'tertiary', route: '/rational-medication' },
-  { id: 5, label: 'AI助手', icon: sparkles, color: 'secondary', route: '/ai-assistant' }
+  { id: 5, label: 'AI助手', icon: sparkles, color: 'secondary', route: '/ai-assistant' },
+  { id: 6, label: '记录新药品', icon: medkit, color: 'rose', route: '/self-reported-medications' }
 ]
 
 const quickActionTestIds = [
@@ -147,7 +148,8 @@ const quickActionTestIds = [
   'home-quick-medication-record',
   'home-quick-help-order',
   'home-quick-rational-medication',
-  'home-quick-ai-assistant'
+  'home-quick-ai-assistant',
+  'home-quick-self-reported-medications'
 ]
 
 const completedCount = computed(() => todayTasks.value.filter((task) => task.status === 'COMPLETED').length)
@@ -290,6 +292,7 @@ onIonViewWillEnter(loadDashboard)
 .icon-warning { background: rgba(245, 158, 11, 0.16); color: #d97706; }
 .icon-tertiary { background: rgba(14, 165, 233, 0.12); color: #0284c7; }
 .icon-secondary { background: rgba(99, 102, 241, 0.12); color: #4f46e5; }
+.icon-rose { background: rgba(225, 29, 72, 0.10); color: #e11d48; }
 
 .task-list {
   display: grid;

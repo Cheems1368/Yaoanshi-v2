@@ -109,6 +109,27 @@
       </el-button>
     </div>
 
+    <!-- DDI 告警确认对话框 -->
+    <el-dialog v-model="ddiDialogVisible" title="用药风险提示" width="520px" :close-on-click-modal="false">
+      <p class="ddi-dialog-intro">启用该计划前检测到以下药物相互作用风险，请确认后继续：</p>
+      <div class="ddi-alert-list">
+        <div v-for="(alert, i) in pendingDdiAlerts" :key="i" class="ddi-alert-item" :class="`ddi-${alert.severity?.toLowerCase()}`">
+          <div class="ddi-alert-header">
+            <el-tag :type="alert.severity === 'HIGH' ? 'danger' : 'warning'" size="small" effect="plain">
+              {{ alert.severity === 'HIGH' ? '高风险' : '中风险' }}
+            </el-tag>
+            <span class="ddi-drug-pair">{{ alert.drugA }} + {{ alert.drugB }}</span>
+          </div>
+          <p class="ddi-message">{{ alert.message }}</p>
+          <p v-if="alert.recommendedAction" class="ddi-action">建议：{{ alert.recommendedAction }}</p>
+        </div>
+      </div>
+      <template #footer>
+        <el-button @click="ddiDialogVisible = false">取消启用</el-button>
+        <el-button type="warning" :loading="activating" @click="doActivate">已知晓风险，确认启用</el-button>
+      </template>
+    </el-dialog>
+
     <section class="tasks-section">
       <div class="section-header">
         <h4>未来 7 天任务</h4>
@@ -147,6 +168,7 @@ import {
   createMedicationPlan,
   getMedicationPlan,
   getMedicationPlanAdherenceReport,
+  getMedicationPlanDdiCheck,
   getMedicationPlanTasks,
   updateMedicationPlan
 } from '@/modules/pharmacist/api/medicationPlans'
@@ -170,6 +192,10 @@ const activating = ref(false)
 const errorMessage = ref('')
 const taskRows = ref([])
 const adherenceReport = ref('')
+
+const ddiDialogVisible = ref(false)
+const pendingDdiAlerts = ref([])
+const pendingActivatePlanId = ref(null)
 
 const createEmptyItem = () => ({
   drugName: '',
@@ -360,13 +386,49 @@ const saveDraft = async () => {
 }
 
 const saveAndActivate = async () => {
-  await persistPlan('ACTIVE')
+  // Save as draft first to get an id, then run DDI check before activating
+  saving.value = true
+  errorMessage.value = ''
+  try {
+    const payload = buildPayload('DRAFT')
+    const response = form.id
+      ? await updateMedicationPlan(form.id, payload)
+      : await createMedicationPlan(payload)
+    hydratePlan(response.data)
+    emit('plan-updated', response.data)
+  } catch (error) {
+    errorMessage.value = error.message || '用药计划保存失败，请稍后重试'
+    saving.value = false
+    return
+  } finally {
+    saving.value = false
+  }
+  // Now trigger activation with DDI check
+  await activateCurrentVersion()
 }
 
 const activateCurrentVersion = async () => {
-  if (!form.id) {
-    return
+  if (!form.id) return
+  errorMessage.value = ''
+  try {
+    const ddiRes = await getMedicationPlanDdiCheck(form.id)
+    const alerts = ddiRes.data?.alerts ?? []
+    if (alerts.length > 0) {
+      pendingDdiAlerts.value = alerts
+      pendingActivatePlanId.value = form.id
+      ddiDialogVisible.value = true
+    } else {
+      await doActivate()
+    }
+  } catch {
+    // DDI check failure is non-blocking — proceed with activation
+    await doActivate()
   }
+}
+
+const doActivate = async () => {
+  ddiDialogVisible.value = false
+  if (!form.id) return
   activating.value = true
   errorMessage.value = ''
   try {
@@ -554,5 +616,59 @@ watch(
   .summary-grid {
     display: grid;
   }
+}
+
+.ddi-dialog-intro {
+  margin: 0 0 16px;
+  color: var(--pro-text-secondary);
+  font-size: 13px;
+}
+
+.ddi-alert-list {
+  display: grid;
+  gap: 12px;
+  max-height: 340px;
+  overflow-y: auto;
+}
+
+.ddi-alert-item {
+  padding: 12px;
+  border-radius: 8px;
+  border-left: 4px solid transparent;
+}
+
+.ddi-high {
+  background: #fef2f2;
+  border-left-color: #ef4444;
+}
+
+.ddi-medium {
+  background: #fffbeb;
+  border-left-color: #f59e0b;
+}
+
+.ddi-alert-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.ddi-drug-pair {
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--pro-text-primary);
+}
+
+.ddi-message {
+  margin: 0 0 4px;
+  font-size: 13px;
+  color: var(--pro-text-primary);
+}
+
+.ddi-action {
+  margin: 0;
+  font-size: 12px;
+  color: var(--pro-text-secondary);
 }
 </style>

@@ -10,11 +10,13 @@ import com.medicine.domain.identity.Patient;
 import com.medicine.domain.identity.PatientHealthProfile;
 import com.medicine.domain.medication.MedicationPlan;
 import com.medicine.domain.medication.MedicationPlanItem;
+import com.medicine.domain.medication.SelfReportedMedication;
 import com.medicine.repository.ddi.DdiRuleMapper;
 import com.medicine.repository.ddi.DrugContraindicationMapper;
 import com.medicine.repository.identity.PatientHealthProfileMapper;
 import com.medicine.repository.medication.MedicationPlanItemMapper;
 import com.medicine.repository.medication.MedicationPlanMapper;
+import com.medicine.repository.medication.SelfReportedMedicationMapper;
 import com.medicine.service.auth.AppPatientService;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
@@ -48,6 +50,7 @@ public class AppDdiScreeningService {
     private final AppPatientService appPatientService;
     private final MedicationPlanMapper medicationPlanMapper;
     private final MedicationPlanItemMapper medicationPlanItemMapper;
+    private final SelfReportedMedicationMapper selfReportedMedicationMapper;
     private final DdiRuleMapper ddiRuleMapper;
     private final DrugContraindicationMapper drugContraindicationMapper;
     private final PatientHealthProfileMapper patientHealthProfileMapper;
@@ -56,6 +59,7 @@ public class AppDdiScreeningService {
             AppPatientService appPatientService,
             MedicationPlanMapper medicationPlanMapper,
             MedicationPlanItemMapper medicationPlanItemMapper,
+            SelfReportedMedicationMapper selfReportedMedicationMapper,
             DdiRuleMapper ddiRuleMapper,
             DrugContraindicationMapper drugContraindicationMapper,
             PatientHealthProfileMapper patientHealthProfileMapper
@@ -63,6 +67,7 @@ public class AppDdiScreeningService {
         this.appPatientService = appPatientService;
         this.medicationPlanMapper = medicationPlanMapper;
         this.medicationPlanItemMapper = medicationPlanItemMapper;
+        this.selfReportedMedicationMapper = selfReportedMedicationMapper;
         this.ddiRuleMapper = ddiRuleMapper;
         this.drugContraindicationMapper = drugContraindicationMapper;
         this.patientHealthProfileMapper = patientHealthProfileMapper;
@@ -89,7 +94,13 @@ public class AppDdiScreeningService {
 
         MedicationPlan activePlan = medicationPlanMapper.selectActiveByPatientId(tenantId, patient.getId());
         List<MedicationPlanItem> existingItems = activePlan == null ? List.of() : medicationPlanItemMapper.selectByPlanId(tenantId, activePlan.getId());
+        List<SelfReportedMedication> activeSelfReported = selfReportedMedicationMapper.selectActiveByPatientId(tenantId, patient.getId());
         PatientHealthProfile healthProfile = patientHealthProfileMapper.selectByPatientId(tenantId, patient.getId());
+
+        // Build unified background drug name list: ACTIVE plan items + ACTIVE self-reported
+        List<String> backgroundDrugNames = new ArrayList<>();
+        existingItems.stream().map(MedicationPlanItem::getDrugName).filter(StringUtils::hasText).forEach(backgroundDrugNames::add);
+        activeSelfReported.stream().map(SelfReportedMedication::getDrugName).filter(StringUtils::hasText).forEach(backgroundDrugNames::add);
 
         List<AppDdiAlert> alerts = new ArrayList<>();
         Set<String> dedupeKeys = new LinkedHashSet<>();
@@ -98,19 +109,17 @@ public class AppDdiScreeningService {
                 .filter(rule -> isPatientFacingSeverity(rule.getSeverity()))
                 .toList();
         for (String newDrug : normalizedNewDrugs) {
-            for (MedicationPlanItem existingItem : existingItems) {
-                if (!StringUtils.hasText(existingItem.getDrugName())) {
-                    continue;
-                }
+            for (String backgroundDrug : backgroundDrugNames) {
                 for (DdiRule rule : interactionRules) {
-                    if (matchesInteraction(rule, existingItem.getDrugName(), newDrug)) {
+                    if (matchesInteraction(rule, backgroundDrug, newDrug)) {
                         AppDdiAlert alert = new AppDdiAlert();
                         alert.setType("INTERACTION");
                         alert.setSeverity(rule.getSeverity());
-                        alert.setDrugA(existingItem.getDrugName());
+                        alert.setDrugA(backgroundDrug);
                         alert.setDrugB(newDrug);
                         alert.setMessage(rule.getMessage());
                         alert.setRecommendedAction(rule.getRecommendedAction());
+                        alert.setPatientSummary(StringUtils.hasText(rule.getPatientSummary()) ? rule.getPatientSummary() : rule.getMessage());
                         addIfAbsent(alerts, dedupeKeys, alert);
                     }
                 }
@@ -252,6 +261,101 @@ public class AppDdiScreeningService {
             keywords.addAll(aliases.stream().map(this::normalizeText).toList());
         }
         return keywords;
+    }
+
+    /**
+     * Checks DDI interactions for all drugs within a plan:
+     * - Internal: each plan drug vs every other plan drug
+     * - External: each plan drug vs the patient's ACTIVE self-reported medications
+     * Does NOT include the current ACTIVE medication plan in the background,
+     * since this plan is about to replace it.
+     */
+    public AppDdiScreenResult screenPlanDrugs(Long patientId, List<String> planDrugNames) {
+        List<String> normalizedPlanDrugs = normalizeDrugNames(planDrugNames);
+        if (normalizedPlanDrugs.isEmpty()) {
+            AppDdiScreenResult empty = new AppDdiScreenResult();
+            empty.setAlerts(List.of());
+            return empty;
+        }
+
+        List<SelfReportedMedication> activeSelfReported =
+                selfReportedMedicationMapper.selectActiveByPatientId(DEFAULT_TENANT_ID, patientId);
+        List<String> selfReportedDrugNames = activeSelfReported.stream()
+                .map(SelfReportedMedication::getDrugName)
+                .filter(StringUtils::hasText)
+                .toList();
+
+        Patient patient = new Patient();
+        patient.setId(patientId);
+        patient.setTenantId(DEFAULT_TENANT_ID);
+        PatientHealthProfile healthProfile = patientHealthProfileMapper.selectByPatientId(DEFAULT_TENANT_ID, patientId);
+
+        List<AppDdiAlert> alerts = new ArrayList<>();
+        Set<String> dedupeKeys = new LinkedHashSet<>();
+
+        List<DdiRule> interactionRules = ddiRuleMapper.selectActiveRules(DEFAULT_TENANT_ID).stream()
+                .filter(rule -> isPatientFacingSeverity(rule.getSeverity()))
+                .toList();
+
+        // For each plan drug, check against all other plan drugs + self-reported background
+        for (int i = 0; i < normalizedPlanDrugs.size(); i++) {
+            String newDrug = normalizedPlanDrugs.get(i);
+
+            List<String> background = new ArrayList<>();
+            for (int j = 0; j < normalizedPlanDrugs.size(); j++) {
+                if (i != j) {
+                    background.add(normalizedPlanDrugs.get(j));
+                }
+            }
+            background.addAll(selfReportedDrugNames);
+
+            for (String bgDrug : background) {
+                for (DdiRule rule : interactionRules) {
+                    if (matchesInteraction(rule, bgDrug, newDrug)) {
+                        AppDdiAlert alert = new AppDdiAlert();
+                        alert.setType("INTERACTION");
+                        alert.setSeverity(rule.getSeverity());
+                        alert.setDrugA(bgDrug);
+                        alert.setDrugB(newDrug);
+                        alert.setMessage(rule.getMessage());
+                        alert.setRecommendedAction(rule.getRecommendedAction());
+                        alert.setPatientSummary(StringUtils.hasText(rule.getPatientSummary())
+                                ? rule.getPatientSummary() : rule.getMessage());
+                        addIfAbsent(alerts, dedupeKeys, alert);
+                    }
+                }
+            }
+        }
+
+        // Contraindication check for each plan drug
+        List<DrugContraindication> contraindicationRules = drugContraindicationMapper.selectActiveRules(DEFAULT_TENANT_ID).stream()
+                .filter(rule -> isPatientFacingSeverity(rule.getSeverity()))
+                .toList();
+        for (String drug : normalizedPlanDrugs) {
+            for (DrugContraindication rule : contraindicationRules) {
+                if (!matchesDrug(rule.getDrugName(), drug) || !matchesCondition(rule, patient, healthProfile)) {
+                    continue;
+                }
+                AppDdiAlert alert = new AppDdiAlert();
+                alert.setType("CONTRAINDICATION");
+                alert.setSeverity(rule.getSeverity());
+                alert.setDrugA(rule.getConditionValue());
+                alert.setDrugB(drug);
+                alert.setMessage(rule.getMessage());
+                alert.setRecommendedAction(rule.getRecommendedAction());
+                addIfAbsent(alerts, dedupeKeys, alert);
+            }
+        }
+
+        alerts.sort(Comparator
+                .comparingInt((AppDdiAlert a) -> severityRank(a.getSeverity()))
+                .thenComparing(AppDdiAlert::getType)
+                .thenComparing(a -> normalizeText(a.getDrugA()))
+                .thenComparing(a -> normalizeText(a.getDrugB())));
+
+        AppDdiScreenResult result = new AppDdiScreenResult();
+        result.setAlerts(alerts);
+        return result;
     }
 
     private String normalizeText(String value) {

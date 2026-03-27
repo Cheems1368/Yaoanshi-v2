@@ -53,6 +53,11 @@ export interface PrescriptionDTO {
   attachments: PrescriptionAttachmentDTO[]
 }
 
+export interface PlanItemSummaryDTO {
+  drugName: string
+  dosage?: string | null
+}
+
 export interface MedicationPlanDTO {
   id: number
   patientId: number
@@ -68,6 +73,7 @@ export interface MedicationPlanDTO {
   createdByPharmacistId?: number | null
   confirmedAt?: string | null
   createdAt?: string | null
+  items?: PlanItemSummaryDTO[] | null
 }
 
 export interface DoseTaskDTO {
@@ -151,7 +157,32 @@ export interface AppDdiAlert {
   drugA: string
   drugB: string
   message: string
+  patientSummary?: string | null
   recommendedAction?: string | null
+}
+
+export interface SelfReportedMedicationDTO {
+  id: number
+  patientId: number
+  drugName: string
+  dosage?: string | null
+  status: 'PENDING' | 'ACTIVE' | 'STOPPED' | 'TRANSFERRED' | string
+  notes?: string | null
+  operatorType: string
+  operatorAccountId: number
+  workOrderId?: number | null
+  transferredPlanItemId?: number | null
+  createdAt?: string | null
+}
+
+export interface SelfReportedDrugEntry {
+  drugName: string
+  dosage?: string
+}
+
+export interface SelfReportedMedicationCreateRequest {
+  drugs: SelfReportedDrugEntry[]
+  notes?: string
 }
 
 export interface AppDdiScreenResult {
@@ -187,6 +218,7 @@ export interface PatientProfileDTO {
   realNameVerifiedTime?: string
   createdAt?: string
   updatedAt?: string
+  operatorType?: string
   emergencyContact?: {
     name?: string
     phone?: string
@@ -348,6 +380,41 @@ export const assessmentService = {
 export const ddiService = {
   screen(payload: { newDrugNames: string[] }) {
     return httpService.post<AppDdiScreenResult>('/app-api/ddi/screen', payload)
+  }
+}
+
+export interface DrugCatalogDTO {
+  id: number
+  nameCn: string
+  nameEn?: string | null
+  pinyinInitials: string
+  category?: string | null
+}
+
+export const drugCatalogService = {
+  search(q: string, limit = 10) {
+    return httpService.get<DrugCatalogDTO[]>('/app-api/drugs/search', { q, limit })
+  }
+}
+
+export const selfReportedMedicationService = {
+  create(payload: SelfReportedMedicationCreateRequest, priority = 'NORMAL') {
+    return httpService.post<SelfReportedMedicationDTO[]>(
+      `/app-api/self-reported-medications?priority=${priority}`,
+      payload
+    )
+  },
+
+  list() {
+    return httpService.get<SelfReportedMedicationDTO[]>('/app-api/self-reported-medications')
+  },
+
+  withdraw(id: number) {
+    return httpService.post<void>(`/app-api/self-reported-medications/${id}/withdraw`, {})
+  },
+
+  stop(id: number) {
+    return httpService.post<void>(`/app-api/self-reported-medications/${id}/stop`, {})
   }
 }
 

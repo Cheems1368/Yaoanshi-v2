@@ -38,7 +38,6 @@ Additional precedence rules:
 2. If `docs/` conflicts with any file in `Standard document/`, `Standard document/` wins.
 3. `CODEX.md` governs Codex session behavior; `CLAUDE.md` governs Claude session behavior.
 4. Formal product, design, technical, and backend details still belong to the formal documents listed above.
-5. Dual-agent collaboration plan: `docs/DUAL_AGENT_COLLABORATION.md`
 
 ## 2. Mandatory Read Order
 
@@ -59,7 +58,7 @@ Required behavior:
 
 ## 3. Codex Role in Dual-Agent Collaboration
 
-Codex is the **construction + quality dual-core** agent. See `docs/DUAL_AGENT_COLLABORATION.md` for full details.
+Codex is the **construction + quality dual-core** agent. It leads backend scaffolding, code quality review, architecture compliance, and test coverage. Claude leads product definition, frontend implementation, and runtime verification.
 
 Iron law: Codex does NOT redefine requirements. It constructs, tests, and gatekeeps quality.
 

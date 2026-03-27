@@ -11,6 +11,7 @@ import com.medicine.config.AiProperties;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.ArgumentMatchers;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -80,7 +81,7 @@ class AiChatServiceTest {
         when(stringRedisTemplate.opsForValue()).thenReturn(valueOperations);
         when(valueOperations.increment("app:ai:chat:limit:acct-1")).thenReturn(1L);
         when(stringRedisTemplate.expire("app:ai:chat:limit:acct-1", 1, TimeUnit.MINUTES)).thenReturn(true);
-        when(httpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class))).thenReturn(httpResponse);
+        when(httpClient.send(any(HttpRequest.class), ArgumentMatchers.<HttpResponse.BodyHandler<String>>any())).thenReturn(httpResponse);
         when(httpResponse.statusCode()).thenReturn(200);
         when(httpResponse.body()).thenReturn("{\"content\":[{\"type\":\"text\",\"text\":\"" + upstreamReply + "\"}]}");
 
@@ -97,7 +98,7 @@ class AiChatServiceTest {
         assertThat(response.getSuggestions().get(0)).isEqualTo("漏服后该怎么办？");
 
         ArgumentCaptor<HttpRequest> requestCaptor = ArgumentCaptor.forClass(HttpRequest.class);
-        verify(httpClient).send(requestCaptor.capture(), any(HttpResponse.BodyHandler.class));
+        verify(httpClient).send(requestCaptor.capture(), ArgumentMatchers.<HttpResponse.BodyHandler<String>>any());
         JsonNode payload = new ObjectMapper().readTree(extractBody(requestCaptor.getValue()));
         assertThat(payload.path("model").asText()).isEqualTo("Qwen/Qwen3.5-122B-A10B");
         assertThat(payload.path("max_tokens").asInt()).isEqualTo(1024);
@@ -121,7 +122,7 @@ class AiChatServiceTest {
         when(stringRedisTemplate.opsForValue()).thenReturn(valueOperations);
         when(valueOperations.increment("app:ai:chat:limit:acct-1b")).thenReturn(1L);
         when(stringRedisTemplate.expire("app:ai:chat:limit:acct-1b", 1, TimeUnit.MINUTES)).thenReturn(true);
-        when(httpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class))).thenReturn(httpResponse);
+        when(httpClient.send(any(HttpRequest.class), ArgumentMatchers.<HttpResponse.BodyHandler<String>>any())).thenReturn(httpResponse);
         when(httpResponse.statusCode()).thenReturn(200);
         when(httpResponse.body()).thenReturn("""
                 {"choices":[{"message":{"content":"%s"}}]}
@@ -153,7 +154,7 @@ class AiChatServiceTest {
         when(stringRedisTemplate.opsForValue()).thenReturn(valueOperations);
         when(valueOperations.increment("app:ai:chat:limit:acct-2")).thenReturn(1L);
         when(stringRedisTemplate.expire("app:ai:chat:limit:acct-2", 1, TimeUnit.MINUTES)).thenReturn(true);
-        when(httpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class))).thenReturn(httpResponse);
+        when(httpClient.send(any(HttpRequest.class), ArgumentMatchers.<HttpResponse.BodyHandler<String>>any())).thenReturn(httpResponse);
         when(httpResponse.statusCode()).thenReturn(200);
         when(httpResponse.body()).thenReturn("{\"content\":[{\"type\":\"text\",\"text\":\"trimmed reply\"}]}");
 
@@ -170,7 +171,7 @@ class AiChatServiceTest {
         ));
 
         ArgumentCaptor<HttpRequest> requestCaptor = ArgumentCaptor.forClass(HttpRequest.class);
-        verify(httpClient).send(requestCaptor.capture(), any(HttpResponse.BodyHandler.class));
+        verify(httpClient).send(requestCaptor.capture(), ArgumentMatchers.<HttpResponse.BodyHandler<String>>any());
         String body = extractBody(requestCaptor.getValue());
         JsonNode payload = new ObjectMapper().readTree(body);
 
@@ -196,7 +197,7 @@ class AiChatServiceTest {
         when(stringRedisTemplate.opsForValue()).thenReturn(valueOperations);
         when(valueOperations.increment("app:ai:chat:limit:acct-3")).thenReturn(1L);
         when(stringRedisTemplate.expire("app:ai:chat:limit:acct-3", 1, TimeUnit.MINUTES)).thenReturn(true);
-        when(httpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class))).thenReturn(httpResponse);
+        when(httpClient.send(any(HttpRequest.class), ArgumentMatchers.<HttpResponse.BodyHandler<String>>any())).thenReturn(httpResponse);
         when(httpResponse.statusCode()).thenReturn(403);
         when(httpResponse.body()).thenReturn("{\"code\":30001,\"message\":\"Sorry, your account balance is insufficient\",\"data\":null}");
 

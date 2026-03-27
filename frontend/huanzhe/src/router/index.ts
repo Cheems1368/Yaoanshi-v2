@@ -88,6 +88,11 @@ const routes: Array<RouteRecordRaw> = [
     path: '/ai-assistant',
     component: () => import('@/modules/patient/pages/AiAssistantPage.vue'),
     meta: { requiresAuth: true }
+  },
+  {
+    path: '/self-reported-medications',
+    component: () => import('@/modules/patient/pages/SelfReportedMedicationPage.vue'),
+    meta: { requiresAuth: true, requiresBinding: true }
   }
 ]
 

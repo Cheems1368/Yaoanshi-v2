@@ -1,6 +1,7 @@
 package com.medicine.service.admin;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.medicine.api.dto.ddi.AppDdiScreenResult;
 import com.medicine.api.dto.medication.DoseTaskDTO;
 import com.medicine.api.dto.medication.MedicationPlanDTO;
 import com.medicine.common.exception.BusinessException;
@@ -14,6 +15,7 @@ import com.medicine.repository.medication.MedicationDoseTaskMapper;
 import com.medicine.repository.medication.MedicationPlanEventMapper;
 import com.medicine.repository.medication.MedicationPlanItemMapper;
 import com.medicine.repository.medication.MedicationPlanMapper;
+import com.medicine.service.app.AppDdiScreeningService;
 import com.medicine.service.auth.JwtClaims;
 import com.medicine.service.auth.ProfessionalIdentityService;
 import org.springframework.stereotype.Service;
@@ -41,6 +43,7 @@ public class AdminMedicationPlanService {
     private final MedicationPlanEventMapper medicationPlanEventMapper;
     private final MedicationDoseTaskMapper medicationDoseTaskMapper;
     private final ProfessionalIdentityService professionalIdentityService;
+    private final AppDdiScreeningService appDdiScreeningService;
     private final ObjectMapper objectMapper;
 
     public AdminMedicationPlanService(
@@ -49,6 +52,7 @@ public class AdminMedicationPlanService {
             MedicationPlanEventMapper medicationPlanEventMapper,
             MedicationDoseTaskMapper medicationDoseTaskMapper,
             ProfessionalIdentityService professionalIdentityService,
+            AppDdiScreeningService appDdiScreeningService,
             ObjectMapper objectMapper
     ) {
         this.medicationPlanMapper = medicationPlanMapper;
@@ -56,6 +60,7 @@ public class AdminMedicationPlanService {
         this.medicationPlanEventMapper = medicationPlanEventMapper;
         this.medicationDoseTaskMapper = medicationDoseTaskMapper;
         this.professionalIdentityService = professionalIdentityService;
+        this.appDdiScreeningService = appDdiScreeningService;
         this.objectMapper = objectMapper;
     }
 
@@ -110,6 +115,23 @@ public class AdminMedicationPlanService {
         LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
         activateInternal(plan, pharmacistId, now);
         return getPlan(claims, id);
+    }
+
+    public AppDdiScreenResult ddiCheckForPlan(JwtClaims claims, Long id) {
+        professionalIdentityService.getOrCreatePharmacistProfile(claims);
+        MedicationPlan plan = requirePlan(id);
+        List<MedicationPlanItem> items = medicationPlanItemMapper.selectByPlanId(DEFAULT_TENANT_ID, plan.getId());
+        List<String> drugNames = items.stream()
+                .map(MedicationPlanItem::getDrugName)
+                .filter(StringUtils::hasText)
+                .distinct()
+                .toList();
+        if (drugNames.isEmpty()) {
+            AppDdiScreenResult empty = new AppDdiScreenResult();
+            empty.setAlerts(List.of());
+            return empty;
+        }
+        return appDdiScreeningService.screenPlanDrugs(plan.getPatientId(), drugNames);
     }
 
     public MedicationPlanDTO getPlan(JwtClaims claims, Long id) {

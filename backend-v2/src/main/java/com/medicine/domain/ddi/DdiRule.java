@@ -12,6 +12,10 @@ public class DdiRule extends BaseEntity {
     private String recommendedAction;
     private String status;
     private Long maintainedByPharmacistId;
+    private String mechanismDesc;
+    private String alternativeRecommendation;
+    private String referenceSource;
+    private String patientSummary;
 
     public String getRuleCode() {
         return ruleCode;
@@ -75,5 +79,37 @@ public class DdiRule extends BaseEntity {
 
     public void setMaintainedByPharmacistId(Long maintainedByPharmacistId) {
         this.maintainedByPharmacistId = maintainedByPharmacistId;
+    }
+
+    public String getMechanismDesc() {
+        return mechanismDesc;
+    }
+
+    public void setMechanismDesc(String mechanismDesc) {
+        this.mechanismDesc = mechanismDesc;
+    }
+
+    public String getAlternativeRecommendation() {
+        return alternativeRecommendation;
+    }
+
+    public void setAlternativeRecommendation(String alternativeRecommendation) {
+        this.alternativeRecommendation = alternativeRecommendation;
+    }
+
+    public String getReferenceSource() {
+        return referenceSource;
+    }
+
+    public void setReferenceSource(String referenceSource) {
+        this.referenceSource = referenceSource;
+    }
+
+    public String getPatientSummary() {
+        return patientSummary;
+    }
+
+    public void setPatientSummary(String patientSummary) {
+        this.patientSummary = patientSummary;
     }
 }

@@ -128,6 +128,14 @@ if ($NoStart) {
 }
 
 $pomPath = [System.IO.Path]::GetFullPath((Join-Path (Split-Path -Parent $PSScriptRoot) "pom.xml"))
+$mavenGlobalSettingsPath = [System.IO.Path]::GetFullPath((Join-Path (Split-Path -Parent $PSScriptRoot) ".mvn\global-settings.xml"))
 Write-Host ("Starting backend-v2 with Maven (profile={0})..." -f [System.Environment]::GetEnvironmentVariable("SPRING_PROFILES_ACTIVE", 'Process'))
-& mvn spring-boot:run -f $pomPath
+$mavenArgs = @()
+if (Test-Path $mavenGlobalSettingsPath) {
+    # Bypass broken machine-wide mirrors and use repo-pinned Maven settings instead.
+    Write-Host ("Using repo Maven global settings: {0}" -f $mavenGlobalSettingsPath)
+    $mavenArgs += @("-gs", $mavenGlobalSettingsPath)
+}
+$mavenArgs += @("spring-boot:run", "-f", $pomPath)
+& mvn @mavenArgs
 exit $LASTEXITCODE

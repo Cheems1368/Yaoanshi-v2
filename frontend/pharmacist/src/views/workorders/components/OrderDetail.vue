@@ -23,6 +23,13 @@
 
       <OrderSummary :detail="detail" :role="role" />
 
+      <SelfReportedMedicationsPanel
+        v-if="detail.category === 'NEW_MEDICATION_REVIEW'"
+        :order-id="detail.id"
+        :patient-id="detail.patientId"
+        @refresh="$emit('refresh', detail.id)"
+      />
+
       <OrderTimeline :events="detail.events || []" />
 
       <OrderActionBar
@@ -45,6 +52,7 @@ import { Document } from '@element-plus/icons-vue'
 import OrderSummary from './OrderSummary.vue'
 import OrderTimeline from './OrderTimeline.vue'
 import OrderActionBar from './OrderActionBar.vue'
+import SelfReportedMedicationsPanel from './SelfReportedMedicationsPanel.vue'
 
 defineProps({
   orderId: { type: [Number, String], default: null },
@@ -55,7 +63,7 @@ defineProps({
   showBack: { type: Boolean, default: false }
 })
 
-defineEmits(['back', 'claim', 'reply', 'escalate', 'reject', 'close', 'save-draft'])
+defineEmits(['back', 'claim', 'reply', 'escalate', 'reject', 'close', 'save-draft', 'refresh'])
 </script>
 
 <style lang="scss" scoped>

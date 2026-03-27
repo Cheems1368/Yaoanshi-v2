@@ -1,4 +1,4 @@
-﻿# CLAUDE.md
+# CLAUDE.md
 
 ## 0. 语言与沟通规则
 
@@ -36,7 +36,6 @@ Additional precedence rules:
 2. If `docs/` conflicts with any file in `Standard document/`, `Standard document/` wins.
 3. `CLAUDE.md` governs Claude session behavior; `CODEX.md` governs Codex session behavior.
 4. Formal product, design, technical, and backend details still belong to the formal documents listed above.
-5. Dual-agent collaboration plan: `docs/DUAL_AGENT_COLLABORATION.md`
 
 ## 2. Mandatory Read Order
 
@@ -69,7 +68,7 @@ Active product surfaces:
 
 Claude is the product/data/frontend/verification host. It defines correct answers, implements frontend, runs browser acceptance, and manages ops delivery. It does NOT serve as the primary high-frequency backend constructor — that role belongs to Codex.
 
-Full collaboration protocol: `docs/DUAL_AGENT_COLLABORATION.md`
+Codex leads backend scaffolding, code quality review, and test coverage; Claude leads product definition, frontend implementation, and runtime verification.
 
 ### 3.3 Backend zones
 
@@ -94,6 +93,21 @@ All new backend responses must use:
 
 `CommonResult<T>`
 
+### 3.7 WebSocket endpoints
+
+1. Professional notifications: `/ws/admin-notifications` (ticket-authenticated)
+2. Patient notifications: `/ws/app-notifications` (ticket-authenticated)
+
+Both paths require a short-lived one-time socket ticket obtained from `/admin-api/notifications/socket-ticket` or `/app-api/notifications/socket-ticket` before opening the WebSocket connection. Bearer tokens must not appear in WebSocket URLs.
+
+### 3.8 AI assistant
+
+1. Backend endpoint: `POST /app-api/ai/chat`
+2. Patient app route: `/ai-assistant`
+3. AI provider configuration: `medicine.ai.base-url` / `medicine.ai.api-key` / `medicine.ai.model`
+4. Current default provider: SiliconFlow `/v1/chat/completions`, model `zai-org/GLM-4.5-Air`
+5. Local secrets: `backend-v2/.env.local` (gitignored); loaded by `backend-v2/scripts/run-local-with-env.ps1`
+
 ## 4. Allowed / Forbidden Actions
 
 ### 4.1 Always allowed
@@ -114,6 +128,7 @@ All new backend responses must use:
 6. Do not treat `docs/` as source of truth
 7. Do not silently rename public DTOs or route prefixes
 8. Do not create new visual systems outside `FRONTEND_GUIDELINES.md`
+9. Do not skip Flyway migration version numbers or modify already-applied migration files
 
 ### 4.3 Default implementation attitude
 
@@ -139,6 +154,7 @@ For exact versions, always read `Standard document/TECH_STACK.md`.
 2. Persistence: MyBatis Plus
 3. Cache/session support: Redis
 4. API docs: SpringDoc
+5. Drug catalog pinyin search: pinyin4j 2.5.1
 
 ### 5.3 Legacy
 
@@ -159,6 +175,8 @@ For exact versions, always read `Standard document/TECH_STACK.md`.
    - `common`
 3. New backend DTO naming must align with `Standard document/BACKEND_STRUCTURE.md`
 4. Do not expose entities directly from controllers
+5. Schema changes must use Flyway migrations under `backend-v2/src/main/resources/db/migration/` with convention `V{N}__{description}.sql`. Current latest applied version: V7.
+6. Active sub-domain packages include: `drug` (drug catalog), `medication` (self-reported medication)
 
 ### 6.2 Frontend rules
 
@@ -217,6 +235,7 @@ Required backend rules:
    - legacy user bridge
    - professional identity mapped from existing legacy user tables
 5. All schema, table, DTO, and endpoint work must match `BACKEND_STRUCTURE.md`
+6. Schema evolution uses Flyway. Never alter already-applied migrations (V1–V7).
 
 Public names that must not be renamed without updating the formal contract:
 
@@ -227,6 +246,19 @@ Public names that must not be renamed without updating the formal contract:
 5. `CheckinRecordDTO`
 6. `PrescriptionDTO`
 7. `HelpOrderDTO`
+8. `SelfReportedMedicationDTO`
+9. `SelfReportedMedicationCreateRequest`
+10. `DrugCatalogDTO`
+11. `AppDdiAlert`
+12. `AppDdiScreenResult`
+13. `AdminDdiRuleDTO`
+14. `AdminDdiRuleUpsertRequest`
+15. `NotificationLogDTO`
+16. `AppPatientProfileDTO`
+17. `AppPatientHealthProfileDTO`
+18. `AdminPatientDetailDTO`
+19. `KnowledgeAssessmentDTO`
+20. `SatisfactionSurveyDTO`
 
 ## 9. Session Workflow and Output Contract
 
@@ -264,4 +296,3 @@ Relationship between session files:
 4. full implementation phase detail
 
 Those details remain in the formal documents and must be referenced there instead of being reinvented here.
-

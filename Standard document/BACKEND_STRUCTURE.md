@@ -558,6 +558,41 @@ Columns:
 | `remark` | `VARCHAR(255)` | Yes |  |  | optional |
 | audit columns | standard |  |  |  |  |
 
+#### Table: `self_reported_medication`
+
+Purpose:
+
+- patient self-reported medications outside the formal medication plan, used for DDI screening background and pharmacist review
+
+Columns:
+
+| Column | Type | Nullable | Default | Index / Constraint | Business rule |
+|---|---|---|---|---|---|
+| `id` | `BIGINT` | No |  | PK | record id |
+| `patient_id` | `BIGINT` | No |  | `IDX_srm_patient` | target patient |
+| `drug_name` | `VARCHAR(128)` | No |  | `IDX_srm_drug_name` | reported drug name |
+| `dosage` | `VARCHAR(64)` | Yes |  |  | optional dose info |
+| `status` | `VARCHAR(20)` | No | `'PENDING'` | `IDX_srm_status` | `PENDING`, `ACTIVE`, `STOPPED`, `TRANSFERRED` |
+| `notes` | `TEXT` | Yes |  |  | patient supplemental notes |
+| `operator_type` | `VARCHAR(20)` | No |  |  | `PATIENT`, `FAMILY` |
+| `operator_account_id` | `BIGINT` | No |  |  | submitting app account id |
+| `work_order_id` | `BIGINT` | Yes |  | `IDX_srm_workorder` | auto-created review work order |
+| `transferred_plan_item_id` | `BIGINT` | Yes |  |  | medication plan item id after transfer |
+| audit columns | standard |  |  |  |  |
+
+Status state machine:
+
+- `PENDING` — submitted, pending pharmacist review
+- `ACTIVE` — pharmacist acknowledged, drug is being tracked for DDI screening
+- `STOPPED` — pharmacist or patient stopped tracking
+- `TRANSFERRED` — pharmacist moved the drug into the formal medication plan
+
+Business rules:
+
+1. On submission, system auto-creates a `help_order` with `category = NEW_MEDICATION_REVIEW`.
+2. DDI screening for `POST /app-api/ddi/screen` includes all `ACTIVE` self-reported medications as background drugs.
+3. Patient can only stop their own PENDING records (withdraw); pharmacist can stop any ACTIVE record.
+
 ### 4.6 Help order domain
 
 #### Table: `help_order`
@@ -753,6 +788,10 @@ Columns:
 | `recommended_action` | `VARCHAR(255)` | Yes |  |  | suggestion |
 | `status` | `VARCHAR(20)` | No | `'ACTIVE'` |  | `ACTIVE`, `INACTIVE` |
 | `maintained_by_pharmacist_id` | `BIGINT` | Yes |  |  | owner |
+| `patient_summary` | `VARCHAR(255)` | Yes |  |  | short patient-readable summary (falls back to `message` if empty) |
+| `mechanism_desc` | `TEXT` | Yes |  |  | interaction mechanism description (pharmacist-side display) |
+| `alternative_recommendation` | `TEXT` | Yes |  |  | alternative drug recommendations (pharmacist-side display) |
+| `reference_source` | `VARCHAR(255)` | Yes |  |  | reference source (title · chapter · version) |
 | audit columns | standard |  |  |  |  |
 
 #### Table: `ddi_screening_log`
@@ -775,6 +814,7 @@ Columns:
 | `confirmed_by_pharmacist_id` | `BIGINT` | Yes |  |  | confirmer |
 | `confirmed_at` | `DATETIME` | Yes |  |  | confirm time |
 | `confirmation_note` | `VARCHAR(255)` | Yes |  |  | note |
+| `self_reported_medication_id` | `BIGINT` | Yes |  |  | source self-reported medication id (mutually exclusive with `prescription_id`) |
 | audit columns | standard |  |  |  |  |
 
 #### Table: `drug_contraindication`
@@ -797,6 +837,7 @@ Columns:
 | `recommended_action` | `VARCHAR(255)` | Yes |  |  | suggestion |
 | `status` | `VARCHAR(20)` | No | `'ACTIVE'` |  | `ACTIVE`, `INACTIVE` |
 | `maintained_by_pharmacist_id` | `BIGINT` | Yes |  |  | owner |
+| `patient_summary` | `VARCHAR(255)` | Yes |  |  | short patient-readable summary |
 | audit columns | standard |  |  |  |  |
 
 Business rules:
@@ -805,6 +846,50 @@ Business rules:
 2. DISEASE matches against disease history in health profile
 3. ALLERGY matches against drug_allergy / food_allergy fields
 4. first-period scope: stroke-related drugs only
+
+### 4.10 Drug catalog domain
+
+#### Table: `drug_catalog`
+
+Purpose:
+
+- shared reference catalog for drug name autocomplete and pinyin initials search
+- used by patient self-reported medication input and pharmacist DDI rule management
+- not a clinical decision table; it is a search-aid reference only
+
+Columns:
+
+| Column | Type | Nullable | Default | Index / Constraint | Business rule |
+|---|---|---|---|---|---|
+| `id` | `BIGINT` | No |  | PK | catalog entry id |
+| `name_cn` | `VARCHAR(128)` | No |  | `UK_drug_name_tenant`, `IDX_drug_name` | Chinese drug name, unique per tenant |
+| `name_en` | `VARCHAR(128)` | Yes |  |  | optional English name |
+| `pinyin_initials` | `VARCHAR(64)` | No |  | `IDX_drug_pinyin` | pre-computed lowercase pinyin first-letter string (e.g., `aspl` for 阿司匹林) |
+| `category` | `VARCHAR(64)` | Yes |  |  | drug class label (e.g., 抗血小板, 他汀类) |
+| `status` | `VARCHAR(20)` | No | `'ACTIVE'` |  | `ACTIVE`, `INACTIVE` |
+| audit columns | standard |  |  |  |  |
+
+Indexing rules:
+
+1. `IDX_drug_pinyin (tenant_id, pinyin_initials, deleted)` supports prefix-match search by pinyin.
+2. `IDX_drug_name (tenant_id, name_cn, deleted)` supports fuzzy-match search by Chinese name.
+
+Pinyin computation rules:
+
+1. `pinyin_initials` is extracted at insert/update time using `PinyinUtils` (backed by `pinyin4j`).
+2. Each Chinese character contributes one lowercase letter (first letter of its primary Hanyu Pinyin reading).
+3. Non-Chinese characters are skipped.
+4. Multi-reading characters use the first reading from the pinyin dictionary (standard medical pronunciation assumed).
+
+Seed data:
+
+V7 migration pre-seeds 41 common cardiovascular and clinical drugs including antiplatelets, anticoagulants, statins, antihypertensives, diuretics, and antidiabetics.
+
+Business rules:
+
+1. `drug_catalog` is a pharmacist-maintained reference, not a patient-editable list.
+2. Drug names entered outside the catalog (free-text) remain valid; the catalog is autocomplete-only and does not enforce name constraints.
+3. Pinyin prefix match takes priority over fuzzy Chinese name match in search result ranking.
 
 ## 5. Entity relationships
 
@@ -834,7 +919,13 @@ erDiagram
     ddi_rule ||--o{ ddi_screening_log : matches
     drug_contraindication ||--o{ ddi_screening_log : matches_condition
     patient_health_profile ||--o{ ddi_screening_log : checks_against
+    patient ||--o{ self_reported_medication : reports
+    self_reported_medication ||--o| help_order : creates_review
+    self_reported_medication ||--o{ ddi_screening_log : triggers
 ```
+
+Note: `drug_catalog` is a standalone lookup table with no foreign-key relationships to other business tables. It is not shown in the diagram above. It acts as a search-aid reference for drug name autocomplete only.
+
 
 ## 6. API contracts
 
@@ -886,6 +977,41 @@ erDiagram
 | `GET` | `/app-api/prescriptions` | Yes | status/page query | paged prescriptions | none |
 | `POST` | `/app-api/prescriptions/uploads` | Yes | upload metadata | prescription summary | write `prescription`, `prescription_attachment`, `prescription_ocr_record` |
 
+#### Self-reported medication
+
+| Method | Path | Auth | Request | Response `data` | Side effects |
+|---|---|---|---|---|---|
+| `POST` | `/app-api/self-reported-medications` | Yes | `SelfReportedMedicationCreateRequest` | `SelfReportedMedicationDTO` | write `self_reported_medication`, auto-create `NEW_MEDICATION_REVIEW` help order, optional DDI screening |
+| `GET` | `/app-api/self-reported-medications` | Yes | page/status query | paged `SelfReportedMedicationDTO` list | none |
+| `POST` | `/app-api/self-reported-medications/{id}/withdraw` | Yes | none | updated DTO | set status to `STOPPED` (patient-initiated) |
+| `POST` | `/app-api/self-reported-medications/{id}/stop` | Yes | none | updated DTO | set status to `STOPPED` (pharmacist-initiated via admin API boundary) |
+
+`SelfReportedMedicationCreateRequest`:
+
+- `drugName`: string, required
+- `dosage`: string, optional
+- `notes`: string, optional
+
+`SelfReportedMedicationDTO`:
+
+| Field | Type | Notes |
+|---|---|---|
+| `id` | `Long` | record id |
+| `patientId` | `Long` | owner patient |
+| `drugName` | `String` | reported drug name |
+| `dosage` | `String` | optional |
+| `status` | `String` | `PENDING`, `ACTIVE`, `STOPPED`, `TRANSFERRED` |
+| `notes` | `String` | optional |
+| `operatorType` | `String` | `PATIENT`, `FAMILY` |
+| `operatorAccountId` | `Long` | submitter account id |
+| `workOrderId` | `Long` | linked review work order |
+| `transferredPlanItemId` | `Long` | plan item after transfer |
+| `createdAt` | `String` | ISO datetime |
+
+`SelfReportedMedicationRejectRequest`:
+
+- `reason`: string, required
+
 #### DDI screening (patient-side)
 
 | Method | Path | Auth | Request | Response `data` | Side effects |
@@ -905,15 +1031,44 @@ erDiagram
   - `drugB`: second drug (new) or condition name
   - `message`: warning text
   - `recommendedAction`: suggestion text
+  - `patientSummary`: patient-friendly short description (optional, falls back to `message`)
 
 Business rules:
 
-1. Reads patient's current ACTIVE medication plan items as the "existing drugs" set
+1. Reads patient's current ACTIVE medication plan items **and** all ACTIVE self-reported medication records as the "existing drugs" set
 2. Matches new drug names against existing drugs using `ddi_rule` (HIGH + MEDIUM)
 3. Matches new drug names against patient health profile using `drug_contraindication` (HIGH + MEDIUM)
 4. Returns combined alert list, sorted by severity (HIGH first)
 5. This endpoint is informational only — it does NOT block or write audit records
 6. Audit is only written when the patient confirms and proceeds (via prescription upload or plan update)
+7. `AppDdiAlert` includes a `patientSummary` field for patient-readable short description (falls back to `message` if `ddi_rule.patient_summary` is empty)
+
+#### Drug catalog search (patient-side)
+
+| Method | Path | Auth | Request | Response `data` | Side effects |
+|---|---|---|---|---|---|
+| `GET` | `/app-api/drugs/search` | Yes | `q`, `limit` query params | `List<DrugCatalogDTO>` | read-only |
+
+Query parameters:
+
+- `q`: search keyword — Chinese name substring or pinyin initials prefix (e.g., `aspl` matches 阿司匹林)
+- `limit`: max results, default `10`, max `20`
+
+`DrugCatalogDTO`:
+
+| Field | Type | Notes |
+|---|---|---|
+| `id` | `Long` | catalog entry id |
+| `nameCn` | `String` | Chinese drug name |
+| `nameEn` | `String` | optional English name |
+| `pinyinInitials` | `String` | pinyin first-letter string (e.g., `aspl`) |
+| `category` | `String` | drug class label |
+
+Search priority:
+
+1. `name_cn` prefix match (highest)
+2. `pinyin_initials` prefix match
+3. `name_cn` fuzzy match (lowest)
 
 #### AI assistant
 
@@ -962,6 +1117,7 @@ Business rules:
 | `POST` | `/admin-api/medication-plans/{id}/activate` | pharmacist | none | active plan summary | activate plan, generate/recalc tasks |
 | `GET` | `/admin-api/medication-plans/{id}/tasks` | pharmacist | date range | task list | none |
 | `GET` | `/admin-api/medication-plans/{id}/adherence-report` | pharmacist | range | export metadata / report | read-only export |
+| `GET` | `/admin-api/medication-plans/{id}/ddi-check` | pharmacist | none | list of `AppDdiAlert` | check DDI conflicts before activation; reads plan items as new drugs against patient ACTIVE self-reported meds |
 
 #### Help order
 
@@ -974,6 +1130,11 @@ Business rules:
 | `POST` | `/admin-api/help-orders/{id}/escalate` | pharmacist | doctor id optional | updated order | move to doctor queue, event + notification |
 | `POST` | `/admin-api/help-orders/{id}/reject` | pharmacist or doctor | reject DTO | updated order | set rejected |
 | `POST` | `/admin-api/help-orders/{id}/close` | pharmacist or doctor | close DTO | updated order | close order, trigger satisfaction reminder |
+| `GET` | `/admin-api/help-orders/self-reported-medications` | pharmacist | page query | paged `NEW_MEDICATION_REVIEW` order list | none |
+| `POST` | `/admin-api/help-orders/{id}/acknowledge` | pharmacist | none | updated order | set self-reported medication status to `ACTIVE`, acknowledge review |
+| `POST` | `/admin-api/help-orders/{id}/reject-medication` | pharmacist | `SelfReportedMedicationRejectRequest` | updated order | set self-reported medication status to `STOPPED`, record reason |
+| `GET` | `/admin-api/help-orders/{id}/transfer-prefill` | pharmacist | none | prefill data for medication plan | read-only, returns drug name and dosage for plan creation |
+| `POST` | `/admin-api/help-orders/{id}/mark-transferred` | pharmacist | none | updated order | set self-reported medication status to `TRANSFERRED`, link `transferred_plan_item_id` |
 
 #### DDI and notification
 
@@ -988,6 +1149,23 @@ Business rules:
 | `POST` | `/admin-api/ddi/screenings/{id}/confirm` | pharmacist | confirm DTO | confirm result | update `ddi_screening_log` |
 | `POST` | `/admin-api/notifications/socket-ticket` | pharmacist or doctor | none | `{ ticket }` | generate one-time WebSocket ticket in Redis |
 | `GET` | `/admin-api/notifications/logs` | pharmacist admin | query | paged logs | none |
+
+#### Drug catalog search (admin-side)
+
+| Method | Path | Auth role | Request | Response `data` | Side effects |
+|---|---|---|---|---|---|
+| `GET` | `/admin-api/drugs/search` | pharmacist or doctor | `q`, `limit` query params | `List<DrugCatalogDTO>` | read-only |
+
+Same query parameters and `DrugCatalogDTO` shape as the app-side endpoint. Used for autocomplete in DDI rule management and medication plan drug name inputs.
+
+`AdminDdiRuleDTO` and `AdminDdiRuleUpsertRequest` include the following extended fields (added in V6):
+
+| Field | Type | Notes |
+|---|---|---|
+| `patientSummary` | `String` | patient-readable summary |
+| `mechanismDesc` | `String` | interaction mechanism (pharmacist display) |
+| `alternativeRecommendation` | `String` | alternative drug suggestions (pharmacist display) |
+| `referenceSource` | `String` | reference source title/chapter/version |
 
 #### Health check
 

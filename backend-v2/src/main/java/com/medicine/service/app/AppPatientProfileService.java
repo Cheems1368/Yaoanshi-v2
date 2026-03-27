@@ -54,7 +54,9 @@ public class AppPatientProfileService {
         AppPatientService.AccessContext context = appPatientService.requireAccessContext(subject);
         Long tenantId = tenantIdOf(context.patient());
         PatientProfile profile = patientProfileMapper.selectByPatientId(tenantId, context.patient().getId());
-        return toProfileDto(context.patient(), profile);
+        AppPatientProfileDTO dto = toProfileDto(context.patient(), profile);
+        dto.setOperatorType(context.operatorType());
+        return dto;
     }
 
     public AppPatientProfileDTO updateProfile(String subject, AppPatientProfileUpdateRequest request) {

@@ -5,9 +5,12 @@ import com.medicine.api.dto.helporder.HelpOrderDTO;
 import com.medicine.api.dto.helporder.HelpOrderEscalateRequest;
 import com.medicine.api.dto.helporder.HelpOrderRejectRequest;
 import com.medicine.api.dto.helporder.HelpOrderReplyRequest;
+import com.medicine.api.dto.medication.SelfReportedMedicationDTO;
+import com.medicine.api.dto.medication.SelfReportedMedicationRejectRequest;
 import com.medicine.common.model.CommonResult;
 import com.medicine.common.model.PageResult;
 import com.medicine.service.admin.AdminHelpOrderService;
+import com.medicine.service.admin.AdminSelfReportedMedicationService;
 import com.medicine.service.auth.JwtClaims;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -18,14 +21,22 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
+import java.util.Map;
+
 @RestController
 @RequestMapping("/admin-api/help-orders")
 public class AdminHelpOrderController {
 
     private final AdminHelpOrderService adminHelpOrderService;
+    private final AdminSelfReportedMedicationService adminSelfReportedMedicationService;
 
-    public AdminHelpOrderController(AdminHelpOrderService adminHelpOrderService) {
+    public AdminHelpOrderController(
+            AdminHelpOrderService adminHelpOrderService,
+            AdminSelfReportedMedicationService adminSelfReportedMedicationService
+    ) {
         this.adminHelpOrderService = adminHelpOrderService;
+        this.adminSelfReportedMedicationService = adminSelfReportedMedicationService;
     }
 
     @GetMapping
@@ -82,5 +93,53 @@ public class AdminHelpOrderController {
             Authentication authentication
     ) {
         return CommonResult.ok(adminHelpOrderService.close((JwtClaims) authentication.getDetails(), id, request));
+    }
+
+    @GetMapping("/{id}/self-reported-medications")
+    public CommonResult<List<SelfReportedMedicationDTO>> listSelfReportedMedications(
+            @PathVariable("id") Long id,
+            Authentication authentication
+    ) {
+        return CommonResult.ok(adminSelfReportedMedicationService.listForWorkOrder((JwtClaims) authentication.getDetails(), id));
+    }
+
+    @PostMapping("/{id}/self-reported-medications/{srmId}/acknowledge")
+    public CommonResult<SelfReportedMedicationDTO> acknowledgeSelfReportedMedication(
+            @PathVariable("id") Long id,
+            @PathVariable("srmId") Long srmId,
+            Authentication authentication
+    ) {
+        return CommonResult.ok(adminSelfReportedMedicationService.acknowledge((JwtClaims) authentication.getDetails(), srmId));
+    }
+
+    @PostMapping("/{id}/self-reported-medications/{srmId}/reject")
+    public CommonResult<SelfReportedMedicationDTO> rejectSelfReportedMedication(
+            @PathVariable("id") Long id,
+            @PathVariable("srmId") Long srmId,
+            @RequestBody SelfReportedMedicationRejectRequest request,
+            Authentication authentication
+    ) {
+        return CommonResult.ok(adminSelfReportedMedicationService.reject(
+                (JwtClaims) authentication.getDetails(), srmId, request.getReason()));
+    }
+
+    @GetMapping("/{id}/self-reported-medications/{srmId}/transfer-prefill")
+    public CommonResult<Map<String, Object>> getSelfReportedMedicationTransferPrefill(
+            @PathVariable("id") Long id,
+            @PathVariable("srmId") Long srmId,
+            Authentication authentication
+    ) {
+        return CommonResult.ok(adminSelfReportedMedicationService.getTransferPrefill((JwtClaims) authentication.getDetails(), srmId));
+    }
+
+    @PostMapping("/{id}/self-reported-medications/{srmId}/mark-transferred")
+    public CommonResult<Void> markSelfReportedMedicationTransferred(
+            @PathVariable("id") Long id,
+            @PathVariable("srmId") Long srmId,
+            @RequestParam("planItemId") Long planItemId,
+            Authentication authentication
+    ) {
+        adminSelfReportedMedicationService.markTransferred((JwtClaims) authentication.getDetails(), srmId, planItemId);
+        return CommonResult.ok(null);
     }
 }

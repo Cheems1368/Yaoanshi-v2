@@ -82,6 +82,7 @@ Current MVP route list for the patient app:
 - `/drug-category/:id` - Drug Category Screen
 - `/rational-medication` - Rational Medication Education Screen
 - `/ai-assistant` - AI Medication Assistant Screen
+- `/self-reported-medications` - Self-Reported Medication Screen
 
 ### 4.3 Patient App screen list
 
@@ -463,6 +464,38 @@ Success:
 Error:
 
 - Show AI service failure with one-click retry
+
+#### Self-Reported Medication Screen
+
+Route: `/self-reported-medications`
+
+Purpose:
+
+- Let the patient record medications taken outside the formal medication plan
+- Trigger DDI screening before submission
+- View and manage self-reported medication records
+
+Trigger:
+
+- User taps "记录新药品" (Record New Drug) quick entry on Home page
+
+Main actions:
+
+1. View list of self-reported medication records (PENDING / ACTIVE / STOPPED / TRANSFERRED)
+2. Tap "新增" to open entry form: drug name (required), dosage, notes
+3. Before submit: system calls DDI screening; if alerts exist, show alert dialog (see section 7.4.2)
+4. Submit → `POST /app-api/self-reported-medications`
+5. PENDING records can be withdrawn → `POST /app-api/self-reported-medications/{id}/withdraw`
+
+Success:
+
+- Record is created and review work order is auto-created for pharmacist
+- User sees the updated record list with status
+
+Error:
+
+- Show DDI screening failure gracefully (do not block submission)
+- Show save failure and allow retry
 
 ### 4.4 Patient App primary flow
 
@@ -1131,7 +1164,7 @@ Applies to:
 Trigger:
 
 - Patient uploads a new prescription
-- Patient is about to add a new medication (future self-service flow)
+- Patient submits a new self-reported medication via `/self-reported-medications`
 
 Behavior:
 
@@ -1168,7 +1201,46 @@ Success:
 - Pharmacist can create new rules or edit existing ones
 - Changes take effect immediately for subsequent screenings
 
-### 7.5 OCR low confidence
+### 7.5 NEW_MEDICATION_REVIEW work order handling (pharmacist-side)
+
+Applies to:
+
+- Pharmacist Web
+
+Trigger:
+
+- Patient submits a self-reported medication
+- Pharmacist receives a `NEW_MEDICATION_REVIEW` category work order notification
+
+Behavior (in Help Order Detail `OrderDetail`):
+
+1. `OrderDetail` detects `category = NEW_MEDICATION_REVIEW` and embeds `SelfReportedMedicationsPanel`
+2. Panel displays: drug name, dosage, notes, submission time, and any DDI alerts from the original screening
+3. Pharmacist chooses one of three actions:
+
+   **Action A: Acknowledge** (confirm receipt)
+   - Call `POST /admin-api/help-orders/{id}/acknowledge`
+   - Self-reported medication status → `ACTIVE`
+   - Drug is now included in DDI screening background for this patient
+
+   **Action B: Reject**
+   - Call `POST /admin-api/help-orders/{id}/reject-medication` with reason
+   - Self-reported medication status → `STOPPED`
+   - Rejection reason is stored and work order is closed
+
+   **Action C: Transfer to plan**
+   - Call `GET /admin-api/help-orders/{id}/transfer-prefill` to get prefill data
+   - Open or navigate to `MedicationPlanPanel` with prefilled drug/dosage
+   - Pharmacist completes plan item details and activates plan
+   - Call `POST /admin-api/help-orders/{id}/mark-transferred`
+   - Self-reported medication status → `TRANSFERRED`
+
+DDI check before plan activation:
+
+- Before pharmacist activates a plan, `MedicationPlanPanel` calls `GET /admin-api/medication-plans/{id}/ddi-check`
+- If alerts exist, show confirmation dialog: pharmacist must acknowledge before activating
+
+### 7.7 OCR low confidence
 
 Applies to:
 

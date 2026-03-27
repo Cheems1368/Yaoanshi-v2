@@ -1,5 +1,6 @@
 package com.medicine.api.controller;
 
+import com.medicine.api.dto.ddi.AppDdiScreenResult;
 import com.medicine.api.dto.medication.DoseTaskDTO;
 import com.medicine.api.dto.medication.MedicationPlanDTO;
 import com.medicine.common.model.CommonResult;
@@ -69,5 +70,10 @@ public class AdminMedicationPlanController {
             Authentication authentication
     ) {
         return CommonResult.ok(adminMedicationPlanService.buildAdherenceReport((JwtClaims) authentication.getDetails(), id, dateFrom, dateTo));
+    }
+
+    @GetMapping("/{id}/ddi-check")
+    public CommonResult<AppDdiScreenResult> ddiCheck(@PathVariable("id") Long id, Authentication authentication) {
+        return CommonResult.ok(adminMedicationPlanService.ddiCheckForPlan((JwtClaims) authentication.getDetails(), id));
     }
 }

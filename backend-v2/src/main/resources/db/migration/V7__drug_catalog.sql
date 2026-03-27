@@ -1,0 +1,67 @@
+-- V7: Drug catalog with pinyin initials for autocomplete search
+
+CREATE TABLE IF NOT EXISTS drug_catalog (
+    id             BIGINT       NOT NULL AUTO_INCREMENT,
+    name_cn        VARCHAR(128) NOT NULL COMMENT '药品中文名称',
+    name_en        VARCHAR(128)          COMMENT '药品英文名称（可选）',
+    pinyin_initials VARCHAR(64) NOT NULL COMMENT '拼音首字母（小写，如 aspl）',
+    category       VARCHAR(64)           COMMENT '药品分类（如 抗血小板）',
+    status         VARCHAR(20)  NOT NULL DEFAULT 'ACTIVE' COMMENT 'ACTIVE / INACTIVE',
+    creator        VARCHAR(64)           COMMENT '创建人',
+    create_time    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updater        VARCHAR(64)           COMMENT '更新人',
+    update_time    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    deleted        TINYINT(1)   NOT NULL DEFAULT 0,
+    tenant_id      BIGINT       NOT NULL DEFAULT 1,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_drug_name_tenant (tenant_id, name_cn),
+    INDEX idx_drug_pinyin (tenant_id, pinyin_initials, deleted),
+    INDEX idx_drug_name   (tenant_id, name_cn, deleted)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='药品目录（支持拼音首字母检索）';
+
+-- Seed: 常用心脑血管及临床药物（含拼音首字母）
+INSERT INTO drug_catalog (name_cn, name_en, pinyin_initials, category, status, tenant_id, creator, create_time, updater, update_time, deleted)
+SELECT * FROM (VALUES
+    ROW('阿司匹林',       'Aspirin',              'aspl',    '抗血小板',       'ACTIVE', 1, 'system', NOW(), 'system', NOW(), 0),
+    ROW('氯吡格雷',       'Clopidogrel',          'lbgl',    '抗血小板',       'ACTIVE', 1, 'system', NOW(), 'system', NOW(), 0),
+    ROW('替格瑞洛',       'Ticagrelor',           'tgrl',    '抗血小板',       'ACTIVE', 1, 'system', NOW(), 'system', NOW(), 0),
+    ROW('西洛他唑',       'Cilostazol',           'xltz',    '抗血小板',       'ACTIVE', 1, 'system', NOW(), 'system', NOW(), 0),
+    ROW('华法林',         'Warfarin',             'hfl',     '抗凝',           'ACTIVE', 1, 'system', NOW(), 'system', NOW(), 0),
+    ROW('达比加群',       'Dabigatran',           'dbjq',    '抗凝',           'ACTIVE', 1, 'system', NOW(), 'system', NOW(), 0),
+    ROW('利伐沙班',       'Rivaroxaban',          'lfsb',    '抗凝',           'ACTIVE', 1, 'system', NOW(), 'system', NOW(), 0),
+    ROW('阿哌沙班',       'Apixaban',             'apsb',    '抗凝',           'ACTIVE', 1, 'system', NOW(), 'system', NOW(), 0),
+    ROW('阿托伐他汀',     'Atorvastatin',         'atftt',   '他汀类',         'ACTIVE', 1, 'system', NOW(), 'system', NOW(), 0),
+    ROW('瑞舒伐他汀',     'Rosuvastatin',         'rsftt',   '他汀类',         'ACTIVE', 1, 'system', NOW(), 'system', NOW(), 0),
+    ROW('辛伐他汀',       'Simvastatin',          'xftt',    '他汀类',         'ACTIVE', 1, 'system', NOW(), 'system', NOW(), 0),
+    ROW('普伐他汀',       'Pravastatin',          'pftt',    '他汀类',         'ACTIVE', 1, 'system', NOW(), 'system', NOW(), 0),
+    ROW('洛伐他汀',       'Lovastatin',           'lftt',    '他汀类',         'ACTIVE', 1, 'system', NOW(), 'system', NOW(), 0),
+    ROW('硝苯地平',       'Nifedipine',           'xbdp',    '钙通道阻滞剂',   'ACTIVE', 1, 'system', NOW(), 'system', NOW(), 0),
+    ROW('氨氯地平',       'Amlodipine',           'aldp',    '钙通道阻滞剂',   'ACTIVE', 1, 'system', NOW(), 'system', NOW(), 0),
+    ROW('地尔硫卓',       'Diltiazem',            'delz',    '钙通道阻滞剂',   'ACTIVE', 1, 'system', NOW(), 'system', NOW(), 0),
+    ROW('维拉帕米',       'Verapamil',            'wlpm',    '钙通道阻滞剂',   'ACTIVE', 1, 'system', NOW(), 'system', NOW(), 0),
+    ROW('美托洛尔',       'Metoprolol',           'mtle',    'β受体阻滞剂',    'ACTIVE', 1, 'system', NOW(), 'system', NOW(), 0),
+    ROW('比索洛尔',       'Bisoprolol',           'bsll',    'β受体阻滞剂',    'ACTIVE', 1, 'system', NOW(), 'system', NOW(), 0),
+    ROW('卡托普利',       'Captopril',            'ktpl',    'ACEI',           'ACTIVE', 1, 'system', NOW(), 'system', NOW(), 0),
+    ROW('依那普利',       'Enalapril',            'ynpl',    'ACEI',           'ACTIVE', 1, 'system', NOW(), 'system', NOW(), 0),
+    ROW('赖诺普利',       'Lisinopril',           'lnpl',    'ACEI',           'ACTIVE', 1, 'system', NOW(), 'system', NOW(), 0),
+    ROW('缬沙坦',         'Valsartan',            'xst',     'ARB',            'ACTIVE', 1, 'system', NOW(), 'system', NOW(), 0),
+    ROW('厄贝沙坦',       'Irbesartan',           'ebst',    'ARB',            'ACTIVE', 1, 'system', NOW(), 'system', NOW(), 0),
+    ROW('坎地沙坦',       'Candesartan',          'kdst',    'ARB',            'ACTIVE', 1, 'system', NOW(), 'system', NOW(), 0),
+    ROW('奥美沙坦',       'Olmesartan',           'amst',    'ARB',            'ACTIVE', 1, 'system', NOW(), 'system', NOW(), 0),
+    ROW('替米沙坦',       'Telmisartan',          'tmst',    'ARB',            'ACTIVE', 1, 'system', NOW(), 'system', NOW(), 0),
+    ROW('呋塞米',         'Furosemide',           'fsm',     '利尿剂',         'ACTIVE', 1, 'system', NOW(), 'system', NOW(), 0),
+    ROW('螺内酯',         'Spironolactone',       'lnz',     '利尿剂',         'ACTIVE', 1, 'system', NOW(), 'system', NOW(), 0),
+    ROW('氢氯噻嗪',       'Hydrochlorothiazide',  'qlsz',    '利尿剂',         'ACTIVE', 1, 'system', NOW(), 'system', NOW(), 0),
+    ROW('地高辛',         'Digoxin',              'dgx',     '强心苷',         'ACTIVE', 1, 'system', NOW(), 'system', NOW(), 0),
+    ROW('硝酸甘油',       'Nitroglycerin',        'xsgy',    '硝酸酯类',       'ACTIVE', 1, 'system', NOW(), 'system', NOW(), 0),
+    ROW('胺碘酮',         'Amiodarone',           'adt',     '抗心律失常',     'ACTIVE', 1, 'system', NOW(), 'system', NOW(), 0),
+    ROW('布洛芬',         'Ibuprofen',            'blf',     '解热镇痛',       'ACTIVE', 1, 'system', NOW(), 'system', NOW(), 0),
+    ROW('对乙酰氨基酚',   'Paracetamol',          'dyxajf',  '解热镇痛',       'ACTIVE', 1, 'system', NOW(), 'system', NOW(), 0),
+    ROW('克拉霉素',       'Clarithromycin',       'klms',    '抗生素',         'ACTIVE', 1, 'system', NOW(), 'system', NOW(), 0),
+    ROW('红霉素',         'Erythromycin',         'hms',     '抗生素',         'ACTIVE', 1, 'system', NOW(), 'system', NOW(), 0),
+    ROW('利福平',         'Rifampicin',           'lfp',     '抗结核',         'ACTIVE', 1, 'system', NOW(), 'system', NOW(), 0),
+    ROW('二甲双胍',       'Metformin',            'ejsg',    '降糖药',         'ACTIVE', 1, 'system', NOW(), 'system', NOW(), 0),
+    ROW('格列美脲',       'Glimepiride',          'glmn',    '降糖药',         'ACTIVE', 1, 'system', NOW(), 'system', NOW(), 0),
+    ROW('胰岛素',         'Insulin',              'yds',     '降糖药',         'ACTIVE', 1, 'system', NOW(), 'system', NOW(), 0)
+) AS tmp(name_cn, name_en, pinyin_initials, category, status, tenant_id, creator, create_time, updater, update_time, deleted)
+WHERE NOT EXISTS (SELECT 1 FROM drug_catalog WHERE drug_catalog.name_cn = tmp.name_cn AND drug_catalog.tenant_id = 1);

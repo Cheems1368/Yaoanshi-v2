@@ -15,6 +15,7 @@ public interface DdiRuleMapper {
 
     @Select("""
             SELECT id, rule_code, drug_a_name, drug_b_name, severity, message, recommended_action, status, maintained_by_pharmacist_id,
+                   mechanism_desc, alternative_recommendation, reference_source, patient_summary,
                    creator, create_time, updater, update_time, deleted, tenant_id
             FROM ddi_rule
             WHERE tenant_id = #{tenantId} AND deleted = 0 AND status = 'ACTIVE'
@@ -24,6 +25,7 @@ public interface DdiRuleMapper {
 
     @Select("""
             SELECT id, rule_code, drug_a_name, drug_b_name, severity, message, recommended_action, status, maintained_by_pharmacist_id,
+                   mechanism_desc, alternative_recommendation, reference_source, patient_summary,
                    creator, create_time, updater, update_time, deleted, tenant_id
             FROM ddi_rule
             WHERE tenant_id = #{tenantId} AND id = #{id} AND deleted = 0
@@ -34,6 +36,7 @@ public interface DdiRuleMapper {
     @Select("""
             <script>
             SELECT id, rule_code, drug_a_name, drug_b_name, severity, message, recommended_action, status, maintained_by_pharmacist_id,
+                   mechanism_desc, alternative_recommendation, reference_source, patient_summary,
                    creator, create_time, updater, update_time, deleted, tenant_id
             FROM ddi_rule
             WHERE tenant_id = #{tenantId} AND deleted = 0
@@ -87,9 +90,11 @@ public interface DdiRuleMapper {
     @Insert("""
             INSERT INTO ddi_rule (
                 rule_code, drug_a_name, drug_b_name, severity, message, recommended_action, status, maintained_by_pharmacist_id,
+                mechanism_desc, alternative_recommendation, reference_source, patient_summary,
                 creator, create_time, updater, update_time, deleted, tenant_id
             ) VALUES (
                 #{ruleCode}, #{drugAName}, #{drugBName}, #{severity}, #{message}, #{recommendedAction}, #{status}, #{maintainedByPharmacistId},
+                #{mechanismDesc}, #{alternativeRecommendation}, #{referenceSource}, #{patientSummary},
                 #{creator}, #{createTime}, #{updater}, #{updateTime}, #{deleted}, #{tenantId}
             )
             """)
@@ -105,6 +110,10 @@ public interface DdiRuleMapper {
                 recommended_action = #{recommendedAction},
                 status = #{status},
                 maintained_by_pharmacist_id = #{maintainedByPharmacistId},
+                mechanism_desc = #{mechanismDesc},
+                alternative_recommendation = #{alternativeRecommendation},
+                reference_source = #{referenceSource},
+                patient_summary = #{patientSummary},
                 updater = #{updater},
                 update_time = #{updateTime}
             WHERE tenant_id = #{tenantId} AND id = #{id} AND deleted = 0

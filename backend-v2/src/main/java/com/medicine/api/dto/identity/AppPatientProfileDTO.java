@@ -25,6 +25,7 @@ public class AppPatientProfileDTO {
     private String realNameVerifiedTime;
     private String createdAt;
     private String updatedAt;
+    private String operatorType;
 
     public Long getPatientId() {
         return patientId;
@@ -208,6 +209,14 @@ public class AppPatientProfileDTO {
 
     public void setUpdatedAt(String updatedAt) {
         this.updatedAt = updatedAt;
+    }
+
+    public String getOperatorType() {
+        return operatorType;
+    }
+
+    public void setOperatorType(String operatorType) {
+        this.operatorType = operatorType;
     }
 
     public static class EmergencyContactDTO {

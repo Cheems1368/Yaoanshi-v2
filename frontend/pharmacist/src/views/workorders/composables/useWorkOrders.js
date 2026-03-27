@@ -24,6 +24,7 @@ const CATEGORY_TEXT = {
   MISSED_OR_WRONG_DOSE: '漏服 / 错服',
   ADVERSE_REACTION: '不良反应',
   PLAN_CHANGE: '计划调整',
+  NEW_MEDICATION_REVIEW: '自报药物审核',
   OTHER: '其他'
 }
 

@@ -168,10 +168,22 @@
           <el-input v-model="ruleForm.ruleCode" :disabled="ruleDrawerMode !== 'create'" />
         </el-form-item>
         <el-form-item label="药品 A" prop="drugAName">
-          <el-input v-model="ruleForm.drugAName" />
+          <el-autocomplete
+            v-model="ruleForm.drugAName"
+            :fetch-suggestions="queryDrugSuggestions"
+            placeholder="输入中文名称或拼音首字母（如 aspl）"
+            class="full-width"
+            clearable
+          />
         </el-form-item>
         <el-form-item label="药品 B" prop="drugBName">
-          <el-input v-model="ruleForm.drugBName" />
+          <el-autocomplete
+            v-model="ruleForm.drugBName"
+            :fetch-suggestions="queryDrugSuggestions"
+            placeholder="输入中文名称或拼音首字母（如 hfl）"
+            class="full-width"
+            clearable
+          />
         </el-form-item>
         <el-form-item label="风险等级" prop="severity">
           <el-select v-model="ruleForm.severity" class="full-width">
@@ -188,6 +200,19 @@
         </el-form-item>
         <el-form-item label="建议动作" prop="recommendedAction">
           <el-input v-model="ruleForm.recommendedAction" type="textarea" :rows="2" />
+        </el-form-item>
+        <el-divider content-position="left">扩展信息（药师专业参考）</el-divider>
+        <el-form-item label="机制说明">
+          <el-input v-model="ruleForm.mechanismDesc" type="textarea" :rows="3" placeholder="相互作用机制（可选）" />
+        </el-form-item>
+        <el-form-item label="替代建议">
+          <el-input v-model="ruleForm.alternativeRecommendation" type="textarea" :rows="2" placeholder="可替代用药方案（可选）" />
+        </el-form-item>
+        <el-form-item label="参考来源">
+          <el-input v-model="ruleForm.referenceSource" placeholder="如：《临床药理学》第3版第12章（可选）" />
+        </el-form-item>
+        <el-form-item label="患者摘要">
+          <el-input v-model="ruleForm.patientSummary" placeholder="患者侧简短提示，留空则使用提示语（可选）" />
         </el-form-item>
       </el-form>
 
@@ -218,7 +243,13 @@
           />
         </el-form-item>
         <el-form-item label="药品名称" prop="drugName">
-          <el-input v-model="contraindicationForm.drugName" />
+          <el-autocomplete
+            v-model="contraindicationForm.drugName"
+            :fetch-suggestions="queryDrugSuggestions"
+            placeholder="输入中文名称或拼音首字母（如 aspl）"
+            class="full-width"
+            clearable
+          />
         </el-form-item>
         <el-form-item label="条件类型" prop="conditionType">
           <el-select v-model="contraindicationForm.conditionType" class="full-width">
@@ -269,6 +300,7 @@ import {
   updateContraindication,
   updateDdiRule
 } from '@/modules/pharmacist/api/ddi'
+import { searchDrugs } from '@/modules/pharmacist/api/drugs'
 
 const severityOptions = ['HIGH', 'MEDIUM', 'LOW']
 const statusOptions = ['ACTIVE', 'INACTIVE']
@@ -321,6 +353,10 @@ const createDefaultRuleForm = () => ({
   severity: 'HIGH',
   message: '',
   recommendedAction: '',
+  mechanismDesc: '',
+  alternativeRecommendation: '',
+  referenceSource: '',
+  patientSummary: '',
   status: 'ACTIVE'
 })
 
@@ -447,6 +483,10 @@ const openRuleDrawer = (row = null) => {
       severity: row.severity || 'HIGH',
       message: row.message || '',
       recommendedAction: row.recommendedAction || '',
+      mechanismDesc: row.mechanismDesc || '',
+      alternativeRecommendation: row.alternativeRecommendation || '',
+      referenceSource: row.referenceSource || '',
+      patientSummary: row.patientSummary || '',
       status: row.status || 'ACTIVE'
     })
   }
@@ -483,6 +523,10 @@ const submitRuleForm = async () => {
       severity: ruleForm.severity,
       message: ruleForm.message,
       recommendedAction: ruleForm.recommendedAction,
+      mechanismDesc: ruleForm.mechanismDesc || undefined,
+      alternativeRecommendation: ruleForm.alternativeRecommendation || undefined,
+      referenceSource: ruleForm.referenceSource || undefined,
+      patientSummary: ruleForm.patientSummary || undefined,
       status: ruleForm.status
     }
 
@@ -528,6 +572,20 @@ const submitContraindicationForm = async () => {
     await loadContraindications()
   } finally {
     contraindicationSubmitting.value = false
+  }
+}
+
+const queryDrugSuggestions = async (queryString, callback) => {
+  if (!queryString || !queryString.trim()) {
+    callback([])
+    return
+  }
+  try {
+    const res = await searchDrugs(queryString.trim(), 10)
+    const items = (res.data || []).map((d) => ({ value: d.nameCn, category: d.category }))
+    callback(items)
+  } catch {
+    callback([])
   }
 }
 

@@ -728,9 +728,202 @@ cd D:\yaoanshi\frontend\pharmacist; npm run build
 
 ---
 
-## 9. Backlog After P0+
+## 9. Phase 6: Self-Reported Medication Domain (P0+ 自报用药)
 
-The following are intentionally excluded from the primary execution sequence:
+### Goal
+
+Allow patients to record medications taken outside the formal plan, with DDI screening on entry, automatic pharmacist review work order creation, and pharmacist handling flows (acknowledge / reject / transfer-to-plan). Extend DDI rule richness with patient-friendly summaries and clinical detail fields.
+
+**Status: Code-complete as of 2026-03-19. This phase documents the implementation after the fact.**
+
+### Step 6.1: Backend — self-reported medication table + state machine + services
+
+Action:
+
+1. V6 Flyway migration:
+   - Create `self_reported_medication` table (see `BACKEND_STRUCTURE.md` 4.5)
+   - Extend `ddi_rule` with 4 fields: `patient_summary`, `mechanism_desc`, `alternative_recommendation`, `reference_source`
+   - Extend `drug_contraindication` with `patient_summary`
+   - Extend `ddi_screening_log` with `self_reported_medication_id`
+2. Implement `AppSelfReportedMedicationService`:
+   - submit (create record + auto-create NEW_MEDICATION_REVIEW work order)
+   - list (paged, filterable by status)
+   - withdraw (patient stops PENDING record)
+3. Implement `AdminSelfReportedMedicationService`:
+   - acknowledge (PENDING → ACTIVE)
+   - reject (PENDING/ACTIVE → STOPPED)
+   - transfer-prefill (read-only prefill data)
+   - mark-transferred (ACTIVE → TRANSFERRED)
+
+Reference: `BACKEND_STRUCTURE.md` 4.5 (`self_reported_medication` table), 4.9 (DDI extensions)
+
+### Step 6.2: Backend — patient and admin endpoints
+
+Action:
+
+1. Patient endpoints (via `AppSelfReportedMedicationController`):
+   - `POST /app-api/self-reported-medications`
+   - `GET /app-api/self-reported-medications`
+   - `POST /app-api/self-reported-medications/{id}/withdraw`
+   - `POST /app-api/self-reported-medications/{id}/stop`
+2. Admin endpoints in `AdminHelpOrderController`:
+   - `GET /admin-api/help-orders/self-reported-medications`
+   - `POST /admin-api/help-orders/{id}/acknowledge`
+   - `POST /admin-api/help-orders/{id}/reject-medication`
+   - `GET /admin-api/help-orders/{id}/transfer-prefill`
+   - `POST /admin-api/help-orders/{id}/mark-transferred`
+3. Admin endpoint in `AdminMedicationPlanController`:
+   - `GET /admin-api/medication-plans/{id}/ddi-check`
+4. Update `AppDdiScreeningService`:
+   - Include ACTIVE self-reported medications as background drugs in screening
+
+Reference: `BACKEND_STRUCTURE.md` 6.1 (self-reported endpoints), 6.2 (admin help-order and plan endpoints)
+
+### Step 6.3: Frontend — patient SelfReportedMedicationPage
+
+Action:
+
+1. Create `SelfReportedMedicationPage.vue` at `/self-reported-medications`
+2. Entry form: drug name (required), dosage, notes
+3. Before submit: call `POST /app-api/ddi/screen` with drug name; show HIGH/MEDIUM alert dialog if hits
+4. Submit via `POST /app-api/self-reported-medications`
+5. List view: display all records with status badge
+6. PENDING records: show "撤回" button → `POST /withdraw`
+7. Add `selfReportedMedicationService` to `mvp.ts` with typed DTOs
+8. Add `/self-reported-medications` route and "记录新药品" quick entry on Home page (6th quick action)
+
+Reference: `APP_FLOW.md` 4.3 (Self-Reported Medication Screen), 7.4.2 (DDI alert dialog)
+
+### Step 6.4: Frontend — pharmacist SelfReportedMedicationsPanel + work order integration
+
+Action:
+
+1. Create `SelfReportedMedicationsPanel.vue` component:
+   - Show drug details (name, dosage, notes, submission time)
+   - Show DDI alert summary if present
+   - Action buttons: 确认接收 / 拒绝（附原因）/ 转入计划
+2. Update `OrderDetail.vue`: embed panel when `category = NEW_MEDICATION_REVIEW`
+3. Update `useWorkOrders.js`: add `NEW_MEDICATION_REVIEW` category display text
+4. Update `workorders.js` API: add 5 self-reported medication admin endpoints
+5. Update `MedicationPlanPanel.vue`: call `GET /admin-api/medication-plans/{id}/ddi-check` before activation; show confirmation dialog if alerts exist
+6. Update `medicationPlans.js` API: add `getMedicationPlanDdiCheck` method
+7. Update `DdiRules.vue` drawer form: add 4 new fields (patientSummary / mechanismDesc / alternativeRecommendation / referenceSource)
+
+Reference: `APP_FLOW.md` 7.5 (NEW_MEDICATION_REVIEW handling flow)
+
+### Validation commands
+
+```powershell
+mvn -q "-Dtest=AdminDdiServiceTest,AppDdiScreeningServiceTest" test -f D:\yaoanshi\backend-v2\pom.xml
+mvn -q test -f D:\yaoanshi\backend-v2\pom.xml
+cd D:\yaoanshi\frontend\huanzhe; npm run build
+cd D:\yaoanshi\frontend\pharmacist; npm run build
+cd D:\yaoanshi\frontend\yisheng\web-admin; npm run build
+```
+
+### Done when
+
+1. V6 Flyway migration runs cleanly on a fresh schema.
+2. Patient can submit self-reported medication with DDI screening and DDI alert dialog.
+3. NEW_MEDICATION_REVIEW work order is auto-created and pushed to pharmacist.
+4. Pharmacist can acknowledge / reject / transfer self-reported medications via work order detail.
+5. Plan activation DDI check includes self-reported drugs.
+6. All unit tests pass, all three frontend builds pass.
+
+### Blockers / Dependencies
+
+1. `AppDdiScreeningService` must be updated to include ACTIVE self-reported medications before Step 6.2 can be verified end to end.
+
+---
+
+## 10. Phase 7: Drug Catalog and Pinyin Initials Search (P0+ 药品目录拼音检索)
+
+### Inputs
+
+- `BACKEND_STRUCTURE.md` section 4.10 (`drug_catalog` table)
+- `BACKEND_STRUCTURE.md` section 6.1 (`/app-api/drugs/search`)
+- `BACKEND_STRUCTURE.md` section 6.2 (`/admin-api/drugs/search`)
+- completed Phase 6 outputs (self-reported medication domain)
+
+### Background
+
+Drug name entry currently relies on free-text inputs with no autocomplete. This phase introduces a shared drug catalog that supports:
+
+1. Chinese name fuzzy match (e.g., `阿司` → 阿司匹林)
+2. Pinyin initials prefix match (e.g., `aspl` → 阿司匹林)
+
+Pinyin initials are pre-computed at insert time using `PinyinUtils` (backed by `pinyin4j 2.5.1`) and stored in `drug_catalog.pinyin_initials`. The catalog is a search-aid only; free-text drug names remain valid everywhere.
+
+### Steps
+
+#### 7.1 Backend: drug catalog table and seed
+
+Action:
+
+1. Create `drug_catalog` table via `V7__drug_catalog.sql` per `BACKEND_STRUCTURE.md` 4.10.
+2. Pre-seed 41 common cardiovascular and clinical drugs with pre-computed `pinyin_initials`.
+3. Add `PinyinUtils` under `com.medicine.common.util` using `pinyin4j 2.5.1` for future new-entry indexing.
+
+#### 7.2 Backend: search endpoints
+
+Action:
+
+1. Implement `GET /app-api/drugs/search?q=&limit=` → `CommonResult<List<DrugCatalogDTO>>`.
+2. Implement `GET /admin-api/drugs/search?q=&limit=` → same shape.
+3. Search matches `name_cn LIKE CONCAT(q, '%')` OR `pinyin_initials LIKE CONCAT(q, '%')` OR `name_cn LIKE CONCAT('%', q, '%')`, ordered by priority.
+4. Results capped at 20 entries per request.
+
+#### 7.3 Frontend — patient app
+
+Action:
+
+1. Add `drugCatalogService.search(q, limit)` to `src/modules/patient/api/mvp.ts`.
+2. Update `SelfReportedMedicationPage.vue` drug name input with 280ms debounce autocomplete:
+   - Show suggestion list with drug name + category label.
+   - Tap to fill input, hide list on blur (150ms delay to allow click to register).
+
+#### 7.4 Frontend — pharmacist web
+
+Action:
+
+1. Create `src/modules/pharmacist/api/drugs.js` with `searchDrugs(q, limit)`.
+2. Update `DdiRules.vue`: replace `el-input` with `el-autocomplete` for **drug A**, **drug B**, and **drug name** (contraindication form) fields, using `fetch-suggestions` callback to `searchDrugs`.
+
+### Deliverables
+
+1. `V7__drug_catalog.sql` with 41-drug seed
+2. `DrugCatalogMapper`, `DrugCatalogService`, `AppDrugCatalogController`, `AdminDrugCatalogController`
+3. `PinyinUtils` utility
+4. `drugCatalogService` in patient app + autocomplete UI in `SelfReportedMedicationPage.vue`
+5. `drugs.js` in pharmacist web + `el-autocomplete` on all three DDI rule drug name inputs
+
+### Validation commands
+
+```powershell
+mvn -q -DskipTests compile -f D:\yaoanshi\backend-v2\pom.xml
+cd D:\yaoanshi\frontend\huanzhe; npm run build
+cd D:\yaoanshi\frontend\pharmacist; npm run build
+```
+
+### Done when
+
+1. Backend compiles cleanly with pinyin4j on classpath.
+2. `GET /app-api/drugs/search?q=aspl` returns 阿司匹林 in `data`.
+3. `GET /admin-api/drugs/search?q=hfl` returns 华法林 in `data`.
+4. Both frontend builds pass.
+5. Patient app drug name input shows suggestions on typing `aspl`.
+6. Pharmacist DDI rule drawer drug name fields show autocomplete suggestions.
+
+### Blockers / Dependencies
+
+1. V7 migration requires V6 migration applied first.
+2. `pinyin4j 2.5.1` must be resolvable from Maven Central or local cache.
+
+---
+
+## 11. Backlog After P0+
+
+The following items are intentionally excluded from the primary execution sequence:
 
 1. science education content library
 2. content operation capability
