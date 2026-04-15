@@ -122,3 +122,21 @@ Remaining: browser-level UI testing (manual walk-through of all 3 frontends)
 Last Updated
 - 2026-03-27 Asia/Shanghai
 - Reason: Runtime integration tests passed; AI consent bug fixed; 97/97 tests pass
+Docker Local Stack Env Follow-up (2026-04-15)
+- ops/docker-compose.yml:
+  - backend-v2 env_file changed to optional local file (`ops/.env.backend-v2.local`) using Compose v2 `required: false`
+  - admin now waits for backend-v2 health before startup to avoid nginx upstream restart loops
+- ops/.env.backend-v2.local.example:
+  - reduced to secrets only (`MEDICINE_AI_API_KEY`, `MEDICINE_OCR_API_KEY`)
+  - AI/OCR non-secret defaults now rely on backend-v2 application.yml again instead of a third duplicated default set
+- ops/README.md:
+  - clarified that `ops/.env.backend-v2.local` is optional and only needed for AI/OCR secret injection
+  - documented the one-command recovery path: `docker compose up -d backend-v2 admin`
+- verification:
+  - `docker compose -f D:/yaoanshi/ops/docker-compose.yml config` passed with and without `ops/.env.backend-v2.local`
+  - `docker compose -f D:/yaoanshi/ops/docker-compose.yml up -d backend-v2 admin` recovered the stack successfully
+  - `yaoshian-backend-v2` healthy, `yaoshian-pharmacist-admin` up, `http://localhost:8081/health` returned 200
+
+Last Updated
+- 2026-04-15 Asia/Shanghai
+- Reason: fixed Docker review findings around optional env loading, default drift, and local stack recovery documentation
