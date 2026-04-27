@@ -175,7 +175,7 @@ For exact versions, always read `Standard document/TECH_STACK.md`.
    - `common`
 3. New backend DTO naming must align with `Standard document/BACKEND_STRUCTURE.md`
 4. Do not expose entities directly from controllers
-5. Schema changes must use Flyway migrations under `backend-v2/src/main/resources/db/migration/` with convention `V{N}__{description}.sql`. Current latest applied version: V7.
+5. Schema changes must use Flyway migrations under `backend-v2/src/main/resources/db/migration/` with convention `V{N}__{description}.sql`. Current latest applied version: V8.
 6. Active sub-domain packages include: `drug` (drug catalog), `medication` (self-reported medication)
 
 ### 6.2 Frontend rules
@@ -235,7 +235,7 @@ Required backend rules:
    - legacy user bridge
    - professional identity mapped from existing legacy user tables
 5. All schema, table, DTO, and endpoint work must match `BACKEND_STRUCTURE.md`
-6. Schema evolution uses Flyway. Never alter already-applied migrations (V1–V7).
+6. Schema evolution uses Flyway. Never alter already-applied migrations (V1–V8).
 
 Public names that must not be renamed without updating the formal contract:
 

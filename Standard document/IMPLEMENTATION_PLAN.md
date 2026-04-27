@@ -9,8 +9,31 @@ Rules:
 1. This document defines execution order, not product scope or architecture rationale.
 2. `Standard document/PRD.md`, `APP_FLOW.md`, `TECH_STACK.md`, `FRONTEND_GUIDELINES.md`, and `BACKEND_STRUCTURE.md` are mandatory inputs for every implementation phase.
 3. `docs/` is reference only and must not override this file.
-4. This document covers `P0` only.
+4. This document covers `P0` and `P0+` MVP phases, plus the Post-P0 trial readiness sprint.
 5. `P2` and later capabilities must stay in backlog and must not enter the primary build sequence.
+
+## 1.5 Execution Status Summary (as of 2026-03-27)
+
+| Phase | Description | Status |
+|-------|-------------|--------|
+| Phase 0 | Repo and Environment Baseline | ✅ Complete |
+| Phase 1 | backend-v2 Foundation | ✅ Complete |
+| Phase 2 | Frontend Foundation | ✅ Complete |
+| Phase 3 | MVP Core Flows | ✅ Complete |
+| Phase 4 | Integration, QA, and Trial Readiness | ✅ API integration complete; browser UI walkthrough remaining |
+| Phase 5 | DDI Enhancement (P0+) | ✅ Complete |
+| Phase 6 | Self-Reported Medication Domain (P0+) | ✅ Complete |
+| Phase 7 | Drug Catalog and Pinyin Initials Search (P0+) | ✅ Complete |
+| Phase 8 | Post-P0 Trial Readiness Sprint (A–H) | ✅ Complete |
+
+**Current active work:** End-to-end browser demo walkthrough (manual UI testing across all 3 surfaces).
+
+**Flyway current latest:** V8 (`V8__ai_consent.sql`). Next new migration must be V9.
+
+**Known open items:**
+- `MEDICINE_OCR_API_KEY` must be set in `.env.local` for live OCR (graceful fallback if omitted)
+- SEC-002 partially open: refresh tokens remain sessionStorage-managed (future follow-up)
+- Ops cleanup: `ops/sql/sec-003-clear-legacy-patient-id-card-masked.sql` needs to be run
 
 ## 2. Implementation Rules
 
@@ -524,7 +547,7 @@ cd D:\yaoanshi\frontend\yisheng\web-admin; npm run build
 4. object storage unavailable
 5. Redis unavailable
 
-## 7. Phase 4: Integration, QA, and Trial Readiness
+## 7. Phase 4: Integration, QA, and Trial Readiness ✅ (API complete; browser walkthrough remaining)
 
 ### Inputs
 
@@ -583,6 +606,17 @@ Action:
 2. Prepare test report.
 3. Prepare known-issues list.
 4. Prepare rollback notes.
+
+**Completed (2026-03-27):**
+- backend-v2: `mvn compile` ✅, `mvn test` 97/97 ✅ (4 broken test files fixed in `4fc16db`)
+- frontend/huanzhe: `npm run build` ✅
+- frontend/pharmacist: `npm run build` ✅
+- frontend/yisheng/web-admin: `npm run build` ✅
+- Docker stack: MySQL, Redis, MinIO, Nginx all running (infrastructure fixes committed in `fdb3233`)
+- API integration: all patient and admin endpoints verified (send-otp, login, auth/me, bind-patient, medication-plans, dose-tasks, ai/consent, self-reported-medications, prescriptions, ddi/screen, assessments, help-orders, drugs/search)
+- AI consent bug fix (commit `fdb3233`): `AiChatService` was parsing JWT sub as Long for account ID; fixed to resolve account by mobile via `selectActiveByMobile` first
+
+**Remaining:** Browser-level UI testing — manual walk-through of all 3 frontends.
 
 ### Deliverables
 
@@ -921,13 +955,88 @@ cd D:\yaoanshi\frontend\pharmacist; npm run build
 
 ---
 
-## 11. Backlog After P0+
+---
+
+## 11. Phase 8: Post-P0 Trial Readiness Sprint ✅ Complete (2026-03-27)
+
+### Goal
+
+Harden the platform for trial/demo within ~1 month. Eight sub-phases executed after the P0/P0+ code freeze.
+
+### Phase A — Commit Baseline ✅
+
+Committed all Phase 6+7 backend + frontend + standard doc changes (57 files) to `main`. Commit: `f9274e5`.
+
+### Phase B — MinIO S3 Object Storage Integration ✅ (commit `e6178c9`)
+
+- `ops/docker-compose.yml`: MinIO service (9000/9001) + backend-v2 storage env vars
+- `pom.xml`: `software.amazon.awssdk:s3:2.25.60`
+- `S3CompatibleObjectStorageImpl`: real AWS SDK v2 impl, `@Profile(!test)`, PostConstruct bucket init
+- `S3CompatibleObjectStorageStub`: demoted to `@Profile(test)`
+- `ObjectStorageProperties`: region field added
+- `application.yml`: `medicine.storage` config block
+- `run-local-with-env.ps1` + `.env.local.example`: `MEDICINE_STORAGE_*` vars documented
+
+### Phase C — DeepSeek-OCR Integration ✅ (commit `201525c`)
+
+- `OcrProperties`: `@ConfigurationProperties` for `medicine.ocr.*`
+- `OcrService` interface + `OcrResult` (success/extractedText/confidence/responseJson)
+- `DeepSeekOcrService`: SiliconFlow vision API (`deepseek-ai/deepseek-vl2`), graceful fallback if key missing
+- `AppPrescriptionService`: replaced `MANUAL_REVIEW_REQUIRED` stub; `DEEPSEEK_OCR` on success, `MANUAL_REVIEW_REQUIRED + manualFallbackUsed=true` on failure
+- `application.yml`: `medicine.ocr.*` config block
+
+### Phase D — SEC-005 AI Consent Gate ✅ (commit `5f69a4d`)
+
+- `V8__ai_consent.sql`: `ai_consent_granted_at DATETIME NULL` added to `app_account`
+- `AppAccount` domain + `AppAccountMapper`: `selectAiConsentGrantedAt` + `updateAiConsent`
+- `ErrorCode`: `AI_CONSENT_REQUIRED (40031)`
+- `AiChatService`: consent check before upstream call; `checkConsentStatus` / `grantConsent`; bug-fix: resolve account by mobile via `selectActiveByMobile` (not JWT sub parsed as Long)
+- `AiChatController`: `GET/POST /app-api/ai/consent`
+- Patient app: `aiConsentService` in `mvp.ts`; `IonAlert` consent dialog on `AiAssistantPage` first entry
+
+### Phase E — ARC-001/003 Map → Explicit DTO Migration ✅ (commit `036a39f`)
+
+New DTOs: `AppPatientSummaryDTO`, `AppCurrentAccountDTO`, `AppFamilyBindingDTO`, `AppLogoutRequest`, `TransferPrefillDTO`.
+Controllers updated: `AppAuthController`, `AppPatientController`, `AdminHelpOrderController`.
+Response field names preserved; backward-compatible.
+
+### Phase F — CI/CD GitHub Actions ✅ (commit `f285037`)
+
+`.github/workflows/build.yml`: 4 parallel jobs (backend compile+test, 3 frontend builds). Triggers on push/PR to `main`. Maven + npm cache enabled.
+
+### Phase G — Patient App UI/UX Polish ✅ (commit `c5feb36`)
+
+- `variables.css`: 12 semantic `--patient-*` color tokens added
+- `HomePage`, `MedicationReminderPage`, `HelpOrderPage`, `SelfReportedMedicationPage`: hardcoded hex → CSS tokens + `IonRefresher` pull-to-refresh added
+- `ProfilePage`: avatar path fixed (`/src/picture/` → `@/shared/assets/images/` via Vite import)
+
+### Phase H — Pharmacist/Doctor Minor Fixes ✅
+
+- `DdiRules.vue`: `submitRuleForm` + `submitContraindicationForm` — added catch block with `ElMessage.error` on API failure
+- `PharmacistDashboard.vue`: WS-triggered `loadDashboard()` debounced 300ms
+- `Layout.vue` (doctor): removed "Phase 2" subtitle; `.workspace overflow-x: hidden`
+- `index.scss` (doctor): `body overflow-x: hidden`
+
+### Infrastructure Notes (post-Phase 8)
+
+- Docker stack: MySQL `13306`, Redis `16379`, MinIO `9000/9001`, legacy server `48080`
+- Runtime fixes applied during integration testing (committed in `fdb3233`):
+  - `ops/docker-security-audit/redis/redis.conf`: `protected-mode no` (was blocking cross-container Redis connection)
+  - `ops/docker-security-audit/nginx-dev.conf`: upstream → `backend-v2` (was referencing wrong service name)
+  - `ops/sql/mysql/ruoyi-vue-pro.sql` imported: `system_users` + `system_role` + `system_user_role` tables
+
+---
+
+## 12. Backlog After P0+
 
 The following items are intentionally excluded from the primary execution sequence:
 
-1. science education content library
-2. content operation capability
-3. more disease-path expansion (DDI rules for hypertension, diabetes, etc.)
-4. non-MVP capability expansion
-5. any work that reopens legacy backend refactor
+1. Science education content library
+2. Content operation capability
+3. More disease-path expansion (DDI rules for hypertension, diabetes, etc.)
+4. Non-MVP capability expansion
+5. Any work that reopens legacy backend refactor
+6. SEC-002: Refresh token rotation hardening (currently sessionStorage-managed; deferred)
+7. Ops cleanup: `ops/sql/sec-003-clear-legacy-patient-id-card-masked.sql` (historical `id_card_masked` rows)
+8. S3 presigned URL upload end-to-end browser test (Phase B, pending manual verification)
 

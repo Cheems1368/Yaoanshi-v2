@@ -119,9 +119,75 @@ Admin: system/auth/login ✅, patients ✅, drugs/search ✅, help-orders ✅, d
 
 Remaining: browser-level UI testing (manual walk-through of all 3 frontends)
 
+UI Visual Upgrade Sprint (2026-03-31, plan: memoized-brewing-engelbart.md)
+- Phase 0: AppIcon.vue (Lucide-based, 21-icon map) + EmptyState.vue (5 types, SVG illustrations) created
+- Phase 1: variables.css token 补全 — font-weight/line-height/border tokens added; FRONTEND_GUIDELINES.md updated (sections 2.10–2.12, elderly-friendly section 10)
+- Phase 2–6: All patient pages fully token-migrated (zero hardcoded hex/px):
+  HomePage, MedicationReminderPage, MedicationRecordPage, MedicationTabPage,
+  HelpOrderPage, HelpOrderDetailPage, LoginPage, ProfilePage, PrescriptionPage,
+  QuestionnairePage, RealnamePage, AiAssistantPage, AiChatView, AiHomeView,
+  DrugCategoryPage, DrugDetailPage, RationalMedicationPage, SelfReportedMedicationPage
+- Phase 7 (专业端): Minor fixes only (Phase H scope — DdiRules error handling, Dashboard WS debounce,
+  Layout overflow-x). Full ~13-color token migration in pharmacist/doctor deferred (not blocking demo).
+- Phase 8: All 3 frontends build clean ✅
+- TabsPage.vue: restructured tabs (首页/用药/求助/我的), elderly-friendly 56px min-height
+- /simplify cleanup (2026-03-31): AppIcon className computed removed, EmptyState redundant comments
+  removed, HelpOrderPage manual empty-state → <EmptyState type="no-orders" />, unused IonIcon import removed
+
 Last Updated
-- 2026-03-27 Asia/Shanghai
-- Reason: Runtime integration tests passed; AI consent bug fixed; 97/97 tests pass
+- 2026-03-31 Asia/Shanghai
+- Reason: UI visual upgrade plan (memoized-brewing-engelbart.md) substantially complete; all 3 builds pass
+
+DDI Risk Card Inline Detail Alignment (2026-04-14)
+- backend-v2:
+  - Added V9 migration to align `drug_contraindication` detail fields with DDI rules:
+    `mechanism_desc`, `alternative_recommendation`, `reference_source`
+  - Added admin-only rich DDI DTOs:
+    `AdminDdiRiskCardDTO`, `AdminDdiScreenResult`
+  - `GET /admin-api/medication-plans/{id}/ddi-check` now returns rich risk cards for pharmacist review
+  - `GET /admin-api/prescriptions/{id}` pending DDI screenings now return the same rich card shape
+  - Contraindication CRUD DTO/request/domain/mapper/service extended with:
+    `mechanismDesc`, `alternativeRecommendation`, `referenceSource`, `patientSummary`
+  - Plan-side DDI detail generation now deduplicates reversed pairs by rule and preserves configured drug order
+- frontend/pharmacist:
+  - Added shared component `src/components/ddi/AdminDdiRiskCardList.vue`
+  - Medication plan activation warning and prescription review DDI list now use unified inline expandable cards
+  - Interaction rules and contraindication rules now expose aligned detail fields in DDI rule management
+- verification:
+  - `mvn -q "-Dtest=AppDdiScreeningServiceTest,AdminPrescriptionServiceTest,PrescriptionControllerTest" test -f D:/yaoanshi/backend-v2/pom.xml` passed
+  - `mvn -q "-Dtest=AdminMedicationPlanServiceTest" test -f D:/yaoanshi/backend-v2/pom.xml` passed
+  - `npm run build` in `frontend/pharmacist` passed
+
+Last Updated
+- 2026-04-14 Asia/Shanghai
+- Reason: pharmacist-side DDI inline detail alignment implemented; backend targeted tests and pharmacist frontend build passed
+
+DDI Review Follow-up Fixes (2026-04-14)
+- backend-v2:
+  - `ddi_screening_log` now stores interaction rule snapshots:
+    `rule_code`, `rule_status_at_screening`, `drug_a_name`, `drug_b_name`,
+    `message`, `recommended_action`, `mechanism_desc`,
+    `alternative_recommendation`, `reference_source`, `patient_summary`
+  - Prescription confirmation writes the rule snapshot when creating screening logs
+  - Prescription detail DDI cards now prefer screening-log snapshots and only fall back to
+    rule lookup for legacy rows without snapshots
+  - Prescription detail no longer loads all active DDI rules; it batch-loads only the
+    `matchedRuleId` values still needed for legacy fallback
+  - `DdiRuleMapper` added batch lookup by ids for the legacy fallback path
+  - `AppDdiScreeningService` now uses one shared hit-collection pipeline for:
+    patient-facing lightweight alerts and admin-facing rich risk cards
+- frontend/pharmacist:
+  - Removed legacy hidden DDI card templates from medication plan activation dialog and
+    prescription review drawer; shared `AdminDdiRiskCardList` is now the only render path
+- verification:
+  - `mvn -q "-Dtest=AppDdiScreeningServiceTest,AdminPrescriptionServiceTest,PrescriptionControllerTest" test -f D:/yaoanshi/backend-v2/pom.xml` passed
+  - `mvn -q "-Dtest=AdminMedicationPlanServiceTest" test -f D:/yaoanshi/backend-v2/pom.xml` passed
+  - `npm run build` in `frontend/pharmacist` passed
+
+Last Updated
+- 2026-04-14 Asia/Shanghai
+- Reason: fixed DDI review findings across code reuse, historical detail stability, and prescription-detail query efficiency
+
 Docker Local Stack Env Follow-up (2026-04-15)
 - ops/docker-compose.yml:
   - backend-v2 env_file changed to optional local file (`ops/.env.backend-v2.local`) using Compose v2 `required: false`
