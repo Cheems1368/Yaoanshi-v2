@@ -4,7 +4,7 @@
       <ion-toolbar>
         <ion-buttons slot="start" data-testid="ai-back-button">
           <ion-button @click="handleBack">
-            <ion-icon slot="icon-only" :icon="chevronBackOutline" />
+            <AppIcon slot="icon-only" name="chevronBackOutline" :size="22" />
           </ion-button>
         </ion-buttons>
         <ion-title>用药科普助手</ion-title>
@@ -77,7 +77,6 @@ import {
   IonContent,
   IonFooter,
   IonHeader,
-  IonIcon,
   IonInput,
   IonPage,
   IonTitle,
@@ -85,7 +84,6 @@ import {
   IonToolbar,
   onIonViewWillEnter
 } from '@ionic/vue'
-import { chevronBackOutline } from 'ionicons/icons'
 import AiHomeView from '@/modules/patient/components/ai/AiHomeView.vue'
 import AiChatView, { type AiViewMessage } from '@/modules/patient/components/ai/AiChatView.vue'
 import { aiAssistantService, type AiChatMessage } from '@/modules/patient/api/aiAssistant'
@@ -221,6 +219,11 @@ const submitMessage = async (text: string) => {
       content: '当前服务繁忙，请稍后重试。'
     }
     lastFailedPrompt.value = content
+    if (error?.code === 40031) {
+      localStorage.removeItem(AI_CONSENT_KEY)
+      showConsentDialog.value = true
+      return
+    }
     showError(error?.message || 'AI 服务暂不可用')
   } finally {
     isSending.value = false
@@ -250,81 +253,81 @@ const retryLastFailed = () => {
 
 <style scoped>
 .page-header {
-  --background: #ffffff;
-  --color: #1E293B;
+  --background: var(--patient-bg-card);
+  --color: var(--patient-text-primary);
 }
 
 .page-header ion-toolbar {
-  --background: #ffffff;
-  --color: #1E293B;
+  --background: var(--patient-bg-card);
+  --color: var(--patient-text-primary);
 }
 
 .page-header ion-button {
-  --color: #1E293B;
+  --color: var(--patient-text-primary);
 }
 
 .page-content {
-  --background: linear-gradient(180deg, #EBF4FF 0%, #F0F7FF 30%, #F8FAFC 100%);
+  --background: linear-gradient(180deg, var(--patient-primary-light) 0%, var(--patient-bg-page) 40%);
 }
 
 .input-footer {
-  --background: #ffffff;
+  --background: var(--patient-bg-card);
   box-shadow: 0 -1px 8px rgba(0, 0, 0, 0.06);
 }
 
 .input-footer ion-toolbar {
-  --background: #ffffff;
+  --background: var(--patient-bg-card);
   --padding-top: 0;
   --padding-bottom: 0;
 }
 
 .disclaimer-row {
   text-align: center;
-  font-size: 11px;
-  color: #94A3B8;
-  padding: 6px 16px 2px;
-  line-height: 1.4;
+  font-size: var(--patient-font-caption);
+  color: var(--patient-text-muted);
+  padding: var(--patient-space-2) var(--patient-space-4) var(--patient-space-1);
+  line-height: var(--patient-leading-normal);
 }
 
 .input-row {
   display: flex;
-  gap: 8px;
+  gap: var(--patient-space-2);
   align-items: center;
-  padding: 6px 12px calc(8px + env(safe-area-inset-bottom));
+  padding: var(--patient-space-2) var(--patient-space-3) calc(var(--patient-space-2) + env(safe-area-inset-bottom));
 }
 
 .input-wrap {
   flex: 1;
-  background: #F1F5F9;
-  border-radius: 22px;
+  background: var(--patient-bg-page);
+  border-radius: var(--patient-radius-xl);
   overflow: hidden;
 }
 
 .message-input {
   --background: transparent;
-  --padding-start: 16px;
-  --padding-end: 16px;
-  --placeholder-color: #94A3B8;
-  font-size: 14px;
+  --padding-start: var(--patient-space-4);
+  --padding-end: var(--patient-space-4);
+  --placeholder-color: var(--patient-text-muted);
+  font-size: var(--patient-font-helper);
 }
 
 .send-button {
-  --background: #3B82F6;
-  --border-radius: 20px;
-  --padding-start: 16px;
-  --padding-end: 16px;
-  font-size: 14px;
-  font-weight: 600;
+  --background: var(--patient-primary);
+  --border-radius: var(--patient-radius-xl);
+  --padding-start: var(--patient-space-4);
+  --padding-end: var(--patient-space-4);
+  font-size: var(--patient-font-helper);
+  font-weight: var(--patient-font-semibold);
   height: 36px;
 }
 
 .send-button[disabled] {
-  --background: #CBD5E1;
+  --background: var(--patient-border);
 }
 
 .retry-row {
   display: flex;
   justify-content: flex-end;
-  padding: 0 10px calc(4px + env(safe-area-inset-bottom));
+  padding: 0 var(--patient-space-3) calc(var(--patient-space-1) + env(safe-area-inset-bottom));
 }
 </style>

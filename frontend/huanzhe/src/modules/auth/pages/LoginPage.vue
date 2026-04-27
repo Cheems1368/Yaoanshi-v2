@@ -3,7 +3,7 @@
     <ion-content class="login-content">
       <div class="login-container">
         <section class="hero-card">
-          <p class="eyebrow">药安师 MVP</p>
+          <p class="eyebrow">药按时 MVP</p>
           <h1>患者登录</h1>
           <p class="hero-text">
             请输入手机号和验证码登录，完成患者绑定后即可进入用药流程。
@@ -208,104 +208,110 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .login-content {
-  --background: linear-gradient(180deg, #eff6ff 0%, #ffffff 42%, #f8fafc 100%);
+  --background: var(--patient-bg-gradient);
 }
 
 .login-container {
   min-height: 100%;
   max-width: 520px;
   margin: 0 auto;
-  padding: 48px 20px 32px;
+  padding: var(--patient-space-12) var(--patient-space-5) var(--patient-space-8);
 }
 
 .hero-card,
 .form-card {
-  background: #ffffff;
-  border-radius: 24px;
-  box-shadow: 0 18px 40px rgba(37, 99, 235, 0.08);
+  background: var(--patient-bg-card);
+  border-radius: var(--patient-radius-xl);
+  box-shadow: var(--patient-shadow-sm);
 }
 
 .hero-card {
-  padding: 28px 24px;
-  margin-bottom: 18px;
-  border: 1px solid rgba(37, 99, 235, 0.12);
+  padding: var(--patient-space-6) var(--patient-space-5);
+  margin-bottom: var(--patient-space-4);
+  border: var(--patient-border-light);
 }
 
 .eyebrow {
-  margin: 0 0 12px;
-  color: #2563eb;
-  font-size: 13px;
-  font-weight: 700;
+  margin: 0 0 var(--patient-space-3);
+  color: var(--patient-primary);
+  font-size: var(--patient-font-caption);
+  font-weight: var(--patient-font-bold);
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
 .hero-card h1 {
-  margin: 0 0 12px;
-  font-size: 30px;
-  color: #0f172a;
+  margin: 0 0 var(--patient-space-3);
+  font-size: var(--patient-font-page-title);
+  color: var(--patient-text-primary);
+  font-weight: var(--patient-font-bold);
+  line-height: var(--patient-leading-tight);
 }
 
 .hero-text {
   margin: 0;
-  color: #475569;
-  line-height: 1.7;
+  color: var(--patient-text-secondary);
+  line-height: var(--patient-leading-relaxed);
+  font-size: var(--patient-font-body);
 }
 
 .form-card {
-  padding: 24px 20px;
+  padding: var(--patient-space-5);
 }
 
 .form-item {
-  margin-bottom: 18px;
+  margin-bottom: var(--patient-space-4);
 }
 
 .form-item label {
   display: block;
-  margin-bottom: 8px;
-  font-size: 14px;
-  font-weight: 600;
-  color: #1e293b;
+  margin-bottom: var(--patient-space-2);
+  font-size: var(--patient-font-helper);
+  font-weight: var(--patient-font-semibold);
+  color: var(--patient-text-primary);
 }
 
 .form-input {
-  --background: #f8fafc;
-  --border-color: #dbeafe;
-  --border-radius: 14px;
-  --padding-start: 14px;
-  --padding-end: 14px;
-  --padding-top: 12px;
-  --padding-bottom: 12px;
-  color: #0f172a;
-  border: 1px solid #dbeafe;
-  border-radius: 14px;
+  --background: var(--patient-bg-page);
+  --border-color: var(--patient-primary-light);
+  --border-radius: var(--patient-radius-md);
+  --padding-start: var(--patient-space-4);
+  --padding-end: var(--patient-space-4);
+  --padding-top: var(--patient-space-3);
+  --padding-bottom: var(--patient-space-3);
+  color: var(--patient-text-primary);
+  border: var(--patient-border-default);
+  border-radius: var(--patient-radius-md);
+  font-size: var(--patient-font-body);
 }
 
 .otp-row {
   display: grid;
   grid-template-columns: 1fr auto;
-  gap: 10px;
+  gap: var(--patient-space-3);
 }
 
 .otp-button {
-  min-width: 122px;
-  --border-color: #2563eb;
-  --color: #2563eb;
-  --border-radius: 14px;
+  min-width: var(--patient-space-10);
+  --border-color: var(--patient-primary);
+  --color: var(--patient-primary);
+  --border-radius: var(--patient-radius-md);
+  height: var(--patient-space-12);
 }
 
 .login-button {
-  margin-top: 8px;
-  --background: linear-gradient(135deg, #2563eb, #1d4ed8);
-  --border-radius: 16px;
-  height: 48px;
-  font-weight: 700;
+  margin-top: var(--patient-space-2);
+  --background: linear-gradient(135deg, var(--patient-primary), var(--patient-primary-dark));
+  --border-radius: var(--patient-radius-lg);
+  height: var(--patient-space-12);
+  font-size: var(--patient-font-body);
+  font-weight: var(--patient-font-bold);
 }
 
 .tips-text {
-  margin: 16px 0 0;
-  color: #64748b;
-  font-size: 13px;
-  line-height: 1.6;
+  margin: var(--patient-space-4) 0 0;
+  color: var(--patient-text-secondary);
+  font-size: var(--patient-font-caption);
+  line-height: var(--patient-leading-relaxed);
 }
 </style>

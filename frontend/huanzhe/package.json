@@ -28,6 +28,7 @@
     "@ionic/vue-router": "^8.0.0",
     "axios": "^1.11.0",
     "ionicons": "^7.0.0",
+    "lucide-vue-next": "^1.0.0",
     "vue": "^3.3.0",
     "vue-router": "^4.2.0"
   },

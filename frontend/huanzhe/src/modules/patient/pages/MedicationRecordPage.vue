@@ -13,33 +13,32 @@
       <div class="container">
         <ion-card class="overview-card">
           <ion-card-content class="overview-grid">
-            <div>
+            <div class="overview-item">
               <div class="overview-number">{{ records.length }}</div>
-              <div class="overview-label">近 30 天记录</div>
+              <div class="overview-label">近 30 天</div>
             </div>
-            <div>
+            <div class="overview-divider"></div>
+            <div class="overview-item">
+              <div class="overview-number overview-number--done">{{ completedCount }}</div>
+              <div class="overview-label">已服药</div>
+            </div>
+            <div class="overview-divider"></div>
+            <div class="overview-item">
               <div class="overview-number">{{ effectiveCount }}</div>
               <div class="overview-label">有效记录</div>
             </div>
-            <div>
-              <div class="overview-number">{{ completedCount }}</div>
-              <div class="overview-label">已服药</div>
-            </div>
           </ion-card-content>
         </ion-card>
 
-        <ion-card v-if="loading" class="empty-card">
-          <ion-card-content class="empty-state">
-            <ion-spinner name="crescent" />
-          </ion-card-content>
-        </ion-card>
+        <div v-if="loading" class="loading-state">
+          <ion-spinner name="crescent" />
+        </div>
 
-        <ion-card v-else-if="records.length === 0" class="empty-card">
-          <ion-card-content class="empty-state">
-            <ion-icon :icon="calendarOutline" class="empty-icon" />
-            <p class="empty-text">最近 30 天暂无服药记录</p>
-          </ion-card-content>
-        </ion-card>
+        <EmptyState
+          v-else-if="records.length === 0"
+          type="no-records"
+          title="最近 30 天暂无服药记录"
+        />
 
         <ion-card v-for="record in records" :key="record.id" class="record-card">
           <ion-card-content>
@@ -55,7 +54,7 @@
             <div v-if="record.note" class="record-note">{{ record.note }}</div>
             <div v-if="record.skipReason" class="record-note">原因：{{ record.skipReason }}</div>
             <div v-if="record.correction" class="record-note">这是更正记录</div>
-            <div v-if="!record.effective" class="record-note muted">已被后续更正覆盖</div>
+            <div v-if="!record.effective" class="record-note record-note--muted">已被后续更正覆盖</div>
 
             <div v-if="record.effective" class="record-actions">
               <ion-button size="small" color="success" fill="outline" @click="correctRecord(record, 'TAKEN')">
@@ -84,7 +83,6 @@ import {
   IonCardContent,
   IonContent,
   IonHeader,
-  IonIcon,
   IonPage,
   IonSpinner,
   IonTitle,
@@ -93,7 +91,6 @@ import {
   onIonViewWillEnter
 } from '@ionic/vue'
 import { computed, ref } from 'vue'
-import { calendarOutline } from 'ionicons/icons'
 import { medicationService, type CheckinRecordDTO } from '@/modules/patient/api/mvp'
 
 const loading = ref(false)
@@ -144,11 +141,7 @@ const formatDateTime = (value?: string | null) => {
 }
 
 const resultText = (result: string) => {
-  const map: Record<string, string> = {
-    TAKEN: '已服药',
-    MISSED: '漏服',
-    SKIPPED: '跳过'
-  }
+  const map: Record<string, string> = { TAKEN: '已服药', MISSED: '漏服', SKIPPED: '跳过' }
   return map[result] || result
 }
 
@@ -167,73 +160,103 @@ onIonViewWillEnter(loadRecords)
 
 <style scoped>
 .page-content {
-  --background: #f6f8fb;
+  --background: var(--patient-bg-page);
 }
 
 .container {
-  padding: 16px;
+  padding: var(--patient-space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--patient-space-3);
 }
 
-.overview-card,
-.record-card,
-.empty-card {
-  border-radius: 18px;
-  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+/* ── 概览卡片 ── */
+.overview-card {
+  margin: 0;
 }
 
 .overview-grid {
   display: flex;
-  justify-content: space-between;
+  align-items: center;
+  justify-content: space-around;
+  padding: var(--patient-space-4) var(--patient-space-3) var(--patient-space-3);
+}
+
+.overview-item {
+  flex: 1;
   text-align: center;
 }
 
 .overview-number {
-  font-size: 28px;
-  font-weight: 700;
-  color: #1d4ed8;
+  font-size: var(--patient-font-page-title);
+  font-weight: var(--patient-font-bold);
+  line-height: var(--patient-leading-tight);
+  color: var(--patient-primary);
 }
 
-.overview-label,
-.record-meta,
-.record-note,
-.empty-text {
-  color: #64748b;
+.overview-number--done {
+  color: var(--patient-success);
+}
+
+.overview-label {
+  font-size: var(--patient-font-helper);
+  color: var(--patient-text-secondary);
+  margin-top: var(--patient-space-1);
+}
+
+.overview-divider {
+  width: 1px;
+  height: 40px;
+  background: var(--patient-border);
+  flex-shrink: 0;
+}
+
+/* ── 加载状态 ── */
+.loading-state {
+  padding: var(--patient-space-8) var(--patient-space-4);
+  text-align: center;
+}
+
+/* ── 记录卡片 ── */
+.record-card {
+  margin: 0;
 }
 
 .record-header {
   display: flex;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--patient-space-3);
   align-items: flex-start;
 }
 
 .record-title {
-  font-size: 18px;
-  font-weight: 700;
-  color: #0f172a;
+  font-size: var(--patient-font-subtitle);
+  font-weight: var(--patient-font-bold);
+  color: var(--patient-text-primary);
+  line-height: var(--patient-leading-tight);
+}
+
+.record-meta {
+  font-size: var(--patient-font-helper);
+  color: var(--patient-text-secondary);
+  margin-top: var(--patient-space-1);
+  line-height: var(--patient-leading-normal);
 }
 
 .record-note {
-  margin-top: 10px;
+  font-size: var(--patient-font-helper);
+  color: var(--patient-text-secondary);
+  margin-top: var(--patient-space-2);
+  line-height: var(--patient-leading-normal);
 }
 
-.record-note.muted {
-  color: #94a3b8;
+.record-note--muted {
+  color: var(--patient-text-muted);
 }
 
 .record-actions {
   display: flex;
-  gap: 12px;
-  margin-top: 16px;
-}
-
-.empty-state {
-  text-align: center;
-  padding: 32px 12px;
-}
-
-.empty-icon {
-  font-size: 36px;
-  color: #94a3b8;
+  gap: var(--patient-space-3);
+  margin-top: var(--patient-space-4);
 }
 </style>

@@ -60,10 +60,11 @@
               <ion-card-subtitle>支持轮询刷新，收到推送会立即同步</ion-card-subtitle>
             </ion-card-header>
             <ion-card-content>
-              <div v-if="events.length === 0" class="empty-state">
-                <ion-icon :icon="chatboxEllipsesOutline" class="empty-icon" />
-                <p class="empty-text">暂时还没有会话记录</p>
-              </div>
+              <EmptyState
+                v-if="events.length === 0"
+                type="no-orders"
+                title="暂时还没有会话记录"
+              />
 
               <div v-else class="event-list">
                 <div
@@ -126,7 +127,6 @@ import {
   IonContent,
   IonFooter,
   IonHeader,
-  IonIcon,
   IonPage,
   IonSpinner,
   IonTextarea,
@@ -136,7 +136,6 @@ import {
   onIonViewDidLeave,
   onIonViewWillEnter
 } from '@ionic/vue'
-import { chatboxEllipsesOutline } from 'ionicons/icons'
 import { computed, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { helpOrderService, type HelpOrderDTO, type HelpOrderEventDTO } from '@/modules/patient/api/mvp'
@@ -350,85 +349,88 @@ onIonViewDidLeave(() => {
 
 <style scoped>
 .page-content {
-  --background: #f6f8fb;
+  --background: var(--patient-bg-page);
 }
 
 .page-container {
-  padding: 16px;
+  padding: var(--patient-space-4);
 }
 
 .summary-card,
 .timeline-card,
 .empty-card {
-  border-radius: 18px;
-  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+  border-radius: var(--patient-radius-lg);
+  box-shadow: var(--patient-shadow-sm);
 }
 
 .summary-top {
   display: flex;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--patient-space-3);
   align-items: flex-start;
 }
 
 .summary-title {
-  font-size: 20px;
-  font-weight: 700;
-  color: #0f172a;
+  font-size: var(--patient-font-title);
+  font-weight: var(--patient-font-bold);
+  color: var(--patient-text-primary);
+  line-height: var(--patient-leading-tight);
 }
 
 .summary-meta,
 .summary-label,
 .empty-text,
 .event-meta {
-  color: #64748b;
+  color: var(--patient-text-secondary);
 }
 
 .summary-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-  margin-top: 14px;
+  gap: var(--patient-space-3);
+  margin-top: var(--patient-space-4);
 }
 
 .summary-item {
   display: grid;
-  gap: 6px;
-  padding: 12px;
-  border-radius: 14px;
-  background: #f8fafc;
-  color: #0f172a;
+  gap: var(--patient-space-1);
+  padding: var(--patient-space-3);
+  border-radius: var(--patient-radius-md);
+  background: var(--patient-bg-page);
+  color: var(--patient-text-primary);
 }
 
 .summary-body {
-  margin-top: 14px;
-  color: #334155;
-  line-height: 1.7;
+  margin-top: var(--patient-space-4);
+  color: var(--patient-text-primary);
+  line-height: var(--patient-leading-relaxed);
   white-space: pre-wrap;
+  font-size: var(--patient-font-body);
 }
 
 .summary-notice {
-  margin-top: 12px;
-  padding: 12px 14px;
-  border-radius: 14px;
-  background: #eff6ff;
-  color: #1d4ed8;
-  line-height: 1.6;
+  margin-top: var(--patient-space-3);
+  padding: var(--patient-space-3) var(--patient-space-4);
+  border-radius: var(--patient-radius-md);
+  background: var(--patient-primary-light);
+  color: var(--patient-primary);
+  line-height: var(--patient-leading-normal);
+  font-size: var(--patient-font-helper);
 }
 
 .summary-notice--warning {
-  background: #fff7ed;
-  color: #c2410c;
+  background: rgba(245, 158, 11, 0.12);
+  color: var(--patient-warning);
 }
 
 .summary-notice--danger {
-  background: #fef2f2;
-  color: #b91c1c;
+  background: rgba(239, 68, 68, 0.10);
+  color: var(--patient-danger);
 }
 
 .event-list {
   display: grid;
-  gap: 12px;
+  gap: var(--patient-space-3);
 }
 
 .event-row {
@@ -449,19 +451,19 @@ onIonViewDidLeave(() => {
 
 .event-bubble {
   max-width: min(86%, 460px);
-  padding: 14px;
-  border-radius: 18px;
-  box-shadow: 0 10px 18px rgba(15, 23, 42, 0.06);
+  padding: var(--patient-space-4);
+  border-radius: var(--patient-radius-lg);
+  box-shadow: var(--patient-shadow-sm);
 }
 
 .event-bubble--incoming {
-  background: #ffffff;
-  color: #0f172a;
+  background: var(--patient-bg-card);
+  color: var(--patient-text-primary);
 }
 
 .event-bubble--outgoing {
-  background: linear-gradient(135deg, #1d4ed8, #0f766e);
-  color: #ffffff;
+  background: linear-gradient(135deg, var(--patient-primary), var(--patient-primary-dark));
+  color: var(--patient-text-inverse);
 }
 
 .event-bubble--outgoing .event-meta,
@@ -470,48 +472,51 @@ onIonViewDidLeave(() => {
 }
 
 .event-bubble--system {
-  background: #e2e8f0;
-  color: #334155;
+  background: var(--patient-border);
+  color: var(--patient-text-primary);
 }
 
 .event-title {
-  font-weight: 700;
+  font-weight: var(--patient-font-semibold);
+  font-size: var(--patient-font-body);
 }
 
 .event-meta {
   display: flex;
   justify-content: space-between;
-  gap: 12px;
-  margin-top: 8px;
-  font-size: 12px;
+  gap: var(--patient-space-3);
+  margin-top: var(--patient-space-2);
+  font-size: var(--patient-font-caption);
 }
 
 .event-content {
-  margin-top: 10px;
-  line-height: 1.7;
+  margin-top: var(--patient-space-2);
+  line-height: var(--patient-leading-relaxed);
   white-space: pre-wrap;
+  font-size: var(--patient-font-body);
 }
 
 .composer-toolbar {
-  --padding-top: 8px;
-  --padding-bottom: 8px;
-  --padding-start: 16px;
-  --padding-end: 16px;
+  --padding-top: var(--patient-space-2);
+  --padding-bottom: var(--patient-space-2);
+  --padding-start: var(--patient-space-4);
+  --padding-end: var(--patient-space-4);
 }
 
 .composer {
   display: flex;
   align-items: flex-end;
-  gap: 12px;
+  gap: var(--patient-space-3);
 }
 
 .composer-input {
   flex: 1;
-  --background: #f8fafc;
-  --border-radius: 16px;
-  border: 1px solid #dbe3f0;
-  border-radius: 16px;
-  padding: 4px 8px;
+  --background: var(--patient-bg-page);
+  --border-radius: var(--patient-radius-lg);
+  border: var(--patient-border-default);
+  border-radius: var(--patient-radius-lg);
+  padding: var(--patient-space-1) var(--patient-space-2);
+  font-size: var(--patient-font-body);
 }
 
 .composer-button {
@@ -519,18 +524,10 @@ onIonViewDidLeave(() => {
 }
 
 .terminal-banner {
-  padding: 10px 0;
-  color: #64748b;
-  line-height: 1.6;
+  padding: var(--patient-space-3) 0;
+  color: var(--patient-text-secondary);
+  line-height: var(--patient-leading-normal);
+  font-size: var(--patient-font-helper);
 }
 
-.empty-state {
-  text-align: center;
-  padding: 32px 12px;
-}
-
-.empty-icon {
-  font-size: 36px;
-  color: #94a3b8;
-}
 </style>

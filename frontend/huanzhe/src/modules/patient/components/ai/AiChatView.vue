@@ -8,7 +8,7 @@
       :data-testid="`ai-message-${message.role}-${index}`"
     >
       <div class="avatar" :class="message.role">
-        <ion-icon v-if="message.role === 'assistant'" :icon="sparklesOutline" />
+        <AppIcon v-if="message.role === 'assistant'" name="sparkles" :size="18" />
         <span v-else>我</span>
       </div>
       <div class="bubble" :class="message.role">
@@ -34,8 +34,6 @@
 </template>
 
 <script setup lang="ts">
-import { IonIcon } from '@ionic/vue'
-import { sparklesOutline } from 'ionicons/icons'
 
 export interface AiViewMessage {
   role: 'assistant' | 'user'
@@ -90,14 +88,14 @@ const renderText = (text: string) => {
 }
 
 .avatar.assistant {
-  background: linear-gradient(135deg, #3B82F6 0%, #2563EB 100%);
-  color: #ffffff;
+  background: linear-gradient(135deg, var(--patient-primary) 0%, var(--patient-primary-dark) 100%);
+  color: var(--patient-text-inverse);
   font-size: 18px;
 }
 
 .avatar.user {
-  background: #E2E8F0;
-  color: #475569;
+  background: var(--patient-border);
+  color: var(--patient-text-secondary);
   font-size: 13px;
   font-weight: 700;
 }
@@ -111,21 +109,21 @@ const renderText = (text: string) => {
 }
 
 .bubble.assistant {
-  background: #ffffff;
+  background: var(--patient-bg-card);
   border-radius: 2px 16px 16px 16px;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
-  color: #1E293B;
+  box-shadow: var(--patient-shadow-sm);
+  color: var(--patient-text-primary);
 }
 
 .bubble.user {
-  background: #3B82F6;
+  background: var(--patient-primary);
   border-radius: 16px 2px 16px 16px;
-  color: #ffffff;
+  color: var(--patient-text-inverse);
 }
 
 /* Content */
 .content {
-  font-size: 15px;
+  font-size: var(--patient-font-body);
 }
 
 /* Loading dots animation */
@@ -140,7 +138,7 @@ const renderText = (text: string) => {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: #94A3B8;
+  background: var(--patient-text-muted);
   animation: pulse-dot 1.2s ease-in-out infinite;
 }
 
@@ -175,19 +173,20 @@ const renderText = (text: string) => {
 .suggestion-chip {
   display: inline-flex;
   align-items: center;
-  padding: 6px 14px;
-  border-radius: 18px;
-  border: 1px solid #BFDBFE;
-  background: #EFF6FF;
-  color: #2563EB;
-  font-size: 13px;
+  padding: var(--patient-space-2) var(--patient-space-4);
+  border-radius: var(--patient-radius-xl);
+  border: 1px solid var(--patient-primary-light);
+  background: var(--patient-primary-light);
+  color: var(--patient-primary);
+  font-size: var(--patient-font-caption);
   line-height: 1.4;
   cursor: pointer;
   transition: all 0.15s ease;
 }
 
 .suggestion-chip:active {
-  background: #DBEAFE;
-  border-color: #93C5FD;
+  background: var(--patient-primary-light);
+  border-color: var(--patient-primary);
+  opacity: 0.8;
 }
 </style>

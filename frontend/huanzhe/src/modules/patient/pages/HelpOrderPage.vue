@@ -58,14 +58,11 @@
             <ion-card-title>我的工单</ion-card-title>
           </ion-card-header>
           <ion-card-content>
-            <div v-if="loading" class="empty-state">
+            <div v-if="loading" class="loading-state">
               <ion-spinner name="crescent" />
             </div>
 
-            <div v-else-if="orders.length === 0" class="empty-state">
-              <ion-icon :icon="chatboxEllipsesOutline" class="empty-icon" />
-              <p class="empty-text">还没有提交过工单</p>
-            </div>
+            <EmptyState v-else-if="orders.length === 0" type="no-orders" />
 
             <div v-else class="order-list">
               <button
@@ -111,7 +108,6 @@ import {
   IonCheckbox,
   IonContent,
   IonHeader,
-  IonIcon,
   IonInput,
   IonItem,
   IonLabel,
@@ -128,7 +124,6 @@ import {
   onIonViewWillEnter
 } from '@ionic/vue'
 import { computed, ref } from 'vue'
-import { chatboxEllipsesOutline } from 'ionicons/icons'
 import { useRoute, useRouter } from 'vue-router'
 import { helpOrderService, type HelpOrderDTO } from '@/modules/patient/api/mvp'
 
@@ -299,64 +294,60 @@ onIonViewWillEnter(async () => {
 }
 
 .page-container {
-  padding: 16px;
+  padding: var(--patient-space-4);
 }
 
 .form-card,
 .list-card {
-  border-radius: 18px;
-  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+  border-radius: var(--patient-radius-lg);
+  box-shadow: var(--patient-shadow-sm);
 }
 
 .checkbox-label {
-  margin-left: 12px;
+  margin-left: var(--patient-space-3);
+}
+
+.loading-state {
+  text-align: center;
+  padding: var(--patient-space-8) var(--patient-space-3);
 }
 
 .order-list {
   display: grid;
-  gap: 14px;
+  gap: var(--patient-space-3);
 }
 
 .order-item {
   width: 100%;
-  padding: 14px;
+  padding: var(--patient-space-4);
   border: 0;
-  border-radius: 14px;
+  border-radius: var(--patient-radius-md);
   background: var(--patient-bg-page);
   text-align: left;
+  min-height: 64px;
 }
 
 .order-top {
   display: flex;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--patient-space-3);
   align-items: flex-start;
 }
 
 .order-title {
-  font-size: 16px;
-  font-weight: 700;
+  font-size: var(--patient-font-body);
+  font-weight: var(--patient-font-bold);
   color: var(--patient-text-primary);
 }
 
 .order-meta,
-.order-desc,
-.empty-text {
+.order-desc {
   color: var(--patient-text-secondary);
 }
 
 .order-desc {
-  margin: 10px 0;
+  margin: var(--patient-space-2) 0;
   white-space: pre-wrap;
 }
 
-.empty-state {
-  text-align: center;
-  padding: 32px 12px;
-}
-
-.empty-icon {
-  font-size: 36px;
-  color: var(--patient-text-muted);
-}
 </style>

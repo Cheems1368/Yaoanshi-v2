@@ -395,18 +395,18 @@ onIonViewWillEnter(async () => {
 }
 
 .proxy-banner {
-  background: #fef3c7;
-  color: #92400e;
+  background: rgba(245, 158, 11, 0.12);
+  color: var(--patient-warning);
   text-align: center;
-  padding: 10px 16px;
-  font-size: 14px;
+  padding: var(--patient-space-3) var(--patient-space-4);
+  font-size: var(--patient-font-helper);
 }
 
 .form-card,
 .list-card {
-  margin: 16px;
-  border-radius: 18px;
-  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+  margin: var(--patient-space-4);
+  border-radius: var(--patient-radius-xl);
+  box-shadow: var(--patient-shadow-md);
 }
 
 .card-title {
@@ -457,8 +457,8 @@ onIonViewWillEnter(async () => {
   right: 0;
   background: var(--patient-bg-card);
   border: 1px solid var(--patient-border);
-  border-radius: 10px;
-  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.10);
+  border-radius: var(--patient-radius-md);
+  box-shadow: var(--patient-shadow-md);
   z-index: 100;
   overflow: hidden;
   max-height: 200px;
@@ -579,7 +579,7 @@ onIonViewWillEnter(async () => {
 
 .withdraw-btn {
   background: rgba(239, 68, 68, 0.1);
-  color: #b91c1c;
+  color: var(--patient-danger);
 }
 
 .stop-btn {
@@ -616,12 +616,12 @@ onIonViewWillEnter(async () => {
 }
 
 .ddi-high {
-  background: #fef2f2;
+  background: rgba(239, 68, 68, 0.08);
   border-left: 4px solid var(--patient-danger);
 }
 
 .ddi-medium {
-  background: #fffbeb;
+  background: rgba(245, 158, 11, 0.08);
   border-left: 4px solid var(--patient-warning);
 }
 

@@ -62,6 +62,12 @@ class HttpService {
         if (error.response?.status >= 500) {
           return Promise.reject(new Error('Server error'))
         }
+        if (error.response?.data) {
+          const data = error.response.data
+          const businessError = new Error(data.msg || data.message || 'Request failed') as any
+          businessError.code = data.code
+          return Promise.reject(businessError)
+        }
         if (error.request) {
           return Promise.reject(new Error('Network error'))
         }

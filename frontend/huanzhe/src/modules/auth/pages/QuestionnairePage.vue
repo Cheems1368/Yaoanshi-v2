@@ -3,7 +3,7 @@
     <ion-header class="custom-header">
       <ion-toolbar>
         <ion-button fill="clear" class="back-btn" @click="goBack">
-          <ion-icon :icon="chevronBackOutline" class="back-icon" aria-hidden="true" />
+          <AppIcon name="chevronBackOutline" :size="20" aria-hidden="true" />
         </ion-button>
         <ion-title class="page-title">患者健康管理信息表</ion-title>
       </ion-toolbar>
@@ -100,8 +100,7 @@
 <script setup lang="ts">
 import { ref, reactive, computed } from "vue"
 import { useRouter } from "vue-router"
-import { IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonButton, IonIcon, IonTextarea } from "@ionic/vue"
-import { chevronBackOutline } from "ionicons/icons"
+import { IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonButton, IonTextarea } from "@ionic/vue"
 import { healthDataService, type HealthData } from "@/services/healthDataService"
 import { patientService } from "@/modules/patient/api/mvp"
 
@@ -158,104 +157,99 @@ const goBack = () => {
 
 <style scoped>
 .custom-header {
-  --background: #ffffff;
-  --color: #000000;
+  --background: var(--patient-bg-card);
+  --color: var(--patient-text-primary);
 }
 
 .back-btn {
-  --color: #666666;
-  margin-left: 10px;
-}
-
-.back-icon {
-  width: 20px;
-  height: 20px;
+  --color: var(--patient-text-secondary);
+  margin-left: var(--patient-space-3);
 }
 
 .page-title {
-  font-size: 18px;
-  font-weight: 600;
-  color: #dc2626;
+  font-size: var(--patient-font-subtitle);
+  font-weight: var(--patient-font-semibold);
+  color: var(--patient-danger);
   text-align: center;
 }
 
 .questionnaire-content {
-  --background: #f5f5f5;
+  --background: var(--patient-bg-page);
 }
 
 .questionnaire-container {
-  padding: 20px;
+  padding: var(--patient-space-5);
   max-width: 400px;
   margin: 0 auto;
 }
 
 .progress-section {
-  margin-bottom: 20px;
+  margin-bottom: var(--patient-space-5);
 }
 
 .progress-bar {
   width: 100%;
   height: 8px;
-  background-color: #e5e7eb;
-  border-radius: 4px;
+  background-color: var(--patient-border);
+  border-radius: var(--patient-radius-sm);
   overflow: hidden;
-  margin-bottom: 10px;
+  margin-bottom: var(--patient-space-3);
 }
 
 .progress-fill {
   height: 100%;
-  background: linear-gradient(90deg, #dc2626, #f59e0b, #3b82f6);
+  background: linear-gradient(90deg, var(--patient-danger), var(--patient-warning), var(--patient-primary));
   transition: width 0.3s ease;
 }
 
 .progress-text {
   text-align: center;
-  font-size: 14px;
-  color: #666666;
+  font-size: var(--patient-font-helper);
+  color: var(--patient-text-secondary);
 }
 
 .form-container {
-  background: #ffffff;
-  border: 3px solid #3b82f6;
-  border-radius: 12px;
-  padding: 20px;
-  margin-bottom: 20px;
+  background: var(--patient-bg-card);
+  border: 3px solid var(--patient-primary);
+  border-radius: var(--patient-radius-md);
+  padding: var(--patient-space-5);
+  margin-bottom: var(--patient-space-5);
   min-height: 400px;
 }
 
 .layer-header {
-  margin-bottom: 20px;
+  margin-bottom: var(--patient-space-5);
   text-align: center;
 }
 
 .layer-title {
-  font-size: 20px;
-  font-weight: 600;
-  margin: 0 0 8px 0;
+  font-size: var(--patient-font-subtitle);
+  font-weight: var(--patient-font-semibold);
+  margin: 0 0 var(--patient-space-2) 0;
 }
 
 .layer-description {
-  font-size: 14px;
-  color: #666666;
+  font-size: var(--patient-font-helper);
+  color: var(--patient-text-secondary);
   margin: 0;
 }
 
 .layer-red .layer-title {
-  color: #dc2626;
+  color: var(--patient-danger);
 }
 
 .layer-yellow .layer-title {
-  color: #f59e0b;
+  color: var(--patient-warning);
 }
 
 .layer-blue .layer-title {
-  color: #3b82f6;
+  color: var(--patient-primary);
 }
 
 .form-fields {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: var(--patient-space-5);
 }
 
 .form-item {
@@ -264,64 +258,64 @@ const goBack = () => {
 }
 
 .form-label {
-  font-size: 16px;
-  font-weight: 500;
-  color: #333333;
-  margin-bottom: 8px;
+  font-size: var(--patient-font-body);
+  font-weight: var(--patient-font-semibold);
+  color: var(--patient-text-primary);
+  margin-bottom: var(--patient-space-2);
 }
 
 .form-label.required::after {
   content: ' *';
-  color: #dc2626;
+  color: var(--patient-danger);
 }
 
 .form-input {
-  --background: #ffffff;
-  --color: #333333;
-  --border-radius: 8px;
+  --background: var(--patient-bg-card);
+  --color: var(--patient-text-primary);
+  --border-radius: var(--patient-radius-md);
   --border-width: 1px;
-  --border-color: #d1d5db;
-  --padding-start: 12px;
-  --padding-end: 12px;
-  height: 48px;
+  --border-color: var(--patient-border);
+  --padding-start: var(--patient-space-3);
+  --padding-end: var(--patient-space-3);
+  height: var(--patient-space-12);
 }
 
 .form-textarea {
-  --background: #ffffff;
-  --color: #333333;
-  --border-radius: 8px;
+  --background: var(--patient-bg-card);
+  --color: var(--patient-text-primary);
+  --border-radius: var(--patient-radius-md);
   --border-width: 1px;
-  --border-color: #d1d5db;
-  --padding-start: 12px;
-  --padding-end: 12px;
+  --border-color: var(--patient-border);
+  --padding-start: var(--patient-space-3);
+  --padding-end: var(--patient-space-3);
 }
 
 .action-buttons {
   display: flex;
   justify-content: space-between;
-  gap: 15px;
-  margin-top: 20px;
+  gap: var(--patient-space-4);
+  margin-top: var(--patient-space-5);
 }
 
 .prev-btn {
-  --border-color: #6b7280;
-  --color: #6b7280;
+  --border-color: var(--patient-border);
+  --color: var(--patient-text-secondary);
   flex: 1;
-  height: 48px;
+  height: var(--patient-space-12);
 }
 
 .next-btn {
-  --background: #3b82f6;
-  --color: #ffffff;
+  --background: var(--patient-primary);
+  --color: var(--patient-text-inverse);
   flex: 1;
-  height: 48px;
+  height: var(--patient-space-12);
 }
 
 .submit-btn {
-  --background: #dc2626;
-  --color: #ffffff;
+  --background: var(--patient-danger);
+  --color: var(--patient-text-inverse);
   flex: 1;
-  height: 48px;
-  font-weight: 600;
+  height: var(--patient-space-12);
+  font-weight: var(--patient-font-bold);
 }
 </style>

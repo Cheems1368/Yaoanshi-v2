@@ -120,84 +120,84 @@ const goBack = () => {
 
 <style scoped>
 .page-header {
-  --background: #2979ff;
-  --color: #ffffff;
+  --background: var(--patient-primary);
+  --color: var(--patient-text-inverse);
 }
 
 .page-content {
-  --background: linear-gradient(180deg, #eff6ff 0%, #ffffff 35%, #f8fafc 100%);
+  --background: linear-gradient(180deg, var(--patient-primary-light) 0%, var(--patient-bg-card) 35%, var(--patient-bg-page) 100%);
 }
 
 .container {
-  padding: 16px;
+  padding: var(--patient-space-4);
 }
 
 .hero-card {
-  border-radius: 14px;
-  margin-bottom: 12px;
-  border: 1px solid #dbeafe;
+  border-radius: var(--patient-radius-lg);
+  margin-bottom: var(--patient-space-3);
+  border: 1px solid var(--patient-border-light);
 }
 
 .topic {
   margin: 0;
-  color: #2563eb;
-  font-size: 13px;
+  color: var(--patient-primary);
+  font-size: var(--patient-font-caption);
 }
 
 .hero-card h2 {
-  margin: 8px 0 4px;
-  color: #0f172a;
+  margin: var(--patient-space-2) 0 var(--patient-space-1);
+  color: var(--patient-text-primary);
 }
 
 .generic-name {
   margin: 0;
-  color: #64748b;
+  color: var(--patient-text-muted);
 }
 
 .detail-card {
-  border-radius: 14px;
-  margin-bottom: 10px;
+  border-radius: var(--patient-radius-lg);
+  margin-bottom: var(--patient-space-3);
 }
 
 .detail-card ion-card-title {
-  color: #1e293b;
-  font-size: 17px;
+  color: var(--patient-text-primary);
+  font-size: var(--patient-font-body);
 }
 
 .detail-card ion-card-content {
-  color: #334155;
-  line-height: 1.6;
+  color: var(--patient-text-primary);
+  line-height: var(--patient-leading-relaxed);
 }
 
 .warning ion-card-title {
-  color: #b45309;
+  color: var(--patient-warning);
 }
 
 .safe-note {
-  margin-top: 12px;
-  border-radius: 14px;
-  border: 1px solid #fed7aa;
-  background: #fff7ed;
-  padding: 14px;
+  margin-top: var(--patient-space-3);
+  border-radius: var(--patient-radius-lg);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  background: rgba(245, 158, 11, 0.08);
+  padding: var(--patient-space-4);
 }
 
 .safe-note h3 {
-  margin: 0 0 8px;
-  color: #9a3412;
+  margin: 0 0 var(--patient-space-2);
+  color: var(--patient-warning);
 }
 
 .safe-note p {
   margin: 0;
-  color: #7c2d12;
-  line-height: 1.6;
+  color: var(--patient-text-primary);
+  line-height: var(--patient-leading-relaxed);
 }
 
 .error-card {
-  border-radius: 14px;
+  border-radius: var(--patient-radius-lg);
   text-align: center;
 }
 
 .error-card p {
-  color: #64748b;
+  color: var(--patient-text-muted);
 }
 </style>

@@ -38,13 +38,13 @@ const routes: Array<RouteRecordRaw> = [
         meta: { requiresAuth: true }
       },
       {
-        path: 'help-order',
-        component: () => import('@/modules/patient/pages/HelpOrderPage.vue'),
+        path: 'medication',
+        component: () => import('@/modules/patient/pages/MedicationTabPage.vue'),
         meta: { requiresAuth: true, requiresBinding: true }
       },
       {
-        path: 'prescription',
-        component: () => import('@/modules/patient/pages/PrescriptionPage.vue'),
+        path: 'help-order',
+        component: () => import('@/modules/patient/pages/HelpOrderPage.vue'),
         meta: { requiresAuth: true, requiresBinding: true }
       },
       {
@@ -53,6 +53,15 @@ const routes: Array<RouteRecordRaw> = [
         meta: { requiresAuth: true }
       }
     ]
+  },
+  {
+    path: '/tabs/prescription',
+    redirect: '/prescription'
+  },
+  {
+    path: '/prescription',
+    component: () => import('@/modules/patient/pages/PrescriptionPage.vue'),
+    meta: { requiresAuth: true, requiresBinding: true }
   },
   {
     path: '/medication-reminder',
