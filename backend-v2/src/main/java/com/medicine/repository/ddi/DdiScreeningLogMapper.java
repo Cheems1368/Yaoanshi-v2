@@ -16,11 +16,17 @@ public interface DdiScreeningLogMapper {
 
     @Insert("""
             INSERT INTO ddi_screening_log (
-                patient_id, prescription_id, medication_plan_id, matched_rule_id, severity, confirm_status,
+                patient_id, prescription_id, medication_plan_id, matched_rule_id,
+                rule_code, rule_status_at_screening, drug_a_name, drug_b_name,
+                severity, message, recommended_action, mechanism_desc, alternative_recommendation, reference_source, patient_summary,
+                confirm_status,
                 confirmed_by_pharmacist_id, confirmed_at, confirmation_note,
                 creator, create_time, updater, update_time, deleted, tenant_id
             ) VALUES (
-                #{patientId}, #{prescriptionId}, #{medicationPlanId}, #{matchedRuleId}, #{severity}, #{confirmStatus},
+                #{patientId}, #{prescriptionId}, #{medicationPlanId}, #{matchedRuleId},
+                #{ruleCode}, #{ruleStatusAtScreening}, #{drugAName}, #{drugBName},
+                #{severity}, #{message}, #{recommendedAction}, #{mechanismDesc}, #{alternativeRecommendation}, #{referenceSource}, #{patientSummary},
+                #{confirmStatus},
                 #{confirmedByPharmacistId}, #{confirmedAt}, #{confirmationNote},
                 #{creator}, #{createTime}, #{updater}, #{updateTime}, #{deleted}, #{tenantId}
             )
@@ -29,7 +35,10 @@ public interface DdiScreeningLogMapper {
     int insert(DdiScreeningLog log);
 
     @Select("""
-            SELECT id, patient_id, prescription_id, medication_plan_id, matched_rule_id, severity, confirm_status,
+            SELECT id, patient_id, prescription_id, medication_plan_id, matched_rule_id,
+                   rule_code, rule_status_at_screening, drug_a_name, drug_b_name,
+                   severity, message, recommended_action, mechanism_desc, alternative_recommendation, reference_source, patient_summary,
+                   confirm_status,
                    confirmed_by_pharmacist_id, confirmed_at, confirmation_note,
                    creator, create_time, updater, update_time, deleted, tenant_id
             FROM ddi_screening_log
@@ -39,7 +48,10 @@ public interface DdiScreeningLogMapper {
     List<DdiScreeningLog> selectByPrescriptionId(@Param("tenantId") Long tenantId, @Param("prescriptionId") Long prescriptionId);
 
     @Select("""
-            SELECT id, patient_id, prescription_id, medication_plan_id, matched_rule_id, severity, confirm_status,
+            SELECT id, patient_id, prescription_id, medication_plan_id, matched_rule_id,
+                   rule_code, rule_status_at_screening, drug_a_name, drug_b_name,
+                   severity, message, recommended_action, mechanism_desc, alternative_recommendation, reference_source, patient_summary,
+                   confirm_status,
                    confirmed_by_pharmacist_id, confirmed_at, confirmation_note,
                    creator, create_time, updater, update_time, deleted, tenant_id
             FROM ddi_screening_log

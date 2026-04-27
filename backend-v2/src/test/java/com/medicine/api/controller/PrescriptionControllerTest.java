@@ -1,8 +1,8 @@
 package com.medicine.api.controller;
 
+import com.medicine.api.dto.ddi.AdminDdiRiskCardDTO;
 import com.medicine.api.dto.prescription.FilePresignRequest;
 import com.medicine.api.dto.prescription.FilePresignResponse;
-import com.medicine.api.dto.prescription.PrescriptionDTO;
 import com.medicine.common.model.CommonResult;
 import com.medicine.service.admin.AdminPrescriptionService;
 import com.medicine.service.app.AppFileService;
@@ -58,13 +58,13 @@ class PrescriptionControllerTest {
         TestingAuthenticationToken authentication = new TestingAuthenticationToken("pharmacist", "token");
         authentication.setDetails(claims);
 
-        PrescriptionDTO.DdiScreeningDTO dto = new PrescriptionDTO.DdiScreeningDTO();
-        dto.setId(1L);
+        AdminDdiRiskCardDTO dto = new AdminDdiRiskCardDTO();
+        dto.setScreeningId(1L);
         when(adminPrescriptionService.confirmScreening(claims, 1L, null)).thenReturn(dto);
 
-        CommonResult<PrescriptionDTO.DdiScreeningDTO> result = adminDdiController.confirm(1L, null, authentication);
+        CommonResult<AdminDdiRiskCardDTO> result = adminDdiController.confirm(1L, null, authentication);
 
         assertThat(result.getCode()).isEqualTo(200);
-        assertThat(result.getData().getId()).isEqualTo(1L);
+        assertThat(result.getData().getScreeningId()).isEqualTo(1L);
     }
 }

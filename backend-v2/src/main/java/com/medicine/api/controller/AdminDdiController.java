@@ -1,11 +1,11 @@
 package com.medicine.api.controller;
 
+import com.medicine.api.dto.ddi.AdminDdiRiskCardDTO;
 import com.medicine.api.dto.ddi.AdminDdiRuleDTO;
 import com.medicine.api.dto.ddi.AdminDdiRuleUpsertRequest;
 import com.medicine.api.dto.ddi.DrugContraindicationDTO;
 import com.medicine.api.dto.ddi.DrugContraindicationUpsertRequest;
 import com.medicine.api.dto.prescription.DdiScreeningConfirmRequest;
-import com.medicine.api.dto.prescription.PrescriptionDTO;
 import com.medicine.common.model.CommonResult;
 import com.medicine.common.model.PageResult;
 import com.medicine.service.admin.AdminDdiService;
@@ -97,7 +97,7 @@ public class AdminDdiController {
     }
 
     @PostMapping("/screenings/{id}/confirm")
-    public CommonResult<PrescriptionDTO.DdiScreeningDTO> confirm(
+    public CommonResult<AdminDdiRiskCardDTO> confirm(
             @PathVariable("id") Long id,
             @RequestBody(required = false) DdiScreeningConfirmRequest request,
             Authentication authentication

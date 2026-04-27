@@ -1,5 +1,6 @@
 package com.medicine.service.app;
 
+import com.medicine.api.dto.ddi.AdminDdiScreenResult;
 import com.medicine.api.dto.ddi.AppDdiScreenRequest;
 import com.medicine.api.dto.ddi.AppDdiScreenResult;
 import com.medicine.common.exception.BusinessException;
@@ -144,6 +145,36 @@ class AppDdiScreeningServiceTest {
         assertThatThrownBy(() -> appDdiScreeningService.screenForSubject("13800138000", request))
                 .isInstanceOf(BusinessException.class)
                 .hasMessage("BAD_REQUEST");
+    }
+
+    @Test
+    void shouldReturnDetailedPlanAlertsWithoutDuplicatingReversedPairs() {
+        when(selfReportedMedicationMapper.selectActiveByPatientId(1L, 201L)).thenReturn(List.of());
+        when(patientHealthProfileMapper.selectByPatientId(1L, 201L)).thenReturn(null);
+
+        DdiRule interactionRule = new DdiRule();
+        interactionRule.setId(301L);
+        interactionRule.setRuleCode("DDI-HIGH-WARFARIN-AMOXICILLIN");
+        interactionRule.setDrugAName("Warfarin");
+        interactionRule.setDrugBName("Amoxicillin");
+        interactionRule.setSeverity("HIGH");
+        interactionRule.setMessage("High risk");
+        interactionRule.setMechanismDesc("Mechanism");
+        when(ddiRuleMapper.selectActiveRules(1L)).thenReturn(List.of(interactionRule));
+        when(drugContraindicationMapper.selectActiveRules(1L)).thenReturn(List.of());
+
+        AdminDdiScreenResult result = appDdiScreeningService.screenPlanDrugsDetailed(201L, List.of("Warfarin", "Amoxicillin"));
+        AppDdiScreenResult appResult = appDdiScreeningService.screenPlanDrugs(201L, List.of("Warfarin", "Amoxicillin"));
+
+        assertThat(result.getAlerts()).hasSize(1);
+        assertThat(result.getAlerts().get(0).getRuleCode()).isEqualTo("DDI-HIGH-WARFARIN-AMOXICILLIN");
+        assertThat(result.getAlerts().get(0).getDrugA()).isEqualTo("Warfarin");
+        assertThat(result.getAlerts().get(0).getDrugB()).isEqualTo("Amoxicillin");
+        assertThat(result.getAlerts().get(0).getMechanismDesc()).isEqualTo("Mechanism");
+        assertThat(appResult.getAlerts()).hasSize(1);
+        assertThat(appResult.getAlerts().get(0).getType()).isEqualTo("INTERACTION");
+        assertThat(appResult.getAlerts().get(0).getDrugA()).isEqualTo("Amoxicillin");
+        assertThat(appResult.getAlerts().get(0).getDrugB()).isEqualTo("Warfarin");
     }
 
     private AppPatientService.AccessContext accessContext() {

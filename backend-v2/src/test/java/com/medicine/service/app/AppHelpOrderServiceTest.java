@@ -6,6 +6,7 @@ import com.medicine.api.dto.helporder.HelpOrderReplyRequest;
 import com.medicine.common.exception.BusinessException;
 import com.medicine.common.exception.ErrorCode;
 import com.medicine.domain.helporder.HelpOrder;
+import com.medicine.domain.helporder.HelpOrderEvent;
 import com.medicine.domain.identity.AppAccount;
 import com.medicine.domain.identity.Patient;
 import com.medicine.repository.helporder.HelpOrderEventMapper;
@@ -17,6 +18,7 @@ import com.medicine.service.auth.AppPatientService;
 import com.medicine.service.notification.NotificationDispatchService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
@@ -30,7 +32,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.catchThrowableOfType;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyMap;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -90,7 +91,10 @@ class AppHelpOrderServiceTest {
         assertThat(result.getCategory()).isEqualTo("MEDICATION");
         assertThat(result.getPriority()).isEqualTo("URGENT");
         assertThat(result.getStatus()).isEqualTo("SUBMITTED");
-        assertThat(result.getDescription()).isNull();
+        assertThat(result.getDescription()).isEmpty();
+        ArgumentCaptor<HelpOrderEvent> eventCaptor = ArgumentCaptor.forClass(HelpOrderEvent.class);
+        verify(helpOrderEventMapper).insert(eventCaptor.capture());
+        assertThat(eventCaptor.getValue().getContent()).isEmpty();
         verify(notificationDispatchService).createAndDispatch(
                 eq(1L),
                 eq("app-help-order"),

@@ -74,7 +74,7 @@ public class AppHelpOrderService {
         order.setSubmittedById(context.appAccount().getId());
         order.setCategory(normalizeCategory(request.getCategory()));
         order.setTitle(requireText(request.getTitle()));
-        order.setDescription(blankToNull(request.getDescription()));
+        order.setDescription(request.getDescription() == null ? "" : request.getDescription().trim());
         order.setStatus("SUBMITTED");
         order.setPriority(normalizePriority(request.getPriority()));
         order.setRequiresOfflineEmergency(Boolean.TRUE.equals(request.getRequiresOfflineEmergency()));
@@ -89,7 +89,7 @@ public class AppHelpOrderService {
         applyAudit(order, "app-help-order", now);
         helpOrderMapper.insert(order);
 
-        appendEvent(order.getId(), "SUBMITTED", null, "SUBMITTED", context.operatorType(), context.appAccount().getId(), blankToNull(request.getDescription()), now);
+        appendEvent(order.getId(), "SUBMITTED", null, "SUBMITTED", context.operatorType(), context.appAccount().getId(), order.getDescription(), now);
         createNotification(
                 "PHARMACIST",
                 patient.getBoundByPharmacistId(),
@@ -229,7 +229,7 @@ public class AppHelpOrderService {
         event.setToStatus(toStatus);
         event.setOperatorType(operatorType);
         event.setOperatorId(operatorId == null ? 0L : operatorId);
-        event.setContent(blankToNull(content));
+        event.setContent(content == null ? "" : content.trim());
         event.setAttachmentFileAssetId(null);
         event.setMetadataJson(null);
         applyAudit(event, "app-help-order", now);

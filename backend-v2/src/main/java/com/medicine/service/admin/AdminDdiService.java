@@ -155,6 +155,10 @@ public class AdminDdiService {
         rule.setSeverity(requireText(request.getSeverity()).toUpperCase());
         rule.setMessage(requireText(request.getMessage()));
         rule.setRecommendedAction(optionalText(request.getRecommendedAction()));
+        rule.setMechanismDesc(optionalText(request.getMechanismDesc()));
+        rule.setAlternativeRecommendation(optionalText(request.getAlternativeRecommendation()));
+        rule.setReferenceSource(optionalText(request.getReferenceSource()));
+        rule.setPatientSummary(optionalText(request.getPatientSummary()));
         rule.setStatus(defaultStatus(request.getStatus(), "ACTIVE"));
         rule.setMaintainedByPharmacistId(pharmacist.getId());
         rule.setCreator("pharmacist-" + pharmacist.getId());
@@ -182,6 +186,10 @@ public class AdminDdiService {
         current.setSeverity(requireText(request.getSeverity()).toUpperCase());
         current.setMessage(requireText(request.getMessage()));
         current.setRecommendedAction(optionalText(request.getRecommendedAction()));
+        current.setMechanismDesc(optionalText(request.getMechanismDesc()));
+        current.setAlternativeRecommendation(optionalText(request.getAlternativeRecommendation()));
+        current.setReferenceSource(optionalText(request.getReferenceSource()));
+        current.setPatientSummary(optionalText(request.getPatientSummary()));
         current.setStatus(defaultStatus(request.getStatus(), current.getStatus()));
         current.setMaintainedByPharmacistId(pharmacist.getId());
         current.setUpdater("pharmacist-" + pharmacist.getId());
@@ -219,6 +227,10 @@ public class AdminDdiService {
         dto.setSeverity(rule.getSeverity());
         dto.setMessage(rule.getMessage());
         dto.setRecommendedAction(rule.getRecommendedAction());
+        dto.setMechanismDesc(rule.getMechanismDesc());
+        dto.setAlternativeRecommendation(rule.getAlternativeRecommendation());
+        dto.setReferenceSource(rule.getReferenceSource());
+        dto.setPatientSummary(rule.getPatientSummary());
         dto.setStatus(rule.getStatus());
         dto.setMaintainedByPharmacistId(rule.getMaintainedByPharmacistId());
         dto.setUpdatedAt(formatDateTime(rule.getUpdateTime()));

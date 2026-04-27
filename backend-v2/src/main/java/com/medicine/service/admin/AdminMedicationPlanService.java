@@ -1,7 +1,7 @@
 package com.medicine.service.admin;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.medicine.api.dto.ddi.AppDdiScreenResult;
+import com.medicine.api.dto.ddi.AdminDdiScreenResult;
 import com.medicine.api.dto.medication.DoseTaskDTO;
 import com.medicine.api.dto.medication.MedicationPlanDTO;
 import com.medicine.common.exception.BusinessException;
@@ -117,7 +117,7 @@ public class AdminMedicationPlanService {
         return getPlan(claims, id);
     }
 
-    public AppDdiScreenResult ddiCheckForPlan(JwtClaims claims, Long id) {
+    public AdminDdiScreenResult ddiCheckForPlan(JwtClaims claims, Long id) {
         professionalIdentityService.getOrCreatePharmacistProfile(claims);
         MedicationPlan plan = requirePlan(id);
         List<MedicationPlanItem> items = medicationPlanItemMapper.selectByPlanId(DEFAULT_TENANT_ID, plan.getId());
@@ -127,11 +127,11 @@ public class AdminMedicationPlanService {
                 .distinct()
                 .toList();
         if (drugNames.isEmpty()) {
-            AppDdiScreenResult empty = new AppDdiScreenResult();
+            AdminDdiScreenResult empty = new AdminDdiScreenResult();
             empty.setAlerts(List.of());
             return empty;
         }
-        return appDdiScreeningService.screenPlanDrugs(plan.getPatientId(), drugNames);
+        return appDdiScreeningService.screenPlanDrugsDetailed(plan.getPatientId(), drugNames);
     }
 
     public MedicationPlanDTO getPlan(JwtClaims claims, Long id) {

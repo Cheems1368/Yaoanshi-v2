@@ -40,6 +40,22 @@ public interface DdiRuleMapper {
                    creator, create_time, updater, update_time, deleted, tenant_id
             FROM ddi_rule
             WHERE tenant_id = #{tenantId} AND deleted = 0
+              AND id IN
+              <foreach collection="ids" item="id" open="(" separator="," close=")">
+                #{id}
+              </foreach>
+            ORDER BY id ASC
+            </script>
+            """)
+    List<DdiRule> selectByIds(@Param("tenantId") Long tenantId, @Param("ids") List<Long> ids);
+
+    @Select("""
+            <script>
+            SELECT id, rule_code, drug_a_name, drug_b_name, severity, message, recommended_action, status, maintained_by_pharmacist_id,
+                   mechanism_desc, alternative_recommendation, reference_source, patient_summary,
+                   creator, create_time, updater, update_time, deleted, tenant_id
+            FROM ddi_rule
+            WHERE tenant_id = #{tenantId} AND deleted = 0
             <if test="keyword != null and keyword != ''">
               AND (
                    rule_code LIKE CONCAT('%', #{keyword}, '%')

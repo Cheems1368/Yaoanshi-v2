@@ -1,5 +1,6 @@
 package com.medicine.service.admin;
 
+import com.medicine.api.dto.ddi.AdminDdiRiskCardDTO;
 import com.medicine.api.dto.prescription.DdiScreeningConfirmRequest;
 import com.medicine.api.dto.prescription.PrescriptionConfirmRequest;
 import com.medicine.api.dto.prescription.PrescriptionDTO;
@@ -21,10 +22,12 @@ import com.medicine.repository.prescription.PrescriptionAttachmentMapper;
 import com.medicine.repository.prescription.PrescriptionItemMapper;
 import com.medicine.repository.prescription.PrescriptionMapper;
 import com.medicine.repository.prescription.PrescriptionOcrRecordMapper;
+import com.medicine.service.app.AppDdiScreeningService;
 import com.medicine.service.auth.JwtClaims;
 import com.medicine.service.auth.ProfessionalIdentityService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -35,6 +38,8 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -65,6 +70,9 @@ class AdminPrescriptionServiceTest {
 
     @Mock
     private ProfessionalIdentityService professionalIdentityService;
+
+    @Mock
+    private AppDdiScreeningService appDdiScreeningService;
 
     @InjectMocks
     private AdminPrescriptionService adminPrescriptionService;
@@ -116,6 +124,11 @@ class AdminPrescriptionServiceTest {
         when(prescriptionAttachmentMapper.selectByPrescriptionId(1L, 401L)).thenReturn(List.of(attachment()));
         when(fileAssetMapper.selectByIdAndTenant(1L, 301L)).thenReturn(fileAsset());
         when(prescriptionItemMapper.selectByPrescriptionId(1L, 401L)).thenReturn(List.of(item("Aspirin"), item("Warfarin")));
+        when(ddiRuleMapper.selectByIds(1L, List.of(601L))).thenReturn(List.of(highRiskRule()));
+        AdminDdiRiskCardDTO riskCard = new AdminDdiRiskCardDTO();
+        riskCard.setRuleCode("DDI-HIGH-ASPIRIN-WARFARIN");
+        riskCard.setSeverity("HIGH");
+        when(appDdiScreeningService.toInteractionRiskCard(any(DdiRule.class))).thenReturn(riskCard);
 
         PrescriptionDTO result = adminPrescriptionService.confirmPrescription(claims, 401L, confirmRequest("Aspirin", "Warfarin"));
 
@@ -135,13 +148,107 @@ class AdminPrescriptionServiceTest {
         when(professionalIdentityService.getOrCreatePharmacistProfile(claims)).thenReturn(profile());
         when(ddiScreeningLogMapper.selectByIdAndTenant(1L, 701L)).thenReturn(log);
         when(ddiRuleMapper.selectById(1L, 601L)).thenReturn(highRiskRule());
+        AdminDdiRiskCardDTO riskCard = new AdminDdiRiskCardDTO();
+        riskCard.setRuleCode("DDI-HIGH-ASPIRIN-WARFARIN");
+        riskCard.setSeverity("HIGH");
+        riskCard.setRuleId(601L);
+        when(appDdiScreeningService.toInteractionRiskCard(any(DdiRule.class))).thenReturn(riskCard);
 
         DdiScreeningConfirmRequest request = new DdiScreeningConfirmRequest();
         request.setNote("ok");
-        PrescriptionDTO.DdiScreeningDTO dto = adminPrescriptionService.confirmScreening(claims, 701L, request);
+        AdminDdiRiskCardDTO dto = adminPrescriptionService.confirmScreening(claims, 701L, request);
 
         assertThat(dto.getSeverity()).isEqualTo("HIGH");
-        assertThat(dto.getMatchedRuleId()).isEqualTo(601L);
+        assertThat(dto.getRuleId()).isEqualTo(601L);
+        assertThat(dto.getScreeningId()).isEqualTo(701L);
+    }
+
+    @Test
+    void shouldPersistRuleSnapshotWhenCreatingScreeningLog() {
+        JwtClaims claims = claims();
+        Prescription prescription = prescription();
+        DdiRule rule = highRiskRule();
+        when(professionalIdentityService.getOrCreatePharmacistProfile(claims)).thenReturn(profile());
+        when(prescriptionMapper.selectByIdAndTenant(1L, 401L)).thenReturn(prescription);
+        when(ddiRuleMapper.selectActiveRules(1L)).thenReturn(List.of(rule));
+        when(ddiScreeningLogMapper.selectByPrescriptionId(1L, 401L)).thenReturn(List.of());
+
+        assertThatThrownBy(() -> adminPrescriptionService.confirmPrescription(claims, 401L, confirmRequest("Aspirin", "Warfarin")))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("DDI_CONFIRM_REQUIRED");
+
+        ArgumentCaptor<DdiScreeningLog> captor = ArgumentCaptor.forClass(DdiScreeningLog.class);
+        verify(ddiScreeningLogMapper).insert(captor.capture());
+        DdiScreeningLog inserted = captor.getValue();
+        assertThat(inserted.getRuleCode()).isEqualTo("DDI-HIGH-ASPIRIN-WARFARIN");
+        assertThat(inserted.getDrugAName()).isEqualTo("Aspirin");
+        assertThat(inserted.getDrugBName()).isEqualTo("Warfarin");
+        assertThat(inserted.getMessage()).isEqualTo("High risk");
+        assertThat(inserted.getMechanismDesc()).isEqualTo("Mechanism");
+    }
+
+    @Test
+    void shouldUseScreeningSnapshotForPrescriptionDetail() {
+        JwtClaims claims = claims();
+        Prescription prescription = prescription();
+        DdiScreeningLog log = new DdiScreeningLog();
+        log.setId(701L);
+        log.setMatchedRuleId(601L);
+        log.setRuleCode("DDI-HIGH-ASPIRIN-WARFARIN");
+        log.setDrugAName("Aspirin");
+        log.setDrugBName("Warfarin");
+        log.setSeverity("HIGH");
+        log.setMessage("Snapshot message");
+        log.setRecommendedAction("Snapshot action");
+        log.setMechanismDesc("Snapshot mechanism");
+        log.setAlternativeRecommendation("Snapshot alternative");
+        log.setReferenceSource("Snapshot reference");
+        log.setPatientSummary("Snapshot summary");
+        log.setConfirmStatus("PENDING_CONFIRM");
+        when(professionalIdentityService.getOrCreatePharmacistProfile(claims)).thenReturn(profile());
+        when(prescriptionMapper.selectByIdAndTenant(1L, 401L)).thenReturn(prescription);
+        when(prescriptionOcrRecordMapper.selectLatestByPrescriptionId(1L, 401L)).thenReturn(ocrRecord("LOW_CONFIDENCE"));
+        when(prescriptionAttachmentMapper.selectByPrescriptionId(1L, 401L)).thenReturn(List.of());
+        when(prescriptionItemMapper.selectByPrescriptionId(1L, 401L)).thenReturn(List.of());
+        when(ddiScreeningLogMapper.selectByPrescriptionId(1L, 401L)).thenReturn(List.of(log));
+
+        PrescriptionDTO dto = adminPrescriptionService.getPrescriptionDetail(claims, 401L);
+
+        assertThat(dto.getPendingDdiScreenings()).hasSize(1);
+        assertThat(dto.getPendingDdiScreenings().get(0).getRuleCode()).isEqualTo("DDI-HIGH-ASPIRIN-WARFARIN");
+        assertThat(dto.getPendingDdiScreenings().get(0).getMechanismDesc()).isEqualTo("Snapshot mechanism");
+        verify(ddiRuleMapper, never()).selectActiveRules(1L);
+        verify(ddiRuleMapper, never()).selectByIds(eq(1L), any());
+    }
+
+    @Test
+    void shouldFallbackToRuleLookupForLegacyScreeningLogs() {
+        JwtClaims claims = claims();
+        Prescription prescription = prescription();
+        DdiScreeningLog legacyLog = new DdiScreeningLog();
+        legacyLog.setId(701L);
+        legacyLog.setMatchedRuleId(601L);
+        legacyLog.setSeverity("HIGH");
+        legacyLog.setConfirmStatus("PENDING_CONFIRM");
+        when(professionalIdentityService.getOrCreatePharmacistProfile(claims)).thenReturn(profile());
+        when(prescriptionMapper.selectByIdAndTenant(1L, 401L)).thenReturn(prescription);
+        when(prescriptionOcrRecordMapper.selectLatestByPrescriptionId(1L, 401L)).thenReturn(ocrRecord("LOW_CONFIDENCE"));
+        when(prescriptionAttachmentMapper.selectByPrescriptionId(1L, 401L)).thenReturn(List.of());
+        when(prescriptionItemMapper.selectByPrescriptionId(1L, 401L)).thenReturn(List.of());
+        when(ddiScreeningLogMapper.selectByPrescriptionId(1L, 401L)).thenReturn(List.of(legacyLog));
+        when(ddiRuleMapper.selectByIds(1L, List.of(601L))).thenReturn(List.of(highRiskRule()));
+        AdminDdiRiskCardDTO riskCard = new AdminDdiRiskCardDTO();
+        riskCard.setRuleCode("DDI-HIGH-ASPIRIN-WARFARIN");
+        riskCard.setSeverity("HIGH");
+        riskCard.setMechanismDesc("Mechanism");
+        when(appDdiScreeningService.toInteractionRiskCard(any(DdiRule.class))).thenReturn(riskCard);
+
+        PrescriptionDTO dto = adminPrescriptionService.getPrescriptionDetail(claims, 401L);
+
+        assertThat(dto.getPendingDdiScreenings()).hasSize(1);
+        assertThat(dto.getPendingDdiScreenings().get(0).getRuleCode()).isEqualTo("DDI-HIGH-ASPIRIN-WARFARIN");
+        verify(ddiRuleMapper).selectByIds(1L, List.of(601L));
+        verify(ddiRuleMapper, never()).selectActiveRules(1L);
     }
 
     @Test
@@ -152,7 +259,6 @@ class AdminPrescriptionServiceTest {
         when(prescriptionOcrRecordMapper.selectLatestByPrescriptionId(1L, 401L)).thenReturn(ocrRecord("LOW_CONFIDENCE"));
         when(prescriptionAttachmentMapper.selectByPrescriptionId(1L, 401L)).thenReturn(List.of());
         when(prescriptionItemMapper.selectByPrescriptionId(1L, 401L)).thenReturn(List.of());
-        when(ddiRuleMapper.selectActiveRules(1L)).thenReturn(List.of());
         when(ddiScreeningLogMapper.selectByPrescriptionId(1L, 401L)).thenReturn(List.of());
 
         PrescriptionRejectRequest request = new PrescriptionRejectRequest();
@@ -232,11 +338,17 @@ class AdminPrescriptionServiceTest {
     private DdiRule highRiskRule() {
         DdiRule rule = new DdiRule();
         rule.setId(601L);
+        rule.setRuleCode("DDI-HIGH-ASPIRIN-WARFARIN");
         rule.setDrugAName("Aspirin");
         rule.setDrugBName("Warfarin");
         rule.setSeverity("HIGH");
         rule.setMessage("High risk");
         rule.setRecommendedAction("Confirm first");
+        rule.setMechanismDesc("Mechanism");
+        rule.setAlternativeRecommendation("Alternative");
+        rule.setReferenceSource("Reference");
+        rule.setPatientSummary("Summary");
+        rule.setStatus("ACTIVE");
         return rule;
     }
 
