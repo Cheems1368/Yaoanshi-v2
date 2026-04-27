@@ -18,16 +18,16 @@
 h1 {
   margin: 0 0 12px;
   font-size: 72px;
-  color: #2979ff;
+  color: var(--pro-brand-primary);
 }
 
 p {
   margin: 0 0 20px;
-  color: #556c8a;
+  color: var(--pro-text-secondary);
 }
 
 a {
-  color: #2979ff;
+  color: var(--pro-brand-primary);
   text-decoration: none;
 }
 </style>

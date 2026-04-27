@@ -275,6 +275,35 @@
         <el-form-item label="建议动作" prop="recommendedAction">
           <el-input v-model="contraindicationForm.recommendedAction" type="textarea" :rows="2" />
         </el-form-item>
+        <el-divider content-position="left">扩展信息（药师专业参考）</el-divider>
+        <el-form-item label="机制说明">
+          <el-input
+            v-model="contraindicationForm.mechanismDesc"
+            type="textarea"
+            :rows="3"
+            placeholder="禁忌机制或风险说明（可选）"
+          />
+        </el-form-item>
+        <el-form-item label="替代建议">
+          <el-input
+            v-model="contraindicationForm.alternativeRecommendation"
+            type="textarea"
+            :rows="2"
+            placeholder="可替代方案或处理建议（可选）"
+          />
+        </el-form-item>
+        <el-form-item label="参考来源">
+          <el-input
+            v-model="contraindicationForm.referenceSource"
+            placeholder="如：《心血管用药指南》第 3 章（可选）"
+          />
+        </el-form-item>
+        <el-form-item label="患者摘要">
+          <el-input
+            v-model="contraindicationForm.patientSummary"
+            placeholder="患者侧简短提示，留空则前台使用主提示语（可选）"
+          />
+        </el-form-item>
       </el-form>
 
       <template #footer>
@@ -369,6 +398,10 @@ const createDefaultContraindicationForm = () => ({
   severity: 'HIGH',
   message: '',
   recommendedAction: '',
+  mechanismDesc: '',
+  alternativeRecommendation: '',
+  referenceSource: '',
+  patientSummary: '',
   status: 'ACTIVE'
 })
 
@@ -506,6 +539,10 @@ const openContraindicationDrawer = (row = null) => {
       severity: row.severity || 'HIGH',
       message: row.message || '',
       recommendedAction: row.recommendedAction || '',
+      mechanismDesc: row.mechanismDesc || '',
+      alternativeRecommendation: row.alternativeRecommendation || '',
+      referenceSource: row.referenceSource || '',
+      patientSummary: row.patientSummary || '',
       status: row.status || 'ACTIVE'
     })
   }
@@ -567,6 +604,10 @@ const submitContraindicationForm = async () => {
       severity: contraindicationForm.severity,
       message: contraindicationForm.message,
       recommendedAction: contraindicationForm.recommendedAction,
+      mechanismDesc: contraindicationForm.mechanismDesc || undefined,
+      alternativeRecommendation: contraindicationForm.alternativeRecommendation || undefined,
+      referenceSource: contraindicationForm.referenceSource || undefined,
+      patientSummary: contraindicationForm.patientSummary || undefined,
       status: contraindicationForm.status
     }
 

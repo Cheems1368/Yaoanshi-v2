@@ -39,11 +39,11 @@
           :draft="currentDraft"
           :show-back="isMobile"
           role="doctor"
+          :on-reply="handleReply"
+          :on-reject="handleReject"
+          :on-close="handleClose"
+          :on-save-draft="handleSaveDraft"
           @back="mobileShowDetail = false"
-          @reply="handleReply"
-          @reject="handleReject"
-          @close="handleClose"
-          @save-draft="handleSaveDraft"
         />
       </div>
     </div>
@@ -112,15 +112,15 @@ function handleStatusChange(statusValue) {
 }
 
 function handleReply(id, content) {
-  reply(id, content)
+  return reply(id, content)
 }
 
 function handleReject(id, reason) {
-  reject(id, reason)
+  return reject(id, reason)
 }
 
 function handleClose(id, note) {
-  close(id, note)
+  return close(id, note)
 }
 
 function handleSaveDraft(id, draft) {

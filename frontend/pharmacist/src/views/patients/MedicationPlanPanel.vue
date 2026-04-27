@@ -112,18 +112,7 @@
     <!-- DDI 告警确认对话框 -->
     <el-dialog v-model="ddiDialogVisible" title="用药风险提示" width="520px" :close-on-click-modal="false">
       <p class="ddi-dialog-intro">启用该计划前检测到以下药物相互作用风险，请确认后继续：</p>
-      <div class="ddi-alert-list">
-        <div v-for="(alert, i) in pendingDdiAlerts" :key="i" class="ddi-alert-item" :class="`ddi-${alert.severity?.toLowerCase()}`">
-          <div class="ddi-alert-header">
-            <el-tag :type="alert.severity === 'HIGH' ? 'danger' : 'warning'" size="small" effect="plain">
-              {{ alert.severity === 'HIGH' ? '高风险' : '中风险' }}
-            </el-tag>
-            <span class="ddi-drug-pair">{{ alert.drugA }} + {{ alert.drugB }}</span>
-          </div>
-          <p class="ddi-message">{{ alert.message }}</p>
-          <p v-if="alert.recommendedAction" class="ddi-action">建议：{{ alert.recommendedAction }}</p>
-        </div>
-      </div>
+      <AdminDdiRiskCardList v-model="expandedDdiAlertKey" :alerts="pendingDdiAlerts" />
       <template #footer>
         <el-button @click="ddiDialogVisible = false">取消启用</el-button>
         <el-button type="warning" :loading="activating" @click="doActivate">已知晓风险，确认启用</el-button>
@@ -163,6 +152,7 @@
 <script setup>
 import { computed, reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
+import AdminDdiRiskCardList from '@/components/ddi/AdminDdiRiskCardList.vue'
 import {
   activateMedicationPlan,
   createMedicationPlan,
@@ -196,6 +186,7 @@ const adherenceReport = ref('')
 const ddiDialogVisible = ref(false)
 const pendingDdiAlerts = ref([])
 const pendingActivatePlanId = ref(null)
+const expandedDdiAlertKey = ref('')
 
 const createEmptyItem = () => ({
   drugName: '',
@@ -415,6 +406,7 @@ const activateCurrentVersion = async () => {
     const alerts = ddiRes.data?.alerts ?? []
     if (alerts.length > 0) {
       pendingDdiAlerts.value = alerts
+      expandedDdiAlertKey.value = ''
       pendingActivatePlanId.value = form.id
       ddiDialogVisible.value = true
     } else {
@@ -540,6 +532,16 @@ watch(
   box-shadow: var(--pro-shadow-sm);
 }
 
+.ddi-alert-list {
+  max-height: min(60vh, 560px);
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.ddi-alert-list > .ddi-alert-item {
+  display: none;
+}
+
 .panel-header,
 .header-actions,
 .section-header,
@@ -619,9 +621,29 @@ watch(
 }
 
 .ddi-dialog-intro {
-  margin: 0 0 16px;
+  margin: 0;
   color: var(--pro-text-secondary);
   font-size: 13px;
+}
+
+:deep(.el-dialog) {
+  display: flex;
+  max-height: calc(100vh - 48px);
+  flex-direction: column;
+  margin-top: 24px !important;
+  margin-bottom: 24px;
+}
+
+:deep(.el-dialog__body) {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  display: grid;
+  gap: 16px;
+}
+
+:deep(.el-dialog__footer) {
+  flex: 0 0 auto;
 }
 
 .ddi-alert-list {
@@ -638,13 +660,13 @@ watch(
 }
 
 .ddi-high {
-  background: #fef2f2;
-  border-left-color: #ef4444;
+  background: var(--pro-danger-bg);
+  border-left-color: var(--pro-danger);
 }
 
 .ddi-medium {
-  background: #fffbeb;
-  border-left-color: #f59e0b;
+  background: var(--pro-warning-bg);
+  border-left-color: var(--pro-warning);
 }
 
 .ddi-alert-header {

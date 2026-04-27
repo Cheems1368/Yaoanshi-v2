@@ -9,11 +9,14 @@
 
     <!-- Action buttons -->
     <template v-else>
+      <div v-if="showDoctorWorkflowHint" class="action-bar__hint">
+        请先回复接手工单，之后才可关闭。
+      </div>
       <div class="action-bar__buttons">
         <el-button
           v-if="showClaim"
           type="success"
-          @click="$emit('claim', detail.id)"
+          @click="handleClaim"
         >
           认领
         </el-button>
@@ -86,10 +89,14 @@ import { computed, nextTick, ref, watch } from 'vue'
 const props = defineProps({
   detail: { type: Object, required: true },
   role: { type: String, default: 'pharmacist' },
-  draft: { type: Object, default: null }
+  draft: { type: Object, default: null },
+  onClaim: { type: Function, default: null },
+  onReply: { type: Function, default: null },
+  onEscalate: { type: Function, default: null },
+  onReject: { type: Function, default: null },
+  onClose: { type: Function, default: null },
+  onSaveDraft: { type: Function, default: null }
 })
-
-const emit = defineEmits(['claim', 'reply', 'escalate', 'reject', 'close', 'save-draft'])
 
 const activeAction = ref(null)
 const inputText = ref('')
@@ -142,7 +149,14 @@ const showEscalate = computed(() =>
   isPharmacist.value && ['SUBMITTED', 'PHARMACIST_IN_PROGRESS'].includes(status.value)
 )
 const showReject = computed(() => !isTerminal.value)
-const showClose = computed(() => !isTerminal.value)
+// Doctors can close only after they take ownership via reply.
+const showClose = computed(() => {
+  if (isPharmacist.value) return !isTerminal.value
+  return status.value === 'DOCTOR_IN_PROGRESS'
+})
+const showDoctorWorkflowHint = computed(() =>
+  !isPharmacist.value && status.value === 'WAITING_DOCTOR'
+)
 
 // Restore draft when detail changes
 watch(() => props.draft, (draft) => {
@@ -159,7 +173,7 @@ function toggleAction(action) {
   }
   // Save current draft before switching
   if (activeAction.value && inputText.value.trim()) {
-    emit('save-draft', { action: activeAction.value, text: inputText.value })
+    props.onSaveDraft?.({ action: activeAction.value, text: inputText.value })
   }
   activeAction.value = action
   inputText.value = ''
@@ -172,14 +186,36 @@ function cancelAction() {
 }
 
 async function handleSubmit() {
+  const action = activeAction.value
+  if (!action) {
+    return
+  }
+
+  const handlers = {
+    reply: props.onReply,
+    escalate: props.onEscalate,
+    reject: props.onReject,
+    close: props.onClose
+  }
+  const handler = handlers[action]
+  if (!handler) {
+    return
+  }
+
   submitting.value = true
   try {
-    emit(activeAction.value, inputText.value)
+    await handler(props.detail.id, inputText.value)
     activeAction.value = null
     inputText.value = ''
+  } catch {
+    // Parent handlers already surface request errors.
   } finally {
     submitting.value = false
   }
+}
+
+function handleClaim() {
+  return props.onClaim?.(props.detail.id)
 }
 </script>
 
@@ -203,6 +239,15 @@ async function handleSubmit() {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+}
+
+.action-bar__hint {
+  padding: 12px 14px;
+  border-radius: var(--pro-radius-md);
+  background: var(--pro-bg-secondary);
+  color: var(--pro-text-secondary);
+  font-size: 13px;
+  line-height: 1.5;
 }
 
 .action-bar__input {

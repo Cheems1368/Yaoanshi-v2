@@ -143,7 +143,7 @@ const handleCommand = async (command) => {
   min-width: var(--sidebar-width);
   flex: 0 0 var(--sidebar-width);
   border-right: 1px solid var(--pro-border-color);
-  background: linear-gradient(180deg, #ffffff 0%, #f5f7fa 100%);
+  background: linear-gradient(180deg, var(--pro-bg-primary) 0%, var(--pro-bg-secondary) 100%);
   overflow: hidden;
   transition:
     width 160ms ease,
@@ -172,7 +172,7 @@ const handleCommand = async (command) => {
   place-items: center;
   border-radius: 14px;
   background: var(--pro-brand-primary);
-  color: #ffffff;
+  color: var(--pro-text-inverse);
   font-family: var(--pro-title-font-family);
   font-weight: 700;
   box-shadow: var(--pro-shadow-sm);

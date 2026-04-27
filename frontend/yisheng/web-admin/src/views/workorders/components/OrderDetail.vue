@@ -29,12 +29,12 @@
         :detail="detail"
         :role="role"
         :draft="draft"
-        @claim="$emit('claim', detail.id)"
-        @reply="$emit('reply', detail.id, $event)"
-        @escalate="$emit('escalate', detail.id, $event)"
-        @reject="$emit('reject', detail.id, $event)"
-        @close="$emit('close', detail.id, $event)"
-        @save-draft="$emit('save-draft', detail.id, $event)"
+        :on-claim="onClaim"
+        :on-reply="onReply"
+        :on-escalate="onEscalate"
+        :on-reject="onReject"
+        :on-close="onClose"
+        :on-save-draft="handleSaveDraft"
       />
     </template>
   </div>
@@ -46,16 +46,29 @@ import OrderSummary from './OrderSummary.vue'
 import OrderTimeline from './OrderTimeline.vue'
 import OrderActionBar from './OrderActionBar.vue'
 
-defineProps({
+const props = defineProps({
   orderId: { type: [Number, String], default: null },
   detail: { type: Object, default: null },
   loading: { type: Boolean, default: false },
   role: { type: String, default: 'pharmacist' },
   draft: { type: Object, default: null },
-  showBack: { type: Boolean, default: false }
+  showBack: { type: Boolean, default: false },
+  onClaim: { type: Function, default: null },
+  onReply: { type: Function, default: null },
+  onEscalate: { type: Function, default: null },
+  onReject: { type: Function, default: null },
+  onClose: { type: Function, default: null },
+  onSaveDraft: { type: Function, default: null }
 })
 
-defineEmits(['back', 'claim', 'reply', 'escalate', 'reject', 'close', 'save-draft'])
+const emit = defineEmits(['back'])
+
+function handleSaveDraft(draft) {
+  if (!props.detail?.id) {
+    return
+  }
+  props.onSaveDraft?.(props.detail.id, draft)
+}
 </script>
 
 <style lang="scss" scoped>

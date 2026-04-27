@@ -89,7 +89,7 @@ defineProps({
 }
 
 .summary-note--danger {
-  background: #fef0f0;
+  background: var(--pro-danger-bg);
   color: var(--pro-danger);
 }
 

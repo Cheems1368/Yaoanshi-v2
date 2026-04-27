@@ -141,26 +141,14 @@
             show-icon
             class="ddi-banner"
           />
-          <div class="ddi-list">
-            <article v-for="screening in detail.pendingDdiScreenings" :key="screening.id" class="ddi-card">
-              <div class="ddi-header">
-                <strong>{{ screening.severity }} 风险</strong>
-                <el-tag :type="screening.confirmStatus === 'CONFIRMED_CONTINUE' ? 'success' : 'danger'" effect="plain">
-                  {{ screening.confirmStatus === 'CONFIRMED_CONTINUE' ? '已确认' : '待确认' }}
-                </el-tag>
-              </div>
-              <p>{{ screening.message || '检测到高风险相互作用' }}</p>
-              <p>{{ screening.recommendedAction || '请药师明确记录继续使用理由。' }}</p>
-              <el-button
-                v-if="screening.confirmStatus !== 'CONFIRMED_CONTINUE'"
-                type="warning"
-                plain
-                @click="handleConfirmScreening(screening.id)"
-              >
-                确认继续
-              </el-button>
-            </article>
-          </div>
+          <AdminDdiRiskCardList
+            v-model="expandedScreeningKey"
+            :alerts="detail.pendingDdiScreenings"
+            :show-confirm-button="true"
+            :show-confirm-state="true"
+            :show-confirmation-note="true"
+            @confirm="handleConfirmScreening"
+          />
         </section>
 
         <section class="drawer-actions">
@@ -177,6 +165,7 @@
 import { reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import AdminDdiRiskCardList from '@/components/ddi/AdminDdiRiskCardList.vue'
 import {
   confirmDdiScreening,
   confirmPrescription,
@@ -195,6 +184,7 @@ const total = ref(0)
 const detailVisible = ref(false)
 const detail = ref(null)
 const editableItems = ref([])
+const expandedScreeningKey = ref('')
 
 const query = reactive({
   keyword: '',
@@ -230,6 +220,7 @@ const openDetail = async (id) => {
   try {
     const response = await getPrescriptionDetail(id)
     detail.value = response.data
+    expandedScreeningKey.value = ''
     editableItems.value = response.data.items?.length
       ? response.data.items.map((item) => ({
           drugName: item.drugName || '',
@@ -297,6 +288,7 @@ const reloadCurrentDetail = async () => {
   }
   const response = await getPrescriptionDetail(detail.value.id)
   detail.value = response.data
+  expandedScreeningKey.value = ''
 }
 
 const handleConfirm = async () => {
@@ -458,6 +450,10 @@ loadPrescriptions()
 .ddi-list {
   display: grid;
   gap: 16px;
+}
+
+.ddi-list {
+  display: none;
 }
 
 .summary-grid {
