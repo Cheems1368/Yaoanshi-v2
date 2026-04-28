@@ -30,3 +30,50 @@ docker logs --since 1m yaoshian-backend-v2
 docker logs --since 1m yaoshian-pharmacist-admin
 curl http://localhost:8081/health
 ```
+
+## 患者端真机 Live Reload 演示
+
+前置条件：
+
+- Android 手机已开启 USB 调试，并通过数据线连接电脑。
+- `ANDROID_HOME` 或 `ANDROID_SDK_ROOT` 指向本机 Android SDK，例如 `D:\ANDROIDSDK`。
+- JDK 21 可用；脚本会优先读取 `-JavaHome`、`JAVA21_HOME`、`JDK21_HOME`，也会尝试本机 `D:\Java\java21`。
+- 本地测试账号 `pharmacist` / `doctor` 已通过 `ops/scripts/ensure-local-professional-test-accounts.ps1` 准备。
+
+启动演示栈：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File D:\yaoanshi\ops\scripts\start-mobile-demo-stack.ps1
+```
+
+按现场指定的患者手机号和院内 ID 重置演示数据：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File D:\yaoanshi\ops\scripts\reset-mobile-demo-data.ps1 `
+  -Mobile 13900000001 `
+  -HospitalPatientId DEMO-STROKE-001 `
+  -Name 张三
+```
+
+可选：先构建患者端 Android debug 包：
+
+```powershell
+cd D:\yaoanshi\frontend\huanzhe
+npm run android:build
+```
+
+运行患者端到手机：
+
+```powershell
+cd D:\yaoanshi\frontend\huanzhe
+npm run android:live
+```
+
+验收路径：
+
+1. 手机打开“药按时”。
+2. 使用固定演示验证码登录。
+3. 绑定现场指定患者。
+4. 药师端创建并激活用药计划。
+5. 手机首页和“用药”页能看到计划名、今日任务、药品、剂量和时间。
+6. 处方页使用“拍照上传”或“相册/电子处方”选择图片，完成预览和登记，列表出现记录。

@@ -18,7 +18,7 @@ Project
 - Yaoshian MVP P0
 
 Branch / Context
-- Branch: main (origin: https://github.com/Cheems1368/Yaoanshi-v2.git)
+- Branch: codex/mobile-demo (origin: https://github.com/Cheems1368/Yaoanshi-v2.git)
 - Active workstream: Post-P0+ optimization sprint (trial/demo readiness, ~1 month)
 - Active surfaces: backend-v2, frontend/huanzhe, frontend/pharmacist, frontend/yisheng/web-admin
 
@@ -241,3 +241,30 @@ Doctor Help Order Reply 400 Fix (2026-04-28)
 Last Updated
 - 2026-04-28 Asia/Shanghai
 - Reason: fixed doctor-side upgraded help-order reply 400 caused by dual-role JWT role resolution.
+
+Patient Android Mobile Demo Prep (2026-04-28)
+- frontend/huanzhe:
+  - Added Capacitor Android project for `com.yaoanshi.patient` / `药按时`.
+  - Added Android npm scripts and PowerShell helpers for JDK 21 detection, debug build, adb reverse, install, and launch.
+  - Prescription upload page now has separate camera capture and gallery/e-prescription file inputs while preserving presign/register/list flow.
+  - Removed unused `@capacitor/camera` dependency so the first-stage demo stays on browser file inputs.
+- ops:
+  - Added demo stack startup script and scoped demo-data reset script.
+  - Reset script requires mobile, hospital patient ID, and patient name before touching demo rows.
+  - ops README documents JDK 21, Android Live Reload, reset command, and smoke path.
+- verification:
+  - `npm run build --prefix D:\yaoanshi\frontend\huanzhe` passed.
+  - `npm run android:sync --prefix D:\yaoanshi\frontend\huanzhe` passed.
+  - `npm run android:build --prefix D:\yaoanshi\frontend\huanzhe` passed.
+  - `cd D:\yaoanshi\frontend\huanzhe\android; .\gradlew.bat assembleDebug --no-daemon` passed with JDK 21.
+  - `D:\ANDROIDSDK\platform-tools\adb.exe devices` showed `S4AALFDUIZAUDUEY device`.
+- open risks:
+  - `npm run android:live -- -DeviceId S4AALFDUIZAUDUEY` built successfully but APK install was blocked by the phone:
+    `INSTALL_FAILED_USER_RESTRICTED: Install canceled by user`.
+  - Old user-level Gradle daemon registry still logs a stale Java 8 expiration-check warning; builds pass when scripts force JDK 21 and `--no-daemon`.
+- next:
+  - On the phone, enable/allow USB app installation, rerun `npm run android:live -- -DeviceId S4AALFDUIZAUDUEY`, then perform the real-device smoke path.
+
+Last Updated
+- 2026-04-28 Asia/Shanghai
+- Reason: prepared patient Android mobile demo build/run path; blocked only by phone-side install permission.

@@ -27,15 +27,26 @@
           </ion-card-header>
           <ion-card-content>
             <input
-              ref="fileInputRef"
+              ref="cameraInputRef"
+              class="hidden-input"
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              capture="environment"
+              @change="handleFileChange"
+            />
+
+            <input
+              ref="galleryInputRef"
               class="hidden-input"
               type="file"
               accept="image/png,image/jpeg,image/webp"
               @change="handleFileChange"
             />
 
-            <ion-button expand="block" @click="triggerFilePicker">选择图片</ion-button>
-
+            <div class="upload-action-grid">
+              <ion-button expand="block" @click="triggerCameraPicker">拍照上传</ion-button>
+              <ion-button expand="block" fill="outline" @click="triggerGalleryPicker">相册/电子处方</ion-button>
+            </div>
             <div v-if="selectedFile" class="selected-file">
               <div class="file-meta">
                 <strong>{{ selectedFile.name }}</strong>
@@ -166,7 +177,8 @@ import {
 const MAX_SIZE_BYTES = 10 * 1024 * 1024
 
 const router = useRouter()
-const fileInputRef = ref<HTMLInputElement | null>(null)
+const cameraInputRef = ref<HTMLInputElement | null>(null)
+const galleryInputRef = ref<HTMLInputElement | null>(null)
 const selectedFile = ref<File | null>(null)
 const previewUrl = ref('')
 const candidateDrugNamesText = ref('')
@@ -179,6 +191,7 @@ const showDdiModal = ref(false)
 const pendingDdiAlerts = ref<AppDdiAlert[]>([])
 const pendingUploadFile = ref<File | null>(null)
 const pendingUploadDrugNames = ref<string[]>([])
+const allowedContentTypes = new Set(['image/jpeg', 'image/png', 'image/webp'])
 
 const pendingDrugNamesLabel = computed(() => pendingUploadDrugNames.value.join('、') || '--')
 
@@ -218,13 +231,40 @@ const resetSelection = () => {
   candidateDrugNamesText.value = ''
   revokePreview()
   clearDdiPromptState()
-  if (fileInputRef.value) {
-    fileInputRef.value.value = ''
+  if (cameraInputRef.value) {
+    cameraInputRef.value.value = ''
+  }
+  if (galleryInputRef.value) {
+    galleryInputRef.value.value = ''
   }
 }
 
-const triggerFilePicker = () => {
-  fileInputRef.value?.click()
+const triggerCameraPicker = () => {
+  cameraInputRef.value?.click()
+}
+
+const triggerGalleryPicker = () => {
+  galleryInputRef.value?.click()
+}
+
+const resolveSupportedContentType = (file: File) => {
+  const declaredType = file.type.trim().toLowerCase()
+  if (allowedContentTypes.has(declaredType)) {
+    return declaredType
+  }
+
+  const lowerName = file.name.trim().toLowerCase()
+  if (lowerName.endsWith('.jpg') || lowerName.endsWith('.jpeg')) {
+    return 'image/jpeg'
+  }
+  if (lowerName.endsWith('.png')) {
+    return 'image/png'
+  }
+  if (lowerName.endsWith('.webp')) {
+    return 'image/webp'
+  }
+
+  return ''
 }
 
 const handleFileChange = (event: Event) => {
@@ -233,7 +273,7 @@ const handleFileChange = (event: Event) => {
   if (!file) {
     return
   }
-  if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+  if (!resolveSupportedContentType(file)) {
     resetSelection()
     showMessage('仅支持 JPG、PNG、WEBP 图片')
     return
@@ -305,9 +345,11 @@ const buildConsultDescription = (file: File | null, newDrugNames: string[], aler
 }
 
 const registerUpload = async (file: File, options?: { screeningDegraded?: boolean; acknowledgedRisk?: boolean }) => {
+  const contentType = resolveSupportedContentType(file)
+
   const presign = await prescriptionService.presignUpload({
     filename: file.name,
-    contentType: file.type,
+    contentType,
     sizeBytes: file.size,
     businessType: 'PRESCRIPTION'
   })
@@ -315,7 +357,7 @@ const registerUpload = async (file: File, options?: { screeningDegraded?: boolea
   const result = await prescriptionService.registerUpload({
     objectKey: presign.data.objectKey,
     originalFilename: file.name,
-    contentType: file.type,
+    contentType,
     sizeBytes: file.size
   })
 
@@ -483,6 +525,12 @@ onMounted(() => {
 
 .hidden-input {
   display: none;
+}
+
+.upload-action-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--patient-space-3);
 }
 
 .selected-file {
