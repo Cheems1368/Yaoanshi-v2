@@ -268,3 +268,20 @@ Patient Android Mobile Demo Prep (2026-04-28)
 Last Updated
 - 2026-04-28 Asia/Shanghai
 - Reason: prepared patient Android mobile demo build/run path; blocked only by phone-side install permission.
+
+Patient Android Live Reload Cleartext Fix (2026-04-28)
+- frontend/huanzhe/android:
+  - Added debug-only Android manifest override to permit cleartext traffic for Capacitor live reload.
+- debugging:
+  - Phone WebView was failing on `http://127.0.0.1:3001/` with `net::ERR_CLEARTEXT_NOT_PERMITTED`.
+  - APK already contained the expected live reload server config; adb reverse for 3001/8080 was present.
+- verification:
+  - `npm run android:build --prefix D:\yaoanshi\frontend\huanzhe` passed.
+  - `npm run android:live -- -DeviceId S4AALFDUIZAUDUEY` built, installed, and launched successfully.
+  - Follow-up logcat no longer showed `ERR_CLEARTEXT_NOT_PERMITTED`.
+- next:
+  - Continue real-device smoke walkthrough: login, bind patient, create/activate plan, verify today's tasks, and prescription image registration.
+
+Last Updated
+- 2026-04-28 Asia/Shanghai
+- Reason: fixed patient Android debug WebView cleartext block for live reload.
