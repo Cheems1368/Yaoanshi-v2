@@ -7,7 +7,7 @@ This document is the authoritative backend structure specification for `backend-
 Rules:
 
 1. `Standard document/BACKEND_STRUCTURE.md` is the only source of truth for future backend design and implementation.
-2. Existing materials under `docs/` and the frozen `backend/` codebase are legacy references only.
+2. The frozen `backend/` codebase can be inspected for legacy behavior, but it does not define future `backend-v2` contracts.
 3. If a legacy contract, schema, or flow conflicts with this document, this document wins for `backend-v2`.
 4. This document defines structure and contracts. It does not replace SQL migration scripts, but all future SQL must be generated from this document.
 

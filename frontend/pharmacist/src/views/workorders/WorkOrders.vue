@@ -1,19 +1,16 @@
 <template>
   <section class="workstation">
-    <!-- Page header -->
     <header class="workstation__header pro-page-header">
       <div class="pro-page-header__copy">
         <h2>工单处理</h2>
-        <p>承接患者求助、认领处理、必要时升级到医生，并完成关闭或驳回。</p>
+        <p>承接患者求助、认领处理，必要时升级到医生，并完成关闭或驳回。</p>
       </div>
       <div class="pro-toolbar">
         <el-button type="primary" @click="loadOrders">刷新</el-button>
       </div>
     </header>
 
-    <!-- Dual-column body -->
     <div :class="['workstation__body', { 'workstation__body--detail-open': mobileShowDetail }]">
-      <!-- Left: queue -->
       <div v-show="!mobileShowDetail || !isMobile" class="workstation__queue">
         <OrderQueue
           :orders="orders"
@@ -30,7 +27,6 @@
         />
       </div>
 
-      <!-- Right: detail -->
       <div v-show="mobileShowDetail || !isMobile" class="workstation__detail">
         <OrderDetail
           :order-id="selectedId"
@@ -83,10 +79,9 @@ const {
   unreadIds,
   loadOrders, selectOrder,
   claim, reply, escalate, reject, close,
-  saveDraft, getDraft, clearDraft
+  saveDraft, getDraft
 } = useWorkOrders('pharmacist', api)
 
-// Mobile single-column mode
 const mobileShowDetail = ref(false)
 
 const isMobile = computed(() => {

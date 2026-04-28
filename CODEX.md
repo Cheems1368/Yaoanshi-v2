@@ -8,9 +8,7 @@
 
 ## 1. Purpose and Precedence
 
-This file is the AI operating manual for GPT-5.3 Codex sessions in this repository.
-
-For Claude Opus 4.6 sessions, refer to `CLAUDE.md` instead.
+This file is the AI operating manual for Codex sessions in this repository.
 
 It defines:
 
@@ -19,7 +17,7 @@ It defines:
 3. naming and structure rules
 4. allowed and forbidden actions
 5. document precedence
-6. Codex-specific role and responsibilities
+6. shared workflow and output rules
 
 This file does not replace the formal project documents.
 
@@ -34,9 +32,9 @@ Authoritative source mapping:
 
 Additional precedence rules:
 
-1. `docs/` is reference only.
-2. If `docs/` conflicts with any file in `Standard document/`, `Standard document/` wins.
-3. `CODEX.md` governs Codex session behavior; `CLAUDE.md` governs Claude session behavior.
+1. `Standard document/*.md` is the only project knowledge base.
+2. The `docs/` tree has been removed and must not be consulted as project knowledge, reference storage, or a plan output location.
+3. `CODEX.md`, `CLAUDE.md`, and `AGENTS.md` share the same operating protocol; they do not create separate product or implementation authority.
 4. Formal product, design, technical, and backend details still belong to the formal documents listed above.
 
 ## 2. Mandatory Read Order
@@ -46,61 +44,33 @@ Every Codex session must follow this default read order:
 1. Read `CODEX.md`
 2. Read `progress.txt`
 3. Read `Standard document/IMPLEMENTATION_PLAN.md`
-4. Read only the task-relevant formal documents from `Standard document/`
+4. Select task-relevant formal documents from the matrix below
 5. Inspect repository files before making assumptions
+
+Task-to-document lookup matrix:
+
+1. Product scope, user stories, success criteria, non-goals: `Standard document/PRD.md`
+2. Pages, routes, user flows, triggers, success/error paths: `Standard document/APP_FLOW.md`
+3. Dependencies, versions, build tools, runtime requirements: `Standard document/TECH_STACK.md`
+4. UI tokens, components, layout, responsive rules: `Standard document/FRONTEND_GUIDELINES.md`
+5. Database, API, DTO, auth, storage, migrations: `Standard document/BACKEND_STRUCTURE.md`
+6. Build order, phase sequence, validation gates: `Standard document/IMPLEMENTATION_PLAN.md`
 
 Required behavior:
 
 1. Do not start implementation from memory alone.
-2. Do not assume legacy `docs/` is current truth.
+2. Do not recreate or consult `docs/` for project knowledge.
 3. Do not invent missing project rules if a formal document already defines them.
 4. Use `progress.txt` as the current execution memory and state source.
+5. Temporary implementation plans stay in the conversation; only durable build sequence changes belong in `Standard document/IMPLEMENTATION_PLAN.md`.
 
-## 3. Codex Role in Dual-Agent Collaboration
+## 3. Unified AI Collaboration Model
 
-Codex is the **construction + quality dual-core** agent. It leads backend scaffolding, code quality review, architecture compliance, and test coverage. Claude leads product definition, frontend implementation, and runtime verification.
+All AI assistants working in this repository follow the same workflow: read the session manual, read `progress.txt`, consult the task-relevant formal documents, inspect the repo, state the files and plan before editing, implement the smallest safe diff, validate, and update progress when work is completed.
 
-Iron law: Codex does NOT redefine requirements. It constructs, tests, and gatekeeps quality.
+No assistant may redefine product requirements, invent contracts, or bypass the formal documents because of its tool identity.
 
-### 3.1 Codex Primary Responsibilities
-
-1. **Scaffolding and batch construction** — backend-v2 scaffolding, bulk DTO/VO/Controller/Mapper/Service generation, test skeletons, CI config skeletons
-2. **Code quality review and refactoring** — using `security-best-practices` skill
-3. **Architecture compliance checks** — using `medicine-contract-and-architecture` skill
-4. **Unit test / integration test writing and maintenance**
-5. **CI/CD pipeline debugging** — using `gh-fix-ci` skill
-6. **Debugging, testing, and maintenance** — startup errors, build failures, regression verification, missing test coverage
-7. **Skill lifecycle management** — using `skill-manager` and `skill-evolution-manager`
-
-### 3.2 Codex Secondary Responsibilities (assisting Claude)
-
-1. Review Claude's frontend components for quality
-2. Write tests for code Claude implements
-3. Audit error handling in integration code
-4. Verify progress.txt consistency with actual code/test state
-
-### 3.3 Tiered Collaboration Flows
-
-1. **Design tasks**: Claude defines → Codex compliance check → Claude finalizes
-2. **Scaffold/batch tasks**: Claude defines constraints → Codex constructs → Codex self-tests → Claude reviews product alignment
-3. **Frontend tasks**: Claude implements → Claude browser verification → Codex quality review + test coverage
-4. **Debug/fix tasks**: Codex leads diagnosis and fix → Claude runtime/browser verification
-
-### 3.4 Handoff Protocol
-
-**When receiving work from Claude, expect:**
-1. Changed file list (path + brief description)
-2. Validation commands already run and their results
-3. Current progress.txt state
-4. Specific instructions (e.g., review security, add tests, check architecture compliance)
-5. Referenced formal documents/sections from `Standard document/`
-
-**When handing back to Claude, provide:**
-1. Review report or generated code files
-2. Issue list (severity + file location + suggestion)
-3. Test results (pass/fail + logs)
-4. Action items for Claude to address
-5. Referenced formal documents/sections from `Standard document/`
+For handoff or review work, provide changed files, validation results, referenced formal document sections, open risks, and next actions.
 
 ## 4. Project Snapshot
 
@@ -142,8 +112,8 @@ All new backend responses must use: `CommonResult<T>`
 2. Do not copy legacy backend code into `backend-v2`
 3. Do not invent endpoints, DTOs, file paths, package roots, or dependency versions
 4. Do not silently rename public DTOs or route prefixes
-5. Do not make implementation changes without coordinating with Claude (Codex reviews, Claude implements)
-6. Do not treat `docs/` as source of truth
+5. Do not make implementation changes without checking the task-relevant formal documents first
+6. Do not use or recreate `docs/` as project knowledge, reference storage, or plan output
 
 ### 5.3 Default attitude
 
@@ -229,17 +199,17 @@ Every Codex session should follow this workflow:
 
 1. Read `CODEX.md`
 2. Read `progress.txt`
-3. Read task-relevant formal documents
-4. Inspect repository files before making assumptions
-5. Execute task (review, test, audit, scaffold)
-6. Output results in handoff format (see Section 3.3)
-7. Update `progress.txt` when completing tasks
+3. Read `Standard document/IMPLEMENTATION_PLAN.md`
+4. Identify task-relevant formal documents using the lookup matrix in Section 2
+5. Inspect repository files before making assumptions
+6. Execute task (review, test, audit, scaffold)
+7. Output results with changed files, validation, open risks, and next actions
+8. Update `progress.txt` when completing tasks
 
 Relationship between session files:
 
-1. `CODEX.md` = Codex operating manual
-2. `CLAUDE.md` = Claude operating manual
-3. `progress.txt` = shared execution memory and state source
+1. `CODEX.md`, `CLAUDE.md`, and `AGENTS.md` = shared AI operating protocol for this repository
+2. `progress.txt` = shared execution memory and state source
 
 ## 11. Validation Commands
 

@@ -8,7 +8,7 @@ Rules:
 
 - All flow descriptions in this document use plain English.
 - This document defines the expected user navigation for MVP.
-- Legacy pages inside `docs/` or old front-end code are reference only.
+- Old front-end code can be inspected for current implementation state, but it is not a flow authority.
 - If a legacy route conflicts with this document, this document wins.
 
 ## 2. Product surfaces

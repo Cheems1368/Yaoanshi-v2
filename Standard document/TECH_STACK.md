@@ -7,7 +7,7 @@ This file is the authoritative technology stack document for the project.
 Rules:
 
 1. `Standard document/TECH_STACK.md` is the source of truth for future development.
-2. Legacy manifests and old `docs/` files are reference only.
+2. Existing manifests can be inspected for current implementation state, but standard versions must come from this file.
 3. Version ranges such as `^`, `~`, `latest`, `mysql:8`, `redis:6-alpine`, and `nginx:alpine` are not acceptable as a standard definition.
 4. When code and this document conflict:
    - Existing legacy code is treated as `Legacy Frozen`
@@ -530,4 +530,3 @@ The effective standard to follow now is:
 3. Pharmacist Web development follows the exact locked versions listed for `frontend/pharmacist`.
 4. Doctor Web development follows the exact locked versions listed for `frontend/yisheng/web-admin`.
 5. Any new backend implementation must target the `backend-v2` standard in Section 7 and Section 8.
-

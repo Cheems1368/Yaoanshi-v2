@@ -1,17 +1,13 @@
 <template>
   <div class="order-detail">
-    <!-- Empty state -->
     <div v-if="!orderId" class="order-detail__empty">
       <el-icon :size="48" color="var(--pro-text-secondary)"><Document /></el-icon>
       <p>请从左侧选择工单</p>
     </div>
 
-    <!-- Loading -->
     <el-skeleton v-else-if="loading" :rows="10" animated class="order-detail__skeleton" />
 
-    <!-- Detail content -->
     <template v-else-if="detail">
-      <!-- Back button for mobile single-column mode -->
       <el-button
         v-if="showBack"
         text
@@ -61,7 +57,7 @@ const props = defineProps({
   onSaveDraft: { type: Function, default: null }
 })
 
-const emit = defineEmits(['back'])
+defineEmits(['back'])
 
 function handleSaveDraft(draft) {
   if (!props.detail?.id) {

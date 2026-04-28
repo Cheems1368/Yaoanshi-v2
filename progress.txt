@@ -1,3 +1,19 @@
+Progress Maintenance Rules
+- Read this file after the session manual and before implementation work.
+- Keep Branch / Context, Current State, In Progress, and Next current when work starts or finishes.
+- After completing a feature, fix, review, or validation pass, append a dated note with what changed, what was validated, what remains broken or risky, and the next action.
+- Do not store secrets, tokens, credentials, or .env values here.
+- Do not rewrite historical entries unless correcting a factual error; append new dated notes instead.
+- Temporary implementation plans stay in the conversation. Durable build sequence changes belong in Standard document/IMPLEMENTATION_PLAN.md.
+
+Current State Update Template
+- Date:
+- Workstream:
+- Changed:
+- Validated:
+- Open risks:
+- Next:
+
 Project
 - Yaoshian MVP P0
 
@@ -206,3 +222,22 @@ Docker Local Stack Env Follow-up (2026-04-15)
 Last Updated
 - 2026-04-15 Asia/Shanghai
 - Reason: fixed Docker review findings around optional env loading, default drift, and local stack recovery documentation
+
+Doctor Help Order Reply 400 Fix (2026-04-28)
+- backend-v2:
+  - Added `effectiveRole` to professional JWT claims so doctor/pharmacist web login preserves the selected role.
+  - Admin login now normalizes requested `role` (`doctor` / `pharmacist`) and writes it into access + refresh tokens.
+  - Admin token refresh now preserves `effectiveRole` from the refresh token.
+  - Professional identity checks now prefer `effectiveRole`; legacy opaque professional tokens without this field still fall back to role-code checks.
+  - This prevents dual-role users (`admin` / `super_admin` / `tenant_admin`) from being treated as pharmacists when logged in from the doctor web app.
+- work order behavior:
+  - Doctor web fixed path: `POST /admin-api/help-orders/{id}/reply` can handle `WAITING_DOCTOR` / `DOCTOR_IN_PROGRESS` orders as doctor identity.
+  - API contract unchanged: request body remains `{ content }`; response remains `CommonResult<HelpOrderDTO>`.
+- tests:
+  - Added coverage for dual-role doctor login, token refresh role preservation, JWT effectiveRole round-trip, identity role resolution, and doctor reply on upgraded work orders.
+- verification:
+  - `mvn "-Dtest=AdminAuthServiceTest,JwtTokenServiceTest,ProfessionalIdentityServiceTest,AdminHelpOrderServiceTest,AppHelpOrderServiceTest" test` passed.
+
+Last Updated
+- 2026-04-28 Asia/Shanghai
+- Reason: fixed doctor-side upgraded help-order reply 400 caused by dual-role JWT role resolution.

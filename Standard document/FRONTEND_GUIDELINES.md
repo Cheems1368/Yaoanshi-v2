@@ -9,7 +9,7 @@ This document is the only authoritative front-end design system for the project.
 Rules:
 
 1. `Standard document/FRONTEND_GUIDELINES.md` is the source of truth for all future UI work.
-2. Existing styles in `docs/`, legacy pages, and scattered page-level CSS are reference only.
+2. Existing legacy pages and scattered page-level CSS can be inspected for current state, but they do not define the design system.
 3. When a screen conflicts with this document, this document wins.
 4. Every visual decision in MVP must be traceable to a token, component rule, or layout rule in this file.
 

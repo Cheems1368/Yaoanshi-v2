@@ -28,6 +28,7 @@ defineProps({
 function eventColor(eventType) {
   const map = {
     SUBMITTED: 'var(--pro-brand-primary)',
+    PATIENT_REPLY: 'var(--pro-brand-primary)',
     ASSIGNED: 'var(--pro-brand-primary)',
     PHARMACIST_REPLY: 'var(--pro-success)',
     DOCTOR_REPLY: 'var(--pro-success)',

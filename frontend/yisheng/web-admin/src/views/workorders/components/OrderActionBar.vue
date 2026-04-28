@@ -1,13 +1,11 @@
 <template>
   <section class="action-bar">
-    <!-- Closed / Rejected banner -->
     <div v-if="isTerminal" class="action-bar__terminal">
       <el-tag :type="detail.status === 'CLOSED' ? 'success' : 'danger'" size="large" effect="plain">
         {{ detail.status === 'CLOSED' ? '工单已关闭' : '工单已驳回' }}
       </el-tag>
     </div>
 
-    <!-- Action buttons -->
     <template v-else>
       <div v-if="showDoctorWorkflowHint" class="action-bar__hint">
         请先回复接手工单，之后才可关闭。
@@ -53,7 +51,6 @@
         </el-button>
       </div>
 
-      <!-- Inline input area -->
       <transition name="expand">
         <div v-if="activeAction" class="action-bar__input">
           <div class="action-bar__input-header">
@@ -149,7 +146,6 @@ const showEscalate = computed(() =>
   isPharmacist.value && ['SUBMITTED', 'PHARMACIST_IN_PROGRESS'].includes(status.value)
 )
 const showReject = computed(() => !isTerminal.value)
-// Doctors can close only after they take ownership via reply.
 const showClose = computed(() => {
   if (isPharmacist.value) return !isTerminal.value
   return status.value === 'DOCTOR_IN_PROGRESS'
@@ -158,7 +154,6 @@ const showDoctorWorkflowHint = computed(() =>
   !isPharmacist.value && status.value === 'WAITING_DOCTOR'
 )
 
-// Restore draft when detail changes
 watch(() => props.draft, (draft) => {
   if (draft) {
     activeAction.value = draft.action
@@ -171,7 +166,6 @@ function toggleAction(action) {
     cancelAction()
     return
   }
-  // Save current draft before switching
   if (activeAction.value && inputText.value.trim()) {
     props.onSaveDraft?.({ action: activeAction.value, text: inputText.value })
   }
@@ -207,8 +201,6 @@ async function handleSubmit() {
     await handler(props.detail.id, inputText.value)
     activeAction.value = null
     inputText.value = ''
-  } catch {
-    // Parent handlers already surface request errors.
   } finally {
     submitting.value = false
   }

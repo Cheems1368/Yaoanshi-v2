@@ -107,8 +107,11 @@ public interface HelpOrderMapper {
             FROM help_order ho
             INNER JOIN patient p ON p.id = ho.patient_id AND p.deleted = 0
             WHERE ho.tenant_id = #{tenantId} AND ho.deleted = 0
-            <if test="status != null and status != ''">
-              AND ho.status = #{status}
+            <if test="statuses != null and statuses.size > 0">
+              AND ho.status IN
+              <foreach collection="statuses" item="status" open="(" separator="," close=")">
+                #{status}
+              </foreach>
             </if>
             <if test="scopeType == 'PHARMACIST'">
               AND (
@@ -132,7 +135,7 @@ public interface HelpOrderMapper {
             @Param("tenantId") Long tenantId,
             @Param("scopeType") String scopeType,
             @Param("scopeId") Long scopeId,
-            @Param("status") String status,
+            @Param("statuses") List<String> statuses,
             @Param("offset") int offset,
             @Param("pageSize") int pageSize
     );
@@ -142,8 +145,11 @@ public interface HelpOrderMapper {
             SELECT COUNT(1)
             FROM help_order
             WHERE tenant_id = #{tenantId} AND deleted = 0
-            <if test="status != null and status != ''">
-              AND status = #{status}
+            <if test="statuses != null and statuses.size > 0">
+              AND status IN
+              <foreach collection="statuses" item="status" open="(" separator="," close=")">
+                #{status}
+              </foreach>
             </if>
             <if test="scopeType == 'PHARMACIST'">
               AND (
@@ -165,7 +171,7 @@ public interface HelpOrderMapper {
             @Param("tenantId") Long tenantId,
             @Param("scopeType") String scopeType,
             @Param("scopeId") Long scopeId,
-            @Param("status") String status
+            @Param("statuses") List<String> statuses
     );
 
     @Update("""

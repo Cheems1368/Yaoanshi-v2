@@ -32,9 +32,9 @@ Authoritative source mapping:
 
 Additional precedence rules:
 
-1. `docs/` is reference only.
-2. If `docs/` conflicts with any file in `Standard document/`, `Standard document/` wins.
-3. `CLAUDE.md` governs Claude session behavior; `CODEX.md` governs Codex session behavior.
+1. `Standard document/*.md` is the only project knowledge base.
+2. The `docs/` tree has been removed and must not be consulted as project knowledge, reference storage, or a plan output location.
+3. `CLAUDE.md`, `CODEX.md`, and `AGENTS.md` share the same operating protocol; they do not create separate product or implementation authority.
 4. Formal product, design, technical, and backend details still belong to the formal documents listed above.
 
 ## 2. Mandatory Read Order
@@ -44,15 +44,25 @@ Every AI session must follow this default read order:
 1. Read `CLAUDE.md`
 2. Read `progress.txt`
 3. Read `Standard document/IMPLEMENTATION_PLAN.md`
-4. Read only the task-relevant formal documents from `Standard document/`
+4. Select task-relevant formal documents from the matrix below
 5. Inspect repository files before making assumptions
+
+Task-to-document lookup matrix:
+
+1. Product scope, user stories, success criteria, non-goals: `Standard document/PRD.md`
+2. Pages, routes, user flows, triggers, success/error paths: `Standard document/APP_FLOW.md`
+3. Dependencies, versions, build tools, runtime requirements: `Standard document/TECH_STACK.md`
+4. UI tokens, components, layout, responsive rules: `Standard document/FRONTEND_GUIDELINES.md`
+5. Database, API, DTO, auth, storage, migrations: `Standard document/BACKEND_STRUCTURE.md`
+6. Build order, phase sequence, validation gates: `Standard document/IMPLEMENTATION_PLAN.md`
 
 Required behavior:
 
 1. Do not start implementation from memory alone.
-2. Do not assume legacy `docs/` is current truth.
+2. Do not recreate or consult `docs/` for project knowledge.
 3. Do not invent missing project rules if a formal document already defines them.
 4. Use `progress.txt` as the current execution memory and state source.
+5. Temporary implementation plans stay in the conversation; only durable build sequence changes belong in `Standard document/IMPLEMENTATION_PLAN.md`.
 
 ## 3. Project Snapshot
 
@@ -64,11 +74,11 @@ Active product surfaces:
 2. Pharmacist Web: `frontend/pharmacist`
 3. Doctor Web: `frontend/yisheng/web-admin`
 
-### 3.2 Dual-agent role
+### 3.2 Unified AI collaboration model
 
-Claude is the product/data/frontend/verification host. It defines correct answers, implements frontend, runs browser acceptance, and manages ops delivery. It does NOT serve as the primary high-frequency backend constructor — that role belongs to Codex.
+All AI assistants working in this repository follow the same workflow: read the session manual, read `progress.txt`, consult the task-relevant formal documents, inspect the repo, state the files and plan before editing, implement the smallest safe diff, validate, and update progress when work is completed.
 
-Codex leads backend scaffolding, code quality review, and test coverage; Claude leads product definition, frontend implementation, and runtime verification.
+No assistant may redefine product requirements, invent contracts, or bypass the formal documents because of its tool identity.
 
 ### 3.3 Backend zones
 
@@ -125,7 +135,7 @@ Both paths require a short-lived one-time socket ticket obtained from `/admin-ap
 3. Do not invent endpoints, DTOs, file paths, package roots, or dependency versions
 4. Do not let page components build URLs directly
 5. Do not add undefined colors, radii, breakpoints, or ad-hoc CSS systems
-6. Do not treat `docs/` as source of truth
+6. Do not use or recreate `docs/` as project knowledge, reference storage, or plan output
 7. Do not silently rename public DTOs or route prefixes
 8. Do not create new visual systems outside `FRONTEND_GUIDELINES.md`
 9. Do not skip Flyway migration version numbers or modify already-applied migration files
@@ -267,7 +277,7 @@ Every AI session should follow this default workflow:
 1. Read `CLAUDE.md`
 2. Read `progress.txt`
 3. Read `Standard document/IMPLEMENTATION_PLAN.md`
-4. Identify task-relevant formal documents
+4. Identify task-relevant formal documents using the lookup matrix in Section 2
 5. Inspect repository files before making assumptions
 6. State target files and editing plan before making changes
 7. Prefer small diffs
@@ -284,9 +294,8 @@ Output requirements for implementation work:
 
 Relationship between session files:
 
-1. `CLAUDE.md` = Claude operating manual
-2. `CODEX.md` = Codex operating manual
-3. `progress.txt` = shared execution memory and state source
+1. `CLAUDE.md`, `CODEX.md`, and `AGENTS.md` = shared AI operating protocol for this repository
+2. `progress.txt` = shared execution memory and state source
 
 `CLAUDE.md` does not contain:
 

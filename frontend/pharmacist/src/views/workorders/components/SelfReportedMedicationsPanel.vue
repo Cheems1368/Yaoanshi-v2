@@ -32,7 +32,6 @@
       </div>
     </div>
 
-    <!-- 驳回原因对话框 -->
     <el-dialog v-model="rejectDialogVisible" title="驳回原因" width="380px" :append-to-body="true">
       <el-input
         v-model="rejectReason"

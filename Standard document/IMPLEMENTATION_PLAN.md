@@ -8,7 +8,7 @@ Rules:
 
 1. This document defines execution order, not product scope or architecture rationale.
 2. `Standard document/PRD.md`, `APP_FLOW.md`, `TECH_STACK.md`, `FRONTEND_GUIDELINES.md`, and `BACKEND_STRUCTURE.md` are mandatory inputs for every implementation phase.
-3. `docs/` is reference only and must not override this file.
+3. The removed `docs/` tree must not be recreated as a knowledge base, reference store, or plan output location.
 4. This document covers `P0` and `P0+` MVP phases, plus the Post-P0 trial readiness sprint.
 5. `P2` and later capabilities must stay in backlog and must not enter the primary build sequence.
 
@@ -676,10 +676,10 @@ Action:
    - Beta-blockers + severe bradycardia
 4. Generate SQL INSERT scripts for `drug_contraindication` table.
 
-Collaboration:
+AI collaboration:
 
-- Claude: define rule content (drug pairs, severity, message text) — reference `BACKEND_STRUCTURE.md` 4.9
-- Codex: batch generate SQL scripts + unit tests
+- Confirm rule content (drug pairs, severity, message text) against `BACKEND_STRUCTURE.md` 4.9 before generation.
+- Generate SQL scripts and unit tests only after the rule content is clear.
 
 ### Step 5.2: Patient-side DDI screening backend
 
@@ -696,11 +696,11 @@ Action:
 4. Create `drug_contraindication` table DDL in local schema bootstrap.
 5. Add unit tests for screening service.
 
-Collaboration:
+AI collaboration:
 
-- Claude: define API constraints + screening logic design
-- Codex: generate service/controller/DTO skeleton + tests
-- Claude: review product alignment
+- Confirm API constraints and screening logic against `BACKEND_STRUCTURE.md`.
+- Generate service, controller, DTO, and tests after the contract is clear.
+- Review product alignment against `PRD.md` and `APP_FLOW.md`.
 
 ### Step 5.3: Patient-side DDI alert frontend
 
@@ -714,10 +714,10 @@ Action:
 3. "取消" option can navigate to help order creation with pre-filled context.
 4. Graceful degradation: if DDI screening API fails, proceed without blocking.
 
-Collaboration:
+AI collaboration:
 
-- Claude: frontend implementation + browser acceptance
-- Codex: quality review + test coverage
+- Implement the frontend flow and run browser acceptance.
+- Add quality review and test coverage appropriate to the behavior changed.
 
 ### Step 5.4: Pharmacist DDI rule management
 
@@ -731,11 +731,11 @@ Action:
    - Create/edit form in drawer or dialog
    - Separate tabs for DDI rules and contraindication rules
 
-Collaboration:
+AI collaboration:
 
-- Claude: define constraints + frontend implementation
-- Codex: generate backend CRUD skeleton + tests
-- Claude: browser acceptance
+- Confirm constraints before implementation.
+- Implement backend CRUD, frontend UI, and tests within the documented contracts.
+- Run browser acceptance for the management page.
 
 ### Validation commands
 

@@ -1,13 +1,11 @@
 <template>
   <section class="action-bar">
-    <!-- Closed / Rejected banner -->
     <div v-if="isTerminal" class="action-bar__terminal">
       <el-tag :type="detail.status === 'CLOSED' ? 'success' : 'danger'" size="large" effect="plain">
         {{ detail.status === 'CLOSED' ? '工单已关闭' : '工单已驳回' }}
       </el-tag>
     </div>
 
-    <!-- Action buttons -->
     <template v-else>
       <div class="action-bar__buttons">
         <el-button
@@ -50,7 +48,6 @@
         </el-button>
       </div>
 
-      <!-- Inline input area -->
       <transition name="expand">
         <div v-if="activeAction" class="action-bar__input">
           <div class="action-bar__input-header">
@@ -144,7 +141,6 @@ const showEscalate = computed(() =>
 const showReject = computed(() => !isTerminal.value)
 const showClose = computed(() => !isTerminal.value)
 
-// Restore draft when detail changes
 watch(() => props.draft, (draft) => {
   if (draft) {
     activeAction.value = draft.action
@@ -157,7 +153,6 @@ function toggleAction(action) {
     cancelAction()
     return
   }
-  // Save current draft before switching
   if (activeAction.value && inputText.value.trim()) {
     emit('save-draft', { action: activeAction.value, text: inputText.value })
   }

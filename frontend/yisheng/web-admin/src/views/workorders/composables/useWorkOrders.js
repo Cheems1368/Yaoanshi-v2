@@ -29,6 +29,7 @@ const CATEGORY_TEXT = {
 
 const EVENT_TEXT = {
   SUBMITTED: '患者提交',
+  PATIENT_REPLY: '患者追问',
   ASSIGNED: '药师认领',
   PHARMACIST_REPLY: '药师回复',
   ESCALATED_TO_DOCTOR: '升级医生',
@@ -88,10 +89,7 @@ export function useWorkOrders(role, api) {
   const detail = ref(null)
   const detailLoading = ref(false)
 
-  // draft preservation: Map<orderId, { action, text }>
   const drafts = reactive(new Map())
-
-  // unread markers from WS notifications
   const unreadIds = reactive(new Set())
 
   async function loadOrders() {
@@ -125,7 +123,6 @@ export function useWorkOrders(role, api) {
     router.replace({ query: { ...route.query, id } })
   }
 
-  // actions
   async function claim(id) {
     if (!api.claimWorkOrder) return
     await api.claimWorkOrder(id)
@@ -169,7 +166,6 @@ export function useWorkOrders(role, api) {
     }
   }
 
-  // draft management
   function saveDraft(id, action, text) {
     if (text?.trim()) {
       drafts.set(id, { action, text })
@@ -184,7 +180,6 @@ export function useWorkOrders(role, api) {
     drafts.delete(id)
   }
 
-  // WS notification handler
   function handleNotification(event) {
     if (!event?.detail?.businessType?.startsWith('HELP_ORDER_')) return
     loadOrders()
@@ -197,7 +192,6 @@ export function useWorkOrders(role, api) {
     }
   }
 
-  // restore selection from URL query on mount
   function initFromRoute() {
     const idFromQuery = route.query.id
     if (idFromQuery) {

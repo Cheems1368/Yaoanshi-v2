@@ -41,11 +41,11 @@ public class JwtTokenService {
     }
 
     public String generateAccessToken(String subject, String domain, String deviceId, List<String> roles) {
-        return generateToken(subject, domain, "APP", deviceId, null, null, null, roles, jwtProperties.getAccessTokenSeconds());
+        return generateToken(subject, domain, "APP", deviceId, null, null, null, roles, null, jwtProperties.getAccessTokenSeconds());
     }
 
     public String generateRefreshToken(String subject, String domain, String deviceId, List<String> roles) {
-        return generateToken(subject, domain, "APP", deviceId, null, null, null, roles, jwtProperties.getRefreshTokenSeconds());
+        return generateToken(subject, domain, "APP", deviceId, null, null, null, roles, null, jwtProperties.getRefreshTokenSeconds());
     }
 
     public String generateProfessionalAccessToken(
@@ -54,6 +54,17 @@ public class JwtTokenService {
             Long tenantId,
             String displayName,
             List<String> roles
+    ) {
+        return generateProfessionalAccessToken(subject, userId, tenantId, displayName, roles, null);
+    }
+
+    public String generateProfessionalAccessToken(
+            String subject,
+            Long userId,
+            Long tenantId,
+            String displayName,
+            List<String> roles,
+            String effectiveRole
     ) {
         return generateToken(
                 subject,
@@ -64,6 +75,7 @@ public class JwtTokenService {
                 tenantId,
                 displayName,
                 roles,
+                effectiveRole,
                 jwtProperties.getAccessTokenSeconds()
         );
     }
@@ -75,6 +87,17 @@ public class JwtTokenService {
             String displayName,
             List<String> roles
     ) {
+        return generateProfessionalRefreshToken(subject, userId, tenantId, displayName, roles, null);
+    }
+
+    public String generateProfessionalRefreshToken(
+            String subject,
+            Long userId,
+            Long tenantId,
+            String displayName,
+            List<String> roles,
+            String effectiveRole
+    ) {
         return generateToken(
                 subject,
                 "admin",
@@ -84,6 +107,7 @@ public class JwtTokenService {
                 tenantId,
                 displayName,
                 roles,
+                effectiveRole,
                 jwtProperties.getRefreshTokenSeconds()
         );
     }
@@ -117,6 +141,7 @@ public class JwtTokenService {
             claims.setJti((String) payload.get("jti"));
             claims.setRoles(objectMapper.convertValue(payload.get("roles"), new TypeReference<>() {
             }));
+            claims.setEffectiveRole((String) payload.get("effectiveRole"));
             claims.setUserId(asLong(payload.get("userId")));
             claims.setTenantId(asLong(payload.get("tenantId")));
             claims.setDisplayName((String) payload.get("displayName"));
@@ -170,6 +195,7 @@ public class JwtTokenService {
             Long tenantId,
             String displayName,
             List<String> roles,
+            String effectiveRole,
             long ttlSeconds
     ) {
         try {
@@ -191,6 +217,9 @@ public class JwtTokenService {
             }
             if (displayName != null) {
                 payload.put("displayName", displayName);
+            }
+            if (effectiveRole != null) {
+                payload.put("effectiveRole", effectiveRole);
             }
             payload.put("roles", roles);
             payload.put("jti", UUID.randomUUID().toString());

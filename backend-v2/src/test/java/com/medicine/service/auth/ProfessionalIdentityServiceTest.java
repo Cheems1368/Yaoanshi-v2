@@ -1,8 +1,10 @@
 package com.medicine.service.auth;
 
 import com.medicine.common.exception.BusinessException;
+import com.medicine.domain.identity.DoctorProfile;
 import com.medicine.domain.identity.PharmacistProfile;
 import com.medicine.domain.identity.SystemUser;
+import com.medicine.repository.identity.DoctorProfileMapper;
 import com.medicine.repository.identity.PharmacistProfileMapper;
 import com.medicine.repository.identity.ProfessionalIdentityRepository;
 import org.junit.jupiter.api.Test;
@@ -25,6 +27,9 @@ class ProfessionalIdentityServiceTest {
 
     @Mock
     private PharmacistProfileMapper pharmacistProfileMapper;
+
+    @Mock
+    private DoctorProfileMapper doctorProfileMapper;
 
     @InjectMocks
     private ProfessionalIdentityService professionalIdentityService;
@@ -61,6 +66,32 @@ class ProfessionalIdentityServiceTest {
         assertThatThrownBy(() -> professionalIdentityService.getOrCreatePharmacistProfile(claims))
                 .isInstanceOf(BusinessException.class)
                 .hasMessage("PATIENT_MANAGEMENT_PERMISSION_DENIED");
+    }
+
+    @Test
+    void shouldUseDoctorEffectiveRoleForDualRoleClaims() {
+        JwtClaims claims = professionalClaims();
+        claims.setRoles(java.util.List.of("admin"));
+        claims.setEffectiveRole("doctor");
+        SystemUser systemUser = new SystemUser();
+        systemUser.setId(100L);
+        systemUser.setTenantId(1L);
+        systemUser.setUsername("doctor");
+        systemUser.setNickname("Doctor A");
+
+        when(doctorProfileMapper.selectBySystemUserId(1L, 100L)).thenReturn(null);
+        when(professionalIdentityRepository.selectActiveSystemUser(1L, 100L)).thenReturn(systemUser);
+        doAnswer(invocation -> {
+            DoctorProfile profile = invocation.getArgument(0);
+            profile.setId(9101L);
+            return 1;
+        }).when(doctorProfileMapper).insert(any(DoctorProfile.class));
+
+        DoctorProfile profile = professionalIdentityService.getOrCreateDoctorProfile(claims);
+
+        assertThat(profile.getId()).isEqualTo(9101L);
+        assertThat(professionalIdentityService.isDoctor(claims)).isTrue();
+        assertThat(professionalIdentityService.isPharmacist(claims)).isFalse();
     }
 
     private JwtClaims professionalClaims() {

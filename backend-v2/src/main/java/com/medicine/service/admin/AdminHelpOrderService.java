@@ -27,6 +27,7 @@ import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
@@ -67,12 +68,13 @@ public class AdminHelpOrderService {
         int normalizedPageNo = Math.max(pageNo, 1);
         int normalizedPageSize = Math.max(pageSize, 1);
         int offset = (normalizedPageNo - 1) * normalizedPageSize;
-        long total = helpOrderMapper.countForAdmin(claims.getTenantId(), scope.operatorType(), scope.operatorId(), blankToNull(status));
+        List<String> statuses = parseStatuses(status);
+        long total = helpOrderMapper.countForAdmin(claims.getTenantId(), scope.operatorType(), scope.operatorId(), statuses);
         List<HelpOrderDTO> rows = helpOrderMapper.searchForAdmin(
                         claims.getTenantId(),
                         scope.operatorType(),
                         scope.operatorId(),
-                        blankToNull(status),
+                        statuses,
                         offset,
                         normalizedPageSize
                 ).stream()
@@ -480,6 +482,17 @@ public class AdminHelpOrderService {
 
     private String blankToNull(String value) {
         return StringUtils.hasText(value) ? value.trim() : null;
+    }
+
+    private List<String> parseStatuses(String value) {
+        if (!StringUtils.hasText(value)) {
+            return List.of();
+        }
+        return Arrays.stream(value.split(","))
+                .map(String::trim)
+                .filter(StringUtils::hasText)
+                .distinct()
+                .toList();
     }
 
     private String formatDateTime(LocalDateTime value) {

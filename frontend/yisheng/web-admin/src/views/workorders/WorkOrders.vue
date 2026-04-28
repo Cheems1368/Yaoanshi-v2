@@ -1,6 +1,5 @@
 <template>
   <section class="workstation">
-    <!-- Page header -->
     <header class="workstation__header">
       <div>
         <h2>升级工单</h2>
@@ -11,9 +10,7 @@
       </div>
     </header>
 
-    <!-- Dual-column body -->
     <div :class="['workstation__body', { 'workstation__body--detail-open': mobileShowDetail }]">
-      <!-- Left: queue -->
       <div v-show="!mobileShowDetail || !isMobile" class="workstation__queue">
         <OrderQueue
           :orders="orders"
@@ -30,7 +27,6 @@
         />
       </div>
 
-      <!-- Right: detail -->
       <div v-show="mobileShowDetail || !isMobile" class="workstation__detail">
         <OrderDetail
           :order-id="selectedId"
@@ -80,7 +76,6 @@ const {
   saveDraft, getDraft
 } = useWorkOrders('doctor', api)
 
-// Mobile single-column mode
 const mobileShowDetail = ref(false)
 
 const isMobile = computed(() => {
