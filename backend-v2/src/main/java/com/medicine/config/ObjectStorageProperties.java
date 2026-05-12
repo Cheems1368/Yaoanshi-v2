@@ -6,6 +6,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 public class ObjectStorageProperties {
 
     private String endpoint = "http://localhost:9000";
+    private String publicEndpoint = "";
     private String bucket = "yaoanshi-mvp";
     private String accessKey = "";
     private String secretKey = "";
@@ -17,6 +18,14 @@ public class ObjectStorageProperties {
 
     public void setEndpoint(String endpoint) {
         this.endpoint = endpoint;
+    }
+
+    public String getPublicEndpoint() {
+        return publicEndpoint;
+    }
+
+    public void setPublicEndpoint(String publicEndpoint) {
+        this.publicEndpoint = publicEndpoint;
     }
 
     public String getBucket() {

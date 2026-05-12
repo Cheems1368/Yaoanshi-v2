@@ -25,6 +25,7 @@ Branch / Context
 Current State
 - All P0/P0+ phases (Phase 0–7) committed (2026-03-27, commit f9274e5)
 - Post-P0 optimization plan approved; Week 1 work complete
+- Project-local `yaoanshi-neat` skill added for progress memory and Standard document knowledge maintenance (2026-05-12)
 - Last session (2026-03-27): Phase A–F completed (see below)
 
 In Progress
@@ -32,6 +33,11 @@ In Progress
 
 Next
 - End-to-end demo walkthrough (browser-level, manual UI testing)
+- Use `yaoanshi-neat` for future explicit closeout tidy or context recovery requests
+
+Last Updated
+- 2026-05-12 Asia/Shanghai
+- Reason: added project-local `yaoanshi-neat` skill for progress memory and knowledge-state checks.
 
 Completed This Sprint
 
@@ -285,3 +291,70 @@ Patient Android Live Reload Cleartext Fix (2026-04-28)
 Last Updated
 - 2026-04-28 Asia/Shanghai
 - Reason: fixed patient Android debug WebView cleartext block for live reload.
+
+Real OCR Feedback Plan (2026-04-28)
+- current finding:
+  - Patient prescription upload currently registers the object key only; it does not PUT the selected image bytes to MinIO/S3.
+  - Backend OCR currently receives a presigned URL based on the internal Docker MinIO host (`http://minio:9000/...`), which external OCR providers cannot fetch.
+  - Therefore real OCR cannot produce useful feedback yet and falls back to low-confidence manual review.
+- chosen approach:
+  - Patient app will PUT the selected image bytes to the presigned upload URL before calling prescription registration.
+  - Backend will read the uploaded object bytes from MinIO/S3 by object key.
+  - OCR request will send the image as base64/data URL content instead of asking the OCR provider to fetch a local MinIO URL.
+- constraints:
+  - `MEDICINE_OCR_API_KEY` must be supplied only through environment variables or approved secret tooling.
+  - Do not write OCR secrets, tokens, private keys, or `.env` values into code, docs, progress notes, or logs.
+  - Demo patient identity must not be hardcoded; use the actual on-site test patient selected for the walkthrough.
+- next:
+  - Add true frontend upload PUT, object storage byte-read support, OCR base64 forwarding, adb reverse for port 9000, and targeted backend/frontend verification.
+  - Then validate on a real phone by confirming the uploaded object exists in MinIO and the patient/pharmacist screens show real OCR status and confidence.
+
+Last Updated
+- 2026-04-28 Asia/Shanghai
+- Reason: recorded the real OCR feedback gap and implementation direction without changing code.
+
+Real OCR Feedback Chain Implementation (2026-04-28)
+- Changed:
+  - Patient prescription upload now PUTs selected image bytes to the presigned MinIO/S3 URL before registering the prescription.
+  - Upload PUT failure stops registration and shows a clear image-upload failure toast.
+  - Object storage now separates internal endpoint access from public presigned URL generation via `medicine.storage.public-endpoint`.
+  - Backend prescription registration now reads uploaded object bytes by object key and sends base64/data URL image content to OCR.
+  - OCR missing-key, image-read, empty-image, and upstream failures continue to fall back to manual review with explicit backend log reasons.
+  - Android live reload script now reverses port 9000 for phone access to local MinIO.
+  - Smoke/e2e prescription helpers now upload the test image bytes before registration.
+  - Patient and pharmacist OCR status mapping now displays `HIGH_CONFIDENCE` as a readable high-confidence OCR result.
+- Validated:
+  - `npm run build --prefix D:\yaoanshi\frontend\huanzhe` passed.
+  - `mvn "-Dtest=AppPrescriptionServiceTest,PrescriptionControllerTest,S3CompatibleObjectStorageStubTest" clean test -f D:\yaoanshi\backend-v2\pom.xml` passed.
+  - `npm run android:build --prefix D:\yaoanshi\frontend\huanzhe` passed.
+  - `npm run build --prefix D:\yaoanshi\frontend\pharmacist` passed.
+  - `docker compose -f D:\yaoanshi\ops\docker-compose.yml config` passed.
+  - `git diff --check` passed with only line-ending normalization warnings.
+- Open risks:
+  - Real OCR still depends on `MEDICINE_OCR_API_KEY` being supplied through local secret configuration.
+  - Real-device verification still needs MinIO object existence and patient/pharmacist OCR status confirmation.
+- Next:
+  - Restart the Docker backend stack with the local OCR secret configured, rerun Android live mode, and complete the real-phone prescription upload walkthrough.
+
+Last Updated
+- 2026-04-28 Asia/Shanghai
+- Reason: implemented and validated the real OCR upload/read/base64 feedback chain.
+
+Yaoanshi Neat Skill Implementation (2026-05-12)
+- Changed:
+  - Added project-local `.codex/skills/yaoanshi-neat` for explicit context recovery and closeout tidy workflows.
+  - Added a compact knowledge map for `progress.txt` and `Standard document/*.md` maintenance rules.
+  - Added a read-only knowledge-state checker for `progress.txt`, Standard documents, forbidden `docs/`, relative-time markers, size warnings, and mojibake markers.
+  - Kept root instruction files and Memory out of default update scope.
+- Validated:
+  - `python C:\Users\Z5089\.codex\skills\.system\skill-creator\scripts\quick_validate.py D:\yaoanshi\.codex\skills\yaoanshi-neat` passed.
+  - `python D:\yaoanshi\.codex\skills\yaoanshi-neat\scripts\check_knowledge_state.py D:\yaoanshi` passed with no errors.
+- Open risks:
+  - The checker reports existing relative-time markers in `progress.txt` and several Standard documents; these were not changed because this task only introduced the skill and checker.
+  - Existing unrelated working-tree changes remain in backend, frontend, ops, and `progress.txt`.
+- Next:
+  - Use `yaoanshi-neat` on future explicit closeout requests, and decide separately whether to clean existing relative-time markers.
+
+Last Updated
+- 2026-05-12 Asia/Shanghai
+- Reason: implemented and validated project-local `yaoanshi-neat` skill.

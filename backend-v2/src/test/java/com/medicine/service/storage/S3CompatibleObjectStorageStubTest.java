@@ -30,4 +30,18 @@ class S3CompatibleObjectStorageStubTest {
         assertThat(storage.createPresignedUploadUrl("prescriptions/b.png"))
                 .isEqualTo("http://localhost:9000/yaoshian-mvp/prescriptions/b.png?action=upload");
     }
+
+    @Test
+    void shouldUsePublicEndpointForPresignedUrls() {
+        ObjectStorageProperties properties = new ObjectStorageProperties();
+        properties.setEndpoint("http://minio:9000");
+        properties.setPublicEndpoint("http://127.0.0.1:9000");
+        properties.setBucket("yaoshian-mvp");
+        S3CompatibleObjectStorageStub storage = new S3CompatibleObjectStorageStub(properties);
+
+        assertThat(storage.createPresignedUploadUrl("prescriptions/c.png"))
+                .isEqualTo("http://127.0.0.1:9000/yaoshian-mvp/prescriptions/c.png?action=upload");
+        assertThat(storage.readObjectBytes("prescriptions/c.png"))
+                .isEqualTo("stub-object:prescriptions/c.png".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+    }
 }

@@ -24,8 +24,15 @@ public class S3CompatibleObjectStorageStub implements S3CompatibleObjectStorage 
         return baseObjectUrl(objectKey) + "?action=download";
     }
 
+    @Override
+    public byte[] readObjectBytes(String objectKey) {
+        return ("stub-object:" + objectKey).getBytes(java.nio.charset.StandardCharsets.UTF_8);
+    }
+
     private String baseObjectUrl(String objectKey) {
-        String endpoint = properties.getEndpoint();
+        String endpoint = org.springframework.util.StringUtils.hasText(properties.getPublicEndpoint())
+                ? properties.getPublicEndpoint()
+                : properties.getEndpoint();
         if (endpoint.endsWith("/")) {
             endpoint = endpoint.substring(0, endpoint.length() - 1);
         }

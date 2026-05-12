@@ -21,6 +21,8 @@ import com.medicine.repository.prescription.PrescriptionMapper;
 import com.medicine.repository.prescription.PrescriptionOcrRecordMapper;
 import com.medicine.service.ocr.OcrService;
 import com.medicine.service.storage.S3CompatibleObjectStorage;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -33,6 +35,8 @@ import java.util.Set;
 
 @Service
 public class AppPrescriptionService {
+
+    private static final Logger log = LoggerFactory.getLogger(AppPrescriptionService.class);
 
     private static final long DEFAULT_TENANT_ID = 1L;
     private static final long MAX_SIZE_BYTES = 10L * 1024L * 1024L;
@@ -137,7 +141,7 @@ public class AppPrescriptionService {
         applyAudit(attachment, now, "app-prescription");
         prescriptionAttachmentMapper.insert(attachment);
 
-        OcrService.OcrResult ocrResult = ocrService.performOcr(fileAsset.getPublicUrl());
+        OcrService.OcrResult ocrResult = performOcrFromStoredObject(fileAsset);
         PrescriptionOcrRecord ocrRecord = new PrescriptionOcrRecord();
         ocrRecord.setPrescriptionId(prescription.getId());
         if (ocrResult.isSuccess()) {
@@ -172,6 +176,20 @@ public class AppPrescriptionService {
         PrescriptionDTO dto = toSummaryDto(prescription);
         dto.setAttachments(List.of(attachmentDTO));
         return dto;
+    }
+
+    private OcrService.OcrResult performOcrFromStoredObject(FileAsset fileAsset) {
+        try {
+            byte[] imageBytes = objectStorage.readObjectBytes(fileAsset.getObjectKey());
+            if (imageBytes.length == 0) {
+                log.warn("OCR image object is empty, objectKey={}", fileAsset.getObjectKey());
+                return OcrService.OcrResult.failure("IMAGE_OBJECT_EMPTY");
+            }
+            return ocrService.performOcr(imageBytes, fileAsset.getMimeType());
+        } catch (Exception ex) {
+            log.warn("OCR image read failed, objectKey={}, reason={}", fileAsset.getObjectKey(), ex.getMessage());
+            return OcrService.OcrResult.failure("IMAGE_READ_FAILED");
+        }
     }
 
     private AppAccount requireAccount(String subject) {

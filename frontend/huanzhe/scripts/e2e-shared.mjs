@@ -174,6 +174,17 @@ export async function createPrescriptionUpload(baseUrl, session, filename = 'smo
     }
   })
 
+  const putResponse = await fetch(presign.payload.data.uploadUrl, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'image/png'
+    },
+    body: tinyPngBuffer
+  })
+  if (!putResponse.ok) {
+    throw new Error(`Prescription image upload failed: HTTP ${putResponse.status}`)
+  }
+
   const upload = await requestJson(`${baseUrl}/app-api/prescriptions/uploads`, {
     method: 'POST',
     headers: appHeaders(session.accessToken),

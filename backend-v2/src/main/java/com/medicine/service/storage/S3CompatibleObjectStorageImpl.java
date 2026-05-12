@@ -6,10 +6,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
+import software.amazon.awssdk.core.sync.ResponseTransformer;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.S3Configuration;
 import software.amazon.awssdk.services.s3.model.*;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest;
@@ -40,19 +43,21 @@ public class S3CompatibleObjectStorageImpl implements S3CompatibleObjectStorage 
         var credentials = StaticCredentialsProvider.create(
                 AwsBasicCredentials.create(props.getAccessKey(), props.getSecretKey()));
         var region = Region.of(props.getRegion() != null ? props.getRegion() : "us-east-1");
-        var endpoint = URI.create(props.getEndpoint());
+        var internalEndpoint = URI.create(props.getEndpoint());
+        var publicEndpoint = URI.create(resolvePublicEndpoint());
 
         this.s3Client = S3Client.builder()
-                .endpointOverride(endpoint)
+                .endpointOverride(internalEndpoint)
                 .credentialsProvider(credentials)
                 .region(region)
                 .forcePathStyle(true)
                 .build();
 
         this.presigner = S3Presigner.builder()
-                .endpointOverride(endpoint)
+                .endpointOverride(publicEndpoint)
                 .credentialsProvider(credentials)
                 .region(region)
+                .serviceConfiguration(S3Configuration.builder().pathStyleAccessEnabled(true).build())
                 .build();
 
         ensureBucketExists();
@@ -94,5 +99,18 @@ public class S3CompatibleObjectStorageImpl implements S3CompatibleObjectStorage 
                 .getObjectRequest(getRequest)
                 .build();
         return presigner.presignGetObject(presignRequest).url().toString();
+    }
+
+    @Override
+    public byte[] readObjectBytes(String objectKey) {
+        var getRequest = GetObjectRequest.builder()
+                .bucket(props.getBucket())
+                .key(objectKey)
+                .build();
+        return s3Client.getObject(getRequest, ResponseTransformer.toBytes()).asByteArray();
+    }
+
+    private String resolvePublicEndpoint() {
+        return StringUtils.hasText(props.getPublicEndpoint()) ? props.getPublicEndpoint() : props.getEndpoint();
     }
 }

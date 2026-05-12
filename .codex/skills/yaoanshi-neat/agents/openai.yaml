@@ -1,0 +1,4 @@
+interface:
+  display_name: "Yaoanshi Neat"
+  short_description: "整理药按时项目进度记忆、收尾审查与标准知识库一致性"
+  default_prompt: "Use $yaoanshi-neat to整理一下当前药按时项目上下文、更新 progress.txt，并报告未处理风险。"

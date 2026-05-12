@@ -79,7 +79,8 @@ class AppPrescriptionServiceTest {
         when(appAccountMapper.selectActiveByMobile(1L, "13800138000")).thenReturn(account);
         when(patientMapper.selectByAppAccountId(1L, 101L)).thenReturn(patient);
         when(objectStorage.createPresignedDownloadUrl("prescriptions/mock.jpg")).thenReturn("download-url");
-        when(ocrService.performOcr(any())).thenReturn(OcrService.OcrResult.failure(""));
+        when(objectStorage.readObjectBytes("prescriptions/mock.jpg")).thenReturn("image-bytes".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        when(ocrService.performOcr(any(byte[].class), any())).thenReturn(OcrService.OcrResult.failure(""));
 
         doAnswer(invocation -> {
             FileAsset fileAsset = invocation.getArgument(0);

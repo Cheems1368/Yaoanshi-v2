@@ -389,6 +389,8 @@ const statusText = (status) => {
 
 const ocrStatusText = (status) => {
   switch (status) {
+    case 'HIGH_CONFIDENCE':
+      return '高置信度，识别完成'
     case 'LOW_CONFIDENCE':
       return '低置信度，转人工复核'
     case 'SUCCESS':

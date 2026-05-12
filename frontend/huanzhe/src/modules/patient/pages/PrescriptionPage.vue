@@ -354,6 +354,13 @@ const registerUpload = async (file: File, options?: { screeningDegraded?: boolea
     businessType: 'PRESCRIPTION'
   })
 
+  try {
+    await prescriptionService.uploadToPresignedUrl(presign.data.uploadUrl, file, contentType)
+  } catch {
+    showMessage('图片上传失败，请检查网络后重试')
+    return
+  }
+
   const result = await prescriptionService.registerUpload({
     objectKey: presign.data.objectKey,
     originalFilename: file.name,
@@ -474,6 +481,8 @@ const mapStatus = (status?: string | null) => {
 
 const mapOcrStatus = (status?: string | null) => {
   switch (status) {
+    case 'HIGH_CONFIDENCE':
+      return '高置信度，识别完成'
     case 'LOW_CONFIDENCE':
       return '低置信度，转人工复核'
     case 'SUCCESS':

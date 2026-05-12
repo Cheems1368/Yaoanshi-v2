@@ -2,6 +2,7 @@ param(
     [string]$DeviceId = "",
     [int]$PatientPort = 3001,
     [int]$BackendPort = 8080,
+    [int]$MinioPort = 9000,
     [string]$AndroidSdkRoot = $env:ANDROID_HOME,
     [string]$JavaHome = ""
 )
@@ -143,6 +144,7 @@ Wait-HttpReady -Url "http://127.0.0.1:$PatientPort"
 
 & $adb -s $targetDevice reverse "tcp:$PatientPort" "tcp:$PatientPort" | Out-Null
 & $adb -s $targetDevice reverse "tcp:$BackendPort" "tcp:$BackendPort" | Out-Null
+& $adb -s $targetDevice reverse "tcp:$MinioPort" "tcp:$MinioPort" | Out-Null
 
 Push-Location $root
 try {

@@ -4,7 +4,7 @@ import java.math.BigDecimal;
 
 public interface OcrService {
 
-    OcrResult performOcr(String imageUrl);
+    OcrResult performOcr(byte[] imageBytes, String contentType);
 
     class OcrResult {
         private final boolean success;

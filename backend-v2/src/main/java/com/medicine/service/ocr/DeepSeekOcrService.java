@@ -14,6 +14,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -24,8 +25,8 @@ public class DeepSeekOcrService implements OcrService {
     private static final Logger log = LoggerFactory.getLogger(DeepSeekOcrService.class);
 
     private static final String OCR_PROMPT =
-            "请提取这张处方图片中的所有文字内容，包括药品名称、规格、剂量、用法用量、患者姓名、诊断等信息。" +
-            "按原文输出，保持原始格式。如果图片不清晰或非处方，请说明原因。";
+            "请提取这张处方图片中的所有文字内容，包括药品名称、规格、剂量、用法用量、患者姓名、诊断等信息。"
+                    + "按原文输出，保持原始格式。如果图片不清晰或不是处方，请说明原因。";
 
     private static final BigDecimal HIGH_CONFIDENCE = new BigDecimal("0.85");
     private static final BigDecimal LOW_CONFIDENCE = new BigDecimal("0.30");
@@ -44,14 +45,18 @@ public class DeepSeekOcrService implements OcrService {
     }
 
     @Override
-    public OcrResult performOcr(String imageUrl) {
+    public OcrResult performOcr(byte[] imageBytes, String contentType) {
         if (!StringUtils.hasText(ocrProperties.getApiKey())) {
-            log.info("OCR API key not configured, skipping OCR for image: {}", imageUrl);
-            return OcrResult.failure(null);
+            log.info("OCR API key not configured, skipping OCR.");
+            return OcrResult.failure("OCR_API_KEY_MISSING");
+        }
+        if (imageBytes == null || imageBytes.length == 0) {
+            log.warn("OCR image bytes are empty.");
+            return OcrResult.failure("OCR_IMAGE_EMPTY");
         }
 
         try {
-            Map<String, Object> payload = buildPayload(imageUrl);
+            Map<String, Object> payload = buildPayload(imageBytes, contentType);
             String requestJson = objectMapper.writeValueAsString(payload);
 
             HttpRequest request = HttpRequest.newBuilder()
@@ -87,18 +92,21 @@ public class DeepSeekOcrService implements OcrService {
 
         } catch (InterruptedException ex) {
             Thread.currentThread().interrupt();
-            log.warn("OCR call interrupted for image: {}", imageUrl);
-            return OcrResult.failure(null);
+            log.warn("OCR call interrupted.");
+            return OcrResult.failure("OCR_CALL_INTERRUPTED");
         } catch (Exception ex) {
-            log.warn("OCR call failed for image {}: {}", imageUrl, ex.getMessage());
-            return OcrResult.failure(null);
+            log.warn("OCR call failed: {}", ex.getMessage());
+            return OcrResult.failure("OCR_CALL_FAILED");
         }
     }
 
-    private Map<String, Object> buildPayload(String imageUrl) {
+    private Map<String, Object> buildPayload(byte[] imageBytes, String contentType) {
+        String normalizedContentType = StringUtils.hasText(contentType) ? contentType.trim().toLowerCase() : "image/jpeg";
+        String dataUrl = "data:" + normalizedContentType + ";base64," + Base64.getEncoder().encodeToString(imageBytes);
+
         Map<String, Object> imageContent = new LinkedHashMap<>();
         imageContent.put("type", "image_url");
-        imageContent.put("image_url", Map.of("url", imageUrl));
+        imageContent.put("image_url", Map.of("url", dataUrl));
 
         Map<String, Object> textContent = new LinkedHashMap<>();
         textContent.put("type", "text");

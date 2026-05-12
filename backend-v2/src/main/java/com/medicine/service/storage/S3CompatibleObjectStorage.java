@@ -5,4 +5,6 @@ public interface S3CompatibleObjectStorage {
     String createPresignedUploadUrl(String objectKey);
 
     String createPresignedDownloadUrl(String objectKey);
+
+    byte[] readObjectBytes(String objectKey);
 }
