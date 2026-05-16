@@ -23,15 +23,20 @@ Branch / Context
 - Active surfaces: backend-v2, frontend/huanzhe, frontend/pharmacist, frontend/yisheng/web-admin
 
 Current State
+- 2026-05-12 update: Phase T0/T1 complete for post-P0 trial/demo closed loop: Standard document sync plus patient text/image help-order loop.
+- Current implementation includes backend-v2 multi-image help-order attachments, patient image upload/reply UI, and pharmacist `/mobile/workorders`.
 - All P0/P0+ phases (Phase 0–7) committed (2026-03-27, commit f9274e5)
 - Post-P0 optimization plan approved; Week 1 work complete
 - Project-local `yaoanshi-neat` skill added for progress memory and Standard document knowledge maintenance (2026-05-12)
 - Last session (2026-03-27): Phase A–F completed (see below)
 
 In Progress
+- None for the completed Phase T0/T1 slice; next work is Phase T2 planning/implementation.
 - Phase 4: Integration testing — runtime integration complete
 
 Next
+- Run browser/mobile-width manual walkthrough for the image help-order loop against a live local stack.
+- Plan Phase T2: doctor mobile Web queue/detail, patient minimum context, and structured doctor decision events.
 - End-to-end demo walkthrough (browser-level, manual UI testing)
 - Use `yaoanshi-neat` for future explicit closeout tidy or context recovery requests
 
@@ -75,6 +80,7 @@ Completed Phases (durable record)
 Phase 0–7 — see git history from 2026-03-19 sessions
 
 Infrastructure Notes
+- Flyway current latest in working tree: V10 (`V10__help_order_event_attachments.sql`); next new migration must be V11.
 - Flyway current latest: V8 (V8__ai_consent.sql); next new migration must be V9
 - Never modify already-applied migrations V1–V8
 - WebSocket /ws/admin-notifications and /ws/app-notifications both use one-time socket tickets
@@ -358,3 +364,192 @@ Yaoanshi Neat Skill Implementation (2026-05-12)
 Last Updated
 - 2026-05-12 Asia/Shanghai
 - Reason: implemented and validated project-local `yaoanshi-neat` skill.
+
+Hospital Follow-up Planning Ledger (2026-05-12)
+- Workstream:
+  - Post-meeting planning for the next trial/demo iteration after the 2026-04-29 hospital discussion.
+- Changed:
+  - Locked the next planning frame as a 4-week local/demo-environment trial version, not immediate code execution.
+  - Set the primary demo story to patient help-order collaboration:
+    patient submits a medication discomfort request with text and images, pharmacist reviews on mobile web, escalates when medication stop/change/reduction advice needs doctor confirmation, doctor records agree/disagree, and patient sees the final conclusion.
+  - Set the default demo case to an elderly stroke follow-up patient with hypertension.
+  - Decided that non-primary capabilities must be reachable from the main story but do not need to be forced into one oversized flow:
+    medication reminders, prescription/OCR review, DDI/contraindication rules, personalized education, and dialect speech evaluation.
+  - Locked the Week 1 implementation slice as the text/image help-order loop:
+    patient creates a help order with title, category, description, and up to 3 images per message; pharmacist mobile web can list, open, view images, and reply with text.
+  - Planned help-order conversation semantics:
+    creating an order creates the first patient message; patients can continue sending text and image messages in the detail view; professional replies are text-only for this slice.
+  - Planned attachment contract direction:
+    extend app file presign for `HELP_ORDER_IMAGE`, add multi-attachment support for help-order events, keep old single `attachment_file_asset_id` compatible, and restrict attachment access to help-order participants.
+  - Locked upload limits for the trial:
+    up to 3 images per message, 10 MB per image, JPEG/PNG/WebP only for Week 1.
+  - Locked professional mobile web direction:
+    add explicit `/mobile/...` routes inside existing pharmacist and doctor frontends, reuse current professional accounts, and avoid disrupting desktop admin pages.
+  - Locked later planning decisions:
+    audio is an optional patient attachment and internal dialect evaluation item, not a promised speech-to-text product feature in the patient UI;
+    medication reminders use Capacitor local notifications with a 30-minute second reminder;
+    family account second reminders are local/foreground trial behavior, not remote push;
+    rules expand to HIGH/MEDIUM/LOW with high-risk confirmation, medium warning, low-risk record-only behavior;
+    education cards are hospital-provided/reviewed CSV content tagged by diagnosis, drug, and population.
+- Validated:
+  - Read current `progress.txt`, `Standard document/IMPLEMENTATION_PLAN.md`, relevant Standard documents, and the 2026-04-29 meeting transcript.
+  - Read existing code shape for patient help orders, help-order events, app file presign, patient help-order pages, professional order detail components, notifications, OCR, and DDI/rule surfaces.
+  - Confirmed current implementation has text-only help-order create/reply DTOs, one legacy event attachment field, prescription-only image presign, existing patient app WebSocket details, and desktop-oriented pharmacist/doctor work-order pages.
+- Open risks:
+  - No repository code or Standard documents have been changed for this plan yet.
+  - The new multi-attachment event model needs a migration after current Flyway latest `V9__ddi_admin_detail_alignment.sql`; do not modify already-applied migrations.
+  - Hospital-reviewed rule and education content is not required to unblock development, but unreviewed medical details must be hidden or clearly excluded from formal hospital-facing demonstration.
+  - Dialect evaluation using public program audio is limited to internal evaluation only; original public audio should not be stored as product data or externally demonstrated without authorization.
+  - Real AI/OCR still depends on environment-provided credentials; do not commit secrets or `.env` values.
+- Next:
+  - Continue planning the Week 1 text/image help-order slice into exact contracts, migration shape, patient UI states, pharmacist mobile route behavior, and targeted test cases.
+  - Then plan Week 2 doctor agree/disagree traceability, Week 3 medication/family reminders, and Week 4 import/education/dialect evaluation and full demo rehearsal.
+
+Last Updated
+- 2026-05-12 Asia/Shanghai
+- Reason: recorded hospital follow-up planning decisions and the agreed Week 1 text/image help-order slice without changing code.
+
+Trial Demo Phase T0/T1 Implementation (2026-05-12)
+- Workstream:
+  - Post-P0 trial/demo closed-loop implementation, first slice: patient text/image help-order to pharmacist mobile Web reply.
+- Changed:
+  - Updated Standard documents for the phase-based trial/demo sequence, help-order image attachment contract, and mobile help-order flow.
+  - Added Flyway `V10__help_order_event_attachments.sql` for `help_order_event_attachment`; next new migration must be V11.
+  - Extended `/app-api/files/presign` to allow `HELP_ORDER_IMAGE` with JPEG/PNG/WebP, 10 MB max.
+  - Added `/app-api/files/register` so uploaded help-order images become `file_asset` rows before order creation/reply.
+  - Added multi-image event attachments to `HelpOrderDTO.EventDTO.attachments` with short-lived detail-time download URLs.
+  - Preserved legacy `help_order_event.attachment_file_asset_id` for historical compatibility.
+  - Added backend validation for at most 3 images per help-order event, file ownership, `HELP_ORDER_IMAGE` type, and terminal order reply conflict.
+  - Patient help-order create page now supports camera/gallery images, upload privacy warning, object-storage PUT, file registration, and create-with-attachment IDs.
+  - Patient help-order detail now displays image thumbnails and supports follow-up text or images, with at least one required while the order is open.
+  - Pharmacist frontend added independent `/mobile/workorders` route for mobile list/detail/image preview/text reply, reusing existing admin APIs and WebSocket refresh events.
+- Validated:
+  - `mvn -q test -f D:\yaoanshi\backend-v2\pom.xml` passed.
+  - `npm run build --prefix D:\yaoanshi\frontend\huanzhe` passed.
+  - `npm run build --prefix D:\yaoanshi\frontend\pharmacist` passed.
+  - `python D:\yaoanshi\.codex\skills\yaoanshi-neat\scripts\check_knowledge_state.py D:\yaoanshi` passed with warnings only.
+- Open risks:
+  - Browser/mobile-width walkthrough against a live local stack still needs to be run.
+  - Pharmacist mobile route has build validation but not visual QA screenshots yet.
+  - The knowledge checker still reports pre-existing relative-time markers in `progress.txt` and Standard documents.
+  - `progress.txt` already had uncommitted changes before this cleanup; do not treat the whole file diff as only this session's work.
+- Next:
+  - Start local stack and manually verify the Phase T1 script: patient creates “服药后皮下淤血” adverse-reaction order with 1-3 images, pharmacist opens `/mobile/workorders`, views images, replies, and patient detail sees the reply.
+  - Then plan/implement Phase T2: doctor mobile Web queue/detail, patient minimum context, and structured `ADOPTED` / `NOT_ADOPTED` decision events.
+
+Last Updated
+- 2026-05-12 Asia/Shanghai
+- Reason: recorded Phase T0/T1 implementation, validation, known risks, and next Phase T2 action.
+
+Trial Demo Phase T2 Implementation (2026-05-12)
+- Workstream:
+  - Post-P0 trial/demo closed-loop implementation, second slice: doctor mobile Web collaboration and structured decision events.
+- Changed:
+  - Added `POST /admin-api/help-orders/{id}/doctor-decision` for doctor-only `ADOPTED` / `NOT_ADOPTED` decisions.
+  - Doctor decisions append `DOCTOR_DECISION` help-order events with `metadata_json.decisionResult`, close the order, write the final conclusion into `service_notice`, and notify the patient plus responsible pharmacist.
+  - Extended `HelpOrderDTO` detail responses with additive `patientContext` containing minimum non-sensitive context: name, gender, age, primary diagnosis, allergy summaries, medical-history summary, and current-medication summary.
+  - Extended help-order event DTOs with additive `decisionResult` for timeline display.
+  - Added doctor mobile Web route `/mobile/workorders` with escalated queue, detail timeline, image viewing, patient context, and structured decision form.
+  - Fixed doctor work-order page/component visible Chinese mojibake in the touched route, queue, summary, timeline, and action-bar surfaces.
+  - Updated Standard documents for the T2 route, endpoint, event semantics, and validation gate.
+- Validated:
+  - `mvn -q "-Dtest=AdminHelpOrderServiceTest" test -f D:\yaoanshi\backend-v2\pom.xml` passed.
+  - `mvn -q "-Dtest=AdminHelpOrderServiceTest,AppHelpOrderServiceTest,NotificationDispatchServiceTest" test -f D:\yaoanshi\backend-v2\pom.xml` passed.
+  - `mvn -q test -f D:\yaoanshi\backend-v2\pom.xml` passed.
+  - `npm run build --prefix D:\yaoanshi\frontend\yisheng\web-admin` passed.
+  - `npm run build --prefix D:\yaoanshi\frontend\huanzhe` passed.
+  - `npm run build --prefix D:\yaoanshi\frontend\pharmacist` passed.
+  - `python D:\yaoanshi\.codex\skills\yaoanshi-neat\scripts\check_knowledge_state.py D:\yaoanshi` passed with warnings only.
+- Open risks:
+  - Browser/mobile-width walkthrough was not completed because `http://localhost:8080/health` and `http://localhost:3001` timed out; the local live stack was not available in this session.
+  - Phase T1 mobile walkthrough remains open for the same live-stack reason.
+  - Knowledge checker still reports pre-existing relative-time marker warnings in `progress.txt` and Standard documents.
+  - Current working tree still includes uncommitted Phase T1 changes plus this T2 slice; do not treat all diffs as only T2.
+- Next:
+  - Start the local stack and run the combined T1/T2 browser walkthrough: patient submits image help order, pharmacist replies/escalates from mobile, doctor opens `/mobile/workorders`, submits `ADOPTED` or `NOT_ADOPTED`, and patient/pharmacist timelines show the final conclusion.
+
+Last Updated
+- 2026-05-12 Asia/Shanghai
+- Reason: recorded Phase T2 implementation, validation, and live-stack walkthrough blocker.
+
+Trial Demo Phase T1/T2 Mobile-Width Verification Gate (2026-05-12)
+- Workstream:
+  - Post-P0 trial/demo closed-loop validation for patient image help order, pharmacist mobile reply, doctor mobile decision, and patient final-result visibility.
+- Changed:
+  - Added patient e2e script `frontend/huanzhe/scripts/e2e-helporder-mobile-decision.mjs`.
+  - Added npm command `e2e:helporder-mobile`.
+  - Fixed patient app help-order detail event DTO mapping so app-side `DOCTOR_DECISION` events expose `decisionResult` from `metadata_json`.
+  - Added `AppHelpOrderServiceTest` coverage for app-side doctor decision result timeline exposure.
+- Validated:
+  - `node --check scripts/e2e-helporder-mobile-decision.mjs` passed in `frontend/huanzhe`.
+  - `mvn -q "-Dtest=AppHelpOrderServiceTest" test -f D:\yaoanshi\backend-v2\pom.xml` passed.
+  - Local backend-v2 `/health` returned 200 after running backend-v2 from the host with Docker MySQL/Redis/MinIO.
+  - `powershell -ExecutionPolicy Bypass -File D:\yaoanshi\ops\scripts\start-mobile-demo-stack.ps1 -SkipDocker` prepared local professional test accounts and started/reused patient, doctor, and pharmacist dev servers.
+  - `npm run e2e:helporder-mobile --prefix D:\yaoanshi\frontend\huanzhe` passed.
+  - Passing e2e summary: `attachmentCount=1`, `decisionResult=ADOPTED`, `finalStatus=CLOSED`, `patientFinalResultVisible=true`.
+- Open risks:
+  - Full Docker backend-v2 image build was blocked by external Docker/APK TLS/EOF fetch failures, so the successful verification used host-run backend-v2 plus Docker infrastructure services.
+  - The script revealed an existing app profile update issue: `PUT /app-api/patients/me/profile` can fail for a first-time `patient_profile` insert because `real_name_verified` is null; the verification script avoids that path by using admin patient update for context seeding.
+  - Knowledge checker relative-time warnings in `progress.txt` and Standard documents remain pre-existing.
+- Next:
+  - Plan Phase T3: medication reminder and family second-reminder demo path, using the now-validated T1/T2 help-order closed loop as the baseline.
+
+Last Updated
+- 2026-05-12 Asia/Shanghai
+- Reason: added and passed the T1/T2 mobile-width e2e verification gate.
+
+Trial Demo Phase T3 Implementation (2026-05-12)
+- Workstream:
+  - Post-P0 trial/demo closed-loop implementation, third slice: medication reminder and family second-reminder demo path.
+- Changed:
+  - Extended app-side `DoseTaskDTO` with additive reminder-stage fields: `reminderStage`, `overdueMinutes`, `familyReminderDue`, and `familyBindingCount`.
+  - Backend now derives reminder stages from existing dose tasks and active family binding count without adding tables, migrations, notification logs, or background schedulers.
+  - Reminder stage semantics are fixed as `UPCOMING`, `DUE`, `FAMILY_REMINDER_DUE`, `OVERDUE`, and `HANDLED`, with the family reminder threshold fixed at 30 minutes overdue.
+  - Patient reminder pages `/medication-reminder` and `/tabs/medication` now show App-internal reminder state, including patient-side "family has been reminded" and family-side "needs your help" messages.
+  - Touched reminder UI text was normalized to readable Chinese in the affected task-card, button, toast, and empty-state surfaces.
+  - Extended `frontend/huanzhe/scripts/e2e-medication-family.mjs` to create an already-overdue dose task, assert patient/family reminder UI, complete family delegated check-in, and verify the task returns to `HANDLED`.
+  - Updated Standard documents for the T3 `DoseTaskDTO` contract, daily medication/family-assisted flows, and validation gate.
+- Validated:
+  - `mvn -q "-Dtest=AppMedicationServiceTest" test -f D:\yaoanshi\backend-v2\pom.xml` passed.
+  - `npm run build --prefix D:\yaoanshi\frontend\huanzhe` passed.
+  - `node --check frontend\huanzhe\scripts\e2e-medication-family.mjs` passed.
+  - Original `npm run e2e:medication-family --prefix D:\yaoanshi\frontend\huanzhe` was blocked because `127.0.0.1:48080` was not listening.
+  - T3 e2e passed against a temporary validation stack using backend `18080`, patient `3101`, and pharmacist proxy `3103`.
+  - Passing T3 e2e summary: `familyOperatorType=FAMILY`, `familyHandledReminderStage=HANDLED`, `familyReminderDueAfterCheckin=false`.
+- Open risks:
+  - The main local `8080` backend listener was a Docker/WSL relay serving a pre-existing runtime, so the successful T3 e2e used a temporary host-run backend on `18080`.
+  - Knowledge checker relative-time warnings in `progress.txt` and Standard documents remain pre-existing.
+  - Current working tree still includes uncommitted T1/T2 changes plus this T3 slice; do not treat all diffs as only T3.
+- Next:
+  - Plan Phase T4: OCR hardening, CSV rule import, and reviewed education recommendation.
+
+Last Updated
+- 2026-05-12 Asia/Shanghai
+- Reason: implemented and validated Phase T3 medication/family second-reminder demo path.
+
+Trial Demo Phase T4 Implementation (2026-05-16)
+- Workstream:
+  - Post-P0 trial/demo closed-loop implementation, fourth slice: OCR hardening, CSV rule import, and reviewed education recommendation.
+- Changed:
+  - Added `V11__t4_ocr_import_education.sql` for OCR record hardening fields and `education_content_card`.
+  - Hardened OCR output handling: medication-only structured JSON prompt, safe extracted text, confidence threshold `0.80`, OCR draft items written as `prescription_item.source = OCR`, and prescription status `OCR_DONE` only for high-confidence structured results.
+  - Added test-profile `MockOcrService` so OCR tests/builds do not require live OCR secrets.
+  - Added DDI and contraindication CSV import endpoints with dry-run preview, row-level result reporting, 1 MB / 500 row limits, duplicate-key errors, LOW/MEDIUM/HIGH severity support, and overwrite by `ruleCode`.
+  - Added education content import/list APIs with overwrite by `contentCode`, `DRAFT/REVIEWED/INACTIVE` status, ISO `reviewedAt`, and patient-side reviewed-only recommendation/detail endpoints.
+  - Pharmacist Web now exposes CSV import/template actions under `/ddi/rules`, an education content screen at `/education/content`, and OCR raw text / OCR draft item visibility in prescription review.
+  - Patient App now shows reviewed education recommendations at the top of `/rational-medication` and opens detail route `/education/cards/:id`.
+  - Updated Standard documents for T4 routes, endpoints, OCR persistence semantics, CSV import behavior, and validation gate.
+- Validated:
+  - `mvn -q "-Dtest=AppPrescriptionServiceTest,AdminDdiServiceTest,EducationServiceTest" test` passed in `backend-v2`.
+  - `npm run build` passed in `frontend/pharmacist`.
+  - `npm run build` passed in `frontend/huanzhe`.
+- Open risks:
+  - Live OCR still requires `MEDICINE_OCR_API_KEY`; default/test flows use graceful fallback or mock OCR.
+  - Browser walkthrough against a live local stack was not run in this slice.
+  - Current working tree still includes uncommitted T1/T2/T3 changes plus T4; do not treat all diffs as only T4.
+- Next:
+  - Plan Phase T5: voice evaluation and final demo acceptance, then run a full demo walkthrough after the local stack is available.
+
+Last Updated
+- 2026-05-16 Asia/Shanghai
+- Reason: implemented and validated Phase T4 OCR/CSV/education demo slice.

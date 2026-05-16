@@ -60,9 +60,7 @@ const props = defineProps({
 defineEmits(['back'])
 
 function handleSaveDraft(draft) {
-  if (!props.detail?.id) {
-    return
-  }
+  if (!props.detail?.id) return
   props.onSaveDraft?.(props.detail.id, draft)
 }
 </script>

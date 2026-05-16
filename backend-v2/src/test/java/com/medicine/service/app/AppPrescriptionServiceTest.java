@@ -1,5 +1,6 @@
 package com.medicine.service.app;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.medicine.api.dto.prescription.PrescriptionDTO;
 import com.medicine.api.dto.prescription.PrescriptionUploadRequest;
 import com.medicine.common.model.PageResult;
@@ -14,6 +15,7 @@ import com.medicine.repository.file.FileAssetMapper;
 import com.medicine.repository.identity.AppAccountMapper;
 import com.medicine.repository.identity.PatientMapper;
 import com.medicine.repository.prescription.PrescriptionAttachmentMapper;
+import com.medicine.repository.prescription.PrescriptionItemMapper;
 import com.medicine.repository.prescription.PrescriptionMapper;
 import com.medicine.repository.prescription.PrescriptionOcrRecordMapper;
 import com.medicine.service.ocr.OcrService;
@@ -49,6 +51,9 @@ class AppPrescriptionServiceTest {
     private PrescriptionAttachmentMapper prescriptionAttachmentMapper;
 
     @Mock
+    private PrescriptionItemMapper prescriptionItemMapper;
+
+    @Mock
     private PrescriptionOcrRecordMapper prescriptionOcrRecordMapper;
 
     @Mock
@@ -59,6 +64,9 @@ class AppPrescriptionServiceTest {
 
     @Spy
     private ObjectStorageProperties objectStorageProperties = new ObjectStorageProperties();
+
+    @Spy
+    private ObjectMapper objectMapper = new ObjectMapper();
 
     @InjectMocks
     private AppPrescriptionService appPrescriptionService;
@@ -103,6 +111,7 @@ class AppPrescriptionServiceTest {
             return 1;
         }).when(prescriptionOcrRecordMapper).insert(any(PrescriptionOcrRecord.class));
         when(prescriptionOcrRecordMapper.selectLatestByPrescriptionId(1L, 401L)).thenReturn(latestOcrRecord);
+        when(prescriptionItemMapper.selectByPrescriptionId(1L, 401L)).thenReturn(java.util.List.of());
 
         PrescriptionUploadRequest request = new PrescriptionUploadRequest();
         request.setObjectKey("prescriptions/mock.jpg");
@@ -163,6 +172,7 @@ class AppPrescriptionServiceTest {
         when(prescriptionAttachmentMapper.selectByPrescriptionId(1L, 401L)).thenReturn(java.util.List.of(attachment));
         when(fileAssetMapper.selectByIdAndTenant(1L, 301L)).thenReturn(fileAsset);
         when(prescriptionOcrRecordMapper.selectLatestByPrescriptionId(1L, 401L)).thenReturn(ocrRecord);
+        when(prescriptionItemMapper.selectByPrescriptionId(1L, 401L)).thenReturn(java.util.List.of());
 
         PageResult<PrescriptionDTO> result = appPrescriptionService.getPrescriptions("13800138000", null, 1, 20);
 

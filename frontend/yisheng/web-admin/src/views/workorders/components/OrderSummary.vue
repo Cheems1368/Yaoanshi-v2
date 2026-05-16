@@ -16,7 +16,7 @@
           </el-tag>
         </div>
         <span>当前处理：{{ detail.currentHandlerName || '待分配' }}</span>
-        <span>医生：{{ detail.assignedDoctorName || '未升级' }}</span>
+        <span>医生：{{ detail.assignedDoctorName || '未指定' }}</span>
       </article>
     </div>
 

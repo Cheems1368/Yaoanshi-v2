@@ -10,6 +10,10 @@ public class DoseTaskDTO {
     private String scheduledAt;
     private String status;
     private String notificationStatus;
+    private String reminderStage;
+    private Long overdueMinutes;
+    private Boolean familyReminderDue;
+    private Integer familyBindingCount;
     private Long lastEffectiveCheckinId;
     private String lockedAfter;
     private String drugName;
@@ -81,6 +85,38 @@ public class DoseTaskDTO {
 
     public void setNotificationStatus(String notificationStatus) {
         this.notificationStatus = notificationStatus;
+    }
+
+    public String getReminderStage() {
+        return reminderStage;
+    }
+
+    public void setReminderStage(String reminderStage) {
+        this.reminderStage = reminderStage;
+    }
+
+    public Long getOverdueMinutes() {
+        return overdueMinutes;
+    }
+
+    public void setOverdueMinutes(Long overdueMinutes) {
+        this.overdueMinutes = overdueMinutes;
+    }
+
+    public Boolean getFamilyReminderDue() {
+        return familyReminderDue;
+    }
+
+    public void setFamilyReminderDue(Boolean familyReminderDue) {
+        this.familyReminderDue = familyReminderDue;
+    }
+
+    public Integer getFamilyBindingCount() {
+        return familyBindingCount;
+    }
+
+    public void setFamilyBindingCount(Integer familyBindingCount) {
+        this.familyBindingCount = familyBindingCount;
     }
 
     public Long getLastEffectiveCheckinId() {

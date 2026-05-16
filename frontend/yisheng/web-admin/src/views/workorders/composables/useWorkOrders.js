@@ -24,7 +24,8 @@ const CATEGORY_TEXT = {
   MISSED_OR_WRONG_DOSE: '漏服 / 错服',
   ADVERSE_REACTION: '不良反应',
   PLAN_CHANGE: '计划调整',
-  OTHER: '其他'
+  OTHER: '其他',
+  NEW_MEDICATION_REVIEW: '新药品审核'
 }
 
 const EVENT_TEXT = {
@@ -34,6 +35,7 @@ const EVENT_TEXT = {
   PHARMACIST_REPLY: '药师回复',
   ESCALATED_TO_DOCTOR: '升级医生',
   DOCTOR_REPLY: '医生回复',
+  DOCTOR_DECISION: '医生决策',
   REJECTED: '工单驳回',
   CLOSED: '工单关闭'
 }
@@ -56,6 +58,12 @@ export function categoryText(category) {
 
 export function eventText(eventType) {
   return EVENT_TEXT[eventType] || eventType
+}
+
+export function decisionText(decisionResult) {
+  if (decisionResult === 'ADOPTED') return '采纳建议'
+  if (decisionResult === 'NOT_ADOPTED') return '不采纳建议'
+  return decisionResult || ''
 }
 
 export function formatDate(value) {
@@ -182,20 +190,20 @@ export function useWorkOrders(role, api) {
 
   function handleNotification(event) {
     if (!event?.detail?.businessType?.startsWith('HELP_ORDER_')) return
-    loadOrders()
+    void loadOrders()
     const notifOrderId = event.detail?.businessId
     if (notifOrderId && notifOrderId !== selectedId.value) {
       unreadIds.add(notifOrderId)
     }
     if (notifOrderId && notifOrderId === selectedId.value) {
-      loadDetail(selectedId.value)
+      void loadDetail(selectedId.value)
     }
   }
 
   function initFromRoute() {
     const idFromQuery = route.query.id
     if (idFromQuery) {
-      selectOrder(Number(idFromQuery) || idFromQuery)
+      void selectOrder(Number(idFromQuery) || idFromQuery)
     }
   }
 

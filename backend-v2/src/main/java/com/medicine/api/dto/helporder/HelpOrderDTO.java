@@ -27,6 +27,8 @@ public class HelpOrderDTO {
     private String rejectReason;
     private String serviceNotice;
     private String createdAt;
+    private List<Long> attachmentFileAssetIds;
+    private PatientContextDTO patientContext;
     private List<EventDTO> events;
 
     public Long getId() {
@@ -221,6 +223,97 @@ public class HelpOrderDTO {
         this.events = events;
     }
 
+    public List<Long> getAttachmentFileAssetIds() {
+        return attachmentFileAssetIds;
+    }
+
+    public void setAttachmentFileAssetIds(List<Long> attachmentFileAssetIds) {
+        this.attachmentFileAssetIds = attachmentFileAssetIds;
+    }
+
+    public PatientContextDTO getPatientContext() {
+        return patientContext;
+    }
+
+    public void setPatientContext(PatientContextDTO patientContext) {
+        this.patientContext = patientContext;
+    }
+
+    public static class PatientContextDTO {
+        private String name;
+        private String gender;
+        private Integer age;
+        private String primaryDiseaseName;
+        private String drugAllergy;
+        private String foodAllergy;
+        private String medicalHistorySummary;
+        private String currentMedicationSummary;
+
+        public String getName() {
+            return name;
+        }
+
+        public void setName(String name) {
+            this.name = name;
+        }
+
+        public String getGender() {
+            return gender;
+        }
+
+        public void setGender(String gender) {
+            this.gender = gender;
+        }
+
+        public Integer getAge() {
+            return age;
+        }
+
+        public void setAge(Integer age) {
+            this.age = age;
+        }
+
+        public String getPrimaryDiseaseName() {
+            return primaryDiseaseName;
+        }
+
+        public void setPrimaryDiseaseName(String primaryDiseaseName) {
+            this.primaryDiseaseName = primaryDiseaseName;
+        }
+
+        public String getDrugAllergy() {
+            return drugAllergy;
+        }
+
+        public void setDrugAllergy(String drugAllergy) {
+            this.drugAllergy = drugAllergy;
+        }
+
+        public String getFoodAllergy() {
+            return foodAllergy;
+        }
+
+        public void setFoodAllergy(String foodAllergy) {
+            this.foodAllergy = foodAllergy;
+        }
+
+        public String getMedicalHistorySummary() {
+            return medicalHistorySummary;
+        }
+
+        public void setMedicalHistorySummary(String medicalHistorySummary) {
+            this.medicalHistorySummary = medicalHistorySummary;
+        }
+
+        public String getCurrentMedicationSummary() {
+            return currentMedicationSummary;
+        }
+
+        public void setCurrentMedicationSummary(String currentMedicationSummary) {
+            this.currentMedicationSummary = currentMedicationSummary;
+        }
+    }
+
     public static class EventDTO {
         private Long id;
         private String eventType;
@@ -231,6 +324,8 @@ public class HelpOrderDTO {
         private String operatorName;
         private String content;
         private Long attachmentFileAssetId;
+        private List<HelpOrderAttachmentDTO> attachments;
+        private String decisionResult;
         private String eventAt;
 
         public Long getId() {
@@ -303,6 +398,22 @@ public class HelpOrderDTO {
 
         public void setAttachmentFileAssetId(Long attachmentFileAssetId) {
             this.attachmentFileAssetId = attachmentFileAssetId;
+        }
+
+        public List<HelpOrderAttachmentDTO> getAttachments() {
+            return attachments;
+        }
+
+        public void setAttachments(List<HelpOrderAttachmentDTO> attachments) {
+            this.attachments = attachments;
+        }
+
+        public String getDecisionResult() {
+            return decisionResult;
+        }
+
+        public void setDecisionResult(String decisionResult) {
+            this.decisionResult = decisionResult;
         }
 
         public String getEventAt() {

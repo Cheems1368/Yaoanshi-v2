@@ -4,6 +4,8 @@ import com.medicine.config.ObjectStorageProperties;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
 
+import java.time.Duration;
+
 @Service
 @Profile("test")
 public class S3CompatibleObjectStorageStub implements S3CompatibleObjectStorage {
@@ -20,8 +22,9 @@ public class S3CompatibleObjectStorageStub implements S3CompatibleObjectStorage 
     }
 
     @Override
-    public String createPresignedDownloadUrl(String objectKey) {
-        return baseObjectUrl(objectKey) + "?action=download";
+    public String createPresignedDownloadUrl(String objectKey, Duration signatureDuration) {
+        long seconds = signatureDuration == null ? 3600 : signatureDuration.toSeconds();
+        return baseObjectUrl(objectKey) + "?action=download&ttl=" + seconds;
     }
 
     @Override

@@ -89,13 +89,13 @@ public class S3CompatibleObjectStorageImpl implements S3CompatibleObjectStorage 
     }
 
     @Override
-    public String createPresignedDownloadUrl(String objectKey) {
+    public String createPresignedDownloadUrl(String objectKey, Duration signatureDuration) {
         var getRequest = GetObjectRequest.builder()
                 .bucket(props.getBucket())
                 .key(objectKey)
                 .build();
         var presignRequest = GetObjectPresignRequest.builder()
-                .signatureDuration(Duration.ofSeconds(DEFAULT_EXPIRY_SECONDS))
+                .signatureDuration(signatureDuration == null ? Duration.ofSeconds(DEFAULT_EXPIRY_SECONDS) : signatureDuration)
                 .getObjectRequest(getRequest)
                 .build();
         return presigner.presignGetObject(presignRequest).url().toString();

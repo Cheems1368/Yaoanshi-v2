@@ -17,7 +17,7 @@ class S3CompatibleObjectStorageStubTest {
         assertThat(storage.createPresignedUploadUrl("prescriptions/a.png"))
                 .isEqualTo("http://localhost:9000/yaoshian-mvp/prescriptions/a.png?action=upload");
         assertThat(storage.createPresignedDownloadUrl("prescriptions/a.png"))
-                .isEqualTo("http://localhost:9000/yaoshian-mvp/prescriptions/a.png?action=download");
+                .isEqualTo("http://localhost:9000/yaoshian-mvp/prescriptions/a.png?action=download&ttl=3600");
     }
 
     @Test

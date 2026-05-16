@@ -20,6 +20,8 @@ public class PrescriptionDTO {
     private String rejectReason;
     private String ocrStatus;
     private String ocrConfidence;
+    private String ocrRawText;
+    private String ocrFailureReason;
     private List<AttachmentDTO> attachments;
     private List<ItemDTO> items;
     private List<AdminDdiRiskCardDTO> pendingDdiScreenings;
@@ -134,6 +136,22 @@ public class PrescriptionDTO {
 
     public void setOcrConfidence(String ocrConfidence) {
         this.ocrConfidence = ocrConfidence;
+    }
+
+    public String getOcrRawText() {
+        return ocrRawText;
+    }
+
+    public void setOcrRawText(String ocrRawText) {
+        this.ocrRawText = ocrRawText;
+    }
+
+    public String getOcrFailureReason() {
+        return ocrFailureReason;
+    }
+
+    public void setOcrFailureReason(String ocrFailureReason) {
+        this.ocrFailureReason = ocrFailureReason;
     }
 
     public List<AttachmentDTO> getAttachments() {

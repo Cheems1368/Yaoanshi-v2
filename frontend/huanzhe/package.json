@@ -13,6 +13,7 @@
     "e2e:prescription-review": "node scripts/e2e-prescription-review.mjs",
     "e2e:medication-family": "node scripts/e2e-medication-family.mjs",
     "e2e:helporder-collab": "node scripts/e2e-helporder-collab.mjs",
+    "e2e:helporder-mobile": "node scripts/e2e-helporder-mobile-decision.mjs",
     "e2e:pharmacist-patient": "node scripts/e2e-pharmacist-patient.mjs",
     "e2e:admin-notifications": "node scripts/e2e-admin-notifications.mjs",
     "e2e:challenge-cup": "node scripts/e2e-challenge-cup.mjs",

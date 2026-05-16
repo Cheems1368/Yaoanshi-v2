@@ -8,16 +8,10 @@
 
     <template v-else>
       <div v-if="showDoctorWorkflowHint" class="action-bar__hint">
-        请先回复接手工单，之后才可关闭。
+        请先回复接手工单，之后才能关闭；移动端可直接提交采纳/不采纳决策。
       </div>
       <div class="action-bar__buttons">
-        <el-button
-          v-if="showClaim"
-          type="success"
-          @click="handleClaim"
-        >
-          认领
-        </el-button>
+        <el-button v-if="showClaim" type="success" @click="handleClaim">认领</el-button>
         <el-button
           v-if="showReply"
           :type="activeAction === 'reply' ? 'primary' : 'default'"
@@ -135,9 +129,7 @@ const status = computed(() => props.detail?.status)
 const isTerminal = computed(() => status.value === 'CLOSED' || status.value === 'REJECTED')
 const isPharmacist = computed(() => props.role === 'pharmacist')
 
-const showClaim = computed(() =>
-  isPharmacist.value && status.value === 'SUBMITTED'
-)
+const showClaim = computed(() => isPharmacist.value && status.value === 'SUBMITTED')
 const showReply = computed(() => {
   if (isPharmacist.value) return ['SUBMITTED', 'PHARMACIST_IN_PROGRESS'].includes(status.value)
   return ['WAITING_DOCTOR', 'DOCTOR_IN_PROGRESS'].includes(status.value)
@@ -181,10 +173,7 @@ function cancelAction() {
 
 async function handleSubmit() {
   const action = activeAction.value
-  if (!action) {
-    return
-  }
-
+  if (!action) return
   const handlers = {
     reply: props.onReply,
     escalate: props.onEscalate,
@@ -192,9 +181,7 @@ async function handleSubmit() {
     close: props.onClose
   }
   const handler = handlers[action]
-  if (!handler) {
-    return
-  }
+  if (!handler) return
 
   submitting.value = true
   try {
@@ -227,70 +214,34 @@ function handleClaim() {
   padding: 8px 0;
 }
 
+.action-bar__hint {
+  padding: 10px 12px;
+  border-radius: var(--pro-radius-md);
+  background: var(--pro-warning-bg);
+  color: var(--pro-warning);
+  font-size: 14px;
+}
+
 .action-bar__buttons {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-}
-
-.action-bar__hint {
-  padding: 12px 14px;
-  border-radius: var(--pro-radius-md);
-  background: var(--pro-bg-secondary);
-  color: var(--pro-text-secondary);
-  font-size: 13px;
-  line-height: 1.5;
+  gap: 10px;
 }
 
 .action-bar__input {
   display: grid;
-  gap: 12px;
-  padding-top: 16px;
-  border-top: 1px solid var(--pro-border-color);
+  gap: 10px;
 }
 
-.action-bar__input-header {
+.action-bar__input-header,
+.action-bar__input-footer {
   display: flex;
   align-items: center;
   justify-content: space-between;
-
-  span {
-    font-size: 14px;
-    font-weight: 600;
-    color: var(--pro-text-primary);
-  }
 }
 
-.action-bar__input-footer {
-  display: flex;
-  justify-content: flex-end;
-}
-
-.expand-enter-active,
-.expand-leave-active {
-  transition: all 240ms cubic-bezier(0.2, 0, 0, 1);
-  overflow: hidden;
-}
-
-.expand-enter-from,
-.expand-leave-to {
-  opacity: 0;
-  max-height: 0;
-}
-
-.expand-enter-to,
-.expand-leave-from {
-  opacity: 1;
-  max-height: 300px;
-}
-
-@media (max-width: 768px) {
-  .action-bar__buttons {
-    flex-direction: column;
-
-    .el-button {
-      width: 100%;
-    }
-  }
+.action-bar__input-header {
+  color: var(--pro-text-primary);
+  font-weight: 600;
 }
 </style>

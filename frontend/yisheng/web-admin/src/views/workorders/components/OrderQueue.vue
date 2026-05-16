@@ -32,9 +32,7 @@
           @select="$emit('select', $event)"
         />
       </template>
-      <div v-else class="order-queue__empty">
-        暂无工单
-      </div>
+      <div v-else class="order-queue__empty">暂无工单</div>
     </div>
 
     <div class="order-queue__pager">
@@ -78,14 +76,14 @@ const tabs = computed(() => {
       { label: '全部', value: '' },
       { label: '待处理', value: 'WAITING_DOCTOR' },
       { label: '处理中', value: 'DOCTOR_IN_PROGRESS' },
-      { label: '已完结', value: 'CLOSED,REJECTED' }
+      { label: '已完成', value: 'CLOSED,REJECTED' }
     ]
   }
   return [
     { label: '全部', value: '' },
     { label: '待处理', value: 'SUBMITTED' },
     { label: '处理中', value: 'PHARMACIST_IN_PROGRESS' },
-    { label: '已完结', value: 'CLOSED,REJECTED' }
+    { label: '已完成', value: 'CLOSED,REJECTED' }
   ]
 })
 
@@ -93,9 +91,9 @@ const filteredOrders = computed(() => {
   if (!keyword.value.trim()) return props.orders
   const kw = keyword.value.trim().toLowerCase()
   return props.orders.filter(
-    (o) =>
-      (o.patientName && o.patientName.toLowerCase().includes(kw)) ||
-      (o.orderNo && o.orderNo.toLowerCase().includes(kw))
+    (order) =>
+      (order.patientName && order.patientName.toLowerCase().includes(kw)) ||
+      (order.orderNo && order.orderNo.toLowerCase().includes(kw))
   )
 })
 

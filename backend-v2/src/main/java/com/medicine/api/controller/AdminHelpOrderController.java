@@ -2,6 +2,7 @@ package com.medicine.api.controller;
 
 import com.medicine.api.dto.helporder.HelpOrderCloseRequest;
 import com.medicine.api.dto.helporder.HelpOrderDTO;
+import com.medicine.api.dto.helporder.HelpOrderDoctorDecisionRequest;
 import com.medicine.api.dto.helporder.HelpOrderEscalateRequest;
 import com.medicine.api.dto.helporder.HelpOrderRejectRequest;
 import com.medicine.api.dto.helporder.HelpOrderReplyRequest;
@@ -93,6 +94,15 @@ public class AdminHelpOrderController {
             Authentication authentication
     ) {
         return CommonResult.ok(adminHelpOrderService.close((JwtClaims) authentication.getDetails(), id, request));
+    }
+
+    @PostMapping("/{id}/doctor-decision")
+    public CommonResult<HelpOrderDTO> doctorDecision(
+            @PathVariable("id") Long id,
+            @RequestBody HelpOrderDoctorDecisionRequest request,
+            Authentication authentication
+    ) {
+        return CommonResult.ok(adminHelpOrderService.doctorDecision((JwtClaims) authentication.getDetails(), id, request));
     }
 
     @GetMapping("/{id}/self-reported-medications")

@@ -16,6 +16,31 @@
           <p>按疾病或药物主题快速查看核心用法、风险提示和联合用药注意事项。</p>
         </section>
 
+        <section v-if="recommendationLoading || recommendations.length || recommendationError" class="recommendation-section">
+          <div class="section-head">
+            <h3>为你推荐</h3>
+            <ion-spinner v-if="recommendationLoading" name="crescent" />
+          </div>
+          <ion-card v-if="recommendationError" class="empty-card">
+            <ion-card-content>{{ recommendationError }}</ion-card-content>
+          </ion-card>
+          <article
+            v-for="card in recommendations"
+            :key="card.id"
+            class="education-card"
+            @click="openEducationCard(card.id)"
+          >
+            <div class="category-head">
+              <h3>{{ card.title }}</h3>
+              <ion-badge v-if="card.categoryName || card.category">{{ card.categoryName || card.category }}</ion-badge>
+            </div>
+            <p>{{ card.summary || '点击查看已审核的用药教育内容。' }}</p>
+            <div class="tag-row">
+              <ion-chip v-for="tag in mergedTags(card)" :key="`${card.id}-${tag}`" size="small">{{ tag }}</ion-chip>
+            </div>
+          </article>
+        </section>
+
         <ion-searchbar
           v-model="searchText"
           placeholder="搜索分类、主题或药品"
@@ -69,13 +94,18 @@ import {
   IonHeader,
   IonPage,
   IonSearchbar,
+  IonSpinner,
   IonTitle,
   IonToolbar
 } from '@ionic/vue'
 import { rationalMedicationData } from '@/modules/patient/data/rationalMedication'
+import { educationService, type EducationContentCardDTO } from '@/modules/patient/api/mvp'
 
 const router = useRouter()
 const searchText = ref('')
+const recommendations = ref<EducationContentCardDTO[]>([])
+const recommendationLoading = ref(false)
+const recommendationError = ref('')
 
 const filteredCategories = computed(() => {
   return rationalMedicationData.searchCategories(searchText.value)
@@ -85,9 +115,33 @@ const openCategory = (categoryId: string) => {
   router.push(`/drug-category/${categoryId}`)
 }
 
+const openEducationCard = (id: number) => {
+  router.push(`/education/cards/${id}`)
+}
+
+const mergedTags = (card: EducationContentCardDTO) => {
+  return [...(card.diagnosisTags || []), ...(card.drugTags || []), ...(card.populationTags || [])].slice(0, 4)
+}
+
 const resetSearch = () => {
   searchText.value = ''
 }
+
+const loadRecommendations = async () => {
+  recommendationLoading.value = true
+  recommendationError.value = ''
+  try {
+    const response = await educationService.recommendations(5)
+    recommendations.value = response.data || []
+  } catch (error) {
+    recommendations.value = []
+    recommendationError.value = error instanceof Error ? error.message : '推荐内容加载失败'
+  } finally {
+    recommendationLoading.value = false
+  }
+}
+
+loadRecommendations()
 </script>
 
 <style scoped>
@@ -137,7 +191,27 @@ const resetSearch = () => {
   gap: var(--patient-space-3);
 }
 
-.category-card {
+.recommendation-section {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--patient-space-3);
+  margin-bottom: var(--patient-space-4);
+}
+
+.section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.section-head h3 {
+  margin: 0;
+  color: var(--patient-text-primary);
+  font-size: var(--patient-font-subtitle);
+}
+
+.category-card,
+.education-card {
   background: var(--patient-bg-card);
   border-radius: var(--patient-radius-lg);
   border: 1px solid var(--patient-border-light);
@@ -152,13 +226,15 @@ const resetSearch = () => {
   margin-bottom: var(--patient-space-2);
 }
 
-.category-card h3 {
+.category-card h3,
+.education-card h3 {
   margin: 0;
   color: var(--patient-text-primary);
   font-size: var(--patient-font-subtitle);
 }
 
-.category-card p {
+.category-card p,
+.education-card p {
   margin: 0 0 var(--patient-space-3);
   color: var(--patient-text-muted);
   line-height: var(--patient-leading-normal);

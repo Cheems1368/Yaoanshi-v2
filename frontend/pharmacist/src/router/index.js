@@ -9,6 +9,12 @@ const routes = [
     meta: { requiresAuth: false, title: '药师登录' }
   },
   {
+    path: '/mobile/workorders',
+    name: 'MobileWorkOrders',
+    component: () => import('@/views/mobile/MobileWorkOrders.vue'),
+    meta: { requiresAuth: true, title: '移动工单' }
+  },
+  {
     path: '/',
     component: () => import('@/layout/Layout.vue'),
     redirect: '/dashboard',
@@ -55,6 +61,13 @@ const routes = [
         name: 'DdiRules',
         component: () => import('@/views/DdiRules.vue'),
         meta: { title: 'DDI 规则管理' }
+      },
+      {
+        path: 'education/content',
+        alias: ['/education/content'],
+        name: 'EducationContent',
+        component: () => import('@/views/EducationContent.vue'),
+        meta: { title: '用药教育内容' }
       },
       {
         path: 'profile',

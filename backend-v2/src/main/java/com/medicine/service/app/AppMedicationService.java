@@ -14,6 +14,7 @@ import com.medicine.domain.medication.MedicationCheckinRecord;
 import com.medicine.domain.medication.MedicationDoseTask;
 import com.medicine.domain.medication.MedicationPlan;
 import com.medicine.domain.medication.MedicationPlanEvent;
+import com.medicine.repository.identity.PatientFamilyBindingMapper;
 import com.medicine.repository.medication.MedicationCheckinRecordMapper;
 import com.medicine.repository.medication.MedicationDoseTaskMapper;
 import com.medicine.repository.medication.MedicationPlanEventMapper;
@@ -27,18 +28,23 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Set;
 
 @Service
 public class AppMedicationService {
 
     private static final long DEFAULT_TENANT_ID = 1L;
+    private static final long FAMILY_REMINDER_DELAY_MINUTES = 30L;
+    private static final Set<String> HANDLED_TASK_STATUSES = Set.of("COMPLETED", "MISSED", "SKIPPED", "CANCELLED");
 
     private final MedicationPlanMapper medicationPlanMapper;
     private final MedicationPlanItemMapper medicationPlanItemMapper;
     private final MedicationPlanEventMapper medicationPlanEventMapper;
     private final MedicationDoseTaskMapper medicationDoseTaskMapper;
     private final MedicationCheckinRecordMapper medicationCheckinRecordMapper;
+    private final PatientFamilyBindingMapper patientFamilyBindingMapper;
     private final AppPatientService appPatientService;
     private final ObjectMapper objectMapper;
 
@@ -48,6 +54,7 @@ public class AppMedicationService {
             MedicationPlanEventMapper medicationPlanEventMapper,
             MedicationDoseTaskMapper medicationDoseTaskMapper,
             MedicationCheckinRecordMapper medicationCheckinRecordMapper,
+            PatientFamilyBindingMapper patientFamilyBindingMapper,
             AppPatientService appPatientService,
             ObjectMapper objectMapper
     ) {
@@ -56,6 +63,7 @@ public class AppMedicationService {
         this.medicationPlanEventMapper = medicationPlanEventMapper;
         this.medicationDoseTaskMapper = medicationDoseTaskMapper;
         this.medicationCheckinRecordMapper = medicationCheckinRecordMapper;
+        this.patientFamilyBindingMapper = patientFamilyBindingMapper;
         this.appPatientService = appPatientService;
         this.objectMapper = objectMapper;
     }
@@ -72,9 +80,11 @@ public class AppMedicationService {
     public List<DoseTaskDTO> getTodayDoseTasks(String subject, String date) {
         AppPatientService.AccessContext context = appPatientService.requireAccessContext(subject);
         LocalDate taskDate = StringUtils.hasText(date) ? LocalDate.parse(date) : LocalDate.now();
+        int familyBindingCount = patientFamilyBindingMapper.countActiveByPatientId(DEFAULT_TENANT_ID, context.patient().getId());
+        LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
         return medicationDoseTaskMapper.selectTodayByPatientId(DEFAULT_TENANT_ID, context.patient().getId(), taskDate)
                 .stream()
-                .map(this::toDoseTaskDto)
+                .map(task -> toDoseTaskDto(task, familyBindingCount, now))
                 .toList();
     }
 
@@ -220,6 +230,10 @@ public class AppMedicationService {
     }
 
     private DoseTaskDTO toDoseTaskDto(MedicationDoseTask task) {
+        return toDoseTaskDto(task, 0, LocalDateTime.now(ZoneOffset.UTC));
+    }
+
+    private DoseTaskDTO toDoseTaskDto(MedicationDoseTask task, int familyBindingCount, LocalDateTime now) {
         DoseTaskDTO dto = new DoseTaskDTO();
         dto.setId(task.getId());
         dto.setPatientId(task.getPatientId());
@@ -229,6 +243,7 @@ public class AppMedicationService {
         dto.setScheduledAt(formatDateTime(task.getScheduledAt()));
         dto.setStatus(task.getStatus());
         dto.setNotificationStatus(task.getNotificationStatus());
+        applyReminderStage(dto, task, familyBindingCount, now);
         dto.setLastEffectiveCheckinId(task.getLastEffectiveCheckinId());
         dto.setLockedAfter(formatDateTime(task.getLockedAfter()));
         dto.setDrugName(task.getDrugName());
@@ -238,6 +253,32 @@ public class AppMedicationService {
         dto.setMealRelation(task.getMealRelation());
         dto.setInstructions(task.getInstructions());
         return dto;
+    }
+
+    private void applyReminderStage(DoseTaskDTO dto, MedicationDoseTask task, int familyBindingCount, LocalDateTime now) {
+        long overdueMinutes = calculateOverdueMinutes(task.getScheduledAt(), now);
+        boolean pending = "PENDING".equals(task.getStatus());
+        boolean familyReminderDue = pending && overdueMinutes >= FAMILY_REMINDER_DELAY_MINUTES && familyBindingCount > 0;
+        dto.setOverdueMinutes(overdueMinutes);
+        dto.setFamilyBindingCount(familyBindingCount);
+        dto.setFamilyReminderDue(familyReminderDue);
+
+        if (HANDLED_TASK_STATUSES.contains(task.getStatus())) {
+            dto.setReminderStage("HANDLED");
+        } else if (overdueMinutes == 0 && task.getScheduledAt() != null && now.isBefore(task.getScheduledAt())) {
+            dto.setReminderStage("UPCOMING");
+        } else if (overdueMinutes < FAMILY_REMINDER_DELAY_MINUTES) {
+            dto.setReminderStage("DUE");
+        } else {
+            dto.setReminderStage(familyBindingCount > 0 ? "FAMILY_REMINDER_DUE" : "OVERDUE");
+        }
+    }
+
+    private long calculateOverdueMinutes(LocalDateTime scheduledAt, LocalDateTime now) {
+        if (scheduledAt == null || now.isBefore(scheduledAt)) {
+            return 0L;
+        }
+        return ChronoUnit.MINUTES.between(scheduledAt, now);
     }
 
     private CheckinRecordDTO toCheckinDto(MedicationCheckinRecord record) {

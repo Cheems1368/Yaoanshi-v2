@@ -5,10 +5,14 @@ import com.medicine.api.dto.helporder.HelpOrderDTO;
 import com.medicine.api.dto.helporder.HelpOrderReplyRequest;
 import com.medicine.common.exception.BusinessException;
 import com.medicine.common.exception.ErrorCode;
+import com.medicine.domain.file.FileAsset;
 import com.medicine.domain.helporder.HelpOrder;
 import com.medicine.domain.helporder.HelpOrderEvent;
+import com.medicine.domain.helporder.HelpOrderEventAttachment;
 import com.medicine.domain.identity.AppAccount;
 import com.medicine.domain.identity.Patient;
+import com.medicine.repository.file.FileAssetMapper;
+import com.medicine.repository.helporder.HelpOrderEventAttachmentMapper;
 import com.medicine.repository.helporder.HelpOrderEventMapper;
 import com.medicine.repository.helporder.HelpOrderMapper;
 import com.medicine.repository.identity.AppAccountMapper;
@@ -16,6 +20,7 @@ import com.medicine.repository.identity.DoctorProfileMapper;
 import com.medicine.repository.identity.PharmacistProfileMapper;
 import com.medicine.service.auth.AppPatientService;
 import com.medicine.service.notification.NotificationDispatchService;
+import com.medicine.service.storage.S3CompatibleObjectStorage;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -44,6 +49,15 @@ class AppHelpOrderServiceTest {
 
     @Mock
     private HelpOrderEventMapper helpOrderEventMapper;
+
+    @Mock
+    private HelpOrderEventAttachmentMapper helpOrderEventAttachmentMapper;
+
+    @Mock
+    private FileAssetMapper fileAssetMapper;
+
+    @Mock
+    private S3CompatibleObjectStorage objectStorage;
 
     @Mock
     private NotificationDispatchService notificationDispatchService;
@@ -152,6 +166,60 @@ class AppHelpOrderServiceTest {
     }
 
     @Test
+    void shouldCreateHelpOrderWithUpToThreeOwnedImages() {
+        AppPatientService.AccessContext context = accessContext();
+        AtomicReference<HelpOrder> insertedOrder = new AtomicReference<>();
+        when(appPatientService.requireAccessContext("13800138000")).thenReturn(context);
+        when(fileAssetMapper.selectByIdAndTenant(1L, 10L)).thenReturn(helpOrderImage(10L, 101L));
+        when(fileAssetMapper.selectByIdAndTenant(1L, 11L)).thenReturn(helpOrderImage(11L, 101L));
+        when(helpOrderMapper.insert(any(HelpOrder.class))).thenAnswer(invocation -> {
+            HelpOrder order = invocation.getArgument(0);
+            order.setId(910L);
+            insertedOrder.set(order);
+            return 1;
+        });
+        when(helpOrderEventMapper.insert(any(HelpOrderEvent.class))).thenAnswer(invocation -> {
+            HelpOrderEvent event = invocation.getArgument(0);
+            event.setId(710L);
+            return 1;
+        });
+        when(helpOrderMapper.selectById(1L, 910L)).thenAnswer(invocation -> insertedOrder.get());
+        when(helpOrderEventMapper.selectByHelpOrderId(1L, 910L)).thenReturn(List.of());
+
+        HelpOrderDTO request = new HelpOrderDTO();
+        request.setCategory("ADVERSE_REACTION");
+        request.setTitle("服药后皮下淤血");
+        request.setAttachmentFileAssetIds(List.of(10L, 11L));
+
+        HelpOrderDTO result = appHelpOrderService.create("13800138000", request);
+
+        assertThat(result.getId()).isEqualTo(910L);
+        ArgumentCaptor<HelpOrderEventAttachment> attachmentCaptor = ArgumentCaptor.forClass(HelpOrderEventAttachment.class);
+        verify(helpOrderEventAttachmentMapper, org.mockito.Mockito.times(2)).insert(attachmentCaptor.capture());
+        assertThat(attachmentCaptor.getAllValues()).extracting(HelpOrderEventAttachment::getFileAssetId)
+                .containsExactly(10L, 11L);
+    }
+
+    @Test
+    void shouldRejectAttachmentOwnedByAnotherAccount() {
+        when(appPatientService.requireAccessContext("13800138000")).thenReturn(accessContext());
+        when(fileAssetMapper.selectByIdAndTenant(1L, 10L)).thenReturn(helpOrderImage(10L, 999L));
+
+        HelpOrderDTO request = new HelpOrderDTO();
+        request.setCategory("ADVERSE_REACTION");
+        request.setTitle("服药后皮下淤血");
+        request.setAttachmentFileAssetIds(List.of(10L));
+
+        BusinessException exception = catchThrowableOfType(
+                () -> appHelpOrderService.create("13800138000", request),
+                BusinessException.class
+        );
+
+        assertThat(exception).isNotNull();
+        assertThat(exception.getCode()).isEqualTo(ErrorCode.HELP_ORDER_PERMISSION_DENIED.getCode());
+    }
+
+    @Test
     void shouldRejectPatientReplyWhenOrderClosed() {
         AppPatientService.AccessContext context = accessContext();
         HelpOrder order = ownOrder();
@@ -170,6 +238,32 @@ class AppHelpOrderServiceTest {
 
         assertThat(exception).isNotNull();
         assertThat(exception.getCode()).isEqualTo(ErrorCode.HELP_ORDER_STATUS_CONFLICT.getCode());
+    }
+
+    @Test
+    void shouldExposeDoctorDecisionResultInPatientTimeline() {
+        HelpOrder order = ownOrder();
+        order.setStatus("CLOSED");
+        order.setServiceNotice("doctor final decision");
+
+        HelpOrderEvent event = new HelpOrderEvent();
+        event.setId(801L);
+        event.setHelpOrderId(order.getId());
+        event.setEventType("DOCTOR_DECISION");
+        event.setOperatorType("DOCTOR");
+        event.setOperatorId(11L);
+        event.setContent("doctor final decision");
+        event.setMetadataJson("{\"decisionResult\":\"ADOPTED\"}");
+
+        when(appPatientService.requireAccessContext("13800138000")).thenReturn(accessContext());
+        when(helpOrderMapper.selectById(1L, order.getId())).thenReturn(order);
+        when(helpOrderEventMapper.selectByHelpOrderId(1L, order.getId())).thenReturn(List.of(event));
+
+        HelpOrderDTO result = appHelpOrderService.getDetail("13800138000", order.getId());
+
+        assertThat(result.getEvents()).hasSize(1);
+        assertThat(result.getEvents().get(0).getEventType()).isEqualTo("DOCTOR_DECISION");
+        assertThat(result.getEvents().get(0).getDecisionResult()).isEqualTo("ADOPTED");
     }
 
     private AppPatientService.AccessContext accessContext() {
@@ -203,5 +297,18 @@ class AppHelpOrderServiceTest {
         order.setStatus("SUBMITTED");
         order.setPriority("NORMAL");
         return order;
+    }
+
+    private FileAsset helpOrderImage(Long id, Long uploadedById) {
+        FileAsset fileAsset = new FileAsset();
+        fileAsset.setId(id);
+        fileAsset.setBusinessType("HELP_ORDER_IMAGE");
+        fileAsset.setUploadedByType("PATIENT");
+        fileAsset.setUploadedById(uploadedById);
+        fileAsset.setObjectKey("help-orders/images/test-" + id + ".png");
+        fileAsset.setOriginalFilename("test-" + id + ".png");
+        fileAsset.setMimeType("image/png");
+        fileAsset.setSizeBytes(1024L);
+        return fileAsset;
     }
 }

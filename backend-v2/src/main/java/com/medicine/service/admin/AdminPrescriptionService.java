@@ -250,6 +250,8 @@ public class AdminPrescriptionService {
         dto.setOcrConfidence(ocrRecord == null || ocrRecord.getConfidence() == null
                 ? null
                 : ocrRecord.getConfidence().setScale(2, RoundingMode.HALF_UP).toPlainString());
+        dto.setOcrRawText(ocrRecord == null ? null : ocrRecord.getExtractedText());
+        dto.setOcrFailureReason(ocrRecord == null ? null : ocrRecord.getFailureReason());
 
         if (!includeDetails) {
             dto.setAttachments(List.of());

@@ -47,4 +47,14 @@ public interface DrugCatalogMapper {
             @Param("q") String q,
             @Param("limit") int limit
     );
+
+    @Select("""
+            SELECT COUNT(1)
+            FROM drug_catalog
+            WHERE tenant_id = #{tenantId}
+              AND deleted = 0
+              AND status = 'ACTIVE'
+              AND name_cn = #{nameCn}
+            """)
+    int countByNameCn(@Param("tenantId") Long tenantId, @Param("nameCn") String nameCn);
 }

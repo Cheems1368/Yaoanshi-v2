@@ -34,6 +34,16 @@ public interface DrugContraindicationMapper {
     DrugContraindication selectById(@Param("tenantId") Long tenantId, @Param("id") Long id);
 
     @Select("""
+            SELECT id, rule_code, drug_name, condition_type, condition_value, severity, message, recommended_action,
+                   mechanism_desc, alternative_recommendation, reference_source, patient_summary, status,
+                   maintained_by_pharmacist_id, creator, create_time, updater, update_time, deleted, tenant_id
+            FROM drug_contraindication
+            WHERE tenant_id = #{tenantId} AND rule_code = #{ruleCode} AND deleted = 0
+            LIMIT 1
+            """)
+    DrugContraindication selectByRuleCode(@Param("tenantId") Long tenantId, @Param("ruleCode") String ruleCode);
+
+    @Select("""
             <script>
             SELECT id, rule_code, drug_name, condition_type, condition_value, severity, message, recommended_action,
                    mechanism_desc, alternative_recommendation, reference_source, patient_summary, status,

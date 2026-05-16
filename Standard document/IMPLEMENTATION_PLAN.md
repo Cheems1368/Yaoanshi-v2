@@ -26,7 +26,7 @@ Rules:
 | Phase 7 | Drug Catalog and Pinyin Initials Search (P0+) | ✅ Complete |
 | Phase 8 | Post-P0 Trial Readiness Sprint (A–H) | ✅ Complete |
 
-**Current active work:** End-to-end browser demo walkthrough (manual UI testing across all 3 surfaces).
+**Current active work:** Post-P0 trial demo closed-loop implementation, starting with the image help-order loop.
 
 **Flyway current latest:** V8 (`V8__ai_consent.sql`). Next new migration must be V9.
 
@@ -34,6 +34,25 @@ Rules:
 - `MEDICINE_OCR_API_KEY` must be set in `.env.local` for live OCR (graceful fallback if omitted)
 - SEC-002 partially open: refresh tokens remain sessionStorage-managed (future follow-up)
 - Ops cleanup: `ops/sql/sec-003-clear-legacy-patient-id-card-masked.sql` needs to be run
+
+## 1.6 Post-P0 Trial Demo Closed-Loop Sequence
+
+The post-P0 trial/demo work is phase-based, not tied to fixed calendar weeks. Each phase must preserve existing patient, pharmacist, and doctor flows while adding the smallest demonstrable closed loop.
+
+| Phase | Goal | Required validation |
+|-------|------|---------------------|
+| Phase T0 | Standard document sync for trial/demo scope | `BACKEND_STRUCTURE.md`, `APP_FLOW.md`, and this file describe the same contracts and sequence |
+| Phase T1 | Image help-order loop: patient text+image -> pharmacist mobile Web reply -> patient detail sees reply | backend targeted help-order tests, patient build, pharmacist build, manual mobile-width walkthrough |
+| Phase T2 | Doctor mobile Web collaboration and structured `ADOPTED` / `NOT_ADOPTED` decision events | doctor/pharmacist help-order tests, doctor mobile build, and mobile-width walkthrough |
+| Phase T3 | Medication reminder and family second-reminder demo path | backend reminder-stage tests, patient build, and medication/family E2E script |
+| Phase T4 | OCR hardening, CSV rule import, reviewed education recommendation | ✅ backend targeted tests, pharmacist build, patient build |
+| Phase T5 | Voice evaluation and final demo acceptance | voice sample report and full demo walkthrough |
+
+Rules:
+
+1. T1 must land before T2-T5 implementation work.
+2. New database migrations continue from the latest existing Flyway version; after `V10__help_order_event_attachments.sql`, the next migration is `V11`.
+3. Temporary execution plans stay in conversation; durable sequence changes belong here.
 
 ## 2. Implementation Rules
 

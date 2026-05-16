@@ -66,6 +66,13 @@
                 <div v-if="task.instructions || task.mealRelation" class="task-extra">
                   {{ task.instructions || task.mealRelation }}
                 </div>
+                <div
+                  v-if="reminderNotice(task)"
+                  class="task-reminder"
+                  :class="`task-reminder--${task.reminderStage || 'none'}`"
+                >
+                  {{ reminderNotice(task) }}
+                </div>
               </div>
               <ion-badge :color="statusColor(task.status)">{{ statusText(task.status) }}</ion-badge>
             </div>
@@ -121,12 +128,13 @@ import {
   onIonViewWillEnter
 } from '@ionic/vue'
 import { computed, ref } from 'vue'
-import { medicationService, type DoseTaskDTO, type MedicationPlanDTO } from '@/modules/patient/api/mvp'
+import { appAuthService, medicationService, type DoseTaskDTO, type MedicationPlanDTO } from '@/modules/patient/api/mvp'
 import { patientSession } from '@/app/session'
 
 const loading = ref(false)
 const activePlan = ref<MedicationPlanDTO | null>(null)
 const tasks = ref<DoseTaskDTO[]>([])
+const currentAccountType = ref('PATIENT')
 const submittingTaskId = ref<number | null>(null)
 const showToast = ref(false)
 const toastMessage = ref('')
@@ -142,12 +150,14 @@ const showMessage = (message: string) => {
 const loadTasks = async () => {
   loading.value = true
   try {
-    const [planResponse, taskResponse] = await Promise.all([
+    const [planResponse, taskResponse, accountResponse] = await Promise.all([
       medicationService.getActiveMedicationPlan(),
-      medicationService.getTodayDoseTasks()
+      medicationService.getTodayDoseTasks(),
+      appAuthService.getCurrentAccount()
     ])
     activePlan.value = planResponse.data ?? null
     tasks.value = taskResponse.data ?? []
+    currentAccountType.value = String((accountResponse.data as any)?.accountType || 'PATIENT').toUpperCase()
     patientSession.setActivePlanStatus(Boolean(planResponse.data))
   } catch (error: any) {
     activePlan.value = null
@@ -202,6 +212,32 @@ const statusColor = (status: string) => {
   if (status === 'MISSED') return 'danger'
   if (status === 'SKIPPED') return 'warning'
   return 'medium'
+}
+
+const formatOverdue = (minutes?: number | null) => {
+  const value = Math.max(minutes ?? 0, 0)
+  if (value < 60) return `${value} 分钟`
+  const hours = Math.floor(value / 60)
+  const rest = value % 60
+  return rest > 0 ? `${hours} 小时 ${rest} 分钟` : `${hours} 小时`
+}
+
+const reminderNotice = (task: DoseTaskDTO) => {
+  if (task.reminderStage === 'FAMILY_REMINDER_DUE') {
+    return currentAccountType.value === 'FAMILY'
+      ? `已超过 ${formatOverdue(task.overdueMinutes)}，需要你协助记录`
+      : `已超过 ${formatOverdue(task.overdueMinutes)}，已提醒家属协助`
+  }
+  if (task.reminderStage === 'OVERDUE') {
+    return `已超过 ${formatOverdue(task.overdueMinutes)}，请尽快记录`
+  }
+  if (task.reminderStage === 'DUE') {
+    return '已到服药时间，请及时记录'
+  }
+  if (task.reminderStage === 'UPCOMING') {
+    return '尚未到服药时间'
+  }
+  return ''
 }
 
 async function handleRefresh(event: CustomEvent) {
@@ -313,6 +349,27 @@ onIonViewWillEnter(loadTasks)
   font-size: var(--patient-font-caption);
   color: var(--patient-text-muted);
   margin-top: var(--patient-space-1);
+}
+
+.task-reminder {
+  margin-top: var(--patient-space-2);
+  padding: var(--patient-space-2) var(--patient-space-3);
+  border-radius: var(--patient-radius-md);
+  font-size: var(--patient-font-helper);
+  line-height: var(--patient-leading-normal);
+  color: var(--patient-text-primary);
+  background: var(--patient-bg-page);
+}
+
+.task-reminder--DUE,
+.task-reminder--UPCOMING {
+  color: var(--patient-text-secondary);
+}
+
+.task-reminder--OVERDUE,
+.task-reminder--FAMILY_REMINDER_DUE {
+  color: var(--patient-warning);
+  background: color-mix(in srgb, var(--patient-warning) 12%, var(--patient-bg-card));
 }
 
 .task-actions {

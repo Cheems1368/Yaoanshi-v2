@@ -143,4 +143,14 @@ public interface PrescriptionMapper {
             WHERE tenant_id = #{tenantId} AND id = #{id} AND deleted = 0
             """)
     int updateReviewResult(Prescription prescription);
+
+    @Update("""
+            UPDATE prescription
+            SET status = #{status},
+                ocr_confidence = #{ocrConfidence},
+                updater = #{updater},
+                update_time = #{updateTime}
+            WHERE tenant_id = #{tenantId} AND id = #{id} AND deleted = 0
+            """)
+    int updateOcrResult(Prescription prescription);
 }

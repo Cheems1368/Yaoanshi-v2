@@ -259,7 +259,7 @@ public class AppDdiScreeningService {
 
     private boolean isPatientFacingSeverity(String severity) {
         String normalized = normalizeText(severity);
-        return "high".equals(normalized) || "medium".equals(normalized);
+        return "high".equals(normalized) || "medium".equals(normalized) || "low".equals(normalized);
     }
 
     private int severityRank(String severity) {

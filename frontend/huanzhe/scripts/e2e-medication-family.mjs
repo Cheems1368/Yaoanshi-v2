@@ -29,6 +29,10 @@ const familyContext = await browser.newContext({ viewport: { width: 430, height:
 const patientPage = await patientContext.newPage()
 const familyPage = await familyContext.newPage()
 
+function formatUtcTimePoint(date) {
+  return `${String(date.getUTCHours()).padStart(2, '0')}:${String(date.getUTCMinutes()).padStart(2, '0')}`
+}
+
 async function waitForCondition(label, reader, predicate, { attempts = 20, delayMs = 500 } = {}) {
   let lastValue
   for (let attempt = 0; attempt < attempts; attempt += 1) {
@@ -48,12 +52,25 @@ try {
   })
   const patientId = patientMe.payload.data.id
 
+  const familyBinding = await requestJson(`${backendBaseUrl}/app-api/patients/me/family-bindings`, {
+    method: 'POST',
+    headers: appHeaders(patientSession.accessToken),
+    body: {
+      familyMobile: familyIdentity.mobile,
+      familyDisplayName: `Family ${runId}`,
+      relationshipType: 'SPOUSE'
+    }
+  })
+
   const pharmacistSession = await professionalLogin(legacyBaseUrl, {
     username: pharmacistUsername,
     password: pharmacistPassword,
     role: 'pharmacist'
   })
 
+  const now = new Date()
+  const overdueTimePoint = formatUtcTimePoint(new Date(now.getTime() - 31 * 60 * 1000))
+  const dueTimePoint = formatUtcTimePoint(new Date(now.getTime() - 10 * 60 * 1000))
   const plan = await requestJson(`${backendBaseUrl}/admin-api/medication-plans`, {
     method: 'POST',
     headers: adminHeaders(pharmacistSession.accessToken),
@@ -68,11 +85,20 @@ try {
         {
           drugName: 'Amlodipine',
           dosage: '5mg',
-          frequencyCode: 'BID',
-          timePoints: ['08:00', '20:00'],
+          frequencyCode: 'QD',
+          timePoints: [overdueTimePoint],
           mealRelation: 'AFTER_MEAL',
           route: 'PO',
-          instructions: 'Take with water'
+          instructions: 'Family reminder demo dose'
+        },
+        {
+          drugName: 'Atorvastatin',
+          dosage: '20mg',
+          frequencyCode: 'QD',
+          timePoints: [dueTimePoint],
+          mealRelation: 'AFTER_MEAL',
+          route: 'PO',
+          instructions: 'Patient check-in demo dose'
         }
       ]
     }
@@ -85,13 +111,18 @@ try {
       headers: adminHeaders(pharmacistSession.accessToken)
     }
   )
-  const firstTaskId = planTasks.payload.data[0].id
-  const secondTaskId = planTasks.payload.data[1].id
+  const firstTaskId = planTasks.payload.data.find((task) => task.drugName === 'Amlodipine')?.id
+  const secondTaskId = planTasks.payload.data.find((task) => task.drugName === 'Atorvastatin')?.id
+  if (!firstTaskId || !secondTaskId) {
+    throw new Error(`Expected both demo dose tasks, got ${JSON.stringify(planTasks.payload.data)}`)
+  }
 
   await primePatientPage(patientPage, patientBaseUrl, patientSession, { bound: true, hasActivePlan: true })
   await patientPage.goto(`${patientBaseUrl}/medication-reminder`, { waitUntil: 'networkidle' })
-  const taskCard = patientPage.locator('.task-card').first()
-  await taskCard.waitFor()
+  const patientOverdueTaskCard = patientPage.locator('.task-card').filter({ hasText: 'Amlodipine' }).first()
+  await patientOverdueTaskCard.waitFor()
+  await patientOverdueTaskCard.locator('.task-reminder').filter({ hasText: '已提醒家属协助' }).waitFor()
+  const taskCard = patientPage.locator('.task-card').filter({ hasText: 'Atorvastatin' }).first()
 
   await Promise.all([
     patientPage.waitForResponse(
@@ -106,11 +137,11 @@ try {
         headers: appHeaders(patientSession.accessToken)
       }),
     (result) => {
-      const task = result.payload.data.find((item) => item.id === firstTaskId)
+      const task = result.payload.data.find((item) => item.id === secondTaskId)
       return task?.status === 'COMPLETED' && Boolean(task.lastEffectiveCheckinId)
     }
   )
-  const takenTask = afterTaken.payload.data.find((task) => task.id === firstTaskId)
+  const takenTask = afterTaken.payload.data.find((task) => task.id === secondTaskId)
 
   await Promise.all([
     patientPage.waitForResponse(
@@ -118,7 +149,7 @@ try {
         response.url().includes(`/app-api/checkins/${takenTask.lastEffectiveCheckinId}/correct`) &&
         response.request().method() === 'PUT'
     ),
-    patientPage.locator('.task-card').first().locator('ion-button[color="warning"]').click()
+    patientPage.locator('.task-card').filter({ hasText: 'Atorvastatin' }).first().locator('ion-button[color="warning"]').click()
   ])
   const afterCorrection = await waitForCondition(
     'corrected checkin',
@@ -129,31 +160,22 @@ try {
     (result) =>
       result.payload.data.list.some(
         (record) =>
-          record.doseTaskId === firstTaskId &&
+          record.doseTaskId === secondTaskId &&
           record.effective === true &&
           record.result === 'MISSED' &&
           record.correction === true
       )
   )
   const correctedRecord = afterCorrection.payload.data.list.find(
-    (record) => record.doseTaskId === firstTaskId && record.effective === true
+    (record) => record.doseTaskId === secondTaskId && record.effective === true
   )
-
-  const familyBinding = await requestJson(`${backendBaseUrl}/app-api/patients/me/family-bindings`, {
-    method: 'POST',
-    headers: appHeaders(patientSession.accessToken),
-    body: {
-      familyMobile: familyIdentity.mobile,
-      familyDisplayName: `Family ${runId}`,
-      relationshipType: 'SPOUSE'
-    }
-  })
 
   const familySession = await createFamilySession(backendBaseUrl, familyIdentity)
   await primePatientPage(familyPage, patientBaseUrl, familySession, { bound: true, hasActivePlan: true })
   await familyPage.goto(`${patientBaseUrl}/medication-reminder`, { waitUntil: 'networkidle' })
-  const familyTaskCard = familyPage.locator('.task-card').last()
+  const familyTaskCard = familyPage.locator('.task-card').filter({ hasText: 'Amlodipine' }).first()
   await familyTaskCard.waitFor()
+  await familyTaskCard.locator('.task-reminder').filter({ hasText: '需要你协助记录' }).waitFor()
   await Promise.all([
     familyPage.waitForResponse(
       (response) => response.url().includes('/app-api/checkins') && response.request().method() === 'POST'
@@ -169,12 +191,28 @@ try {
       }),
     (result) =>
       result.payload.data.list.some(
-        (record) => record.doseTaskId === secondTaskId && record.effective === true && record.operatorType === 'FAMILY'
+        (record) => record.doseTaskId === firstTaskId && record.effective === true && record.operatorType === 'FAMILY'
       )
   )
   const familyRecord = familyCheckins.payload.data.list.find(
-    (record) => record.doseTaskId === secondTaskId && record.effective === true
+    (record) => record.doseTaskId === firstTaskId && record.effective === true
   )
+  const handledTasks = await waitForCondition(
+    'family-handled reminder stage',
+    async () =>
+      requestJson(`${backendBaseUrl}/app-api/dose-tasks/today`, {
+        headers: appHeaders(familySession.accessToken)
+      }),
+    (result) =>
+      result.payload.data.some(
+        (task) =>
+          task.id === firstTaskId &&
+          task.status === 'COMPLETED' &&
+          task.reminderStage === 'HANDLED' &&
+          task.familyReminderDue === false
+      )
+  )
+  const handledTask = handledTasks.payload.data.find((task) => task.id === firstTaskId)
 
   await requestJson(`${backendBaseUrl}/app-api/patients/me/family-bindings/${familyBinding.payload.data.id}`, {
     method: 'DELETE',
@@ -198,6 +236,9 @@ try {
       planId: plan.payload.data.id,
       patientId,
       taskCount: planTasks.payload.data.length,
+      overdueTaskId: firstTaskId,
+      overdueTimePoint,
+      dueTimePoint,
       taskStatusAfterTaken: takenTask?.status,
       lastEffectiveCheckinIdAfterTaken: takenTask?.lastEffectiveCheckinId,
       correctedRecordId: correctedRecord.id,
@@ -206,7 +247,9 @@ try {
       correctedRecordEffective: correctedRecord.effective,
       familyBindingId: familyBinding.payload.data.id,
       familyOperatorType: familyRecord?.operatorType,
-      familyTaskId: secondTaskId,
+      familyTaskId: firstTaskId,
+      familyHandledReminderStage: handledTask?.reminderStage,
+      familyReminderDueAfterCheckin: handledTask?.familyReminderDue,
       familyAccessAfterUnbindCode: afterUnbind.code,
       familyAccessAfterUnbindMessage: afterUnbind.msg
     })

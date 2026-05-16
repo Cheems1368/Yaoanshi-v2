@@ -67,6 +67,7 @@ import {
   Fold,
   HomeFilled,
   List,
+  Reading,
   User,
   UserFilled,
   WarningFilled
@@ -84,6 +85,7 @@ const menuItems = [
   { path: '/prescriptions', title: '处方审核', icon: Document },
   { path: '/workorders', title: '工单处理', icon: List },
   { path: '/ddi/rules', title: 'DDI 规则管理', icon: WarningFilled },
+  { path: '/education/content', title: '用药教育内容', icon: Reading },
   { path: '/profile', title: '个人资料', icon: UserFilled }
 ]
 

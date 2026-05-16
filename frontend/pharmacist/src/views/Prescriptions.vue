@@ -15,6 +15,7 @@
         />
         <el-select v-model="query.status" clearable placeholder="全部状态" class="query-select">
           <el-option label="待复核" value="UPLOADED" />
+          <el-option label="OCR 已预填" value="OCR_DONE" />
           <el-option label="已复核" value="PHARMACIST_CONFIRMED" />
           <el-option label="已驳回" value="REJECTED" />
         </el-select>
@@ -91,6 +92,22 @@
           </div>
         </section>
 
+        <section v-if="detail.ocrRawText || detail.ocrFailureReason" class="detail-section">
+          <h3>OCR 识别详情</h3>
+          <el-alert
+            v-if="detail.ocrFailureReason"
+            type="warning"
+            :closable="false"
+            :title="`OCR 需要人工兜底：${detail.ocrFailureReason}`"
+            show-icon
+          />
+          <el-collapse v-if="detail.ocrRawText">
+            <el-collapse-item title="查看 OCR 原文" name="ocr-raw">
+              <pre class="ocr-raw">{{ detail.ocrRawText }}</pre>
+            </el-collapse-item>
+          </el-collapse>
+        </section>
+
         <section class="detail-section">
           <h3>附件信息</h3>
           <div v-if="detail.attachments.length" class="attachment-list">
@@ -112,11 +129,16 @@
 
         <section class="detail-section">
           <div class="section-header">
-            <h3>人工录入药品项</h3>
+            <h3>药品项（OCR 预填 / 人工确认）</h3>
             <el-button @click="addItem">新增药品项</el-button>
           </div>
           <div class="item-list">
             <article v-for="(item, index) in editableItems" :key="index" class="item-card">
+              <div class="item-heading">
+                <el-tag size="small" :type="item.source === 'OCR' ? 'success' : 'info'" effect="plain">
+                  {{ item.source === 'OCR' ? 'OCR 草稿' : '人工录入' }}
+                </el-tag>
+              </div>
               <div class="item-grid">
                 <el-input v-model="item.drugName" placeholder="药品名称" />
                 <el-input v-model="item.drugSpec" placeholder="规格" />
@@ -228,7 +250,8 @@ const openDetail = async (id) => {
           dosage: item.dosage || '',
           frequency: item.frequency || '',
           route: item.route || '',
-          durationDays: item.durationDays || 7
+          durationDays: item.durationDays || 7,
+          source: item.source || 'MANUAL'
         }))
       : [createEmptyItem()]
   } catch (error) {
@@ -245,7 +268,8 @@ const createEmptyItem = () => ({
   dosage: '',
   frequency: '',
   route: '',
-  durationDays: 7
+  durationDays: 7,
+  source: 'MANUAL'
 })
 
 const addItem = () => {
@@ -378,6 +402,8 @@ const statusText = (status) => {
   switch (status) {
     case 'UPLOADED':
       return '待复核'
+    case 'OCR_DONE':
+      return 'OCR 已预填'
     case 'PHARMACIST_CONFIRMED':
       return '已复核'
     case 'REJECTED':
@@ -490,6 +516,23 @@ loadPrescriptions()
 
 .drawer-actions {
   justify-content: flex-end;
+}
+
+.item-heading {
+  display: flex;
+  justify-content: flex-start;
+  margin-bottom: 2px;
+}
+
+.ocr-raw {
+  margin: 0;
+  padding: 12px;
+  border-radius: var(--pro-radius-sm);
+  background: var(--pro-bg-secondary);
+  color: var(--pro-text-primary);
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.6;
 }
 
 .ddi-banner {

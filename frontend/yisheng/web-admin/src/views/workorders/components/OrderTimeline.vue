@@ -10,6 +10,9 @@
         placement="top"
       >
         <strong>{{ eventText(event.eventType) }}</strong>
+        <el-tag v-if="event.decisionResult" class="decision-tag" size="small" type="success" effect="plain">
+          {{ decisionText(event.decisionResult) }}
+        </el-tag>
         <p class="timeline-operator">{{ event.operatorName || event.operatorType }}</p>
         <p v-if="event.content" class="timeline-content">{{ event.content }}</p>
       </el-timeline-item>
@@ -19,7 +22,7 @@
 </template>
 
 <script setup>
-import { eventText, formatDate } from '../composables/useWorkOrders'
+import { decisionText, eventText, formatDate } from '../composables/useWorkOrders'
 
 defineProps({
   events: { type: Array, default: () => [] }
@@ -32,6 +35,7 @@ function eventColor(eventType) {
     ASSIGNED: 'var(--pro-brand-primary)',
     PHARMACIST_REPLY: 'var(--pro-success)',
     DOCTOR_REPLY: 'var(--pro-success)',
+    DOCTOR_DECISION: 'var(--pro-success)',
     ESCALATED_TO_DOCTOR: 'var(--pro-warning)',
     REJECTED: 'var(--pro-danger)',
     CLOSED: '#909399'
@@ -50,6 +54,10 @@ function eventColor(eventType) {
   margin: 0;
   font-size: 16px;
   color: var(--pro-text-primary);
+}
+
+.decision-tag {
+  margin-left: 8px;
 }
 
 .timeline-operator {

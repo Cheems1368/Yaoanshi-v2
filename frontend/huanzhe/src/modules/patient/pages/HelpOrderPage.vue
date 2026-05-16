@@ -47,6 +47,41 @@
               <ion-label class="checkbox-label">存在紧急风险，需要线下急诊提醒</ion-label>
             </ion-item>
 
+            <div class="image-uploader">
+              <div class="privacy-warning">上传前请确认图片中不要拍入姓名、身份证、病历号等敏感信息。</div>
+              <div class="image-actions">
+                <ion-button fill="outline" size="small" :disabled="selectedImages.length >= 3" @click="openCameraInput">
+                  拍照
+                </ion-button>
+                <ion-button fill="outline" size="small" :disabled="selectedImages.length >= 3" @click="openGalleryInput">
+                  选择图片
+                </ion-button>
+                <span class="image-count">{{ selectedImages.length }}/3</span>
+              </div>
+              <input
+                ref="cameraInput"
+                class="file-input"
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                capture="environment"
+                @change="handleImageInput"
+              />
+              <input
+                ref="galleryInput"
+                class="file-input"
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                multiple
+                @change="handleImageInput"
+              />
+              <div v-if="selectedImages.length" class="image-preview-list">
+                <div v-for="image in selectedImages" :key="image.id" class="image-preview">
+                  <img :src="image.previewUrl" :alt="image.file.name" />
+                  <button type="button" class="image-remove" :disabled="submitting" @click="removeImage(image.id)">移除</button>
+                </div>
+              </div>
+            </div>
+
             <ion-button expand="block" :disabled="submitting || !canSubmit" @click="submitOrder">
               {{ submitting ? '提交中...' : '提交工单' }}
             </ion-button>
@@ -134,6 +169,18 @@ const submitting = ref(false)
 const orders = ref<HelpOrderDTO[]>([])
 const showToast = ref(false)
 const toastMessage = ref('')
+const cameraInput = ref<HTMLInputElement | null>(null)
+const galleryInput = ref<HTMLInputElement | null>(null)
+const selectedImages = ref<SelectedImage[]>([])
+
+const allowedImageTypes = new Set(['image/jpeg', 'image/png', 'image/webp'])
+const maxImageSizeBytes = 10 * 1024 * 1024
+
+interface SelectedImage {
+  id: string
+  file: File
+  previewUrl: string
+}
 
 const form = ref({
   category: 'MEDICATION_CONSULTATION',
@@ -196,6 +243,7 @@ const resetForm = () => {
     description: '',
     requiresOfflineEmergency: false
   }
+  clearImages()
 }
 
 const openDetail = (id: number) => {
@@ -210,12 +258,14 @@ const submitOrder = async () => {
 
   submitting.value = true
   try {
+    const attachmentFileAssetIds = await uploadSelectedImages()
     const response = await helpOrderService.createHelpOrder({
       category: form.value.category,
       title: form.value.title.trim(),
       description: form.value.description.trim() || undefined,
       priority: form.value.requiresOfflineEmergency ? 'URGENT' : 'NORMAL',
-      requiresOfflineEmergency: form.value.requiresOfflineEmergency
+      requiresOfflineEmergency: form.value.requiresOfflineEmergency,
+      attachmentFileAssetIds
     })
     const createdId = response.data?.id
     resetForm()
@@ -230,6 +280,77 @@ const submitOrder = async () => {
   } finally {
     submitting.value = false
   }
+}
+
+const openCameraInput = () => {
+  cameraInput.value?.click()
+}
+
+const openGalleryInput = () => {
+  galleryInput.value?.click()
+}
+
+const handleImageInput = (event: Event) => {
+  const input = event.target as HTMLInputElement
+  const files = Array.from(input.files ?? [])
+  input.value = ''
+  if (!files.length) return
+
+  for (const file of files) {
+    if (selectedImages.value.length >= 3) {
+      showMessage('单条消息最多上传 3 张图片')
+      break
+    }
+    if (!allowedImageTypes.has(file.type)) {
+      showMessage('仅支持 JPG、PNG、WebP 图片')
+      continue
+    }
+    if (file.size > maxImageSizeBytes) {
+      showMessage('单张图片不能超过 10MB')
+      continue
+    }
+    selectedImages.value.push({
+      id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+      file,
+      previewUrl: URL.createObjectURL(file)
+    })
+  }
+}
+
+const removeImage = (id: string) => {
+  const image = selectedImages.value.find((item) => item.id === id)
+  if (image) {
+    URL.revokeObjectURL(image.previewUrl)
+  }
+  selectedImages.value = selectedImages.value.filter((item) => item.id !== id)
+}
+
+const clearImages = () => {
+  selectedImages.value.forEach((image) => URL.revokeObjectURL(image.previewUrl))
+  selectedImages.value = []
+}
+
+const uploadSelectedImages = async () => {
+  const ids: number[] = []
+  for (const image of selectedImages.value) {
+    const contentType = image.file.type
+    const presign = await helpOrderService.presignImage({
+      filename: image.file.name || 'help-order-image.jpg',
+      contentType,
+      sizeBytes: image.file.size,
+      businessType: 'HELP_ORDER_IMAGE'
+    })
+    await helpOrderService.uploadToPresignedUrl(presign.data.uploadUrl, image.file, contentType)
+    const registered = await helpOrderService.registerImage({
+      objectKey: presign.data.objectKey,
+      originalFilename: image.file.name || presign.data.filename,
+      contentType,
+      sizeBytes: image.file.size,
+      businessType: 'HELP_ORDER_IMAGE'
+    })
+    ids.push(registered.data.id)
+  }
+  return ids
 }
 
 const statusText = (status: string) => {
@@ -305,6 +426,70 @@ onIonViewWillEnter(async () => {
 
 .checkbox-label {
   margin-left: var(--patient-space-3);
+}
+
+.image-uploader {
+  display: grid;
+  gap: var(--patient-space-3);
+  margin: var(--patient-space-4) 0;
+}
+
+.privacy-warning {
+  padding: var(--patient-space-3);
+  border-radius: var(--patient-radius-md);
+  background: rgba(245, 158, 11, 0.12);
+  color: var(--patient-warning);
+  font-size: var(--patient-font-helper);
+  line-height: var(--patient-leading-normal);
+}
+
+.image-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--patient-space-2);
+  flex-wrap: wrap;
+}
+
+.image-count {
+  color: var(--patient-text-secondary);
+  font-size: var(--patient-font-helper);
+}
+
+.file-input {
+  display: none;
+}
+
+.image-preview-list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--patient-space-2);
+}
+
+.image-preview {
+  position: relative;
+  aspect-ratio: 1;
+  overflow: hidden;
+  border-radius: var(--patient-radius-md);
+  background: var(--patient-bg-page);
+}
+
+.image-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.image-remove {
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  border: 0;
+  border-radius: var(--patient-radius-sm);
+  padding: 4px 6px;
+  background: rgba(15, 23, 42, 0.72);
+  color: #fff;
+  font-size: 12px;
 }
 
 .loading-state {

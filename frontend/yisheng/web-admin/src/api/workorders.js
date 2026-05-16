@@ -37,6 +37,15 @@ export function closeWorkOrder(id, data) {
   })
 }
 
+export function doctorDecisionWorkOrder(id, data) {
+  return request({
+    baseURL: backendV2BaseUrl,
+    url: `/admin-api/help-orders/${id}/doctor-decision`,
+    method: 'post',
+    data
+  })
+}
+
 export function rejectWorkOrder(id, data) {
   return request({
     baseURL: backendV2BaseUrl,

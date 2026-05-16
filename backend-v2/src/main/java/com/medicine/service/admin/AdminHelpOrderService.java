@@ -1,64 +1,88 @@
 package com.medicine.service.admin;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.medicine.api.dto.helporder.HelpOrderAttachmentDTO;
 import com.medicine.api.dto.helporder.HelpOrderCloseRequest;
 import com.medicine.api.dto.helporder.HelpOrderDTO;
+import com.medicine.api.dto.helporder.HelpOrderDoctorDecisionRequest;
 import com.medicine.api.dto.helporder.HelpOrderEscalateRequest;
 import com.medicine.api.dto.helporder.HelpOrderRejectRequest;
 import com.medicine.api.dto.helporder.HelpOrderReplyRequest;
 import com.medicine.common.exception.BusinessException;
 import com.medicine.common.exception.ErrorCode;
 import com.medicine.common.model.PageResult;
+import com.medicine.domain.file.FileAsset;
 import com.medicine.domain.helporder.HelpOrder;
 import com.medicine.domain.helporder.HelpOrderEvent;
 import com.medicine.domain.identity.AppAccount;
 import com.medicine.domain.identity.DoctorProfile;
+import com.medicine.domain.identity.Patient;
 import com.medicine.domain.identity.PharmacistProfile;
+import com.medicine.repository.file.FileAssetMapper;
+import com.medicine.repository.helporder.HelpOrderEventAttachmentMapper;
 import com.medicine.repository.helporder.HelpOrderEventMapper;
 import com.medicine.repository.helporder.HelpOrderMapper;
 import com.medicine.repository.identity.AppAccountMapper;
 import com.medicine.repository.identity.DoctorProfileMapper;
+import com.medicine.repository.identity.PatientMapper;
 import com.medicine.repository.identity.PharmacistProfileMapper;
 import com.medicine.service.auth.JwtClaims;
 import com.medicine.service.auth.ProfessionalIdentityService;
 import com.medicine.service.notification.NotificationDispatchService;
+import com.medicine.service.storage.S3CompatibleObjectStorage;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 @Service
 public class AdminHelpOrderService {
 
+    private static final Duration HELP_ORDER_DOWNLOAD_TTL = Duration.ofMinutes(15);
+
     private final HelpOrderMapper helpOrderMapper;
     private final HelpOrderEventMapper helpOrderEventMapper;
+    private final HelpOrderEventAttachmentMapper helpOrderEventAttachmentMapper;
+    private final FileAssetMapper fileAssetMapper;
+    private final S3CompatibleObjectStorage objectStorage;
     private final NotificationDispatchService notificationDispatchService;
     private final ProfessionalIdentityService professionalIdentityService;
     private final PharmacistProfileMapper pharmacistProfileMapper;
     private final DoctorProfileMapper doctorProfileMapper;
+    private final PatientMapper patientMapper;
     private final AppAccountMapper appAccountMapper;
     private final ObjectMapper objectMapper;
 
     public AdminHelpOrderService(
             HelpOrderMapper helpOrderMapper,
             HelpOrderEventMapper helpOrderEventMapper,
+            HelpOrderEventAttachmentMapper helpOrderEventAttachmentMapper,
+            FileAssetMapper fileAssetMapper,
+            S3CompatibleObjectStorage objectStorage,
             NotificationDispatchService notificationDispatchService,
             ProfessionalIdentityService professionalIdentityService,
             PharmacistProfileMapper pharmacistProfileMapper,
             DoctorProfileMapper doctorProfileMapper,
+            PatientMapper patientMapper,
             AppAccountMapper appAccountMapper,
             ObjectMapper objectMapper
     ) {
         this.helpOrderMapper = helpOrderMapper;
         this.helpOrderEventMapper = helpOrderEventMapper;
+        this.helpOrderEventAttachmentMapper = helpOrderEventAttachmentMapper;
+        this.fileAssetMapper = fileAssetMapper;
+        this.objectStorage = objectStorage;
         this.notificationDispatchService = notificationDispatchService;
         this.professionalIdentityService = professionalIdentityService;
         this.pharmacistProfileMapper = pharmacistProfileMapper;
         this.doctorProfileMapper = doctorProfileMapper;
+        this.patientMapper = patientMapper;
         this.appAccountMapper = appAccountMapper;
         this.objectMapper = objectMapper;
     }
@@ -276,6 +300,71 @@ public class AdminHelpOrderService {
         return getDetail(claims, id);
     }
 
+    public HelpOrderDTO doctorDecision(JwtClaims claims, Long id, HelpOrderDoctorDecisionRequest request) {
+        ProfessionalScope scope = resolveScope(claims);
+        if (!"DOCTOR".equals(scope.operatorType())) {
+            throw new BusinessException(ErrorCode.PROFESSIONAL_ROLE_MISMATCH.getCode(), ErrorCode.PROFESSIONAL_ROLE_MISMATCH.getMessage());
+        }
+
+        HelpOrder order = requireOrder(claims.getTenantId(), id);
+        ensureDoctorCanHandle(scope.operatorId(), order);
+        if (!"WAITING_DOCTOR".equals(order.getStatus()) && !"DOCTOR_IN_PROGRESS".equals(order.getStatus())) {
+            throw new BusinessException(ErrorCode.HELP_ORDER_STATUS_CONFLICT.getCode(), ErrorCode.HELP_ORDER_STATUS_CONFLICT.getMessage());
+        }
+
+        String decisionResult = normalizeDecisionResult(request.getDecisionResult());
+        String content = requireText(request.getContent());
+        LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
+        String fromStatus = order.getStatus();
+        order.setStatus("CLOSED");
+        order.setCurrentHandlerType("DOCTOR");
+        order.setCurrentHandlerId(scope.operatorId());
+        if (order.getAssignedDoctorId() == null) {
+            order.setAssignedDoctorId(scope.operatorId());
+        }
+        if (order.getFirstRespondedAt() == null) {
+            order.setFirstRespondedAt(now);
+        }
+        order.setClosedAt(now);
+        order.setServiceNotice(content);
+        order.setUpdater("admin-help-order");
+        order.setUpdateTime(now);
+        helpOrderMapper.updateState(order);
+        appendEvent(
+                claims.getTenantId(),
+                order.getId(),
+                "DOCTOR_DECISION",
+                fromStatus,
+                order.getStatus(),
+                scope.operatorType(),
+                scope.operatorId(),
+                content,
+                Map.of("decisionResult", decisionResult),
+                now
+        );
+        createNotification(
+                claims.getTenantId(),
+                "PATIENT",
+                order.getPatientId(),
+                "HELP_ORDER_DOCTOR_DECISION",
+                order.getId(),
+                Map.of("status", order.getStatus(), "decisionResult", decisionResult, "surveyRequired", true),
+                now
+        );
+        if (order.getResponsiblePharmacistId() != null) {
+            createNotification(
+                    claims.getTenantId(),
+                    "PHARMACIST",
+                    order.getResponsiblePharmacistId(),
+                    "HELP_ORDER_DOCTOR_DECISION",
+                    order.getId(),
+                    Map.of("status", order.getStatus(), "decisionResult", decisionResult, "patientId", order.getPatientId()),
+                    now
+            );
+        }
+        return getDetail(claims, id);
+    }
+
     private ProfessionalScope resolveScope(JwtClaims claims) {
         if (professionalIdentityService.isPharmacist(claims)) {
             return new ProfessionalScope(claims.getTenantId(), "PHARMACIST", professionalIdentityService.getOrCreatePharmacistProfile(claims).getId());
@@ -377,6 +466,9 @@ public class AdminHelpOrderService {
         dto.setServiceNotice(order.getServiceNotice());
         dto.setCreatedAt(formatDateTime(order.getCreateTime()));
         if (includeEvents) {
+            dto.setPatientContext(buildPatientContext(tenantId, order.getPatientId(), order.getPatientName()));
+        }
+        if (includeEvents) {
             dto.setEvents(helpOrderEventMapper.selectByHelpOrderId(tenantId, order.getId()).stream().map(event -> toEventDto(tenantId, event)).toList());
         }
         return dto;
@@ -393,8 +485,58 @@ public class AdminHelpOrderService {
         dto.setOperatorName(resolveOperatorName(tenantId, event.getOperatorType(), event.getOperatorId()));
         dto.setContent(event.getContent());
         dto.setAttachmentFileAssetId(event.getAttachmentFileAssetId());
+        dto.setAttachments(loadAttachmentDtos(tenantId, event));
+        dto.setDecisionResult(extractDecisionResult(event.getMetadataJson()));
         dto.setEventAt(formatDateTime(event.getCreateTime()));
         return dto;
+    }
+
+    private HelpOrderDTO.PatientContextDTO buildPatientContext(Long tenantId, Long patientId, String fallbackName) {
+        HelpOrderDTO.PatientContextDTO dto = new HelpOrderDTO.PatientContextDTO();
+        Patient patient = patientMapper.selectByIdAndTenant(tenantId, patientId);
+        if (patient == null) {
+            dto.setName(fallbackName);
+            return dto;
+        }
+        dto.setName(patient.getName());
+        dto.setGender(patient.getGender());
+        dto.setAge(patient.getAge());
+        dto.setPrimaryDiseaseName(patient.getPrimaryDiseaseName());
+        dto.setDrugAllergy(patient.getDrugAllergy());
+        dto.setFoodAllergy(patient.getFoodAllergy());
+        Map<String, Object> history = parseJsonToMap(patient.getMedicalHistoryJson());
+        Object layer2 = history.get("layer2");
+        if (layer2 instanceof Map<?, ?> layer2Map) {
+            dto.setMedicalHistorySummary(asText(layer2Map.get("medicalHistory")));
+            dto.setCurrentMedicationSummary(asText(layer2Map.get("currentMedication")));
+        } else {
+            dto.setMedicalHistorySummary(asText(history.get("medicalHistory")));
+            dto.setCurrentMedicationSummary(asText(history.get("currentMedication")));
+        }
+        return dto;
+    }
+
+    private List<HelpOrderAttachmentDTO> loadAttachmentDtos(Long tenantId, HelpOrderEvent event) {
+        List<HelpOrderAttachmentDTO> attachments = helpOrderEventAttachmentMapper.selectDtosByEventId(tenantId, event.getId());
+        if (attachments.isEmpty() && event.getAttachmentFileAssetId() != null) {
+            FileAsset legacyFile = fileAssetMapper.selectByIdAndTenant(tenantId, event.getAttachmentFileAssetId());
+            if (legacyFile == null) {
+                return List.of();
+            }
+            HelpOrderAttachmentDTO dto = new HelpOrderAttachmentDTO();
+            dto.setId(null);
+            dto.setFileAssetId(legacyFile.getId());
+            dto.setAttachmentType("IMAGE");
+            dto.setOriginalFilename(legacyFile.getOriginalFilename());
+            dto.setMimeType(legacyFile.getMimeType());
+            dto.setSizeBytes(legacyFile.getSizeBytes());
+            dto.setDownloadUrl(objectStorage.createPresignedDownloadUrl(legacyFile.getObjectKey(), HELP_ORDER_DOWNLOAD_TTL));
+            return List.of(dto);
+        }
+        attachments.forEach(attachment -> attachment.setDownloadUrl(
+                objectStorage.createPresignedDownloadUrl(attachment.getDownloadUrl(), HELP_ORDER_DOWNLOAD_TTL)
+        ));
+        return attachments;
     }
 
     private String resolveOperatorName(Long tenantId, String operatorType, Long operatorId) {
@@ -430,6 +572,21 @@ public class AdminHelpOrderService {
             String content,
             LocalDateTime now
     ) {
+        appendEvent(tenantId, helpOrderId, eventType, fromStatus, toStatus, operatorType, operatorId, content, null, now);
+    }
+
+    private void appendEvent(
+            Long tenantId,
+            Long helpOrderId,
+            String eventType,
+            String fromStatus,
+            String toStatus,
+            String operatorType,
+            Long operatorId,
+            String content,
+            Map<String, Object> metadata,
+            LocalDateTime now
+    ) {
         HelpOrderEvent event = new HelpOrderEvent();
         event.setHelpOrderId(helpOrderId);
         event.setEventType(eventType);
@@ -439,7 +596,7 @@ public class AdminHelpOrderService {
         event.setOperatorId(operatorId);
         event.setContent(blankToNull(content));
         event.setAttachmentFileAssetId(null);
-        event.setMetadataJson(null);
+        event.setMetadataJson(metadata == null ? null : writeJson(metadata));
         applyAudit(event, tenantId, "admin-help-order", now);
         helpOrderEventMapper.insert(event);
     }
@@ -471,6 +628,49 @@ public class AdminHelpOrderService {
         } catch (Exception ex) {
             return "{}";
         }
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> parseJsonToMap(String json) {
+        if (!StringUtils.hasText(json)) {
+            return Map.of();
+        }
+        try {
+            Object parsed = objectMapper.readValue(json, Map.class);
+            if (parsed instanceof Map<?, ?> map) {
+                return map.entrySet().stream()
+                        .filter(entry -> entry.getKey() != null)
+                        .collect(java.util.stream.Collectors.toMap(
+                                entry -> String.valueOf(entry.getKey()),
+                                Map.Entry::getValue,
+                                (left, right) -> right
+                        ));
+            }
+        } catch (Exception ignored) {
+            return Map.of();
+        }
+        return Map.of();
+    }
+
+    private String extractDecisionResult(String metadataJson) {
+        Object value = parseJsonToMap(metadataJson).get("decisionResult");
+        return asText(value);
+    }
+
+    private String asText(Object value) {
+        if (value == null) {
+            return null;
+        }
+        String text = Objects.toString(value, "").trim();
+        return text.isEmpty() ? null : text;
+    }
+
+    private String normalizeDecisionResult(String value) {
+        String normalized = requireText(value).toUpperCase();
+        if (!"ADOPTED".equals(normalized) && !"NOT_ADOPTED".equals(normalized)) {
+            throw new BusinessException(400, "BAD_REQUEST");
+        }
+        return normalized;
     }
 
     private String requireText(String value) {

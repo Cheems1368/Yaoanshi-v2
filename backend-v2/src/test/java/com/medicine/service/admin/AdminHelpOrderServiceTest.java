@@ -3,20 +3,26 @@ package com.medicine.service.admin;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.medicine.api.dto.helporder.HelpOrderCloseRequest;
 import com.medicine.api.dto.helporder.HelpOrderDTO;
+import com.medicine.api.dto.helporder.HelpOrderDoctorDecisionRequest;
 import com.medicine.api.dto.helporder.HelpOrderReplyRequest;
 import com.medicine.common.exception.BusinessException;
+import com.medicine.repository.file.FileAssetMapper;
+import com.medicine.repository.helporder.HelpOrderEventAttachmentMapper;
 import com.medicine.domain.helporder.HelpOrder;
 import com.medicine.domain.helporder.HelpOrderEvent;
 import com.medicine.domain.identity.DoctorProfile;
+import com.medicine.domain.identity.Patient;
 import com.medicine.domain.identity.PharmacistProfile;
 import com.medicine.repository.helporder.HelpOrderEventMapper;
 import com.medicine.repository.helporder.HelpOrderMapper;
 import com.medicine.repository.identity.AppAccountMapper;
 import com.medicine.repository.identity.DoctorProfileMapper;
+import com.medicine.repository.identity.PatientMapper;
 import com.medicine.repository.identity.PharmacistProfileMapper;
 import com.medicine.service.auth.JwtClaims;
 import com.medicine.service.auth.ProfessionalIdentityService;
 import com.medicine.service.notification.NotificationDispatchService;
+import com.medicine.service.storage.S3CompatibleObjectStorage;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -47,6 +53,15 @@ class AdminHelpOrderServiceTest {
     private HelpOrderEventMapper helpOrderEventMapper;
 
     @Mock
+    private HelpOrderEventAttachmentMapper helpOrderEventAttachmentMapper;
+
+    @Mock
+    private FileAssetMapper fileAssetMapper;
+
+    @Mock
+    private S3CompatibleObjectStorage objectStorage;
+
+    @Mock
     private NotificationDispatchService notificationDispatchService;
 
     @Mock
@@ -57,6 +72,9 @@ class AdminHelpOrderServiceTest {
 
     @Mock
     private DoctorProfileMapper doctorProfileMapper;
+
+    @Mock
+    private PatientMapper patientMapper;
 
     @Mock
     private AppAccountMapper appAccountMapper;
@@ -211,6 +229,144 @@ class AdminHelpOrderServiceTest {
                 .hasMessage("HELP_ORDER_PERMISSION_DENIED");
     }
 
+    @Test
+    void shouldCloseOrderWithAdoptedDoctorDecision() {
+        JwtClaims claims = doctorClaims();
+        HelpOrderDoctorDecisionRequest request = new HelpOrderDoctorDecisionRequest();
+        request.setDecisionResult("ADOPTED");
+        request.setContent("同意药师建议，继续观察皮下淤血，若加重及时线下就诊。");
+        HelpOrder order = helpOrder("WAITING_DOCTOR", 1L, "DOCTOR", null, null);
+        Patient patient = patient();
+
+        when(professionalIdentityService.isPharmacist(claims)).thenReturn(false);
+        when(professionalIdentityService.isDoctor(claims)).thenReturn(true);
+        when(professionalIdentityService.getOrCreateDoctorProfile(claims)).thenReturn(doctor(11L));
+        when(helpOrderMapper.selectById(1L, 802L)).thenReturn(order);
+        when(helpOrderEventMapper.selectByHelpOrderId(1L, order.getId())).thenReturn(List.of());
+        when(patientMapper.selectByIdAndTenant(1L, order.getPatientId())).thenReturn(patient);
+
+        HelpOrderDTO result = adminHelpOrderService.doctorDecision(claims, 802L, request);
+
+        assertThat(result.getStatus()).isEqualTo("CLOSED");
+        assertThat(result.getServiceNotice()).isEqualTo(request.getContent());
+        assertThat(result.getPatientContext().getName()).isEqualTo("Test Patient");
+        assertThat(result.getPatientContext().getCurrentMedicationSummary()).isEqualTo("阿司匹林 100mg qd");
+
+        ArgumentCaptor<HelpOrder> orderCaptor = ArgumentCaptor.forClass(HelpOrder.class);
+        verify(helpOrderMapper).updateState(orderCaptor.capture());
+        assertThat(orderCaptor.getValue().getStatus()).isEqualTo("CLOSED");
+        assertThat(orderCaptor.getValue().getCurrentHandlerType()).isEqualTo("DOCTOR");
+        assertThat(orderCaptor.getValue().getCurrentHandlerId()).isEqualTo(11L);
+        assertThat(orderCaptor.getValue().getAssignedDoctorId()).isEqualTo(11L);
+        assertThat(orderCaptor.getValue().getClosedAt()).isNotNull();
+        assertThat(orderCaptor.getValue().getServiceNotice()).isEqualTo(request.getContent());
+
+        ArgumentCaptor<HelpOrderEvent> eventCaptor = ArgumentCaptor.forClass(HelpOrderEvent.class);
+        verify(helpOrderEventMapper).insert(eventCaptor.capture());
+        assertThat(eventCaptor.getValue().getEventType()).isEqualTo("DOCTOR_DECISION");
+        assertThat(eventCaptor.getValue().getFromStatus()).isEqualTo("WAITING_DOCTOR");
+        assertThat(eventCaptor.getValue().getToStatus()).isEqualTo("CLOSED");
+        assertThat(eventCaptor.getValue().getContent()).isEqualTo(request.getContent());
+        assertThat(eventCaptor.getValue().getMetadataJson()).contains("\"decisionResult\":\"ADOPTED\"");
+        verify(notificationDispatchService).createAndDispatch(
+                eq(1L),
+                eq("admin-help-order"),
+                eq("PATIENT"),
+                eq(301L),
+                eq("HELP_ORDER_DOCTOR_DECISION"),
+                eq(order.getId()),
+                anyMap(),
+                any(LocalDateTime.class)
+        );
+        verify(notificationDispatchService).createAndDispatch(
+                eq(1L),
+                eq("admin-help-order"),
+                eq("PHARMACIST"),
+                eq(1L),
+                eq("HELP_ORDER_DOCTOR_DECISION"),
+                eq(order.getId()),
+                anyMap(),
+                any(LocalDateTime.class)
+        );
+    }
+
+    @Test
+    void shouldCloseOrderWithNotAdoptedDoctorDecision() {
+        JwtClaims claims = doctorClaims();
+        HelpOrderDoctorDecisionRequest request = new HelpOrderDoctorDecisionRequest();
+        request.setDecisionResult("NOT_ADOPTED");
+        request.setContent("暂不建议调整用药，先维持原计划并复诊。");
+        HelpOrder order = helpOrder("DOCTOR_IN_PROGRESS", 1L, "DOCTOR", 11L, 11L);
+
+        when(professionalIdentityService.isPharmacist(claims)).thenReturn(false);
+        when(professionalIdentityService.isDoctor(claims)).thenReturn(true);
+        when(professionalIdentityService.getOrCreateDoctorProfile(claims)).thenReturn(doctor(11L));
+        when(helpOrderMapper.selectById(1L, 803L)).thenReturn(order);
+        when(helpOrderEventMapper.selectByHelpOrderId(1L, order.getId())).thenReturn(List.of());
+
+        HelpOrderDTO result = adminHelpOrderService.doctorDecision(claims, 803L, request);
+
+        assertThat(result.getStatus()).isEqualTo("CLOSED");
+        ArgumentCaptor<HelpOrderEvent> eventCaptor = ArgumentCaptor.forClass(HelpOrderEvent.class);
+        verify(helpOrderEventMapper).insert(eventCaptor.capture());
+        assertThat(eventCaptor.getValue().getMetadataJson()).contains("\"decisionResult\":\"NOT_ADOPTED\"");
+    }
+
+    @Test
+    void shouldRejectDoctorDecisionFromPharmacist() {
+        JwtClaims claims = pharmacistClaims();
+        HelpOrderDoctorDecisionRequest request = new HelpOrderDoctorDecisionRequest();
+        request.setDecisionResult("ADOPTED");
+        request.setContent("decision");
+
+        when(professionalIdentityService.isPharmacist(claims)).thenReturn(true);
+        when(professionalIdentityService.getOrCreatePharmacistProfile(claims)).thenReturn(pharmacist(1L));
+
+        assertThatThrownBy(() -> adminHelpOrderService.doctorDecision(claims, 804L, request))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("PROFESSIONAL_ROLE_MISMATCH");
+
+        verify(helpOrderMapper, never()).selectById(any(), any());
+    }
+
+    @Test
+    void shouldRejectDoctorDecisionWhenStatusIsNotDoctorQueue() {
+        JwtClaims claims = doctorClaims();
+        HelpOrderDoctorDecisionRequest request = new HelpOrderDoctorDecisionRequest();
+        request.setDecisionResult("ADOPTED");
+        request.setContent("decision");
+
+        when(professionalIdentityService.isPharmacist(claims)).thenReturn(false);
+        when(professionalIdentityService.isDoctor(claims)).thenReturn(true);
+        when(professionalIdentityService.getOrCreateDoctorProfile(claims)).thenReturn(doctor(11L));
+        when(helpOrderMapper.selectById(1L, 805L)).thenReturn(helpOrder("PHARMACIST_IN_PROGRESS", 1L, "PHARMACIST", 1L, 11L));
+
+        assertThatThrownBy(() -> adminHelpOrderService.doctorDecision(claims, 805L, request))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("HELP_ORDER_STATUS_CONFLICT");
+
+        verify(helpOrderMapper, never()).updateState(any(HelpOrder.class));
+    }
+
+    @Test
+    void shouldRejectDoctorDecisionWhenDoctorIsNotAssigned() {
+        JwtClaims claims = doctorClaims();
+        HelpOrderDoctorDecisionRequest request = new HelpOrderDoctorDecisionRequest();
+        request.setDecisionResult("ADOPTED");
+        request.setContent("decision");
+
+        when(professionalIdentityService.isPharmacist(claims)).thenReturn(false);
+        when(professionalIdentityService.isDoctor(claims)).thenReturn(true);
+        when(professionalIdentityService.getOrCreateDoctorProfile(claims)).thenReturn(doctor(11L));
+        when(helpOrderMapper.selectById(1L, 806L)).thenReturn(helpOrder("WAITING_DOCTOR", 1L, "DOCTOR", 12L, 12L));
+
+        assertThatThrownBy(() -> adminHelpOrderService.doctorDecision(claims, 806L, request))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("HELP_ORDER_PERMISSION_DENIED");
+
+        verify(helpOrderMapper, never()).updateState(any(HelpOrder.class));
+    }
+
     private JwtClaims pharmacistClaims() {
         JwtClaims claims = new JwtClaims();
         claims.setTenantId(1L);
@@ -256,5 +412,21 @@ class AdminHelpOrderServiceTest {
         order.setAssignedDoctorId(doctorId);
         order.setCreateTime(LocalDateTime.now());
         return order;
+    }
+
+    private Patient patient() {
+        Patient patient = new Patient();
+        patient.setId(301L);
+        patient.setTenantId(1L);
+        patient.setName("Test Patient");
+        patient.setGender("FEMALE");
+        patient.setAge(72);
+        patient.setPrimaryDiseaseName("脑卒中随访，高血压");
+        patient.setDrugAllergy("青霉素");
+        patient.setFoodAllergy("无");
+        patient.setMedicalHistoryJson("""
+                {"layer2":{"medicalHistory":"脑梗死后随访，高血压10年","currentMedication":"阿司匹林 100mg qd"}}
+                """);
+        return patient;
     }
 }

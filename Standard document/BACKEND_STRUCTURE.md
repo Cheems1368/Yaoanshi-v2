@@ -330,7 +330,7 @@ Columns:
 | `public_url` | `VARCHAR(512)` | Yes |  |  | signed/public URL cache |
 | `uploaded_by_type` | `VARCHAR(20)` | No |  |  | `PATIENT`, `FAMILY`, `PHARMACIST`, `DOCTOR`, `SYSTEM` |
 | `uploaded_by_id` | `BIGINT` | No |  | `IDX_file_uploader` | logical uploader id |
-| `business_type` | `VARCHAR(32)` | No |  | `IDX_file_business_type` | `PRESCRIPTION`, `HELP_ORDER`, `AVATAR`, `OTHER` |
+| `business_type` | `VARCHAR(32)` | No |  | `IDX_file_business_type` | `PRESCRIPTION`, `HELP_ORDER_IMAGE`, `HELP_ORDER_AUDIO`, `AVATAR`, `OTHER` |
 | `scan_status` | `VARCHAR(20)` | No | `'PENDING'` |  | reserved for file scanning |
 | audit columns | standard |  |  |  |  |
 
@@ -339,6 +339,8 @@ Rules:
 1. MVP only allows image attachments for work orders and prescription uploads.
 2. Binary files are stored in S3-compatible object storage only.
 3. DB stores metadata; never store image binary in DB.
+4. Help-order image upload uses `HELP_ORDER_IMAGE`; each image must be JPEG, PNG, or WebP and no larger than 10 MB.
+5. Help-order detail responses must generate short-lived download URLs after checking order visibility. Clients must not store long-lived public URLs for help-order attachments.
 
 ### 4.4 Prescription domain
 
@@ -420,11 +422,21 @@ Columns:
 | `provider` | `VARCHAR(64)` | No |  |  | OCR provider |
 | `request_payload_json` | `JSON` | Yes |  |  | request snapshot |
 | `response_payload_json` | `JSON` | Yes |  |  | response snapshot |
+| `extracted_text` | `TEXT` | Yes |  |  | medication-line OCR text only; no patient identity fields |
+| `failure_reason` | `VARCHAR(255)` | Yes |  |  | fallback reason when OCR cannot prefill safely |
+| `structured_items_json` | `JSON` | Yes |  |  | structured medication item draft returned by OCR |
 | `confidence` | `DECIMAL(5,2)` | Yes |  |  | confidence |
-| `status` | `VARCHAR(20)` | No |  |  | `SUCCESS`, `FAILED`, `LOW_CONFIDENCE` |
+| `status` | `VARCHAR(20)` | No |  |  | `HIGH_CONFIDENCE`, `LOW_CONFIDENCE`, `SUCCESS`, `FAILED` |
 | `manual_fallback_used` | `BIT(1)` | No | `0` |  | whether pharmacist switched to manual |
 | `executed_at` | `DATETIME` | No |  |  | execution time |
 | audit columns | standard |  |  |  |  |
+
+T4 OCR rules:
+
+1. OCR prompt must ask for medication detail only and must not extract patient identity fields.
+2. Structured OCR with confidence `>= 0.80` and at least one item writes `prescription_item.source = OCR` and sets prescription status to `OCR_DONE`.
+3. Low-confidence, empty, or failed OCR keeps the prescription in manual review flow and records `failure_reason`.
+4. Stored OCR record may keep safe structured JSON and extracted medication text; do not persist image base64 or full upstream raw payload.
 
 ### 4.5 Medication domain
 
@@ -632,8 +644,8 @@ Columns:
 
 Rules:
 
-1. Work order attachments are linked through `file_asset` using `business_type = HELP_ORDER`.
-2. MVP only allows image attachments.
+1. Work order image attachments are linked through `help_order_event_attachment` and `file_asset.business_type = HELP_ORDER_IMAGE`.
+2. MVP help-order messages allow at most three images per event.
 3. After-hours submission is allowed and must still create the order.
 
 #### Table: `help_order_event`
@@ -648,7 +660,7 @@ Columns:
 |---|---|---|---|---|---|
 | `id` | `BIGINT` | No |  | PK | event id |
 | `help_order_id` | `BIGINT` | No |  | `IDX_help_order_event_order` | target order |
-| `event_type` | `VARCHAR(32)` | No |  |  | `SUBMITTED`, `PATIENT_REPLY`, `ASSIGNED`, `PHARMACIST_REPLY`, `ESCALATED_TO_DOCTOR`, `DOCTOR_REPLY`, `REJECTED`, `CLOSED`, `ATTACHMENT_ADDED`, `SYSTEM_NOTICE` |
+| `event_type` | `VARCHAR(32)` | No |  |  | `SUBMITTED`, `PATIENT_REPLY`, `ASSIGNED`, `PHARMACIST_REPLY`, `ESCALATED_TO_DOCTOR`, `DOCTOR_REPLY`, `DOCTOR_DECISION`, `REJECTED`, `CLOSED`, `ATTACHMENT_ADDED`, `SYSTEM_NOTICE` |
 | `from_status` | `VARCHAR(32)` | Yes |  |  | previous status |
 | `to_status` | `VARCHAR(32)` | Yes |  |  | next status |
 | `operator_type` | `VARCHAR(20)` | No |  |  | `PATIENT`, `FAMILY`, `PHARMACIST`, `DOCTOR`, `SYSTEM` |
@@ -657,6 +669,36 @@ Columns:
 | `attachment_file_asset_id` | `BIGINT` | Yes |  |  | optional related image |
 | `metadata_json` | `JSON` | Yes |  |  | extra event context |
 | audit columns | standard |  |  |  |  |
+
+Compatibility:
+
+1. `attachment_file_asset_id` is retained for historical rows only.
+2. New help-order image attachments must be written to `help_order_event_attachment`.
+
+#### Table: `help_order_event_attachment`
+
+Purpose:
+
+- attach multiple files to one help-order event
+
+Columns:
+
+| Column | Type | Nullable | Default | Index / Constraint | Business rule |
+|---|---|---|---|---|---|
+| `id` | `BIGINT` | No |  | PK | attachment id |
+| `help_order_event_id` | `BIGINT` | No |  | `IDX_help_order_event_attachment_event` | target event |
+| `file_asset_id` | `BIGINT` | No |  | `IDX_help_order_event_attachment_file` | attached file |
+| `attachment_type` | `VARCHAR(20)` | No |  |  | `IMAGE` |
+| `sort_order` | `INT` | No | `0` |  | display order in one message |
+| audit columns | standard |  |  |  |  |
+
+Rules:
+
+1. A single help-order event may have at most three image attachments.
+2. The attached file must belong to the current app operator when the patient or family creates/replies to an order.
+3. Detail DTOs return `attachments: HelpOrderAttachmentDTO[]` on each event. Each attachment includes `id`, `fileAssetId`, `attachmentType`, `originalFilename`, `mimeType`, `sizeBytes`, and a short-lived `downloadUrl`.
+4. Doctor structured decisions are stored as `event_type = DOCTOR_DECISION` with `metadata_json.decisionResult` equal to `ADOPTED` or `NOT_ADOPTED`.
+5. Professional help-order detail may include additive `patientContext` with only minimum non-sensitive context: name, gender, age, primary diagnosis, drug allergy, food allergy, medical-history summary, and current-medication summary.
 
 ### 4.7 Notification domain
 
@@ -965,15 +1007,30 @@ Note: `drug_catalog` is a standalone lookup table with no foreign-key relationsh
 | `POST` | `/app-api/checkins` | Yes | check-in submit DTO | `CheckinRecordDTO` | insert `medication_checkin_record`, update task effective record, maybe write notification/audit |
 | `PUT` | `/app-api/checkins/{id}/correct` | Yes | correction DTO | `CheckinRecordDTO` | insert correction row, switch effective row |
 
+`DoseTaskDTO` includes additive app reminder fields for the T3 demo path:
+
+- `reminderStage`: `UPCOMING`, `DUE`, `FAMILY_REMINDER_DUE`, `OVERDUE`, or `HANDLED`
+- `overdueMinutes`: minutes since `scheduledAt`; `0` before due time
+- `familyReminderDue`: true only for pending tasks at least 30 minutes overdue with active family binding
+- `familyBindingCount`: active family account count for the patient
+
+Reminder stage rules:
+
+1. Handled task statuses (`COMPLETED`, `MISSED`, `SKIPPED`, `CANCELLED`) return `HANDLED`.
+2. Pending tasks before `scheduledAt` return `UPCOMING`.
+3. Pending tasks from due time until less than 30 minutes overdue return `DUE`.
+4. Pending tasks at least 30 minutes overdue return `FAMILY_REMINDER_DUE` when `familyBindingCount > 0`; otherwise they return `OVERDUE`.
+
 #### Help order and file
 
 | Method | Path | Auth | Request | Response `data` | Side effects |
 |---|---|---|---|---|---|
 | `POST` | `/app-api/files/presign` | Yes | upload intent | upload token/url | none |
-| `POST` | `/app-api/help-orders` | Yes | `HelpOrderDTO` create body | created order | write `help_order`, `help_order_event`, `file_asset` link, notification |
+| `POST` | `/app-api/files/register` | Yes | uploaded file metadata | file asset summary | register a previously uploaded object for an allowed business type |
+| `POST` | `/app-api/help-orders` | Yes | `HelpOrderDTO` create body with optional `attachmentFileAssetIds` | created order | write `help_order`, `help_order_event`, attachment links, notification |
 | `GET` | `/app-api/help-orders` | Yes | status/category query | paged list | none |
 | `GET` | `/app-api/help-orders/{id}` | Yes | none | order detail + events | none |
-| `POST` | `/app-api/help-orders/{id}/reply` | Yes | `{ content }` | updated order detail | write `help_order_event`, notify current handler |
+| `POST` | `/app-api/help-orders/{id}/reply` | Yes | `{ content, attachmentFileAssetIds }` | updated order detail | write `help_order_event`, attachment links, notify current handler |
 | `GET` | `/app-api/prescriptions` | Yes | status/page query | paged prescriptions | none |
 | `POST` | `/app-api/prescriptions/uploads` | Yes | upload metadata | prescription summary | write `prescription`, `prescription_attachment`, `prescription_ocr_record` |
 
@@ -1130,6 +1187,7 @@ Search priority:
 | `POST` | `/admin-api/help-orders/{id}/escalate` | pharmacist | doctor id optional | updated order | move to doctor queue, event + notification |
 | `POST` | `/admin-api/help-orders/{id}/reject` | pharmacist or doctor | reject DTO | updated order | set rejected |
 | `POST` | `/admin-api/help-orders/{id}/close` | pharmacist or doctor | close DTO | updated order | close order, trigger satisfaction reminder |
+| `POST` | `/admin-api/help-orders/{id}/doctor-decision` | doctor | `{ decisionResult, content }`, where `decisionResult` is `ADOPTED` or `NOT_ADOPTED` | updated order | append `DOCTOR_DECISION`, close order, notify patient and responsible pharmacist |
 | `GET` | `/admin-api/help-orders/self-reported-medications` | pharmacist | page query | paged `NEW_MEDICATION_REVIEW` order list | none |
 | `POST` | `/admin-api/help-orders/{id}/acknowledge` | pharmacist | none | updated order | set self-reported medication status to `ACTIVE`, acknowledge review |
 | `POST` | `/admin-api/help-orders/{id}/reject-medication` | pharmacist | `SelfReportedMedicationRejectRequest` | updated order | set self-reported medication status to `STOPPED`, record reason |
@@ -1143,12 +1201,33 @@ Search priority:
 | `GET` | `/admin-api/ddi/rules` | pharmacist | query | paged rule list | none |
 | `POST` | `/admin-api/ddi/rules` | pharmacist admin | rule DTO | created rule | write `ddi_rule` |
 | `PUT` | `/admin-api/ddi/rules/{id}` | pharmacist admin | rule update DTO | updated rule | update `ddi_rule` |
+| `POST` | `/admin-api/ddi/rules/imports` | pharmacist | multipart CSV + `dryRun` | `CsvImportResultDTO` | preview or overwrite by `ruleCode` |
 | `GET` | `/admin-api/ddi/contraindications` | pharmacist | query | paged contraindication list | none |
 | `POST` | `/admin-api/ddi/contraindications` | pharmacist admin | contraindication DTO | created rule | write `drug_contraindication` |
 | `PUT` | `/admin-api/ddi/contraindications/{id}` | pharmacist admin | update DTO | updated rule | update `drug_contraindication` |
+| `POST` | `/admin-api/ddi/contraindications/imports` | pharmacist | multipart CSV + `dryRun` | `CsvImportResultDTO` | preview or overwrite by `ruleCode` |
 | `POST` | `/admin-api/ddi/screenings/{id}/confirm` | pharmacist | confirm DTO | confirm result | update `ddi_screening_log` |
+| `GET` | `/admin-api/education/cards` | pharmacist | query | paged reviewed/draft content cards | none |
+| `POST` | `/admin-api/education/cards/imports` | pharmacist | multipart CSV + `dryRun` | `CsvImportResultDTO` | preview or overwrite by `contentCode` |
 | `POST` | `/admin-api/notifications/socket-ticket` | pharmacist or doctor | none | `{ ticket }` | generate one-time WebSocket ticket in Redis |
 | `GET` | `/admin-api/notifications/logs` | pharmacist admin | query | paged logs | none |
+
+CSV import limits and semantics:
+
+1. CSV import accepts UTF-8 header-based CSV, maximum 1 MB and 500 rows.
+2. `dryRun=true` parses and reports row-level create/update/error/warning results without writing.
+3. Duplicate keys inside the same file are row errors; applying import only writes when there are zero row errors.
+4. DDI severities are `HIGH`, `MEDIUM`, or `LOW`; LOW is recorded and shown as a weak prompt.
+
+#### Education content (app-side)
+
+| Method | Path | Auth | Request | Response `data` | Side effects |
+|---|---|---|---|---|---|
+| `GET` | `/app-api/education/recommendations` | Yes | `limit` query | `List<EducationContentCardDTO>` | read-only recommendation by patient diagnosis, active meds, and GENERAL fallback |
+| `GET` | `/app-api/education/cards` | Yes | keyword/category/page query | paged reviewed content cards | none |
+| `GET` | `/app-api/education/cards/{id}` | Yes | none | reviewed card detail | none |
+
+`EducationContentCardDTO` includes `contentCode`, `title`, `summary`, `body` on detail/admin responses, `category`, tag lists, review metadata, and source. Patient APIs expose only `REVIEWED` content.
 
 #### Drug catalog search (admin-side)
 

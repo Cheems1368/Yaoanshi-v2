@@ -80,6 +80,18 @@
                       <span>{{ formatDateTime(event.eventAt) }}</span>
                     </div>
                     <div v-if="event.content" class="event-content">{{ event.content }}</div>
+                    <div v-if="event.attachments?.length" class="event-attachments">
+                      <a
+                        v-for="attachment in event.attachments"
+                        :key="attachment.fileAssetId"
+                        class="event-attachment"
+                        :href="attachment.downloadUrl"
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        <img :src="attachment.downloadUrl" :alt="attachment.originalFilename" />
+                      </a>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -97,16 +109,52 @@
           {{ order.status === 'CLOSED' ? '工单已关闭，当前仅支持查看会话记录。' : '工单已驳回，当前不可继续发送消息。' }}
         </div>
         <div v-else class="composer">
-          <ion-textarea
-            v-model="replyContent"
-            class="composer-input"
-            auto-grow
-            :rows="2"
-            placeholder="继续补充药名、症状变化或想确认的问题"
-          />
-          <ion-button class="composer-button" :disabled="replying || !canReply" @click="sendReply">
-            {{ replying ? '发送中...' : '发送' }}
-          </ion-button>
+          <div class="composer-main">
+            <ion-textarea
+              v-model="replyContent"
+              class="composer-input"
+              auto-grow
+              :rows="2"
+              placeholder="继续补充药名、症状变化或想确认的问题"
+            />
+            <ion-button class="composer-button" :disabled="replying || !canReply" @click="sendReply">
+              {{ replying ? '发送中...' : '发送' }}
+            </ion-button>
+          </div>
+          <div class="composer-images">
+            <div class="privacy-warning">补充图片前请确认未拍入姓名、身份证、病历号等敏感信息。</div>
+            <div class="image-actions">
+              <ion-button fill="clear" size="small" :disabled="replying || selectedImages.length >= 3" @click="openCameraInput">
+                拍照
+              </ion-button>
+              <ion-button fill="clear" size="small" :disabled="replying || selectedImages.length >= 3" @click="openGalleryInput">
+                选择图片
+              </ion-button>
+              <span class="image-count">{{ selectedImages.length }}/3</span>
+            </div>
+            <input
+              ref="cameraInput"
+              class="file-input"
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              capture="environment"
+              @change="handleImageInput"
+            />
+            <input
+              ref="galleryInput"
+              class="file-input"
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              multiple
+              @change="handleImageInput"
+            />
+            <div v-if="selectedImages.length" class="selected-image-list">
+              <div v-for="image in selectedImages" :key="image.id" class="selected-image">
+                <img :src="image.previewUrl" :alt="image.file.name" />
+                <button type="button" :disabled="replying" @click="removeImage(image.id)">移除</button>
+              </div>
+            </div>
+          </div>
         </div>
       </ion-toolbar>
     </ion-footer>
@@ -149,6 +197,9 @@ const replying = ref(false)
 const replyContent = ref('')
 const showToast = ref(false)
 const toastMessage = ref('')
+const cameraInput = ref<HTMLInputElement | null>(null)
+const galleryInput = ref<HTMLInputElement | null>(null)
+const selectedImages = ref<SelectedImage[]>([])
 
 let pollTimer: number | null = null
 let notificationClient: ReturnType<typeof createAppNotificationClient> | null = null
@@ -156,7 +207,16 @@ let notificationClient: ReturnType<typeof createAppNotificationClient> | null = 
 const orderId = computed(() => Number(route.params.id))
 const events = computed(() => order.value?.events ?? [])
 const isTerminalStatus = computed(() => ['CLOSED', 'REJECTED'].includes(order.value?.status || ''))
-const canReply = computed(() => Boolean(replyContent.value.trim()) && !isTerminalStatus.value)
+const canReply = computed(() => (Boolean(replyContent.value.trim()) || selectedImages.value.length > 0) && !isTerminalStatus.value)
+
+const allowedImageTypes = new Set(['image/jpeg', 'image/png', 'image/webp'])
+const maxImageSizeBytes = 10 * 1024 * 1024
+
+interface SelectedImage {
+  id: string
+  file: File
+  previewUrl: string
+}
 
 const showMessage = (message: string) => {
   toastMessage.value = message
@@ -191,16 +251,88 @@ const sendReply = async () => {
 
   replying.value = true
   try {
+    const attachmentFileAssetIds = await uploadSelectedImages()
     const response = await helpOrderService.replyHelpOrder(orderId.value, {
-      content: replyContent.value.trim()
+      content: replyContent.value.trim() || undefined,
+      attachmentFileAssetIds
     })
     order.value = response.data ?? order.value
     replyContent.value = ''
+    clearImages()
   } catch (error: any) {
     showMessage(error?.message || '发送失败')
   } finally {
     replying.value = false
   }
+}
+
+const openCameraInput = () => {
+  cameraInput.value?.click()
+}
+
+const openGalleryInput = () => {
+  galleryInput.value?.click()
+}
+
+const handleImageInput = (event: Event) => {
+  const input = event.target as HTMLInputElement
+  const files = Array.from(input.files ?? [])
+  input.value = ''
+  for (const file of files) {
+    if (selectedImages.value.length >= 3) {
+      showMessage('单条消息最多上传 3 张图片')
+      break
+    }
+    if (!allowedImageTypes.has(file.type)) {
+      showMessage('仅支持 JPG、PNG、WebP 图片')
+      continue
+    }
+    if (file.size > maxImageSizeBytes) {
+      showMessage('单张图片不能超过 10MB')
+      continue
+    }
+    selectedImages.value.push({
+      id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+      file,
+      previewUrl: URL.createObjectURL(file)
+    })
+  }
+}
+
+const removeImage = (id: string) => {
+  const image = selectedImages.value.find((item) => item.id === id)
+  if (image) {
+    URL.revokeObjectURL(image.previewUrl)
+  }
+  selectedImages.value = selectedImages.value.filter((item) => item.id !== id)
+}
+
+const clearImages = () => {
+  selectedImages.value.forEach((image) => URL.revokeObjectURL(image.previewUrl))
+  selectedImages.value = []
+}
+
+const uploadSelectedImages = async () => {
+  const ids: number[] = []
+  for (const image of selectedImages.value) {
+    const contentType = image.file.type
+    const presign = await helpOrderService.presignImage({
+      filename: image.file.name || 'help-order-image.jpg',
+      contentType,
+      sizeBytes: image.file.size,
+      businessType: 'HELP_ORDER_IMAGE'
+    })
+    await helpOrderService.uploadToPresignedUrl(presign.data.uploadUrl, image.file, contentType)
+    const registered = await helpOrderService.registerImage({
+      objectKey: presign.data.objectKey,
+      originalFilename: image.file.name || presign.data.filename,
+      contentType,
+      sizeBytes: image.file.size,
+      businessType: 'HELP_ORDER_IMAGE'
+    })
+    ids.push(registered.data.id)
+  }
+  return ids
 }
 
 const startPolling = () => {
@@ -344,6 +476,7 @@ onIonViewDidLeave(() => {
   window.removeEventListener(APP_NOTIFICATION_EVENT, handleRealtimeEvent as EventListener)
   stopPolling()
   disconnectRealtime()
+  clearImages()
 })
 </script>
 
@@ -496,6 +629,28 @@ onIonViewDidLeave(() => {
   font-size: var(--patient-font-body);
 }
 
+.event-attachments {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 92px));
+  gap: var(--patient-space-2);
+  margin-top: var(--patient-space-3);
+}
+
+.event-attachment {
+  display: block;
+  aspect-ratio: 1;
+  overflow: hidden;
+  border-radius: var(--patient-radius-md);
+  background: var(--patient-bg-page);
+}
+
+.event-attachment img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
 .composer-toolbar {
   --padding-top: var(--patient-space-2);
   --padding-bottom: var(--patient-space-2);
@@ -505,8 +660,16 @@ onIonViewDidLeave(() => {
 
 .composer {
   display: flex;
+  flex-direction: column;
+  gap: var(--patient-space-2);
+  padding: var(--patient-space-2) var(--patient-space-3);
+}
+
+.composer-main {
+  display: flex;
   align-items: flex-end;
   gap: var(--patient-space-3);
+  width: 100%;
 }
 
 .composer-input {
@@ -521,6 +684,68 @@ onIonViewDidLeave(() => {
 
 .composer-button {
   align-self: stretch;
+}
+
+.composer-images {
+  display: grid;
+  gap: var(--patient-space-2);
+  width: 100%;
+}
+
+.privacy-warning {
+  color: var(--patient-warning);
+  font-size: var(--patient-font-helper);
+  line-height: var(--patient-leading-normal);
+}
+
+.image-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--patient-space-2);
+  flex-wrap: wrap;
+}
+
+.image-count {
+  color: var(--patient-text-secondary);
+  font-size: var(--patient-font-helper);
+}
+
+.file-input {
+  display: none;
+}
+
+.selected-image-list {
+  display: grid;
+  grid-template-columns: repeat(3, 72px);
+  gap: var(--patient-space-2);
+}
+
+.selected-image {
+  position: relative;
+  width: 72px;
+  aspect-ratio: 1;
+  overflow: hidden;
+  border-radius: var(--patient-radius-md);
+  background: var(--patient-bg-page);
+}
+
+.selected-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.selected-image button {
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  border: 0;
+  border-radius: var(--patient-radius-sm);
+  padding: 3px 5px;
+  background: rgba(15, 23, 42, 0.72);
+  color: #fff;
+  font-size: 11px;
 }
 
 .terminal-banner {

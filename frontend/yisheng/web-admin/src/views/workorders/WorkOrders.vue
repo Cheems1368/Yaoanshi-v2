@@ -3,7 +3,7 @@
     <header class="workstation__header">
       <div>
         <h2>升级工单</h2>
-        <p>仅展示已升级到医生队列的工单，医生可回复、关闭或驳回。</p>
+        <p>仅展示已经升级到医生队列的工单，医生可回复、关闭或驳回。</p>
       </div>
       <div class="workstation__toolbar">
         <el-button type="primary" @click="loadOrders">刷新</el-button>
@@ -168,28 +168,19 @@ function handleSaveDraft(id, draft) {
 }
 
 .workstation__queue {
+  min-height: 0;
   border-right: 1px solid var(--pro-border-color);
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
 }
 
 .workstation__detail {
-  background: var(--pro-bg-secondary);
+  min-height: 0;
   overflow-y: auto;
   padding: 24px;
 }
 
-@media (max-width: 1279px) and (min-width: 1024px) {
-  .workstation__body {
-    grid-template-columns: 300px 1fr;
-  }
-}
-
 @media (max-width: 1023px) {
   .workstation {
-    height: auto;
-    min-height: calc(100vh - 72px - 48px);
+    height: calc(100vh - 72px - 24px);
   }
 
   .workstation__body {
@@ -198,16 +189,6 @@ function handleSaveDraft(id, draft) {
 
   .workstation__queue {
     border-right: none;
-    min-height: 400px;
-  }
-
-  .workstation__detail {
-    min-height: 400px;
-  }
-
-  .workstation__header {
-    flex-direction: column;
-    align-items: stretch;
   }
 }
 </style>

@@ -81,7 +81,12 @@ const routes: Array<RouteRecordRaw> = [
   {
     path: '/rational-medication',
     component: () => import('@/modules/patient/pages/RationalMedicationPage.vue'),
-    meta: { requiresAuth: true }
+    meta: { requiresAuth: true, requiresBinding: true }
+  },
+  {
+    path: '/education/cards/:id',
+    component: () => import('@/modules/patient/pages/EducationCardDetailPage.vue'),
+    meta: { requiresAuth: true, requiresBinding: true }
   },
   {
     path: '/drug-detail/:id',
