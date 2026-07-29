@@ -590,7 +590,7 @@ const validateForm = () => {
 }
 
 const clearErrors = () => {
-  ;(Object.keys(errors) as Array<keyof typeof errors>).forEach((key) => {
+  (Object.keys(errors) as Array<keyof typeof errors>).forEach((key) => {
     errors[key] = ''
   })
 }

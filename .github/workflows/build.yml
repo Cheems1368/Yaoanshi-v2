@@ -1,0 +1,148 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend tests and coverage
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: "17"
+          distribution: temurin
+          cache: maven
+          cache-dependency-path: backend-v2/pom.xml
+
+      - name: Run backend test suite and coverage gate
+        run: mvn -B -ntp clean verify -f backend-v2/pom.xml
+
+      - name: Upload backend test and coverage reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-test-reports
+          path: |
+            backend-v2/target/surefire-reports
+            backend-v2/target/site/jacoco
+          if-no-files-found: warn
+          retention-days: 14
+
+  patient:
+    name: Patient app quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: frontend/huanzhe
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/huanzhe/package-lock.json
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Run lint
+        run: npm run lint
+
+      - name: Run unit tests
+        run: npm run test:unit:ci
+
+      - name: Build patient app
+        run: npm run build
+
+  pharmacist:
+    name: Pharmacist web build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: frontend/pharmacist
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/pharmacist/package-lock.json
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Build pharmacist web
+        run: npm run build
+
+  doctor:
+    name: Doctor web build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: frontend/yisheng/web-admin
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/yisheng/web-admin/package-lock.json
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Build doctor web
+        run: npm run build
+
+  quality-gate:
+    name: Required Quality Gate
+    if: always()
+    needs:
+      - backend
+      - patient
+      - pharmacist
+      - doctor
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Verify all required jobs succeeded
+        shell: bash
+        run: |
+          if [[ "${{ needs.backend.result }}" != "success" ||
+                "${{ needs.patient.result }}" != "success" ||
+                "${{ needs.pharmacist.result }}" != "success" ||
+                "${{ needs.doctor.result }}" != "success" ]]; then
+            echo "One or more required CI jobs failed or were cancelled."
+            exit 1
+          fi
