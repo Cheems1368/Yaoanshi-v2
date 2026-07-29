@@ -23,7 +23,7 @@
   },
   "dependencies": {
     "@capacitor/camera": "^7.0.2",
-    "@capacitor/core": "^7.4.3",
+    "@capacitor/core": "^8.4.2",
     "@ionic/vue": "^8.0.0",
     "@ionic/vue-router": "^8.0.0",
     "axios": "^1.11.0",
