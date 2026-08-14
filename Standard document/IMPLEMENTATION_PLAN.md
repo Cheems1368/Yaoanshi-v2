@@ -26,9 +26,9 @@ Rules:
 | Phase 7 | Drug Catalog and Pinyin Initials Search (P0+) | ✅ Complete |
 | Phase 8 | Post-P0 Trial Readiness Sprint (A–H) | ✅ Complete |
 | Phase T0–T5 | Trial/demo closed loops through voice help orders | ✅ Delivered through PR #32 (`35b1e8a`) |
-| Phase T6 | Android JDK 21 and enforced APK build gate | 🚧 Implemented on PR #37; final GitHub validation pending |
+| Phase T6 | Android JDK 21 and enforced APK build gate | ✅ Delivered through PR #37 (`98115b9`) |
 
-**Current active work:** T1–T5 are merged into `main`. Phase T6 standardizes the Android-only JDK 21 toolchain and adds APK compilation to the required aggregate gate; no new product phase has been started.
+**Current active work:** T1–T6 are merged into `main`; no new product phase is in progress. Android release signing and store publishing remain separate release-engineering work.
 
 **Flyway current latest:** V12 (`V12__help_order_voice_transcription.sql`). Next new migration must be V13.
 
