@@ -126,7 +126,7 @@ jobs:
         run: npm run build
 
   quality-gate:
-    name: Required Quality Gate
+    name: CI / Required Quality Gate
     if: always()
     needs:
       - backend

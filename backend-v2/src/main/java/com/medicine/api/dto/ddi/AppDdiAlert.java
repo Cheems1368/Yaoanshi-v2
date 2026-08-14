@@ -8,6 +8,8 @@ public class AppDdiAlert {
     private String drugB;
     private String message;
     private String recommendedAction;
+    /** 患者侧简短摘要（前端弹窗展示，为空时沿用 message） */
+    private String patientSummary;
 
     public String getType() {
         return type;
@@ -55,5 +57,13 @@ public class AppDdiAlert {
 
     public void setRecommendedAction(String recommendedAction) {
         this.recommendedAction = recommendedAction;
+    }
+
+    public String getPatientSummary() {
+        return patientSummary;
+    }
+
+    public void setPatientSummary(String patientSummary) {
+        this.patientSummary = patientSummary;
     }
 }

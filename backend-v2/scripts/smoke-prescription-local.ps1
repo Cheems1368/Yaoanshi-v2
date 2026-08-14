@@ -11,6 +11,8 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+$TinyPngBytes = [Convert]::FromBase64String("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO2NQ1EAAAAASUVORK5CYII=")
+
 function Invoke-JsonRequest {
     param(
         [string]$Method,
@@ -116,15 +118,17 @@ $pharmacistHeaders = New-AdminHeaders
 $presign = Invoke-JsonRequest -Method Post -Url "$BaseUrl/app-api/files/presign" -Headers $patient.headers -Body @{
     filename = "smoke-prescription.png"
     contentType = "image/png"
-    sizeBytes = 68
+    sizeBytes = $TinyPngBytes.Length
     businessType = "PRESCRIPTION"
 }
+
+Invoke-WebRequest -Method Put -Uri $presign.data.uploadUrl -ContentType "image/png" -Body $TinyPngBytes | Out-Null
 
 $uploaded = Invoke-JsonRequest -Method Post -Url "$BaseUrl/app-api/prescriptions/uploads" -Headers $patient.headers -Body @{
     objectKey = $presign.data.objectKey
     originalFilename = "smoke-prescription.png"
     contentType = "image/png"
-    sizeBytes = 68
+    sizeBytes = $TinyPngBytes.Length
 }
 
 $firstConfirm = Invoke-JsonRequestAllowFailure -Method Post -Url "$BaseUrl/admin-api/prescriptions/$($uploaded.data.id)/confirm" -Headers $pharmacistHeaders -Body @{
@@ -175,15 +179,17 @@ $finalConfirm = Invoke-JsonRequest -Method Post -Url "$BaseUrl/admin-api/prescri
 $rejectPresign = Invoke-JsonRequest -Method Post -Url "$BaseUrl/app-api/files/presign" -Headers $patient.headers -Body @{
     filename = "reject-prescription.png"
     contentType = "image/png"
-    sizeBytes = 68
+    sizeBytes = $TinyPngBytes.Length
     businessType = "PRESCRIPTION"
 }
+
+Invoke-WebRequest -Method Put -Uri $rejectPresign.data.uploadUrl -ContentType "image/png" -Body $TinyPngBytes | Out-Null
 
 $rejectUploaded = Invoke-JsonRequest -Method Post -Url "$BaseUrl/app-api/prescriptions/uploads" -Headers $patient.headers -Body @{
     objectKey = $rejectPresign.data.objectKey
     originalFilename = "reject-prescription.png"
     contentType = "image/png"
-    sizeBytes = 68
+    sizeBytes = $TinyPngBytes.Length
 }
 
 $rejectResult = Invoke-JsonRequest -Method Post -Url "$BaseUrl/admin-api/prescriptions/$($rejectUploaded.data.id)/reject" -Headers $pharmacistHeaders -Body @{

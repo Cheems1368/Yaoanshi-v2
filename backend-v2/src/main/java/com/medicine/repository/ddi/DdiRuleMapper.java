@@ -15,6 +15,7 @@ public interface DdiRuleMapper {
 
     @Select("""
             SELECT id, rule_code, drug_a_name, drug_b_name, severity, message, recommended_action, status, maintained_by_pharmacist_id,
+                   mechanism_desc, alternative_recommendation, reference_source, patient_summary,
                    creator, create_time, updater, update_time, deleted, tenant_id
             FROM ddi_rule
             WHERE tenant_id = #{tenantId} AND deleted = 0 AND status = 'ACTIVE'
@@ -24,6 +25,7 @@ public interface DdiRuleMapper {
 
     @Select("""
             SELECT id, rule_code, drug_a_name, drug_b_name, severity, message, recommended_action, status, maintained_by_pharmacist_id,
+                   mechanism_desc, alternative_recommendation, reference_source, patient_summary,
                    creator, create_time, updater, update_time, deleted, tenant_id
             FROM ddi_rule
             WHERE tenant_id = #{tenantId} AND id = #{id} AND deleted = 0
@@ -32,8 +34,35 @@ public interface DdiRuleMapper {
     DdiRule selectById(@Param("tenantId") Long tenantId, @Param("id") Long id);
 
     @Select("""
+            SELECT id, rule_code, drug_a_name, drug_b_name, severity, message, recommended_action, status, maintained_by_pharmacist_id,
+                   mechanism_desc, alternative_recommendation, reference_source, patient_summary,
+                   creator, create_time, updater, update_time, deleted, tenant_id
+            FROM ddi_rule
+            WHERE tenant_id = #{tenantId} AND rule_code = #{ruleCode} AND deleted = 0
+            LIMIT 1
+            """)
+    DdiRule selectByRuleCode(@Param("tenantId") Long tenantId, @Param("ruleCode") String ruleCode);
+
+    @Select("""
             <script>
             SELECT id, rule_code, drug_a_name, drug_b_name, severity, message, recommended_action, status, maintained_by_pharmacist_id,
+                   mechanism_desc, alternative_recommendation, reference_source, patient_summary,
+                   creator, create_time, updater, update_time, deleted, tenant_id
+            FROM ddi_rule
+            WHERE tenant_id = #{tenantId} AND deleted = 0
+              AND id IN
+              <foreach collection="ids" item="id" open="(" separator="," close=")">
+                #{id}
+              </foreach>
+            ORDER BY id ASC
+            </script>
+            """)
+    List<DdiRule> selectByIds(@Param("tenantId") Long tenantId, @Param("ids") List<Long> ids);
+
+    @Select("""
+            <script>
+            SELECT id, rule_code, drug_a_name, drug_b_name, severity, message, recommended_action, status, maintained_by_pharmacist_id,
+                   mechanism_desc, alternative_recommendation, reference_source, patient_summary,
                    creator, create_time, updater, update_time, deleted, tenant_id
             FROM ddi_rule
             WHERE tenant_id = #{tenantId} AND deleted = 0
@@ -87,9 +116,11 @@ public interface DdiRuleMapper {
     @Insert("""
             INSERT INTO ddi_rule (
                 rule_code, drug_a_name, drug_b_name, severity, message, recommended_action, status, maintained_by_pharmacist_id,
+                mechanism_desc, alternative_recommendation, reference_source, patient_summary,
                 creator, create_time, updater, update_time, deleted, tenant_id
             ) VALUES (
                 #{ruleCode}, #{drugAName}, #{drugBName}, #{severity}, #{message}, #{recommendedAction}, #{status}, #{maintainedByPharmacistId},
+                #{mechanismDesc}, #{alternativeRecommendation}, #{referenceSource}, #{patientSummary},
                 #{creator}, #{createTime}, #{updater}, #{updateTime}, #{deleted}, #{tenantId}
             )
             """)
@@ -105,6 +136,10 @@ public interface DdiRuleMapper {
                 recommended_action = #{recommendedAction},
                 status = #{status},
                 maintained_by_pharmacist_id = #{maintainedByPharmacistId},
+                mechanism_desc = #{mechanismDesc},
+                alternative_recommendation = #{alternativeRecommendation},
+                reference_source = #{referenceSource},
+                patient_summary = #{patientSummary},
                 updater = #{updater},
                 update_time = #{updateTime}
             WHERE tenant_id = #{tenantId} AND id = #{id} AND deleted = 0

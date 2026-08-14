@@ -34,6 +34,27 @@
 - I like concise explanations, concrete steps, and copy-pastable commands.
 - Default language for explanations: Chinese.
 
+## Standard knowledge base
+
+The only project knowledge base is `Standard document/*.md`.
+The `docs/` tree has been removed and must not be consulted as project knowledge, reference storage, or a plan output location.
+
+Task-to-document lookup matrix:
+
+- Product scope, user stories, success criteria, non-goals: `Standard document/PRD.md`
+- Pages, routes, user flows, triggers, success/error paths: `Standard document/APP_FLOW.md`
+- Dependencies, versions, build tools, runtime requirements: `Standard document/TECH_STACK.md`
+- UI tokens, components, layout, responsive rules: `Standard document/FRONTEND_GUIDELINES.md`
+- Database, API, DTO, auth, storage, migrations: `Standard document/BACKEND_STRUCTURE.md`
+- Build order, phase sequence, validation gates: `Standard document/IMPLEMENTATION_PLAN.md`
+
+Workflow rules:
+
+- Read `progress.txt` before implementation work to recover current state.
+- Read `Standard document/IMPLEMENTATION_PLAN.md` for phase/order constraints.
+- Then read only the task-relevant formal documents from the matrix above.
+- Temporary implementation plans stay in the conversation; only durable build sequence changes belong in `Standard document/IMPLEMENTATION_PLAN.md`.
+
 ## Skills
 
 Only the skills listed below are enabled by default for this repository.

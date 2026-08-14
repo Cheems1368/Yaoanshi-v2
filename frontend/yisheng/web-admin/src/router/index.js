@@ -9,6 +9,12 @@ const routes = [
     meta: { requiresAuth: false, title: '医生登录' }
   },
   {
+    path: '/mobile/workorders',
+    name: 'MobileWorkOrders',
+    component: () => import('@/views/mobile/MobileWorkOrders.vue'),
+    meta: { requiresAuth: true, title: '移动工单' }
+  },
+  {
     path: '/',
     component: () => import('@/layout/Layout.vue'),
     redirect: '/workorders',
@@ -18,7 +24,7 @@ const routes = [
         path: 'workorders',
         alias: ['/doctor-dashboard'],
         name: 'WorkOrders',
-        component: () => import('@/views/WorkOrders.vue'),
+        component: () => import('@/views/workorders/WorkOrders.vue'),
         meta: { title: '升级工单' }
       },
       {

@@ -11,6 +11,9 @@ public class PrescriptionOcrRecord extends BaseEntity {
     private String provider;
     private String requestPayloadJson;
     private String responsePayloadJson;
+    private String extractedText;
+    private String failureReason;
+    private String structuredItemsJson;
     private BigDecimal confidence;
     private String status;
     private Boolean manualFallbackUsed;
@@ -46,6 +49,30 @@ public class PrescriptionOcrRecord extends BaseEntity {
 
     public void setResponsePayloadJson(String responsePayloadJson) {
         this.responsePayloadJson = responsePayloadJson;
+    }
+
+    public String getExtractedText() {
+        return extractedText;
+    }
+
+    public void setExtractedText(String extractedText) {
+        this.extractedText = extractedText;
+    }
+
+    public String getFailureReason() {
+        return failureReason;
+    }
+
+    public void setFailureReason(String failureReason) {
+        this.failureReason = failureReason;
+    }
+
+    public String getStructuredItemsJson() {
+        return structuredItemsJson;
+    }
+
+    public void setStructuredItemsJson(String structuredItemsJson) {
+        this.structuredItemsJson = structuredItemsJson;
     }
 
     public BigDecimal getConfidence() {

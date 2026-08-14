@@ -12,6 +12,10 @@ public class AdminDdiRuleDTO {
     private String status;
     private Long maintainedByPharmacistId;
     private String updatedAt;
+    private String mechanismDesc;
+    private String alternativeRecommendation;
+    private String referenceSource;
+    private String patientSummary;
 
     public Long getId() {
         return id;
@@ -91,5 +95,37 @@ public class AdminDdiRuleDTO {
 
     public void setUpdatedAt(String updatedAt) {
         this.updatedAt = updatedAt;
+    }
+
+    public String getMechanismDesc() {
+        return mechanismDesc;
+    }
+
+    public void setMechanismDesc(String mechanismDesc) {
+        this.mechanismDesc = mechanismDesc;
+    }
+
+    public String getAlternativeRecommendation() {
+        return alternativeRecommendation;
+    }
+
+    public void setAlternativeRecommendation(String alternativeRecommendation) {
+        this.alternativeRecommendation = alternativeRecommendation;
+    }
+
+    public String getReferenceSource() {
+        return referenceSource;
+    }
+
+    public void setReferenceSource(String referenceSource) {
+        this.referenceSource = referenceSource;
+    }
+
+    public String getPatientSummary() {
+        return patientSummary;
+    }
+
+    public void setPatientSummary(String patientSummary) {
+        this.patientSummary = patientSummary;
     }
 }

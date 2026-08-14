@@ -9,10 +9,12 @@ import com.medicine.repository.identity.DoctorProfileMapper;
 import com.medicine.repository.identity.PharmacistProfileMapper;
 import com.medicine.repository.identity.ProfessionalIdentityRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Locale;
 
 @Service
 public class ProfessionalIdentityService {
@@ -119,12 +121,20 @@ public class ProfessionalIdentityService {
     }
 
     public boolean isPharmacist(JwtClaims claims) {
+        String effectiveRole = normalizeEffectiveRole(claims);
+        if (StringUtils.hasText(effectiveRole)) {
+            return "pharmacist".equals(effectiveRole);
+        }
         return claims != null
                 && claims.getRoles() != null
                 && claims.getRoles().stream().anyMatch(role -> PHARMACIST_ROLE_CODES.contains(role == null ? "" : role.toLowerCase()));
     }
 
     public boolean isDoctor(JwtClaims claims) {
+        String effectiveRole = normalizeEffectiveRole(claims);
+        if (StringUtils.hasText(effectiveRole)) {
+            return "doctor".equals(effectiveRole);
+        }
         return claims != null
                 && claims.getRoles() != null
                 && claims.getRoles().stream().anyMatch(role -> DOCTOR_ROLE_CODES.contains(role == null ? "" : role.toLowerCase()));
@@ -141,5 +151,12 @@ public class ProfessionalIdentityService {
             return systemUser.getNickname();
         }
         return systemUser.getUsername();
+    }
+
+    private String normalizeEffectiveRole(JwtClaims claims) {
+        if (claims == null || !StringUtils.hasText(claims.getEffectiveRole())) {
+            return null;
+        }
+        return claims.getEffectiveRole().trim().toLowerCase(Locale.ROOT);
     }
 }

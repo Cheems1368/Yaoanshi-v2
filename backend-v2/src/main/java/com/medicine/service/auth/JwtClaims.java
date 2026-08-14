@@ -12,6 +12,7 @@ public class JwtClaims {
     private String deviceId;
     private String jti;
     private List<String> roles;
+    private String effectiveRole;
     private Long userId;
     private Long tenantId;
     private String displayName;
@@ -72,6 +73,14 @@ public class JwtClaims {
 
     public void setRoles(List<String> roles) {
         this.roles = roles;
+    }
+
+    public String getEffectiveRole() {
+        return effectiveRole;
+    }
+
+    public void setEffectiveRole(String effectiveRole) {
+        this.effectiveRole = effectiveRole;
     }
 
     public Long getUserId() {

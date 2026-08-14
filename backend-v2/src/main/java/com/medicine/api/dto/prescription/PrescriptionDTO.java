@@ -1,5 +1,7 @@
 package com.medicine.api.dto.prescription;
 
+import com.medicine.api.dto.ddi.AdminDdiRiskCardDTO;
+
 import java.util.List;
 
 public class PrescriptionDTO {
@@ -18,9 +20,11 @@ public class PrescriptionDTO {
     private String rejectReason;
     private String ocrStatus;
     private String ocrConfidence;
+    private String ocrRawText;
+    private String ocrFailureReason;
     private List<AttachmentDTO> attachments;
     private List<ItemDTO> items;
-    private List<DdiScreeningDTO> pendingDdiScreenings;
+    private List<AdminDdiRiskCardDTO> pendingDdiScreenings;
 
     public Long getId() {
         return id;
@@ -134,6 +138,22 @@ public class PrescriptionDTO {
         this.ocrConfidence = ocrConfidence;
     }
 
+    public String getOcrRawText() {
+        return ocrRawText;
+    }
+
+    public void setOcrRawText(String ocrRawText) {
+        this.ocrRawText = ocrRawText;
+    }
+
+    public String getOcrFailureReason() {
+        return ocrFailureReason;
+    }
+
+    public void setOcrFailureReason(String ocrFailureReason) {
+        this.ocrFailureReason = ocrFailureReason;
+    }
+
     public List<AttachmentDTO> getAttachments() {
         return attachments;
     }
@@ -150,11 +170,11 @@ public class PrescriptionDTO {
         this.items = items;
     }
 
-    public List<DdiScreeningDTO> getPendingDdiScreenings() {
+    public List<AdminDdiRiskCardDTO> getPendingDdiScreenings() {
         return pendingDdiScreenings;
     }
 
-    public void setPendingDdiScreenings(List<DdiScreeningDTO> pendingDdiScreenings) {
+    public void setPendingDdiScreenings(List<AdminDdiRiskCardDTO> pendingDdiScreenings) {
         this.pendingDdiScreenings = pendingDdiScreenings;
     }
 
@@ -308,69 +328,4 @@ public class PrescriptionDTO {
         }
     }
 
-    public static class DdiScreeningDTO {
-        private Long id;
-        private Long matchedRuleId;
-        private String severity;
-        private String confirmStatus;
-        private String message;
-        private String recommendedAction;
-        private String confirmationNote;
-
-        public Long getId() {
-            return id;
-        }
-
-        public void setId(Long id) {
-            this.id = id;
-        }
-
-        public Long getMatchedRuleId() {
-            return matchedRuleId;
-        }
-
-        public void setMatchedRuleId(Long matchedRuleId) {
-            this.matchedRuleId = matchedRuleId;
-        }
-
-        public String getSeverity() {
-            return severity;
-        }
-
-        public void setSeverity(String severity) {
-            this.severity = severity;
-        }
-
-        public String getConfirmStatus() {
-            return confirmStatus;
-        }
-
-        public void setConfirmStatus(String confirmStatus) {
-            this.confirmStatus = confirmStatus;
-        }
-
-        public String getMessage() {
-            return message;
-        }
-
-        public void setMessage(String message) {
-            this.message = message;
-        }
-
-        public String getRecommendedAction() {
-            return recommendedAction;
-        }
-
-        public void setRecommendedAction(String recommendedAction) {
-            this.recommendedAction = recommendedAction;
-        }
-
-        public String getConfirmationNote() {
-            return confirmationNote;
-        }
-
-        public void setConfirmationNote(String confirmationNote) {
-            this.confirmationNote = confirmationNote;
-        }
-    }
 }

@@ -7,28 +7,33 @@
       :class="message.role"
       :data-testid="`ai-message-${message.role}-${index}`"
     >
-      <div class="avatar">{{ message.role === 'assistant' ? 'AI' : '我' }}</div>
-      <div class="bubble">
-        <div v-if="message.isLoading" class="loading">正在生成回答...</div>
+      <div class="avatar" :class="message.role">
+        <AppIcon v-if="message.role === 'assistant'" name="sparkles" :size="18" />
+        <span v-else>我</span>
+      </div>
+      <div class="bubble" :class="message.role">
+        <div v-if="message.isLoading" class="loading">
+          <span class="dot" /><span class="dot" /><span class="dot" />
+        </div>
         <div v-else class="content" v-html="renderText(message.displayContent || message.content)" />
       </div>
     </section>
 
     <section v-if="suggestions.length" class="suggestions">
-      <ion-chip
+      <button
         v-for="(suggestion, index) in suggestions"
         :key="suggestion"
+        class="suggestion-chip"
         :data-testid="`ai-suggestion-${index}`"
         @click="$emit('select-suggestion', suggestion)"
       >
         {{ suggestion }}
-      </ion-chip>
+      </button>
     </section>
   </div>
 </template>
 
 <script setup lang="ts">
-import { IonChip } from '@ionic/vue'
 
 export interface AiViewMessage {
   role: 'assistant' | 'user'
@@ -57,74 +62,131 @@ const renderText = (text: string) => {
 
 <style scoped>
 .chat-container {
-  padding: 14px 12px 90px;
+  padding: 16px 14px 100px;
 }
 
 .message-row {
   display: flex;
-  gap: 8px;
-  margin-bottom: 12px;
+  gap: 10px;
+  margin-bottom: 16px;
+  align-items: flex-start;
 }
 
 .message-row.user {
   flex-direction: row-reverse;
 }
 
+/* Avatar */
 .avatar {
-  width: 32px;
-  height: 32px;
+  width: 36px;
+  height: 36px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.avatar.assistant {
+  background: linear-gradient(135deg, var(--patient-primary) 0%, var(--patient-primary-dark) 100%);
+  color: var(--patient-text-inverse);
+  font-size: 18px;
+}
+
+.avatar.user {
+  background: var(--patient-border);
+  color: var(--patient-text-secondary);
+  font-size: 13px;
   font-weight: 700;
-  background: #dbeafe;
-  color: #1d4ed8;
 }
 
-.message-row.user .avatar {
-  background: #e2e8f0;
-  color: #334155;
-}
-
+/* Bubble */
 .bubble {
-  max-width: calc(100% - 44px);
-  padding: 10px 12px;
-  border-radius: 12px;
-  line-height: 1.6;
-}
-
-.message-row.assistant .bubble {
-  background: #ffffff;
-  border: 1px solid #dbeafe;
-  color: #0f172a;
-}
-
-.message-row.user .bubble {
-  background: #2563eb;
-  color: #ffffff;
-}
-
-.loading {
-  color: #64748b;
-}
-
-.content {
-  font-size: 15px;
+  max-width: calc(100% - 56px);
+  padding: 12px 14px;
+  line-height: 1.7;
   word-break: break-word;
 }
 
+.bubble.assistant {
+  background: var(--patient-bg-card);
+  border-radius: 2px 16px 16px 16px;
+  box-shadow: var(--patient-shadow-sm);
+  color: var(--patient-text-primary);
+}
+
+.bubble.user {
+  background: var(--patient-primary);
+  border-radius: 16px 2px 16px 16px;
+  color: var(--patient-text-inverse);
+}
+
+/* Content */
+.content {
+  font-size: var(--patient-font-body);
+}
+
+/* Loading dots animation */
+.loading {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  padding: 4px 0;
+}
+
+.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--patient-text-muted);
+  animation: pulse-dot 1.2s ease-in-out infinite;
+}
+
+.dot:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.dot:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+@keyframes pulse-dot {
+  0%, 80%, 100% {
+    opacity: 0.3;
+    transform: scale(0.8);
+  }
+  40% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Suggestion chips */
 .suggestions {
-  margin-top: 8px;
-  margin-left: 40px;
+  margin-top: 4px;
+  margin-left: 46px;
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
 }
 
-ion-chip {
-  --background: #dbeafe;
-  --color: #1e3a8a;
+.suggestion-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--patient-space-2) var(--patient-space-4);
+  border-radius: var(--patient-radius-xl);
+  border: 1px solid var(--patient-primary-light);
+  background: var(--patient-primary-light);
+  color: var(--patient-primary);
+  font-size: var(--patient-font-caption);
+  line-height: 1.4;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.suggestion-chip:active {
+  background: var(--patient-primary-light);
+  border-color: var(--patient-primary);
+  opacity: 0.8;
 }
 </style>

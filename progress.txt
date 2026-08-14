@@ -1,303 +1,748 @@
+Progress Maintenance Rules
+- Read this file after the session manual and before implementation work.
+- Keep Branch / Context, Current State, In Progress, and Next current when work starts or finishes.
+- After completing a feature, fix, review, or validation pass, append a dated note with what changed, what was validated, what remains broken or risky, and the next action.
+- Do not store secrets, tokens, credentials, or .env values here.
+- Do not rewrite historical entries unless correcting a factual error; append new dated notes instead.
+- Temporary implementation plans stay in the conversation. Durable build sequence changes belong in Standard document/IMPLEMENTATION_PLAN.md.
+
+Current State Update Template
+- Date:
+- Workstream:
+- Changed:
+- Validated:
+- Open risks:
+- Next:
+
 Project
 - Yaoshian MVP P0
 
-Current Branch / Work Context
-- Branch: main (origin: https://github.com/Cheems1368/Yaoanshi-v2.git)
-- Active workstream: Post-P0+ code cleanup, document alignment, and deployment readiness
-- Active surfaces: backend-v2, patient app, pharmacist web, doctor web
-- dual-agent-collab-plan branch merged into main (fast-forward, 154 files)
+Branch / Context
+- Branch: codex/mobile-demo (origin: https://github.com/Cheems1368/Yaoanshi-v2.git)
+- Active workstream: T1-T5 release-candidate validation and GitHub PR delivery
+- Active surfaces: backend-v2, frontend/huanzhe, frontend/pharmacist, frontend/yisheng/web-admin
 
-Current Phase / Step
-- All P0/P0+ phases (Phase 0-5) completed at code/build/test level
-- Post-P0+ cleanup session completed: code hygiene, document alignment, security report sync
-- Dual-agent collaboration plan established: docs/DUAL_AGENT_COLLABORATION.md (Claude Opus 4.6 + GPT-5.3 Codex)
-
-Completed
-- Formal product document created: Standard document/PRD.md
-- Formal app flow document created: Standard document/APP_FLOW.md
-- Formal tech stack document created: Standard document/TECH_STACK.md
-- Formal frontend design system document created: Standard document/FRONTEND_GUIDELINES.md
-- Formal backend structure document created: Standard document/BACKEND_STRUCTURE.md
-- Formal implementation sequence document created: Standard document/IMPLEMENTATION_PLAN.md
-- AI operating manual created: CLAUDE.md
-- backend directory normalization complete: backendV2 -> backend-v2 (resolved)
-- Initial commit pushed to GitHub (https://github.com/Cheems1368/Yaoanshi-v2.git) on main branch with 4446 files
-- Dual-agent collaboration plan added: docs/DUAL_AGENT_COLLABORATION.md on branch dual-agent-collab-plan
-- Document alignment audit completed: all progress.txt claims verified against actual codebase — no missing deliverables found
-- Patient app Vite proxy baseline aligned to /app-api (port 3001 kept)
-- Doctor web env baseline added: .env.example and .env.development with port 3002
-- Java 17 path validated: D:/Java/Java 17
-- backend-v2 Maven project initialized with Spring Boot 3.2.12
-- backend-v2 package structure created under com.medicine
-- CommonResult, global exception handler, and /health endpoint created
-- JWT security baseline created with /app-api/** and /admin-api/** route segmentation
-- Redis, OpenAPI, and S3-compatible object storage placeholder configuration created
-- Initial DTO, entity, and mapper skeletons created for identity, prescription, medication, help order, notification, assessment, and ddi domains
-- backend-v2 compile validation passed with JDK17 session override
-- backend-v2 runtime validation passed and /health returned CommonResult payload
-- Patient app routing baseline aligned to login / binding / active-plan gate flow
-- Patient app shared HTTP baseline aligned to CommonResult and /app-api service boundary
-- Patient app light-theme tokens aligned closer to shared UI baseline
-- Doctor web routes reduced to MVP work-order queue + profile only
-- Doctor web layout and professional tokens aligned to shared professional UI baseline
-- Legacy pharmacist frontend retired from active workspace path: frontend/medicinal-his-web-delivery
-- New pharmacist frontend path established: frontend/pharmacist
-- frontend/pharmacist rebuilt from doctor web shell baseline instead of continuing legacy pharmacist app
-- Pharmacist web dev baseline aligned: port 3003 and /admin-api proxy only
-- Pharmacist web routes reduced to MVP menu only: dashboard, patients, prescriptions, workorders, profile
-- Pharmacist web service boundary started under src/modules/pharmacist/api with patients, prescriptions, and workorders modules
-- Pharmacist web package/env/startup metadata updated to pharmacist naming
-- Repository path references updated from frontend/medicinal-his-web-delivery to frontend/pharmacist in CLAUDE.md, README.md, Standard document, .dockerignore, and ops compose files
-- Pharmacist web Phase 2 cleanup completed: router aliases added for legacy pharmacist paths while main MVP routes remain /dashboard, /patients, /prescriptions, /workorders, /profile
-- Pharmacist web shell/layout/login/pages rewritten to clean MVP-only professional UI copy; leftover doctor/chat/prescription-review pages and old src/api business modules removed
-- Pharmacist web dependency baseline aligned to Element Plus 2.3.7 and package metadata normalized to yaoshian-pharmacist-web
-- Doctor web Phase 2 cleanup completed: main MVP routes fixed to /workorders and /profile with /doctor-dashboard compatibility redirect retained
-- Doctor web login/layout/pages rewritten to doctor-only MVP shell; leftover pharmacist/patient/prescription/chat pages and old src/api business modules removed
-- Doctor web dependency baseline aligned to Element Plus 2.11.2 and package metadata normalized to yaoshian-doctor-web
-- Professional web login-page mojibake cleanup completed in frontend/pharmacist/src/views/Login.vue and frontend/yisheng/web-admin/src/views/Login.vue with UTF-8 Chinese copy restored
-- frontend/pharmacist npm install completed successfully
-- frontend/pharmacist npm run build passed
-- frontend/yisheng/web-admin npm install completed successfully
-- frontend/yisheng/web-admin npm run build passed
-- frontend/huanzhe package-lock corruption around rollup entries removed by regenerating lockfile with fresh npm install
-- frontend/huanzhe Phase 2 build blockers partially cleaned: RealnamePage.vue, HelpOrderPage.vue, DrugCategoryPage.vue, ExportRecords.vue, QuestionnairePage.vue, patientApi.ts, router/index.ts, shared/http/client.ts, and PrescriptionPage.vue received compile-focused fixes
-- frontend/huanzhe npm install completed successfully and local dependency binaries are now present
-- frontend/huanzhe broken image imports cleaned from QuestionnairePage.vue and LoginPage.vue so Vite asset resolution no longer blocks production build
-- frontend/huanzhe npm run build passed
-- Phase 2 frontend validation gate completed across patient app, pharmacist web, and doctor web
-- frontend/huanzhe patient login page realigned from username/password to mobile + OTP flow through src/modules/patient/api/mvp.ts
-- frontend/huanzhe patient binding page realigned from local-only realname stub to /app-api/patients/bind contract flow
-- frontend/huanzhe session/http baseline extended with refreshToken, deviceId persistence, and 401 refresh retry path for app auth contract
-- Patient app rational-medication module rebuilt with structured static knowledge base (category -> topic -> item/detail) under /rational-medication flow
-- Patient app route chain restored for rational-medication: /rational-medication -> /drug-category/:id -> /drug-detail/:id
-- Patient app AI assistant module added with project service-layer integration (/app-api/ai/chat) and Home quick entry /ai-assistant
-- backend-v2 AI proxy endpoint implemented: POST /app-api/ai/chat with message limits, user-window rate limit, upstream error mapping, and medical safety disclaimer
-- backend-v2 AI configuration added via medicine.ai.base-url/api-key/model/timeout-ms (env override ready)
-- backend-v2 AI upstream baseline was extended for SiliconFlow chat completions experimentation: `https://api.siliconflow.cn/v1/chat/completions` with `Qwen/Qwen3.5-122B-A10B` was validated as an alternate path, optional thinking/maxTokens env controls were added, and upstream message window is now trimmed to SiliconFlow-compatible size
-- backend-v2 AI upstream protocol support was expanded for SiliconFlow: Qwen `Qwen/Qwen3.5-122B-A10B` now defaults to `/v1/messages` (Anthropic-style) instead of `/v1/chat/completions`, with response parsing and insufficient-balance error mapping added for that protocol
-- backend-v2 AI default runtime was switched back to the currently account-verified model `Pro/zai-org/GLM-4.7` on SiliconFlow `/v1/chat/completions`, while dual-protocol support remains in code for later Qwen reactivation
-- backend-v2 AI assistant model was then tuned for patient medication Q&A / knowledge-popularization usage to `zai-org/GLM-4.5-Air`, keeping the same SiliconFlow `/v1/chat/completions` + `OPENAI_CHAT` path for lower latency and lower serving cost
-- backend-v2 / frontend AI assistant copy and guardrails were narrowed to a medication-popularization assistant: system prompt now avoids generic assistant framing, final replies are capped to 200 characters including disclaimer, and patient-side welcome/examples now focus on medication timing / missed doses / adverse-effect literacy
-- backend-v2 local secret-loading path added for AI runtime: `backend-v2/.env.local.example` now documents SiliconFlow variables and `backend-v2/scripts/run-local-with-env.ps1` loads `backend-v2/.env.local` into process env before `mvn spring-boot:run`, keeping real API keys out of Git
-- backend-v2 local AI startup script was corrected to default `SPRING_PROFILES_ACTIVE=local`, so auth/patient/AI smoke paths now inherit the same local datasource + Redis baseline as prior runtime validations
-- backend-v2 local AI startup script now auto-fills `MEDICINE_DB_PASSWORD` from `ops/docker.env`, mirrors legacy DB password, and defaults Redis port to `16379`, removing the extra manual runtime vars previously blocking local `spring-boot:run`
-- backend-v2 security response normalized for unauthorized access to 401 JSON CommonResult on protected APIs
-- Challenge-cup live-upstream AI runtime E2E closure completed at browser level: frontend/huanzhe now has a dedicated `scripts/e2e-challenge-cup-live.mjs` live script plus `npm run e2e:challenge-cup:live`, and real auth -> rational-medication -> `/app-api/ai/chat` -> AI soft-back/home navigation now pass against live SiliconFlow `zai-org/GLM-4.5-Air`
-- frontend/huanzhe AI assistant failure path now supports one-click retry of last failed prompt
-- backend-v2 app auth baseline implemented for /app-api/auth/send-otp, /app-api/auth/login, /app-api/auth/refresh-token, /app-api/auth/logout, and /app-api/auth/me
-- backend-v2 patient self-service baseline implemented for /app-api/patients/bind, /app-api/patients/me, and /app-api/patients/me/family-bindings
-- backend-v2 JWT auth filter now exposes parsed claims on Authentication details for app-side self-service handlers
-- backend-v2 auth/patient baseline upgraded from in-memory stubs to Redis + persistence-backed service flow with datasource configuration, identity mappers, and durable session / otp audit entities
-- backend-v2 TokenPair realigned to formal contract with accessToken, refreshToken, expiresIn, refreshExpiresIn, and deviceId
-- backend-v2 local runtime profile added with env-driven MySQL/Redis credentials plus SQL auto-init for auth/patient smoke tables
-- backend-v2 local smoke script added for send-otp -> login -> auth/me -> bind -> patients/me verification
-- backend-v2 runtime bug risk around MyBatis underscore mapping removed by enabling map-underscore-to-camel-case
-- backend-v2 auth/patient baseline compile validation passed with JDK17 session override
-- backend-v2 refresh-token rotation corrected by adding unique JWT jti so same-second refresh no longer returns identical token strings
-- backend-v2 auth/patient unit coverage added for Redis/database-backed service flow via AppAuthServiceTest and AppPatientServiceTest
-- backend-v2 local runtime smoke passed against real MySQL + Redis on this machine for patient auth/binding flow, with rows observed in app_account, app_account_device_session, otp_login_log, patient and refresh keys observed in Redis
-- frontend/huanzhe API target realigned from legacy 48081/48080 admin endpoints to backend-v2 local target 127.0.0.1:8080 with TokenPair contract fields synced to backend
-- frontend/huanzhe build passed after adding Vite define typings for __API_BASE_URL__ and wiring login/session handling to backend-returned deviceId
-- frontend/huanzhe dev server at 127.0.0.1:3001 successfully proxied /app-api auth/bind smoke traffic to backend-v2 local runtime
-- backend-v2 local smoke script extended to cover refresh-token rotation, device-preserving refresh response, logout, and post-logout refresh invalidation
-- patient frontend local env override files added (.env.local and .env.development.local) so current Vite runtime no longer depends on legacy 48080/admin-api variables
-- patient frontend historical .env, .env.development, and .env.example files were rewritten to a unified UTF-8 minimal config targeting backend-v2 at 127.0.0.1:8080, removing legacy 48080/admin-api variables
-- Playwright was added under frontend/huanzhe and a browser E2E script was added for login -> realname -> home closure
-- patient browser E2E passed in Chromium against http://127.0.0.1:3001 with successful login, binding, home navigation, and persisted session state
-- Phase 3.2 pharmacist patient-management backend closure completed at code/runtime level: legacy admin login token is now accepted by backend-v2 patient APIs through a dedicated legacy-auth datasource pointed at the real legacy MySQL port mapping
-- backend-v2 patient management runtime closure passed against real legacy token on this machine: GET /admin-api/patients, GET /admin-api/patients/{id}, and PUT /admin-api/patients/{id} now succeed with tenant-id=1 + Bearer token from legacy /admin-api/system/auth/login
-- backend-v2 pharmacist first-claim flow verified on patient id 10: saving medical fields assigned responsible pharmacist profile id 1 and created latest ABCD2 snapshot with score=6, riskLevel=HIGH
-- backend-v2 patient list runtime regression fixed after smoke: explicit SQL aliases were added so saved primary disease / responsible pharmacist / pending-fields state now round-trip back to list responses
-- backend-v2 local schema bootstrap compatibility fixed for current MySQL runtime by replacing unsupported ALTER TABLE ... ADD COLUMN IF NOT EXISTS statements with information_schema + PREPARE based conditional DDL
-- frontend/pharmacist patient runtime boundary aligned to mixed backends: legacy auth stays on 48080 while /admin-api/patients* proxies to backend-v2 and pharmacist build remains green
-- Phase 3.3 prescription minimum loop implemented at code/build level: app-side presign + upload registration, backend-v2 prescription/file/DDI persistence/service/controller flow, and pharmacist-side real prescription review screen with manual item entry, reject, and DDI confirmation
-- backend-v2 local schema bootstrap extended with file_asset, prescription, prescription_item, prescription_attachment, prescription_ocr_record, ddi_rule, and ddi_screening_log plus deterministic HIGH-risk DDI seed rules
-- backend-v2 app-side prescription endpoints implemented: POST /app-api/files/presign and POST /app-api/prescriptions/uploads using S3CompatibleObjectStorageStub URLs and persistence-backed upload registration
-- backend-v2 admin-side prescription endpoints implemented: GET /admin-api/prescriptions, GET /admin-api/prescriptions/{id}, POST /admin-api/prescriptions/{id}/confirm, POST /admin-api/prescriptions/{id}/reject, and POST /admin-api/ddi/screenings/{id}/confirm
-- frontend/huanzhe prescription page rewired from legacy mock prescription list to MVP upload-registration flow via src/modules/patient/api/mvp.ts with local image preview and session-scoped registration results
-- frontend/pharmacist prescription page rewired from static cards to backend-v2-powered list + drawer review flow with editable medication items and DDI confirmation actions
-- backend-v2 unit coverage added for AppFileServiceTest, AppPrescriptionServiceTest, AdminPrescriptionServiceTest, and PrescriptionControllerTest
-- backend-v2 Phase 3.4-3.7 contract groundwork started: formal DTO payloads and request DTOs were filled for medication plan, dose task, check-in, help-order, notification log, knowledge assessment, and satisfaction survey
-- backend-v2 Phase 3.4-3.7 domain/model groundwork added: medication plan item/task/check-in/event, help-order event, doctor profile, knowledge assessment answer, and satisfaction survey entities are now present
-- backend-v2 Phase 3.4-3.7 persistence groundwork added: real mappers and local schema bootstrap were extended for medication plan/task/check-in tables, help-order/event tables, notification_log, doctor_profile, knowledge_assessment_answer, and satisfaction_survey
-- backend-v2 app/professional identity baseline extended for family-account delegation and doctor-profile resolution, including accountType exposure in /app-api/auth/me and family access-context enforcement
-- backend-v2 medication-plan backend baseline added at code level: app active-plan/today-task/check-in/correction services plus admin create/update/activate/tasks/adherence-report services/controllers were introduced but not yet compile-validated in this session
-- backend-v2 Phase 3.4-3.7 backend API closure advanced to compile-green: app help-order submit/list/detail, app knowledge/satisfaction assessment submit, admin help-order queue/detail/claim/reply/escalate/reject/close, admin notification-log query, and patient family-binding create/unbind endpoints are now wired and compile validated
-- backend-v2 new mapper methods were hardened with explicit MyBatis @Param bindings to reduce runtime parameter-name drift on new medication/help-order/assessment/notification queries
-- patient app medication/help-order surfaces were rewritten off local storage / legacy patientApi stubs: HomePage, MedicationReminderPage, MedicationRecordPage, and HelpOrderPage now consume mvp.ts real APIs for active plan, dose tasks, check-ins, and help-orders
-- patient app mvp service boundary extended with typed medication/help-order/check-in/assessment/family-binding methods so page code no longer needs legacy patientApi for P0 medication/help-order flows
-- pharmacist and doctor dev proxies were realigned so new `/admin-api/help-orders`, `/admin-api/medication-plans`, `/admin-api/notifications`, `/admin-api/prescriptions`, and `/admin-api/ddi` traffic can reach backend-v2 while legacy auth remains on 48080
-- pharmacist and doctor work-order pages were replaced from static placeholders to backend-v2-driven queue/detail/action pages using claim/reply/escalate/reject/close flows
-- backend-v2 Phase 3 runtime-focused tests added and passed for help-order state transitions, satisfaction one-order-one-survey constraints, and medication correction-window/effective-record switching
-- Phase 3.3-3.7 local runtime closure completed end-to-end: prescription/API smoke, medication-family-help-order API smoke, and three Playwright browser E2E scripts all passed against live local services
-- professional web runtime proxy closure completed: pharmacist prescriptions/help-orders and doctor help-orders now use same-origin dev proxy routing to backend-v2 while legacy auth remains on 48080
-- Phase 4 pharmacist closure completed: `/patient/info` now embeds medication plan create/edit/activate/task/adherence maintenance and prescription review can jump directly into the patient plan panel
-- Phase 4 professional realtime notification closure completed: backend-v2 now exposes `/ws/admin-notifications`, notification_log delivery statuses are written back as SENT/FAILED, and unassigned professional notifications broadcast by role to active pharmacist/doctor sessions
-- Phase 4 browser/runtime validation assets completed: patient auth 401-refresh and natural-expiry E2E split into dedicated scripts, pharmacist patient save smoke was added, and realtime notification E2E now covers submit -> escalate -> doctor reply/close
-- Phase 4 local trial-run delivery assets completed: docs/03-运维部署/phase4-local-runbook.md, docs/06-测试文档/phase4-acceptance.md, docs/06-测试文档/phase4-test-report.md, and ops/scripts/phase4-local-run.ps1 were added
-- backend-v2 local smoke now uses generated patient/family identities per run so repeated execution no longer collides with prior state
-- Codex security audit completed for backend-v2, frontend/huanzhe, frontend/pharmacist, and frontend/yisheng/web-admin; report written to security_best_practices_report.md with findings on browser token storage, WebSocket query-token auth, localStorage PHI caching, insecure default secrets, and AI upstream data egress controls
-- Codex architecture compliance audit completed for backend-v2 against Standard document/BACKEND_STRUCTURE.md; report written to backend_v2_architecture_compliance_report.md with findings on map-based app DTO drift, undocumented family-binding endpoints, and missing app/infrastructure package boundaries
-- backend-v2 unit coverage extended for AiChatService, AdminNotificationService, AdminMedicationPlanService, AppHelpOrderService, AdminNotificationWebSocketAuthenticator, and S3CompatibleObjectStorageStub; existing AdminPatientServiceTest was aligned with current MedicationPlanMapper dependency so full Maven test suite is green again
-- backend-v2 admin realtime auth was tightened from URL query access_token to short-lived one-time websocket tickets, with explicit notification websocket origin allowlist configuration under medicine.notifications.websocket.*
-- frontend/pharmacist and frontend/yisheng/web-admin professional auth storage was tightened so accessToken is memory-only, refreshToken is sessionStorage-scoped, and request bootstrap now restores access tokens through refresh on demand
-- frontend/huanzhe patient auth storage was tightened so accessToken is memory-only and refreshToken is sessionStorage-scoped, with http client bootstrap/401 retry updated to restore access tokens without localStorage persistence
-- frontend notification clients for pharmacist and doctor now request backend-v2 socket tickets before opening /ws/admin-notifications, removing bearer-token exposure from websocket URLs
-- frontend/huanzhe sensitive patient profile and health-questionnaire caching was tightened by moving userDataService and healthDataService from localStorage persistence to runtime memory only, and questionnaire/profile debug logs on PHI paths were removed
-- Dual-agent collaboration protocol revised: Claude role narrowed from "backend constructor" to "product/data/frontend/verification host"; Codex role elevated from "quality assistant" to "construction + quality dual-core host"; A2 changed from uniform flow to four tiered flows; A3 handoff now requires referenced formal documents; A4 validation reordered with architecture compliance before security; three iron laws added; CLAUDE.md and CODEX.md updated to match
-- backend-v2 SEC-003 persistence closure added additive patient self-service profile and health-profile contracts under /app-api/patients/me/profile and /app-api/patients/me/health-profile, backed by dedicated patient_profile and patient_health_profile tables plus explicit DTOs and mappers
-- frontend/huanzhe patient binding, questionnaire, and profile pages now persist real-name/profile/questionnaire data to backend-v2 first and only then refresh in-memory session cache, removing the last memory-only gap introduced by the earlier browser-storage hardening
-- backend-v2 SEC-003 follow-up tightened app-side high-sensitivity exposure: patient self-service profile DTOs no longer populate hospitalPatientId/idCard materials, real-name evidence is persisted as SHA-256 digest only in patient_profile.identity_material_hash, and new writes clear legacy patient.id_card_masked snapshots
-- backend-v2 SEC-003 closure completed for legacy masked identity material: admin patient detail/update contracts no longer expose or accept idCardMasked, pharmacist patient-detail UI no longer displays/submits masked identity numbers, and ops/sql/sec-003-clear-legacy-patient-id-card-masked.sql was added for one-off historical cleanup
-- frontend/huanzhe high-sensitivity display surface was narrowed so profile/test flows show only verification status/type/material-archived state instead of masked identity numbers, and userDataService no longer caches identity numbers in current-session memory
-- DDI enhancement (用药助手增强) formal documents updated: PRD.md section 9.10 expanded with patient-side DDI detection, drug contraindication checking, and rule management; BACKEND_STRUCTURE.md added drug_contraindication table, POST /app-api/ddi/screen endpoint, admin DDI rule CRUD expansion; APP_FLOW.md added patient-side DDI alert flow (7.4.2), pharmacist rule management flow (7.4.3), /ddi/rules route; IMPLEMENTATION_PLAN.md added Phase 5 with steps 5.1-5.4 covering stroke rule library, patient screening backend, patient alert frontend, and pharmacist rule management
-- Phase 5 Step 5.1 + 5.2 backend closure completed at code/test level: stroke DDI seed SQL added under backend-v2/src/main/resources/sql/ddi-stroke-rules-seed.sql, local schema bootstrap now creates drug_contraindication, patient-side /app-api/ddi/screen endpoint is implemented with ACTIVE medication-plan + health-profile screening, and admin DDI rule/contraindication management APIs were scaffolded in AdminDdiController/AdminDdiService with AppDdiScreeningServiceTest coverage added
-- Phase 5 Step 5.3 patient alert frontend completed at code/build level: frontend/huanzhe prescription upload now accepts optional new-drug input, calls /app-api/ddi/screen before registration, shows HIGH/MEDIUM severity alert modal with continue/consult-pharmacist actions, gracefully degrades to direct upload when screening fails, and pre-fills help-order consultation context from the alert dialog
-- Phase 5 Step 5.4 pharmacist rule management completed at code/build/unit-test level: backend-v2 now supports POST /admin-api/ddi/rules with ruleCode-aware upsert DTOs, AdminDdiServiceTest covers DDI rule + contraindication list/create/update/not-found flows, and frontend/pharmacist now exposes /ddi/rules with tabbed DDI/contraindication management, drawer forms, and navigation entry
-- Patient prescription-history follow-up closure completed after formal contract review: Standard document now explicitly defines patient-side prescription history visibility and `GET /app-api/prescriptions`, backend-v2 app prescription service/controller now return paged historical uploads for the bound patient, and frontend/huanzhe prescription page now loads real history from backend instead of only showing in-session registration results
-- dual-agent-collab-plan branch merged into main via fast-forward (154 files, 5 commits)
-- Post-P0+ full-depth code review completed covering security fix verification, document-code alignment, frontend health, backend test coverage, PRD conformance, and deployment readiness
-- SEC-003 residual patient_mobile localStorage persistence fixed: moved from localStorage to sessionStorage in session.ts and all E2E scripts
-- Legacy patientApi.ts references migrated: RealnamePage, QuestionnairePage, and ProfilePage now use patientService from mvp.ts with typed PatientProfileDTO/PatientHealthProfileDTO; legacy patientApi.ts deleted
-- Dead code cleanup completed: src/views/ re-export wrappers (16 files), /test and /medication-consultation routes, requiresActivePlan dead guard, orphan ProfilePage_new.vue, MedicationConsultationPage.vue, TestPage.vue, config/api.ts, services/http.ts, services/patientApi.ts, and pharmacist Patients.vue
-- package.json E2E scripts normalized: Cypress test:e2e replaced with 10 Playwright e2e:* script entries; cypress devDependency removed
-- BACKEND_STRUCTURE.md updated with 10 previously undocumented endpoints: patient profile/health-profile CRUD, family binding create/delete, medication plan detail, notification socket-ticket, AI chat, and health check
-- APP_FLOW.md updated: /ai-assistant route and screen definition added; /medication-consultation removed
-- security_best_practices_report.md updated: SEC-001, SEC-002, SEC-003 marked as FIXED with fix dates and descriptions
-- doctor web post-login runtime fix applied: backend-v2 admin WebSocket default allowed-origins now includes local Vite ports `3001/3002/3003`, and `DoctorProfileMapper` / `PharmacistProfileMapper` query methods now use explicit MyBatis `@Param` bindings to prevent doctor work-order list runtime 500s under non-`-parameters` compilation
-- backend-v2 local runtime regression fix completed for patient auth plus admin APIs: 6 MyBatis mapper files now use explicit `@Param` bindings across 12 multi-parameter methods, Flyway `V3__patch_baseline_missing_tables.sql` backfills baseline-skipped patient auth/profile tables, and follow-up `V4__patch_missing_professional_tables.sql` backfills baseline-skipped `pharmacist_profile` / `doctor_profile` / `abcd2_assessment` so current local `medicine` schema self-heals without manual table creation
+Current State
+- 2026-08-14 update: T1-T5 business work is committed, protected by local branch `codex/backup-mobile-demo-20260814`, rebased onto the latest `origin/main`, and published as GitHub PR #32.
+- GitHub `main` branch protection and CI governance are officially enabled. The governance-enablement baseline was 92 backend tests with 64.33% JaCoCo line coverage; the enforced floor is 60%.
+- Current release candidate: 143 backend tests pass with 61.82% JaCoCo line coverage; patient ESLint, 3 Vitest tests, type check/production build, pharmacist build, and doctor build pass locally. All nine required E2E scenarios pass, with the medication-family scenario additionally covering the reviewed transfer workflow; configured and unconfigured voice-transcription paths are evidenced locally.
+- 2026-08-01 update: Phase T5 complete. Pharmacist mobile work-order actions, Docker MIME/XFYUN runtime, live transcription, three-role mobile flow, and viewport acceptance all passed.
+- 2026-05-12 update: Phase T0/T1 complete for post-P0 trial/demo closed loop: Standard document sync plus patient text/image help-order loop.
+- Current implementation includes backend-v2 multi-image help-order attachments, patient image upload/reply UI, and pharmacist `/mobile/workorders`.
+- All P0/P0+ phases (Phase 0–7) committed (2026-03-27, commit f9274e5)
+- Post-P0 optimization plan approved; Week 1 work complete
+- Project-local `yaoanshi-neat` skill added for progress memory and Standard document knowledge maintenance (2026-05-12)
+- Last session (2026-03-27): Phase A–F completed (see below)
 
 In Progress
-- None
-
-Completed (this session)
-- Work-order recovery + patient conversation enhancement: formal contract docs updated for nullable `help_order.description` and `PATIENT_REPLY` event type; patient app reserves `/help-order/:id` as post-submit conversation route
-- backend-v2 V5 schema recovery migration applied: `V5__patch_remaining_baseline_tables.sql` backfills all 17 baseline-skipped business tables (`file_asset`, prescription, ddi, medication, help_order, notification, assessment domains); previously-500 APIs (`/app-api/medication-plans/active`, `/app-api/dose-tasks/today`, `/app-api/help-orders`) now return 200
-- backend-v2 help-order app-side reply: patient `POST /app-api/help-orders/{id}/reply` added, help-order submit accepts title-only payloads, professional realtime notifications recognize `HELP_ORDER_PATIENT_REPLY`
-- patient help-order frontend rewrite: `HelpOrderPage.vue` restored with title-only submit + list-to-detail navigation, new `HelpOrderDetailPage.vue` renders timeline/reply/closed-state UI, `src/utils/appNotifications.ts` provides `/app-api/notifications/socket-ticket` -> `/ws/app-notifications` realtime refresh with polling fallback
-- NotificationDispatchService patient WS degradation: when patient WebSocket dispatch fails (no active session), notification degrades to IN_APP channel with SENT status so patient can poll for updates
-- Full runtime verification passed: `mvn test` (all unit tests), three frontend `npm run build`, `smoke-auth-patient-local.ps1`, `smoke-core-flows-local.ps1`, and `e2e-helporder-collab.mjs` (patient submit -> detail -> pharmacist reply -> patient reply -> doctor close -> satisfaction)
+- PR #32 review remediation, final required-gate rerun, and mergeability confirmation.
+- Product scope is frozen for this Goal; no next product phase has been started.
 
 Next
-- Tier D: external integrations — real S3 object storage, OCR engine, AI consent gate, CI/CD pipeline
-- Tier E (optional): ARC-004/005 package restructuring, HttpOnly cookie migration
-
-Blockers
-- Phase 3.3 upload flow intentionally does not perform real object-storage PUT yet; current patient page only completes metadata registration and local preview, so attachment replay still depends on later storage integration
-- Current local P0 runtime still depends on mixed machine services: Dockerized MySQL/Redis/legacy server on 13306/16379/48080, locally started backend-v2 on 8080, and three manually started Vite dev servers on 3001/3002/3003
-- Browser auth risk has been reduced by removing token persistence from localStorage, but refresh/session material is still browser-managed; a full HttpOnly-cookie migration remains a follow-up item if SEC-002 is to be fully closed
-- Historical `patient.id_card_masked` rows now have an explicit one-off cleanup script at `ops/sql/sec-003-clear-legacy-patient-id-card-masked.sql`; cleanup execution is still an ops step and has not been run automatically by application startup
-- SEC-005 (AI data egress without consent gate) remains open — needs compliance requirements confirmed
-- ARC-001/003 (Map-based controller responses instead of explicit DTOs) remain open — Codex施工项
-- No CI/CD pipeline configured (no GitHub Actions / GitLab CI)
-- OCR engine not integrated (always returns MANUAL_REVIEW_REQUIRED)
-
-Open Decisions
-- None
-
-Recent Validation
-- `GET http://127.0.0.1:8080/health` returned `200 OK` with `{"service":"backend-v2","status":"UP"}`
-- `powershell -ExecutionPolicy Bypass -File D:/yaoanshi/backend-v2/scripts/smoke-auth-patient-local.ps1` passed again in the current session
-- direct authenticated patient probes confirmed the active regression shape: `/app-api/medication-plans/active`, `/app-api/dose-tasks/today`, and `/app-api/help-orders?pageNo=1&pageSize=20` all returned `500 INTERNAL_SERVER_ERROR` after successful login + bind
-- local MySQL inspection on `127.0.0.1:13306/medicine` confirmed `app_account` and `flyway_schema_history` exist while `help_order` is still absent; Flyway history currently contains `1 << Flyway Baseline >>`, `2 ddi stroke rules seed`, `3 patch baseline missing tables`, and `4 patch missing professional tables`
-- Docker Desktop was started and legacy stack was restored via `docker compose -f D:/yaoanshi/backend/medicinal-his-delivery/docker-compose.yml up -d mysql redis server`; `13306`, `16379`, and `48080` revalidated as healthy
-- backend-v2 local runtime was repackaged and relaunched successfully on `http://127.0.0.1:8080` using local MySQL `3306`, legacy MySQL `13306`, and Redis `16379`
-- powershell -ExecutionPolicy Bypass -File D:/yaoanshi/backend-v2/scripts/smoke-prescription-local.ps1 passed with DDI_REQUIRED -> screening confirm -> PHARMACIST_CONFIRMED plus reject-reason round-trip
-- powershell -ExecutionPolicy Bypass -File D:/yaoanshi/backend-v2/scripts/smoke-core-flows-local.ps1 passed with ACTIVE plan task generation, patient check-in/correction, family delegated check-in, pharmacist claim/reply/escalate, doctor reply/close, knowledge assessment, satisfaction survey, adherence report, notification query, and post-unbind PATIENT_BIND_CONFLICT
-- node --check passed for frontend/huanzhe/scripts/e2e-shared.mjs, e2e-prescription-review.mjs, e2e-medication-family.mjs, and e2e-helporder-collab.mjs
-- node D:/yaoanshi/frontend/huanzhe/scripts/e2e-prescription-review.mjs passed with patient upload registration, pharmacist drawer visibility, DDI confirm, final confirm, and reject-reason verification
-- node D:/yaoanshi/frontend/huanzhe/scripts/e2e-medication-family.mjs passed with task status transition to COMPLETED, correction rewrite to MISSED with effective=true, family delegated check-in operatorType=FAMILY, and post-unbind PATIENT_BIND_CONFLICT
-- node D:/yaoanshi/frontend/huanzhe/scripts/e2e-helporder-collab.mjs passed with family submit, pharmacist queue visibility, pharmacist reply/escalate, doctor reply/close, knowledge assessment submit, satisfaction submit, and closed-notification query
-- frontend/pharmacist dev proxy routing was fixed by putting backend-v2 prefixes ahead of the legacy `/admin-api` fallback and by making work-order requests use same-origin backend-v2 proxy resolution
-- frontend/yisheng/web-admin work-order requests were aligned to same-origin backend-v2 proxy resolution so doctor queue traffic no longer bypasses Vite proxy
-- mvn -q "-Dtest=AdminHelpOrderServiceTest,AppAssessmentServiceTest,AppMedicationServiceTest,AdminPrescriptionServiceTest,AppPrescriptionServiceTest" test -f D:/yaoanshi/backend-v2/pom.xml passed
-- mvn -q -DskipTests compile -f D:/yaoanshi/backend-v2/pom.xml passed after final runtime-fix edits
-- npm run build passed in D:/yaoanshi/frontend/huanzhe
-- npm run build passed in D:/yaoanshi/frontend/pharmacist
-- npm run build passed in D:/yaoanshi/frontend/yisheng/web-admin
-- mvn -q "-Dtest=JwtTokenServiceTest,NotificationDispatchServiceTest,AdminHelpOrderServiceTest" test -f D:/yaoanshi/backend-v2/pom.xml passed
-- mvn -q "-Dtest=AdminNotificationRealtimeServiceTest,NotificationDispatchServiceTest,AdminHelpOrderServiceTest" test -f D:/yaoanshi/backend-v2/pom.xml passed
-- mvn -q "-Dtest=AiChatServiceTest,AdminNotificationServiceTest,AdminMedicationPlanServiceTest,AppHelpOrderServiceTest,AdminNotificationWebSocketAuthenticatorTest,S3CompatibleObjectStorageStubTest" test -f D:/yaoanshi/backend-v2/pom.xml passed
-- mvn -q test -f D:/yaoanshi/backend-v2/pom.xml passed
-- node --check passed for frontend/huanzhe/scripts/e2e-auth-refresh.mjs, e2e-auth-expiry.mjs, e2e-pharmacist-patient.mjs, and e2e-admin-notifications.mjs
-- powershell -ExecutionPolicy Bypass -File D:/yaoanshi/ops/scripts/phase4-local-run.ps1 -SkipBuild -SkipExpiryE2E passed with backend smoke, patient 401 refresh E2E, pharmacist patient smoke, and realtime notification E2E
-- node D:/yaoanshi/frontend/huanzhe/scripts/e2e-admin-notifications.mjs passed with pharmacist realtime queue refresh, doctor realtime queue refresh, doctor reply/close, and closed notification status=SENT
-- powershell -ExecutionPolicy Bypass -File D:/yaoanshi/ops/scripts/phase4-local-run.ps1 -SkipBuild -JwtAccessTokenSeconds 2 passed with backend smoke, short-TTL patient refresh/logout E2E, and realtime-notification E2E skipped by design under expiry mode
-- mvn "-Dtest=AdminNotificationSocketTicketServiceTest,AdminNotificationWebSocketAuthenticatorTest" test -f D:/yaoanshi/backend-v2/pom.xml passed
-- mvn -DskipTests compile -f D:/yaoanshi/backend-v2/pom.xml passed after websocket ticket/origin hardening edits
-- npm run build passed in D:/yaoanshi/frontend/pharmacist after token-storage tightening and websocket ticket handshake changes
-- npm run build passed in D:/yaoanshi/frontend/yisheng/web-admin after token-storage tightening and websocket ticket handshake changes
-- npm run build passed in D:/yaoanshi/frontend/huanzhe after patient access-token memory/sessionStorage tightening and E2E script alignment
-- npm run build passed in D:/yaoanshi/frontend/huanzhe after SEC-003 hardening edits that removed patient profile/health localStorage persistence and PHI-path debug logging
-- mvn "-Dtest=AppPatientProfileServiceTest,AppPatientServiceTest" test -f D:/yaoanshi/backend-v2/pom.xml passed after adding patient profile/health-profile persistence service coverage
-- npm run build passed in D:/yaoanshi/frontend/huanzhe after rewiring real-name bind, questionnaire submit, and profile save/load flows to backend-v2 patient profile/health-profile persistence APIs
-- mvn "-Dtest=AppPatientProfileServiceTest" test -f D:/yaoanshi/backend-v2/pom.xml passed after identity-material digest storage and DTO exposure tightening
-- npm run build passed in D:/yaoanshi/frontend/huanzhe after removing patient identity-number display/edit surfaces and session-cache retention of identity numbers
-- mvn -q "-Dtest=AppPatientProfileServiceTest,AdminPatientServiceTest" test -f D:/yaoanshi/backend-v2/pom.xml passed after SEC-003 admin contract cleanup edits
-- mvn -q -DskipTests compile -f D:/yaoanshi/backend-v2/pom.xml passed after SEC-003 admin contract cleanup edits
-- npm run build passed in D:/yaoanshi/frontend/pharmacist after removing pharmacist patient-detail masked-id field
-- mvn -q -DskipTests compile -f D:/yaoanshi/backend-v2/pom.xml passed after Phase 5 Step 5.1 + 5.2 DDI backend implementation
-- mvn -q "-Dtest=AppDdiScreeningServiceTest" test -f D:/yaoanshi/backend-v2/pom.xml passed
-- mvn -q test -f D:/yaoanshi/backend-v2/pom.xml passed after Phase 5 DDI backend additions
-- npm run build passed in D:/yaoanshi/frontend/huanzhe after Phase 5 Step 5.3 patient-side DDI alert modal, help-order prefill, and screening-failure graceful degradation edits
-- node --check passed for D:/yaoanshi/frontend/huanzhe/scripts/e2e-prescription-review.mjs after adding patient-side DDI modal + graceful-degradation coverage
-- node D:/yaoanshi/frontend/huanzhe/scripts/e2e-prescription-review.mjs could not run in this session because backend-v2 was not listening on http://127.0.0.1:8080 (ECONNREFUSED during app login bootstrap)
-- powershell -ExecutionPolicy Bypass -File D:/yaoanshi/backend-v2/scripts/smoke-core-flows-local.ps1 passed again with medication plan create/activate/tasks, patient/family check-in, help-order collaboration, knowledge assessment, satisfaction survey, adherence report, and post-unbind PATIENT_BIND_CONFLICT
-- powershell -ExecutionPolicy Bypass -File D:/yaoanshi/backend-v2/scripts/smoke-prescription-local.ps1 passed again with DDI_CONFIRM_REQUIRED -> screening confirm -> PHARMACIST_CONFIRMED plus reject-reason round-trip
-- node D:/yaoanshi/frontend/huanzhe/scripts/e2e-prescription-review.mjs passed after Step 5.3 frontend edits with patient-side DDI alert modal visibility, continue-submit branch, screening-failure graceful degradation upload, pharmacist DDI confirm, final confirm, and reject-reason verification
-- mvn -q "-Dtest=AdminDdiServiceTest,AppDdiScreeningServiceTest" test -f D:/yaoanshi/backend-v2/pom.xml passed
-- mvn -q -DskipTests compile -f D:/yaoanshi/backend-v2/pom.xml passed after Phase 5 Step 5.4 backend DDI rule create-path completion
-- npm run build passed in D:/yaoanshi/frontend/pharmacist after adding /ddi/rules tabbed DDI + contraindication rule management
-- npm run build passed in D:/yaoanshi/frontend/pharmacist after pharmacist shell/table responsive fix covering layout min-width shrink, local table scroll wrappers, toolbar wrap, and overflow tooltip strategy
-- node --check passed for D:/yaoanshi/frontend/huanzhe/scripts/e2e-challenge-cup.mjs
-- npm run build passed in D:/yaoanshi/frontend/huanzhe after adding challenge-cup test selectors for Home quick entries, rational-medication pages, and AI assistant views
-- node D:/yaoanshi/frontend/huanzhe/scripts/e2e-challenge-cup.mjs passed with real app auth/bootstrap, Home quick-entry navigation to /rational-medication, cardiovascular -> aspirin detail drilldown, AI assistant success/failure/retry branches, and in-page AI back-to-home fallback before returning to /tabs/home
-- mvn -q "-Dtest=AiChatServiceTest" test -f D:/yaoanshi/backend-v2/pom.xml passed after SiliconFlow/Qwen AI upstream compatibility updates
-- mvn -q -DskipTests compile -f D:/yaoanshi/backend-v2/pom.xml passed after SiliconFlow/Qwen AI upstream compatibility updates
-- live SiliconFlow probing confirmed: `/v1/chat/completions` works for `Pro/zai-org/GLM-4.7`, while `Qwen/Qwen3.5-122B-A10B` requires `/v1/messages` on this account path and currently returns provider code `30001` (insufficient balance)
-- live end-to-end verification against restarted local backend confirmed auth/bind -> `/app-api/ai/chat` now reaches SiliconFlow successfully and surfaces a precise provider-state error (`AI 账户余额不足，请先充值后再试`) instead of the previous generic network failure
-- powershell -ExecutionPolicy Bypass -File D:/yaoanshi/backend-v2/scripts/run-local-with-env.ps1 -EnvFile D:/yaoanshi/backend-v2/.env.local.example -NoStart passed, confirming local `.env.local` parsing and process-env injection for backend-v2 startup
-- mvn -q "-Dtest=AiChatServiceTest" test -f D:/yaoanshi/backend-v2/pom.xml passed after adding live-upstream challenge-cup closure support
-- npm run build passed in D:/yaoanshi/frontend/huanzhe after adding `e2e:challenge-cup:live` and the dedicated live upstream E2E script
-- node D:/yaoanshi/frontend/huanzhe/scripts/e2e-challenge-cup-live.mjs passed with real app auth/bootstrap, Home quick-entry navigation to /rational-medication, cardiovascular -> aspirin detail drilldown, `/app-api/ai/chat` live success on prompt `长期服药为什么还要复查？`, model=`zai-org/GLM-4.5-Air`, safety disclaimer rendered, and in-page AI soft-back before returning to /tabs/home
-- npm run e2e:challenge-cup:live passed in D:/yaoanshi/frontend/huanzhe, revalidating the package.json entry against live SiliconFlow `zai-org/GLM-4.5-Air`
-- mvn -q "-Dtest=AppPrescriptionServiceTest" test -f D:/yaoanshi/backend-v2/pom.xml passed after adding patient prescription-history list coverage
-- mvn -q -DskipTests compile -f D:/yaoanshi/backend-v2/pom.xml passed after adding `GET /app-api/prescriptions`
-- npm run build passed in D:/yaoanshi/frontend/huanzhe after wiring `/tabs/prescription` to backend history list
-
-- npm run build passed in D:/yaoanshi/frontend/huanzhe after post-P0+ dead code cleanup, patientApi migration, session.ts PII fix, and route cleanup
-- node --check passed for e2e-auth-bind.mjs and e2e-shared.mjs after patient_mobile sessionStorage migration
-- Phase C production hardening completed at code/config/test level: prod profile now blocks placeholder JWT/storage secrets before datasource initialization, Swagger/OpenAPI is local-only, Flyway baseline migration directory is active, backend-v2 Dockerfile exists, and ops compose/security assets were realigned to backend-v2 `8080` + `/health`
-- backend-v2 unit coverage added for JwtAuthenticationFilter and AdminNotificationWebSocketHandler; S3CompatibleObjectStorageStub coverage expanded for endpoint normalization contract
-- ops/docker-compose.yml is now a usable backend-v2 baseline instead of an empty file, and docker-security-audit compose files now resolve pharmacist static assets from `frontend/pharmacist/dist`
-- `docker compose -f D:/yaoanshi/ops/docker-security-audit/docker-compose.prod.yml config` now passes with backend-v2 Dockerfile/path resolution and corrected frontend dist mount
-- `mvn -q "-Dtest=JwtAuthenticationFilterTest,AdminNotificationWebSocketHandlerTest,S3CompatibleObjectStorageStubTest" test -f D:/yaoanshi/backend-v2/pom.xml` passed
-- `mvn -q test -f D:/yaoanshi/backend-v2/pom.xml` passed after Phase C hardening
-- prod placeholder-secret validation now fails fast during environment preparation with `Production startup blocked: medicine.jwt.secret is blank or placeholder`
-- `docker build -f D:/yaoanshi/backend-v2/Dockerfile D:/yaoanshi` could not be executed in this session because Docker daemon was unavailable on this machine; prod non-placeholder `/health` startup could not be revalidated because current local MySQL credentials for `prod` profile were rejected before Flyway initialization
-- doctor web login/profile regression fix completed per docs/doctor-login-profile-fix-improved.md: frontend/yisheng/web-admin now clears dev `VITE_API_BASE_URL` so auth, notifications, and help-orders return to same-origin Vite proxy routing instead of bypassing proxy to legacy `48080`
-- doctor web request/user/notification layers were hardened: readable error extraction added, notification socket-ticket requests now support `skipErrorToast`, and residual UTF-8 Chinese mojibake in request/store/adminNotifications copy was restored
-- `npm run build` passed in D:/yaoanshi/frontend/yisheng/web-admin after doctor login/profile proxy + error-handling cleanup
-- `npm run build` passed in D:/yaoanshi/frontend/pharmacist while verifying the doctor-web-only changes did not introduce pharmacist frontend build regressions
-- `powershell -ExecutionPolicy Bypass -File D:/yaoanshi/backend-v2/scripts/smoke-admin-auth-local.ps1` could not be revalidated in this session because the current local backend returned HTTP 500 during admin auth smoke bootstrap
-- `mvn -q -DskipTests compile -f D:/yaoanshi/backend-v2/pom.xml` passed after local auth bootstrap hardening edits in backend-v2 application.yml and run-local-with-env.ps1
-- backend-v2 local auth bootstrap was hardened so direct/local startup now defaults Redis port to `16379` and JWT secret to `local-dev-jwt-secret-change-me`; backend-v2/.env.local.example was updated to document the local JWT override
-- backend-v2 was restarted via `powershell -ExecutionPolicy Bypass -File D:/yaoanshi/backend-v2/scripts/run-local-with-env.ps1`, and `GET http://127.0.0.1:8080/health` returned `200 OK`
-- doctor login 500 was fully fixed in local runtime: backend-v2 local defaults and `.env.local` were aligned to Docker MySQL `medicine` on `13306` and Redis `16379`, so both primary and legacy-auth datasources now resolve against the actual local stack instead of stale `3306/yaoshian_mvp` assumptions
-- Flyway local-start regression was fixed for baseline legacy databases: `V2__ddi_stroke_rules_seed.sql` now creates `ddi_rule` defensively before seeding, which unblocks local startup when schema version `1` was previously baselined without executing the `V1__baseline_schema.sql` DDL
-- local `medicine.flyway_schema_history` failed `V2` row was cleaned up and rerun successfully; schema now shows Flyway versions `1` and `2` both successful, and `ddi_rule` exists in Docker MySQL
-- isolated backend-v2 startup validation on `http://127.0.0.1:18080` passed with local profile, `GET /health` = 200, `POST /admin-api/system/auth/login` for `doctor / 123456 / doctor` = 200, `GET /admin-api/system/auth/get-permission-info` returned `username=doctor` and `roles=[doctor]`, and `POST /admin-api/system/auth/refresh-token` = 200
-- `npm run dev -- --host 127.0.0.1 --port 3102` passed in D:/yaoanshi/frontend/yisheng/web-admin with Vite ready output and no Dart Sass `legacy JS API` deprecation warning after adding `scss.silenceDeprecations=['legacy-js-api']`
-- `mvn -q -DskipTests compile -f D:/yaoanshi/backend-v2/pom.xml` passed after doctor-web runtime follow-up fixes for admin WebSocket origin allowlist expansion and profile-mapper `@Param` binding hardening
-- backend-v2 was restarted again via `powershell -ExecutionPolicy Bypass -File D:/yaoanshi/backend-v2/scripts/run-local-with-env.ps1`, and Flyway successfully advanced local schema `medicine` from version `2` to `3` (`patch baseline missing tables`) and then to `4` (`patch missing professional tables`)
-- local schema revalidation on `127.0.0.1:13306/medicine` now shows `otp_login_log`, `app_account`, `app_account_device_session`, `patient`, `patient_family_binding`, `patient_profile`, `patient_health_profile`, `pharmacist_profile`, `doctor_profile`, and `abcd2_assessment` all present after the new migrations
-- `powershell -ExecutionPolicy Bypass -File D:/yaoanshi/backend-v2/scripts/smoke-auth-patient-local.ps1` passed with `send-otp` = 200, `login` = 200, `auth/me` normal before and after bind, `bind` = 200, `refresh-token` = 200, and post-logout refresh invalidation = `APP_AUTH_REFRESH_INVALID`
-- `powershell -ExecutionPolicy Bypass -File D:/yaoanshi/backend-v2/scripts/smoke-admin-auth-local.ps1` passed with admin login = 200, permission-info = 200, protected patient list API = 200, refresh-token = 200, and post-logout refresh invalidation = `ADMIN_AUTH_INVALID`
-- `npm run build` passed in D:/yaoanshi/frontend/huanzhe after restoring patient help-order list/detail pages, title-only submit flow, and app notification websocket client wiring
-- `node --check D:/yaoanshi/frontend/huanzhe/scripts/e2e-helporder-collab.mjs` passed after extending the script for submit-to-detail navigation and patient follow-up reply coverage
-- `node D:/yaoanshi/frontend/huanzhe/scripts/e2e-helporder-collab.mjs` could not complete in this session because `127.0.0.1:8080` was not listening (`ECONNREFUSED`) before the first app login request
-- after restarting Docker dependencies, backend-v2, and the three Vite frontends, `node D:/yaoanshi/frontend/huanzhe/scripts/e2e-helporder-collab.mjs` passed with `E2E_ADMIN_AUTH_BASE_URL=http://127.0.0.1:8080`, validating patient submit -> detail page -> pharmacist reply -> patient follow-up reply -> doctor close -> satisfaction completion end to end
+- Push the reviewed fixes, confirm the final `CI / Required Quality Gate` is green, keep the branch current with `main`, and resolve every review conversation.
+- Stop at mergeable and do not merge PR #32.
 
 Last Updated
-- 2026-03-14 Asia/Shanghai
-- Reason: Full verification session completed — V5 migration applied and confirmed 500s resolved, NotificationDispatchService patient WS degradation fix applied, all unit tests + three frontend builds + auth/core-flows smoke + help-order E2E passed; prescription smoke DDI screening confirm failure identified as pre-existing non-related issue
+- 2026-08-14 Asia/Shanghai
+- Reason: addressing four actionable PR #32 review comments before final mergeability confirmation.
+
+Completed This Sprint
+
+Phase A — Commit Baseline (2026-03-27)
+- Committed all Phase 6+7 work to main (57 files, commit f9274e5)
+- Working tree clean
+
+Phase D — SEC-005 AI Consent Gate (2026-03-27, commit 5f69a4d)
+- V8 migration: ai_consent_granted_at added to app_account
+- AppAccount domain: aiConsentGrantedAt field
+- AppAccountMapper: selectAiConsentGrantedAt + updateAiConsent
+- ErrorCode: AI_CONSENT_REQUIRED (40031)
+- AiChatService: consent check before upstream call; checkConsentStatus/grantConsent methods
+- AiChatController: GET/POST /app-api/ai/consent endpoints
+- Patient app: aiConsentService in mvp.ts; IonAlert consent dialog on AiAssistantPage first entry
+- SelfReportedMedicationPage.vue: fixed pre-existing TS error (suggestions field on reset)
+
+Phase E — ARC-001/003 Map→DTO Migration (2026-03-27, commit 036a39f)
+- New DTOs: AppPatientSummaryDTO, AppCurrentAccountDTO, AppFamilyBindingDTO, AppLogoutRequest, TransferPrefillDTO
+- AppPatientService, AppAuthService, AdminSelfReportedMedicationService: return typed DTOs
+- AppAuthController, AppPatientController, AdminHelpOrderController: typed controller signatures
+- Response field names preserved; backward-compatible
+
+Phase F — CI/CD GitHub Actions (2026-03-27, commit f285037)
+- .github/workflows/build.yml: 4 parallel jobs (backend compile+test, 3 frontend builds)
+- Triggers on push/PR to main; Maven + npm cache enabled
+
+Blockers (active)
+- MEDICINE_OCR_API_KEY must be set in .env.local to enable live OCR (graceful fallback if omitted)
+- SEC-002 partially open: refresh tokens remain sessionStorage-managed (future follow-up)
+- Historical patient.id_card_masked rows need ops cleanup: ops/sql/sec-003-clear-legacy-patient-id-card-masked.sql
+
+Completed Phases (durable record)
+
+Phase 0–7 — see git history from 2026-03-19 sessions
+
+Infrastructure Notes
+- Flyway current latest: V12 (`V12__help_order_voice_transcription.sql`); next new migration must be V13.
+- Never modify already-applied migrations V1–V12.
+- WebSocket /ws/admin-notifications and /ws/app-notifications both use one-time socket tickets
+- AI provider: SiliconFlow /v1/chat/completions, model zai-org/GLM-4.5-Air
+- AI config: medicine.ai.base-url / medicine.ai.api-key / medicine.ai.model / medicine.ai.timeout-ms
+- Local dev secrets: backend-v2/.env.local (gitignored), startup via run-local-with-env.ps1
+- Local mixed stack: Docker MySQL 13306, Redis 16379, legacy server 48080
+- Object storage: the real S3-compatible implementation is active outside tests; `S3CompatibleObjectStorageStub` is test-profile only.
+- OCR: `DeepSeekOcrService` is active when configured and degrades to manual review when credentials or the provider are unavailable.
+
+Phase B — MinIO S3 Integration (2026-03-27, commit e6178c9)
+- docker-compose.yml: MinIO service (9000/9001) + backend-v2 storage env vars + depends_on
+- pom.xml: software.amazon.awssdk:s3:2.25.60
+- S3CompatibleObjectStorageImpl: real AWS SDK v2 impl, @Profile(!test), PostConstruct bucket init
+- S3CompatibleObjectStorageStub: demoted to @Profile(test)
+- ObjectStorageProperties: region field added
+- application.yml: medicine.storage config block with env var placeholders
+- run-local-with-env.ps1 + .env.local.example: MEDICINE_STORAGE_* vars documented
+
+Phase G — Patient App UI/UX Polish (2026-03-27, commit c5feb36)
+- variables.css: 12 semantic --patient-* color tokens added
+- HomePage/MedicationReminderPage/HelpOrderPage/SelfReportedMedicationPage: hardcoded hex → CSS tokens
+- All four pages: IonRefresher pull-to-refresh added
+- ProfilePage: avatar path fixed (/src/picture/ → @/shared/assets/images/ via Vite import)
+- G.4: all catch blocks already had toast handling — no changes needed
+
+Phase H — Pharmacist/Doctor Minor Fixes (2026-03-27)
+- DdiRules.vue: submitRuleForm + submitContraindicationForm — added catch block with ElMessage.error on API failure
+- PharmacistDashboard.vue: WS-triggered loadDashboard() debounced 300ms (debouncedLoadDashboard)
+- Layout.vue (doctor): removed "Phase 2" subtitle from header; .workspace overflow-x: hidden added
+- index.scss (doctor): body overflow-x: hidden added
+- Both frontends build cleanly (pharmacist + doctor)
+
+Phase C — DeepSeek-OCR Integration (2026-03-27, commit 201525c)
+- OcrProperties: @ConfigurationProperties for medicine.ocr.* (baseUrl/apiKey/model/timeoutMs)
+- OcrService interface + OcrResult (success/extractedText/confidence/responseJson)
+- DeepSeekOcrService: SiliconFlow vision API (deepseek-ai/deepseek-vl2), graceful fallback if key missing
+- AppPrescriptionService: replaced MANUAL_REVIEW_REQUIRED stub; DEEPSEEK_OCR on success, MANUAL_REVIEW_REQUIRED+manualFallbackUsed=true on failure
+- application.yml: medicine.ocr.* config block; run-local-with-env.ps1 + .env.local.example updated
+
+Phase 4 — Integration Testing (2026-03-27, commit 4fc16db + runtime session)
+Build validation:
+- backend-v2: mvn compile ✅, mvn test 97/97 ✅ (fixed 4 broken test files)
+- frontend/huanzhe: npm run build ✅
+- frontend/pharmacist: npm run build ✅
+- frontend/yisheng/web-admin: npm run build ✅
+
+Runtime integration (2026-03-27, Docker stack):
+Infrastructure fixes applied (not committed yet):
+- ops/docker-security-audit/redis/redis.conf: protected-mode yes → no (blocked cross-container connection)
+- ops/docker-security-audit/nginx-dev.conf: upstream medicine-backend-v2-dev → backend-v2
+- ops/sql/mysql/ruoyi-vue-pro.sql imported: system_users + system_role + system_user_role tables created
+
+Bug fixed and committed:
+- AiChatService.checkConsentStatus/grantConsent: was using JWT sub (mobile string parsed as Long) as account ID;
+  changed to resolve account by mobile via selectActiveByMobile first — consent now writes to DB correctly
+- AiChatServiceTest: setUp mocks selectActiveByMobile; 97/97 still pass
+
+API integration test results (all 200 unless noted):
+Patient: send-otp ✅, login ✅, auth/me ✅, bind-patient ✅, medication-plans/active ✅,
+  dose-tasks/today ✅, ai/consent GET+POST ✅ (bug fixed), self-reported-medications ✅,
+  prescriptions list ✅, prescriptions/uploads ✅, ddi/screen ✅, assessments/knowledge ✅
+Admin: system/auth/login ✅, patients ✅, drugs/search ✅, help-orders ✅, ddi/rules ✅ (27 rules)
+
+Remaining: browser-level UI testing (manual walk-through of all 3 frontends)
+
+UI Visual Upgrade Sprint (2026-03-31, plan: memoized-brewing-engelbart.md)
+- Phase 0: AppIcon.vue (Lucide-based, 21-icon map) + EmptyState.vue (5 types, SVG illustrations) created
+- Phase 1: variables.css token 补全 — font-weight/line-height/border tokens added; FRONTEND_GUIDELINES.md updated (sections 2.10–2.12, elderly-friendly section 10)
+- Phase 2–6: All patient pages fully token-migrated (zero hardcoded hex/px):
+  HomePage, MedicationReminderPage, MedicationRecordPage, MedicationTabPage,
+  HelpOrderPage, HelpOrderDetailPage, LoginPage, ProfilePage, PrescriptionPage,
+  QuestionnairePage, RealnamePage, AiAssistantPage, AiChatView, AiHomeView,
+  DrugCategoryPage, DrugDetailPage, RationalMedicationPage, SelfReportedMedicationPage
+- Phase 7 (专业端): Minor fixes only (Phase H scope — DdiRules error handling, Dashboard WS debounce,
+  Layout overflow-x). Full ~13-color token migration in pharmacist/doctor deferred (not blocking demo).
+- Phase 8: All 3 frontends build clean ✅
+- TabsPage.vue: restructured tabs (首页/用药/求助/我的), elderly-friendly 56px min-height
+- /simplify cleanup (2026-03-31): AppIcon className computed removed, EmptyState redundant comments
+  removed, HelpOrderPage manual empty-state → <EmptyState type="no-orders" />, unused IonIcon import removed
+
+Last Updated
+- 2026-03-31 Asia/Shanghai
+- Reason: UI visual upgrade plan (memoized-brewing-engelbart.md) substantially complete; all 3 builds pass
+
+DDI Risk Card Inline Detail Alignment (2026-04-14)
+- backend-v2:
+  - Added V9 migration to align `drug_contraindication` detail fields with DDI rules:
+    `mechanism_desc`, `alternative_recommendation`, `reference_source`
+  - Added admin-only rich DDI DTOs:
+    `AdminDdiRiskCardDTO`, `AdminDdiScreenResult`
+  - `GET /admin-api/medication-plans/{id}/ddi-check` now returns rich risk cards for pharmacist review
+  - `GET /admin-api/prescriptions/{id}` pending DDI screenings now return the same rich card shape
+  - Contraindication CRUD DTO/request/domain/mapper/service extended with:
+    `mechanismDesc`, `alternativeRecommendation`, `referenceSource`, `patientSummary`
+  - Plan-side DDI detail generation now deduplicates reversed pairs by rule and preserves configured drug order
+- frontend/pharmacist:
+  - Added shared component `src/components/ddi/AdminDdiRiskCardList.vue`
+  - Medication plan activation warning and prescription review DDI list now use unified inline expandable cards
+  - Interaction rules and contraindication rules now expose aligned detail fields in DDI rule management
+- verification:
+  - `mvn -q "-Dtest=AppDdiScreeningServiceTest,AdminPrescriptionServiceTest,PrescriptionControllerTest" test -f D:/yaoanshi/backend-v2/pom.xml` passed
+  - `mvn -q "-Dtest=AdminMedicationPlanServiceTest" test -f D:/yaoanshi/backend-v2/pom.xml` passed
+  - `npm run build` in `frontend/pharmacist` passed
+
+Last Updated
+- 2026-04-14 Asia/Shanghai
+- Reason: pharmacist-side DDI inline detail alignment implemented; backend targeted tests and pharmacist frontend build passed
+
+DDI Review Follow-up Fixes (2026-04-14)
+- backend-v2:
+  - `ddi_screening_log` now stores interaction rule snapshots:
+    `rule_code`, `rule_status_at_screening`, `drug_a_name`, `drug_b_name`,
+    `message`, `recommended_action`, `mechanism_desc`,
+    `alternative_recommendation`, `reference_source`, `patient_summary`
+  - Prescription confirmation writes the rule snapshot when creating screening logs
+  - Prescription detail DDI cards now prefer screening-log snapshots and only fall back to
+    rule lookup for legacy rows without snapshots
+  - Prescription detail no longer loads all active DDI rules; it batch-loads only the
+    `matchedRuleId` values still needed for legacy fallback
+  - `DdiRuleMapper` added batch lookup by ids for the legacy fallback path
+  - `AppDdiScreeningService` now uses one shared hit-collection pipeline for:
+    patient-facing lightweight alerts and admin-facing rich risk cards
+- frontend/pharmacist:
+  - Removed legacy hidden DDI card templates from medication plan activation dialog and
+    prescription review drawer; shared `AdminDdiRiskCardList` is now the only render path
+- verification:
+  - `mvn -q "-Dtest=AppDdiScreeningServiceTest,AdminPrescriptionServiceTest,PrescriptionControllerTest" test -f D:/yaoanshi/backend-v2/pom.xml` passed
+  - `mvn -q "-Dtest=AdminMedicationPlanServiceTest" test -f D:/yaoanshi/backend-v2/pom.xml` passed
+  - `npm run build` in `frontend/pharmacist` passed
+
+Last Updated
+- 2026-04-14 Asia/Shanghai
+- Reason: fixed DDI review findings across code reuse, historical detail stability, and prescription-detail query efficiency
+
+Docker Local Stack Env Follow-up (2026-04-15)
+- ops/docker-compose.yml:
+  - backend-v2 env_file changed to optional local file (`ops/.env.backend-v2.local`) using Compose v2 `required: false`
+  - admin now waits for backend-v2 health before startup to avoid nginx upstream restart loops
+- ops/.env.backend-v2.local.example:
+  - reduced to secrets only (`MEDICINE_AI_API_KEY`, `MEDICINE_OCR_API_KEY`)
+  - AI/OCR non-secret defaults now rely on backend-v2 application.yml again instead of a third duplicated default set
+- ops/README.md:
+  - clarified that `ops/.env.backend-v2.local` is optional and only needed for AI/OCR secret injection
+  - documented the one-command recovery path: `docker compose up -d backend-v2 admin`
+- verification:
+  - `docker compose -f D:/yaoanshi/ops/docker-compose.yml config` passed with and without `ops/.env.backend-v2.local`
+  - `docker compose -f D:/yaoanshi/ops/docker-compose.yml up -d backend-v2 admin` recovered the stack successfully
+  - `yaoshian-backend-v2` healthy, `yaoshian-pharmacist-admin` up, `http://localhost:8081/health` returned 200
+
+Last Updated
+- 2026-04-15 Asia/Shanghai
+- Reason: fixed Docker review findings around optional env loading, default drift, and local stack recovery documentation
+
+Doctor Help Order Reply 400 Fix (2026-04-28)
+- backend-v2:
+  - Added `effectiveRole` to professional JWT claims so doctor/pharmacist web login preserves the selected role.
+  - Admin login now normalizes requested `role` (`doctor` / `pharmacist`) and writes it into access + refresh tokens.
+  - Admin token refresh now preserves `effectiveRole` from the refresh token.
+  - Professional identity checks now prefer `effectiveRole`; legacy opaque professional tokens without this field still fall back to role-code checks.
+  - This prevents dual-role users (`admin` / `super_admin` / `tenant_admin`) from being treated as pharmacists when logged in from the doctor web app.
+- work order behavior:
+  - Doctor web fixed path: `POST /admin-api/help-orders/{id}/reply` can handle `WAITING_DOCTOR` / `DOCTOR_IN_PROGRESS` orders as doctor identity.
+  - API contract unchanged: request body remains `{ content }`; response remains `CommonResult<HelpOrderDTO>`.
+- tests:
+  - Added coverage for dual-role doctor login, token refresh role preservation, JWT effectiveRole round-trip, identity role resolution, and doctor reply on upgraded work orders.
+- verification:
+  - `mvn "-Dtest=AdminAuthServiceTest,JwtTokenServiceTest,ProfessionalIdentityServiceTest,AdminHelpOrderServiceTest,AppHelpOrderServiceTest" test` passed.
+
+Last Updated
+- 2026-04-28 Asia/Shanghai
+- Reason: fixed doctor-side upgraded help-order reply 400 caused by dual-role JWT role resolution.
+
+Patient Android Mobile Demo Prep (2026-04-28)
+- frontend/huanzhe:
+  - Added Capacitor Android project for `com.yaoanshi.patient` / `药按时`.
+  - Added Android npm scripts and PowerShell helpers for JDK 21 detection, debug build, adb reverse, install, and launch.
+  - Prescription upload page now has separate camera capture and gallery/e-prescription file inputs while preserving presign/register/list flow.
+  - Removed unused `@capacitor/camera` dependency so the first-stage demo stays on browser file inputs.
+- ops:
+  - Added demo stack startup script and scoped demo-data reset script.
+  - Reset script requires mobile, hospital patient ID, and patient name before touching demo rows.
+  - ops README documents JDK 21, Android Live Reload, reset command, and smoke path.
+- verification:
+  - `npm run build --prefix D:\yaoanshi\frontend\huanzhe` passed.
+  - `npm run android:sync --prefix D:\yaoanshi\frontend\huanzhe` passed.
+  - `npm run android:build --prefix D:\yaoanshi\frontend\huanzhe` passed.
+  - `cd D:\yaoanshi\frontend\huanzhe\android; .\gradlew.bat assembleDebug --no-daemon` passed with JDK 21.
+  - `D:\ANDROIDSDK\platform-tools\adb.exe devices` showed `S4AALFDUIZAUDUEY device`.
+- open risks:
+  - `npm run android:live -- -DeviceId S4AALFDUIZAUDUEY` built successfully but APK install was blocked by the phone:
+    `INSTALL_FAILED_USER_RESTRICTED: Install canceled by user`.
+  - Old user-level Gradle daemon registry still logs a stale Java 8 expiration-check warning; builds pass when scripts force JDK 21 and `--no-daemon`.
+- next:
+  - On the phone, enable/allow USB app installation, rerun `npm run android:live -- -DeviceId S4AALFDUIZAUDUEY`, then perform the real-device smoke path.
+
+Last Updated
+- 2026-04-28 Asia/Shanghai
+- Reason: prepared patient Android mobile demo build/run path; blocked only by phone-side install permission.
+
+Patient Android Live Reload Cleartext Fix (2026-04-28)
+- frontend/huanzhe/android:
+  - Added debug-only Android manifest override to permit cleartext traffic for Capacitor live reload.
+- debugging:
+  - Phone WebView was failing on `http://127.0.0.1:3001/` with `net::ERR_CLEARTEXT_NOT_PERMITTED`.
+  - APK already contained the expected live reload server config; adb reverse for 3001/8080 was present.
+- verification:
+  - `npm run android:build --prefix D:\yaoanshi\frontend\huanzhe` passed.
+  - `npm run android:live -- -DeviceId S4AALFDUIZAUDUEY` built, installed, and launched successfully.
+  - Follow-up logcat no longer showed `ERR_CLEARTEXT_NOT_PERMITTED`.
+- next:
+  - Continue real-device smoke walkthrough: login, bind patient, create/activate plan, verify today's tasks, and prescription image registration.
+
+Last Updated
+- 2026-04-28 Asia/Shanghai
+- Reason: fixed patient Android debug WebView cleartext block for live reload.
+
+Real OCR Feedback Plan (2026-04-28)
+- current finding:
+  - Patient prescription upload currently registers the object key only; it does not PUT the selected image bytes to MinIO/S3.
+  - Backend OCR currently receives a presigned URL based on the internal Docker MinIO host (`http://minio:9000/...`), which external OCR providers cannot fetch.
+  - Therefore real OCR cannot produce useful feedback yet and falls back to low-confidence manual review.
+- chosen approach:
+  - Patient app will PUT the selected image bytes to the presigned upload URL before calling prescription registration.
+  - Backend will read the uploaded object bytes from MinIO/S3 by object key.
+  - OCR request will send the image as base64/data URL content instead of asking the OCR provider to fetch a local MinIO URL.
+- constraints:
+  - `MEDICINE_OCR_API_KEY` must be supplied only through environment variables or approved secret tooling.
+  - Do not write OCR secrets, tokens, private keys, or `.env` values into code, docs, progress notes, or logs.
+  - Demo patient identity must not be hardcoded; use the actual on-site test patient selected for the walkthrough.
+- next:
+  - Add true frontend upload PUT, object storage byte-read support, OCR base64 forwarding, adb reverse for port 9000, and targeted backend/frontend verification.
+  - Then validate on a real phone by confirming the uploaded object exists in MinIO and the patient/pharmacist screens show real OCR status and confidence.
+
+Last Updated
+- 2026-04-28 Asia/Shanghai
+- Reason: recorded the real OCR feedback gap and implementation direction without changing code.
+
+Real OCR Feedback Chain Implementation (2026-04-28)
+- Changed:
+  - Patient prescription upload now PUTs selected image bytes to the presigned MinIO/S3 URL before registering the prescription.
+  - Upload PUT failure stops registration and shows a clear image-upload failure toast.
+  - Object storage now separates internal endpoint access from public presigned URL generation via `medicine.storage.public-endpoint`.
+  - Backend prescription registration now reads uploaded object bytes by object key and sends base64/data URL image content to OCR.
+  - OCR missing-key, image-read, empty-image, and upstream failures continue to fall back to manual review with explicit backend log reasons.
+  - Android live reload script now reverses port 9000 for phone access to local MinIO.
+  - Smoke/e2e prescription helpers now upload the test image bytes before registration.
+  - Patient and pharmacist OCR status mapping now displays `HIGH_CONFIDENCE` as a readable high-confidence OCR result.
+- Validated:
+  - `npm run build --prefix D:\yaoanshi\frontend\huanzhe` passed.
+  - `mvn "-Dtest=AppPrescriptionServiceTest,PrescriptionControllerTest,S3CompatibleObjectStorageStubTest" clean test -f D:\yaoanshi\backend-v2\pom.xml` passed.
+  - `npm run android:build --prefix D:\yaoanshi\frontend\huanzhe` passed.
+  - `npm run build --prefix D:\yaoanshi\frontend\pharmacist` passed.
+  - `docker compose -f D:\yaoanshi\ops\docker-compose.yml config` passed.
+  - `git diff --check` passed with only line-ending normalization warnings.
+- Open risks:
+  - Real OCR still depends on `MEDICINE_OCR_API_KEY` being supplied through local secret configuration.
+  - Real-device verification still needs MinIO object existence and patient/pharmacist OCR status confirmation.
+- Next:
+  - Restart the Docker backend stack with the local OCR secret configured, rerun Android live mode, and complete the real-phone prescription upload walkthrough.
+
+Last Updated
+- 2026-04-28 Asia/Shanghai
+- Reason: implemented and validated the real OCR upload/read/base64 feedback chain.
+
+Yaoanshi Neat Skill Implementation (2026-05-12)
+- Changed:
+  - Added project-local `.codex/skills/yaoanshi-neat` for explicit context recovery and closeout tidy workflows.
+  - Added a compact knowledge map for `progress.txt` and `Standard document/*.md` maintenance rules.
+  - Added a read-only knowledge-state checker for `progress.txt`, Standard documents, forbidden `docs/`, relative-time markers, size warnings, and mojibake markers.
+  - Kept root instruction files and Memory out of default update scope.
+- Validated:
+  - `python C:\Users\Z5089\.codex\skills\.system\skill-creator\scripts\quick_validate.py D:\yaoanshi\.codex\skills\yaoanshi-neat` passed.
+  - `python D:\yaoanshi\.codex\skills\yaoanshi-neat\scripts\check_knowledge_state.py D:\yaoanshi` passed with no errors.
+- Open risks:
+  - The checker reports existing relative-time markers in `progress.txt` and several Standard documents; these were not changed because this task only introduced the skill and checker.
+  - Existing unrelated working-tree changes remain in backend, frontend, ops, and `progress.txt`.
+- Next:
+  - Use `yaoanshi-neat` on future explicit closeout requests, and decide separately whether to clean existing relative-time markers.
+
+Last Updated
+- 2026-05-12 Asia/Shanghai
+- Reason: implemented and validated project-local `yaoanshi-neat` skill.
+
+Hospital Follow-up Planning Ledger (2026-05-12)
+- Workstream:
+  - Post-meeting planning for the next trial/demo iteration after the 2026-04-29 hospital discussion.
+- Changed:
+  - Locked the next planning frame as a 4-week local/demo-environment trial version, not immediate code execution.
+  - Set the primary demo story to patient help-order collaboration:
+    patient submits a medication discomfort request with text and images, pharmacist reviews on mobile web, escalates when medication stop/change/reduction advice needs doctor confirmation, doctor records agree/disagree, and patient sees the final conclusion.
+  - Set the default demo case to an elderly stroke follow-up patient with hypertension.
+  - Decided that non-primary capabilities must be reachable from the main story but do not need to be forced into one oversized flow:
+    medication reminders, prescription/OCR review, DDI/contraindication rules, personalized education, and dialect speech evaluation.
+  - Locked the Week 1 implementation slice as the text/image help-order loop:
+    patient creates a help order with title, category, description, and up to 3 images per message; pharmacist mobile web can list, open, view images, and reply with text.
+  - Planned help-order conversation semantics:
+    creating an order creates the first patient message; patients can continue sending text and image messages in the detail view; professional replies are text-only for this slice.
+  - Planned attachment contract direction:
+    extend app file presign for `HELP_ORDER_IMAGE`, add multi-attachment support for help-order events, keep old single `attachment_file_asset_id` compatible, and restrict attachment access to help-order participants.
+  - Locked upload limits for the trial:
+    up to 3 images per message, 10 MB per image, JPEG/PNG/WebP only for Week 1.
+  - Locked professional mobile web direction:
+    add explicit `/mobile/...` routes inside existing pharmacist and doctor frontends, reuse current professional accounts, and avoid disrupting desktop admin pages.
+  - Locked later planning decisions:
+    audio is an optional patient attachment and internal dialect evaluation item, not a promised speech-to-text product feature in the patient UI;
+    medication reminders use Capacitor local notifications with a 30-minute second reminder;
+    family account second reminders are local/foreground trial behavior, not remote push;
+    rules expand to HIGH/MEDIUM/LOW with high-risk confirmation, medium warning, low-risk record-only behavior;
+    education cards are hospital-provided/reviewed CSV content tagged by diagnosis, drug, and population.
+- Validated:
+  - Read current `progress.txt`, `Standard document/IMPLEMENTATION_PLAN.md`, relevant Standard documents, and the 2026-04-29 meeting transcript.
+  - Read existing code shape for patient help orders, help-order events, app file presign, patient help-order pages, professional order detail components, notifications, OCR, and DDI/rule surfaces.
+  - Confirmed current implementation has text-only help-order create/reply DTOs, one legacy event attachment field, prescription-only image presign, existing patient app WebSocket details, and desktop-oriented pharmacist/doctor work-order pages.
+- Open risks:
+  - No repository code or Standard documents have been changed for this plan yet.
+  - The new multi-attachment event model needs a migration after current Flyway latest `V9__ddi_admin_detail_alignment.sql`; do not modify already-applied migrations.
+  - Hospital-reviewed rule and education content is not required to unblock development, but unreviewed medical details must be hidden or clearly excluded from formal hospital-facing demonstration.
+  - Dialect evaluation using public program audio is limited to internal evaluation only; original public audio should not be stored as product data or externally demonstrated without authorization.
+  - Real AI/OCR still depends on environment-provided credentials; do not commit secrets or `.env` values.
+- Next:
+  - Continue planning the Week 1 text/image help-order slice into exact contracts, migration shape, patient UI states, pharmacist mobile route behavior, and targeted test cases.
+  - Then plan Week 2 doctor agree/disagree traceability, Week 3 medication/family reminders, and Week 4 import/education/dialect evaluation and full demo rehearsal.
+
+Last Updated
+- 2026-05-12 Asia/Shanghai
+- Reason: recorded hospital follow-up planning decisions and the agreed Week 1 text/image help-order slice without changing code.
+
+Trial Demo Phase T0/T1 Implementation (2026-05-12)
+- Workstream:
+  - Post-P0 trial/demo closed-loop implementation, first slice: patient text/image help-order to pharmacist mobile Web reply.
+- Changed:
+  - Updated Standard documents for the phase-based trial/demo sequence, help-order image attachment contract, and mobile help-order flow.
+  - Added Flyway `V10__help_order_event_attachments.sql` for `help_order_event_attachment`; next new migration must be V11.
+  - Extended `/app-api/files/presign` to allow `HELP_ORDER_IMAGE` with JPEG/PNG/WebP, 10 MB max.
+  - Added `/app-api/files/register` so uploaded help-order images become `file_asset` rows before order creation/reply.
+  - Added multi-image event attachments to `HelpOrderDTO.EventDTO.attachments` with short-lived detail-time download URLs.
+  - Preserved legacy `help_order_event.attachment_file_asset_id` for historical compatibility.
+  - Added backend validation for at most 3 images per help-order event, file ownership, `HELP_ORDER_IMAGE` type, and terminal order reply conflict.
+  - Patient help-order create page now supports camera/gallery images, upload privacy warning, object-storage PUT, file registration, and create-with-attachment IDs.
+  - Patient help-order detail now displays image thumbnails and supports follow-up text or images, with at least one required while the order is open.
+  - Pharmacist frontend added independent `/mobile/workorders` route for mobile list/detail/image preview/text reply, reusing existing admin APIs and WebSocket refresh events.
+- Validated:
+  - `mvn -q test -f D:\yaoanshi\backend-v2\pom.xml` passed.
+  - `npm run build --prefix D:\yaoanshi\frontend\huanzhe` passed.
+  - `npm run build --prefix D:\yaoanshi\frontend\pharmacist` passed.
+  - `python D:\yaoanshi\.codex\skills\yaoanshi-neat\scripts\check_knowledge_state.py D:\yaoanshi` passed with warnings only.
+- Open risks:
+  - Browser/mobile-width walkthrough against a live local stack still needs to be run.
+  - Pharmacist mobile route has build validation but not visual QA screenshots yet.
+  - The knowledge checker still reports pre-existing relative-time markers in `progress.txt` and Standard documents.
+  - `progress.txt` already had uncommitted changes before this cleanup; do not treat the whole file diff as only this session's work.
+- Next:
+  - Start local stack and manually verify the Phase T1 script: patient creates “服药后皮下淤血” adverse-reaction order with 1-3 images, pharmacist opens `/mobile/workorders`, views images, replies, and patient detail sees the reply.
+  - Then plan/implement Phase T2: doctor mobile Web queue/detail, patient minimum context, and structured `ADOPTED` / `NOT_ADOPTED` decision events.
+
+Last Updated
+- 2026-05-12 Asia/Shanghai
+- Reason: recorded Phase T0/T1 implementation, validation, known risks, and next Phase T2 action.
+
+Trial Demo Phase T2 Implementation (2026-05-12)
+- Workstream:
+  - Post-P0 trial/demo closed-loop implementation, second slice: doctor mobile Web collaboration and structured decision events.
+- Changed:
+  - Added `POST /admin-api/help-orders/{id}/doctor-decision` for doctor-only `ADOPTED` / `NOT_ADOPTED` decisions.
+  - Doctor decisions append `DOCTOR_DECISION` help-order events with `metadata_json.decisionResult`, close the order, write the final conclusion into `service_notice`, and notify the patient plus responsible pharmacist.
+  - Extended `HelpOrderDTO` detail responses with additive `patientContext` containing minimum non-sensitive context: name, gender, age, primary diagnosis, allergy summaries, medical-history summary, and current-medication summary.
+  - Extended help-order event DTOs with additive `decisionResult` for timeline display.
+  - Added doctor mobile Web route `/mobile/workorders` with escalated queue, detail timeline, image viewing, patient context, and structured decision form.
+  - Fixed doctor work-order page/component visible Chinese mojibake in the touched route, queue, summary, timeline, and action-bar surfaces.
+  - Updated Standard documents for the T2 route, endpoint, event semantics, and validation gate.
+- Validated:
+  - `mvn -q "-Dtest=AdminHelpOrderServiceTest" test -f D:\yaoanshi\backend-v2\pom.xml` passed.
+  - `mvn -q "-Dtest=AdminHelpOrderServiceTest,AppHelpOrderServiceTest,NotificationDispatchServiceTest" test -f D:\yaoanshi\backend-v2\pom.xml` passed.
+  - `mvn -q test -f D:\yaoanshi\backend-v2\pom.xml` passed.
+  - `npm run build --prefix D:\yaoanshi\frontend\yisheng\web-admin` passed.
+  - `npm run build --prefix D:\yaoanshi\frontend\huanzhe` passed.
+  - `npm run build --prefix D:\yaoanshi\frontend\pharmacist` passed.
+  - `python D:\yaoanshi\.codex\skills\yaoanshi-neat\scripts\check_knowledge_state.py D:\yaoanshi` passed with warnings only.
+- Open risks:
+  - Browser/mobile-width walkthrough was not completed because `http://localhost:8080/health` and `http://localhost:3001` timed out; the local live stack was not available in this session.
+  - Phase T1 mobile walkthrough remains open for the same live-stack reason.
+  - Knowledge checker still reports pre-existing relative-time marker warnings in `progress.txt` and Standard documents.
+  - Current working tree still includes uncommitted Phase T1 changes plus this T2 slice; do not treat all diffs as only T2.
+- Next:
+  - Start the local stack and run the combined T1/T2 browser walkthrough: patient submits image help order, pharmacist replies/escalates from mobile, doctor opens `/mobile/workorders`, submits `ADOPTED` or `NOT_ADOPTED`, and patient/pharmacist timelines show the final conclusion.
+
+Last Updated
+- 2026-05-12 Asia/Shanghai
+- Reason: recorded Phase T2 implementation, validation, and live-stack walkthrough blocker.
+
+Trial Demo Phase T1/T2 Mobile-Width Verification Gate (2026-05-12)
+- Workstream:
+  - Post-P0 trial/demo closed-loop validation for patient image help order, pharmacist mobile reply, doctor mobile decision, and patient final-result visibility.
+- Changed:
+  - Added patient e2e script `frontend/huanzhe/scripts/e2e-helporder-mobile-decision.mjs`.
+  - Added npm command `e2e:helporder-mobile`.
+  - Fixed patient app help-order detail event DTO mapping so app-side `DOCTOR_DECISION` events expose `decisionResult` from `metadata_json`.
+  - Added `AppHelpOrderServiceTest` coverage for app-side doctor decision result timeline exposure.
+- Validated:
+  - `node --check scripts/e2e-helporder-mobile-decision.mjs` passed in `frontend/huanzhe`.
+  - `mvn -q "-Dtest=AppHelpOrderServiceTest" test -f D:\yaoanshi\backend-v2\pom.xml` passed.
+  - Local backend-v2 `/health` returned 200 after running backend-v2 from the host with Docker MySQL/Redis/MinIO.
+  - `powershell -ExecutionPolicy Bypass -File D:\yaoanshi\ops\scripts\start-mobile-demo-stack.ps1 -SkipDocker` prepared local professional test accounts and started/reused patient, doctor, and pharmacist dev servers.
+  - `npm run e2e:helporder-mobile --prefix D:\yaoanshi\frontend\huanzhe` passed.
+  - Passing e2e summary: `attachmentCount=1`, `decisionResult=ADOPTED`, `finalStatus=CLOSED`, `patientFinalResultVisible=true`.
+- Open risks:
+  - Full Docker backend-v2 image build was blocked by external Docker/APK TLS/EOF fetch failures, so the successful verification used host-run backend-v2 plus Docker infrastructure services.
+  - The script revealed an existing app profile update issue: `PUT /app-api/patients/me/profile` can fail for a first-time `patient_profile` insert because `real_name_verified` is null; the verification script avoids that path by using admin patient update for context seeding.
+  - Knowledge checker relative-time warnings in `progress.txt` and Standard documents remain pre-existing.
+- Next:
+  - Plan Phase T3: medication reminder and family second-reminder demo path, using the now-validated T1/T2 help-order closed loop as the baseline.
+
+Last Updated
+- 2026-05-12 Asia/Shanghai
+- Reason: added and passed the T1/T2 mobile-width e2e verification gate.
+
+Trial Demo Phase T3 Implementation (2026-05-12)
+- Workstream:
+  - Post-P0 trial/demo closed-loop implementation, third slice: medication reminder and family second-reminder demo path.
+- Changed:
+  - Extended app-side `DoseTaskDTO` with additive reminder-stage fields: `reminderStage`, `overdueMinutes`, `familyReminderDue`, and `familyBindingCount`.
+  - Backend now derives reminder stages from existing dose tasks and active family binding count without adding tables, migrations, notification logs, or background schedulers.
+  - Reminder stage semantics are fixed as `UPCOMING`, `DUE`, `FAMILY_REMINDER_DUE`, `OVERDUE`, and `HANDLED`, with the family reminder threshold fixed at 30 minutes overdue.
+  - Patient reminder pages `/medication-reminder` and `/tabs/medication` now show App-internal reminder state, including patient-side "family has been reminded" and family-side "needs your help" messages.
+  - Touched reminder UI text was normalized to readable Chinese in the affected task-card, button, toast, and empty-state surfaces.
+  - Extended `frontend/huanzhe/scripts/e2e-medication-family.mjs` to create an already-overdue dose task, assert patient/family reminder UI, complete family delegated check-in, and verify the task returns to `HANDLED`.
+  - Updated Standard documents for the T3 `DoseTaskDTO` contract, daily medication/family-assisted flows, and validation gate.
+- Validated:
+  - `mvn -q "-Dtest=AppMedicationServiceTest" test -f D:\yaoanshi\backend-v2\pom.xml` passed.
+  - `npm run build --prefix D:\yaoanshi\frontend\huanzhe` passed.
+  - `node --check frontend\huanzhe\scripts\e2e-medication-family.mjs` passed.
+  - Original `npm run e2e:medication-family --prefix D:\yaoanshi\frontend\huanzhe` was blocked because `127.0.0.1:48080` was not listening.
+  - T3 e2e passed against a temporary validation stack using backend `18080`, patient `3101`, and pharmacist proxy `3103`.
+  - Passing T3 e2e summary: `familyOperatorType=FAMILY`, `familyHandledReminderStage=HANDLED`, `familyReminderDueAfterCheckin=false`.
+- Open risks:
+  - The main local `8080` backend listener was a Docker/WSL relay serving a pre-existing runtime, so the successful T3 e2e used a temporary host-run backend on `18080`.
+  - Knowledge checker relative-time warnings in `progress.txt` and Standard documents remain pre-existing.
+  - Current working tree still includes uncommitted T1/T2 changes plus this T3 slice; do not treat all diffs as only T3.
+- Next:
+  - Plan Phase T4: OCR hardening, CSV rule import, and reviewed education recommendation.
+
+Last Updated
+- 2026-05-12 Asia/Shanghai
+- Reason: implemented and validated Phase T3 medication/family second-reminder demo path.
+
+Trial Demo Phase T4 Implementation (2026-05-16)
+- Workstream:
+  - Post-P0 trial/demo closed-loop implementation, fourth slice: OCR hardening, CSV rule import, and reviewed education recommendation.
+- Changed:
+  - Added `V11__t4_ocr_import_education.sql` for OCR record hardening fields and `education_content_card`.
+  - Hardened OCR output handling: medication-only structured JSON prompt, safe extracted text, confidence threshold `0.80`, OCR draft items written as `prescription_item.source = OCR`, and prescription status `OCR_DONE` only for high-confidence structured results.
+  - Added test-profile `MockOcrService` so OCR tests/builds do not require live OCR secrets.
+  - Added DDI and contraindication CSV import endpoints with dry-run preview, row-level result reporting, 1 MB / 500 row limits, duplicate-key errors, LOW/MEDIUM/HIGH severity support, and overwrite by `ruleCode`.
+  - Added education content import/list APIs with overwrite by `contentCode`, `DRAFT/REVIEWED/INACTIVE` status, ISO `reviewedAt`, and patient-side reviewed-only recommendation/detail endpoints.
+  - Pharmacist Web now exposes CSV import/template actions under `/ddi/rules`, an education content screen at `/education/content`, and OCR raw text / OCR draft item visibility in prescription review.
+  - Patient App now shows reviewed education recommendations at the top of `/rational-medication` and opens detail route `/education/cards/:id`.
+  - Updated Standard documents for T4 routes, endpoints, OCR persistence semantics, CSV import behavior, and validation gate.
+- Validated:
+  - `mvn -q "-Dtest=AppPrescriptionServiceTest,AdminDdiServiceTest,EducationServiceTest" test` passed in `backend-v2`.
+  - `npm run build` passed in `frontend/pharmacist`.
+  - `npm run build` passed in `frontend/huanzhe`.
+- Open risks:
+  - Live OCR still requires `MEDICINE_OCR_API_KEY`; default/test flows use graceful fallback or mock OCR.
+  - Browser walkthrough against a live local stack was not run in this slice.
+  - Current working tree still includes uncommitted T1/T2/T3 changes plus T4; do not treat all diffs as only T4.
+- Next:
+  - Plan Phase T5: voice evaluation and final demo acceptance, then run a full demo walkthrough after the local stack is available.
+
+Last Updated
+- 2026-05-16 Asia/Shanghai
+- Reason: implemented and validated Phase T4 OCR/CSV/education demo slice.
+
+Trial Demo Phase T5 Implementation (2026-05-16)
+- Workstream:
+  - Post-P0 trial/demo closed-loop implementation, fifth slice: help-order voice message plus XFYUN speech-to-text.
+- Changed:
+  - Added `V12__help_order_voice_transcription.sql`, including `help_order_voice_transcript` and `file_asset.business_type` widening for `HELP_ORDER_AUDIO_TRANSCRIPT_SOURCE`.
+  - Added help-order voice DTOs, transcript DTOs, audio file registration support, app/admin transcription endpoints, and idempotent transcript handling.
+  - Added XFYUN streaming speech service with server-side environment variables only, HMAC-SHA256 WebSocket auth, primary `xfime-mianqie`, fallback `iat/mandarin`, missing-key graceful `UNCONFIGURED`, and WAV-to-PCM payload stripping before provider calls.
+  - Patient app now supports hold-to-talk on help-order create/detail, uploads playback audio plus hidden WAV source, sends the original voice message first, plays audio, and lets patient/family trigger or retry transcription.
+  - Pharmacist desktop/mobile timelines can play audio, view transcript state/result, and trigger transcription. Doctor desktop/mobile timelines can play audio and view transcript results without a trigger.
+  - Updated Standard documents and added `reportdocs/T5-voice-sample-report.md`.
+  - Installed FFmpeg via `winget` package `Gyan.FFmpeg` version `8.1.1` and verified `测试语音/*.mp4` can be extracted to mono 16 kHz `pcm_s16le` WAV for ASR-style sample checks.
+- Validated:
+  - `mvn -q "-Dtest=AppFileServiceTest,AppHelpOrderServiceTest,AdminHelpOrderServiceTest,HelpOrderVoiceTranscriptionServiceTest" test -f D:\yaoanshi\backend-v2\pom.xml` passed.
+  - `npm run build --prefix D:\yaoanshi\frontend\huanzhe` passed.
+  - `npm run build --prefix D:\yaoanshi\frontend\pharmacist` passed.
+  - `npm run build --prefix D:\yaoanshi\frontend\yisheng\web-admin` passed.
+  - `git diff --check` passed with only pre-existing Windows LF-to-CRLF warnings.
+  - `ffprobe` + `ffmpeg` sample extraction passed for all six files under `测试语音/`; extraction details are in `reportdocs/T5-voice-sample-report.md`.
+- Open risks:
+  - XFYUN live transcription credentials have been injected into the local environment file by the operator; no secret values are recorded in project documents.
+  - Live transcription still needs a backend restart through `backend-v2/scripts/run-local-with-env.ps1` before the running process can use the injected variables.
+  - Browser/Android WebView microphone permission walkthrough against a live stack was not run in this slice.
+  - Current working tree still includes uncommitted T1/T2/T3/T4 changes plus T5; do not treat all diffs as only T5.
+- Next:
+  - Restart backend-v2, then run a help-order voice live test: patient sends voice, pharmacist triggers transcription, patient/pharmacist/doctor detail all display the transcript.
+
+Last Updated
+- 2026-05-16 Asia/Shanghai
+- Reason: recorded local XFYUN credential injection status and next live transcription validation step.
+
+Trial Demo Phase T5 MIME Fix and Live Verification (2026-07-29)
+- Workstream:
+  - Fixed parameterized browser audio MIME handling and completed the live patient/pharmacist/doctor voice-help-order walkthrough.
+- Root cause and fix:
+  - Real Chromium recording used `audio/webm;codecs=opus`; the backend previously compared the full value against the MIME whitelist and returned `FILE_UPLOAD_INVALID_TYPE`.
+  - `AppFileService` now trims, lowercases, and removes MIME parameters before whitelist validation, extension inference, presign response generation, file registration, persistence, and DTO output.
+  - XFYUN primary-domain transport failures now retry the configured fallback domain in addition to provider error `11200`.
+  - No API, DTO, database schema, or frontend behavior was changed for the MIME fix.
+- Validated:
+  - `mvn -q "-Dtest=AppFileServiceTest,AppHelpOrderServiceTest,HelpOrderVoiceTranscriptionServiceTest,XfyunSpeechTranscriptionServiceTest" test -f D:\yaoanshi\backend-v2\pom.xml` passed.
+  - Parameterized `audio/webm;codecs=opus` presign/register behavior is covered by `AppFileServiceTest`; unsupported parameterized PDF remains rejected.
+  - The first retry accidentally used the stale Docker backend image on port 8080 and reproduced `FILE_UPLOAD_INVALID_TYPE`; verification resumed after stopping that backend container and starting current `backend-v2` sources with `scripts/run-local-with-env.ps1`.
+  - Patient `13816500004` created help order `6` with two playable real-microphone audio messages; the second 11-second message uploaded successfully and returned a non-empty XFYUN `SUCCESS` transcript containing the core complaint of medication use followed by subcutaneous bruising.
+  - Pharmacist reviewed the transcript and escalated help order `6` to the doctor queue with HTTP 200.
+  - Doctor mobile route `/mobile/workorders` displayed both playable audio messages, the successful transcript, and the pharmacist escalation note; no transcription trigger was present.
+- Open risks:
+  - Pharmacist mobile route `/mobile/workorders` currently exposes reply/transcription controls but no claim or escalate control. Escalation was completed through the existing pharmacist desktop work-order UI, so the exact mobile-only escalation path remains incomplete.
+  - The successful transcript captured the core complaint but omitted the final spoken question about stopping medication or contacting a doctor; live ASR wording remains microphone/provider dependent.
+  - Local verification requires host-run `backend-v2`; the existing `medicine-backend-v2:local` Docker image is stale and does not contain this MIME fix.
+  - No XFYUN secret or `.env.local` value is recorded here.
+- Next:
+  - Plan a narrow pharmacist mobile parity fix for claim/escalate actions, then rebuild the local backend image before relying on Docker-only demo startup.
+
+Last Updated
+- 2026-07-29 Asia/Shanghai
+- Reason: recorded the T5 parameterized MIME fix, XFYUN fallback hardening, and live three-role verification outcome.
+
+Trial Demo Phase T5 Completion and Docker Reverification (2026-08-01)
+- Workstream:
+  - Closed the remaining pharmacist mobile action gap and repeated T5 against a newly built Docker backend.
+- Changed:
+  - Pharmacist `/mobile/workorders` now reuses the shared `OrderActionBar` for claim, reply, escalate, reject, and close actions while retaining voice playback/transcription controls.
+  - Shared pharmacist action rules now match backend state rules: `SUBMITTED` shows claim/reply/escalate; `PHARMACIST_IN_PROGRESS` shows reply/escalate/reject/close; `WAITING_DOCTOR`, `CLOSED`, and `REJECTED` are read-only.
+  - Mobile work-order E2E now uses the real pharmacist UI for claim, reply, and escalation, and covers required reject/close branches plus 390x844 and 430x932 horizontal-overflow checks.
+  - Added all seven XFYUN keys to `ops/.env.backend-v2.local.example`; documented separate host-run and Docker env files plus the stale-image restriction for `-SkipDocker`.
+  - Fixed XFYUN authentication on single-digit calendar days by formatting the RFC HTTP date with a two-digit day (`01` instead of Java's permissive `1`); added a regression test.
+  - Doctor mobile decision form now participates in normal document flow so it no longer overlays timeline audio/transcript content.
+  - Updated `Standard document/APP_FLOW.md` to define the full pharmacist mobile action workflow.
+- Validated:
+  - `npm run build --prefix D:\yaoanshi\frontend\pharmacist` passed.
+  - `npm run build --prefix D:\yaoanshi\frontend\yisheng\web-admin` passed.
+  - `npm run e2e:helporder-mobile --prefix D:\yaoanshi\frontend\huanzhe` passed with UI claim/reply/escalate, `REJECTED`, empty-note `CLOSED`, doctor `ADOPTED`, and patient final `CLOSED` assertions.
+  - `mvn -q "-Dtest=AppFileServiceTest,AppHelpOrderServiceTest,AdminHelpOrderServiceTest,HelpOrderVoiceTranscriptionServiceTest,XfyunSpeechTranscriptionServiceTest" test -f D:\yaoanshi\backend-v2\pom.xml` passed.
+  - `docker compose -f D:\yaoanshi\ops\docker-compose.yml up -d --build mysql redis minio backend-v2` rebuilt the current backend image successfully; `/health` returned HTTP 200 and the container was healthy.
+  - Real Chromium recording produced `audio/webm;codecs=opus`, uploaded through MinIO, and created Docker help order 14. Pharmacist-triggered transcription reached `SUCCESS` with non-empty text containing the core semantics: aspirin use followed by subcutaneous bruising and a question about stopping medication/contacting a doctor.
+  - Pharmacist mobile completed claim and escalation to `WAITING_DOCTOR`; doctor mobile displayed playable audio and transcript with zero transcription buttons.
+  - Visual QA passed at 390x844 and 430x932: no horizontal overflow; the doctor decision form starts below the timeline and does not overlap content.
+  - `git diff --check` passed with only existing Windows LF-to-CRLF warnings.
+- Open risks:
+  - XFYUN primary-domain sending can end with `Output closed`; the configured fallback domain completed the accepted live transcription successfully.
+  - ASR wording remains provider/input dependent; this acceptance intentionally checks `SUCCESS`, non-empty text, and core clinical semantics rather than verbatim completeness.
+  - The working tree still contains uncommitted T1-T5 changes; no unrelated changes were cleaned or reverted.
+- Next:
+  - No next product phase started. Await an explicit scope decision.
+
+Last Updated
+- 2026-08-01 Asia/Shanghai
+- Reason: T5 passed code, Docker, real-browser voice, three-role workflow, and mobile viewport acceptance.
+
+T1-T5 Release Candidate and Test Governance Sync (2026-08-14)
+- Workstream:
+  - Preserve the completed T1-T5 work, inherit protected-main testing governance, and qualify `codex/mobile-demo` for a mergeable PR without adding product scope.
+- Changed:
+  - Committed the complete T5 voice help-order workflow and created local protection branch `codex/backup-mobile-demo-20260814` before history synchronization.
+  - Rebased `codex/mobile-demo` onto the latest `origin/main`, accepting `main` as authoritative for CI, PR templates, Dependabot, and `TESTING.md` while retaining JaCoCo plus the candidate's business dependencies and scripts.
+  - Fixed seven patient-app ESLint violations without broad formatting or behavior changes.
+  - Expanded `TESTING.md` with `e2e:helporder-mobile` and its image, voice, pharmacist-mobile, doctor-decision, and patient-result evidence requirements.
+  - The historical notes above that refer to “uncommitted T1-T5” are superseded by this entry; the work is now committed on the candidate branch.
+- Validated:
+  - Protected `main` governance is active: PR-only merge, required `CI / Required Quality Gate`, up-to-date branch, resolved conversations, linear history, administrator enforcement, and no force-push/deletion. Required approvals remain 0 while there is one collaborator.
+  - Governance-enablement `main` baseline: 92 backend tests, 64.33% JaCoCo line coverage, 60% enforced floor.
+  - Candidate clean backend gate: 139 tests passed with 61.29% JaCoCo line coverage.
+  - Candidate patient gate: ESLint passed, Vitest passed 3/3, type check and production build passed.
+  - Candidate pharmacist and doctor production builds passed; `git diff --check` passed before documentation updates.
+- Open risks:
+  - The required E2E matrix and refreshed real-browser voice evidence still need to be collected for this release candidate.
+  - The feature branch has not yet been pushed and no PR exists; GitHub required checks and review-conversation state therefore remain pending.
+  - Real OCR and XFYUN flows depend on approved environment-provided credentials; no secret values are stored in the repository or this record.
+- Next:
+  - Complete the E2E matrix, recheck the latest `origin/main`, push the feature branch, open the PR, and iterate until the required gate is green and all conversations are resolved. Stop before merge.
+- Delivery references:
+  - Final protected-main CI: https://github.com/Cheems1368/Yaoanshi-v2/actions/runs/30434842136
+  - Test governance PR #2: https://github.com/Cheems1368/Yaoanshi-v2/pull/2
+  - Actions and dependency governance PR #26: https://github.com/Cheems1368/Yaoanshi-v2/pull/26
+  - Test standard: https://github.com/Cheems1368/Yaoanshi-v2/blob/main/TESTING.md
+  - CI workflow: https://github.com/Cheems1368/Yaoanshi-v2/blob/main/.github/workflows/build.yml
+
+Last Updated
+- 2026-08-14 Asia/Shanghai
+- Reason: preserved and rebased T1-T5, inherited the protected-main quality gate, recorded fresh candidate metrics, and began PR qualification.
+
+Release Candidate E2E Qualification (2026-08-14)
+- Workstream:
+  - Refreshed the release-candidate browser flows against the current backend-v2 and three current frontends, without changing API contracts or product behavior.
+- Changed:
+  - Updated stale Chinese UI selectors and professional queue-card selectors in the formal E2E scripts.
+  - Made backend-v2 the default professional-auth source for the affected scenarios, removing the obsolete local dependency on port 48080.
+  - Isolated the two prescription uploads so DDI-confirmation UI teardown cannot race the simulated degradation case.
+  - Redacted refresh-token values from authentication test output; evidence now records only token presence and rotation state.
+- Validated:
+  - One serial run passed all nine required scenarios: `auth-bind`, `auth-refresh`, `auth-expiry`, `prescription-review`, `medication-family`, `helporder-collab`, `helporder-mobile`, `pharmacist-patient`, and `admin-notifications`.
+  - `prescription-review` also passed twice consecutively before the full matrix, including DDI confirmation, degradation fallback, pharmacist confirmation, and rejection.
+  - Real Chromium `MediaRecorder` evidence passed with an approved local audio input: upload and XFYUN transcription reached `SUCCESS` with non-empty text, pharmacist mobile claimed and escalated the order, and doctor mobile displayed the audio and transcript.
+  - A temporary backend with no XFYUN credentials verified the same browser recording/upload path degrades to `UNCONFIGURED` with no transcript. The temporary service was stopped afterward.
+  - Sanitized patient, pharmacist, and doctor screenshots remain local under `.playwright-mcp/` and are excluded from Git; approved credentials and token values are absent from repository output.
+  - After the E2E changes, patient ESLint, Vitest 3/3, type check, production build, Node syntax checks, and `git diff --check` passed.
+- Open risks:
+  - The feature branch has not yet been pushed and no PR exists; GitHub required checks, latest-main status, and review-conversation state remain pending.
+  - Live ASR wording remains provider/input dependent; acceptance checks status, non-empty text, and end-to-end role visibility rather than verbatim transcription.
+- Next:
+  - Re-run the final repository gates from a clean candidate, synchronize the latest `origin/main`, open the PR, and continue until the required gate is green and the PR is mergeable. Do not merge.
+
+Last Updated
+- 2026-08-14 Asia/Shanghai
+- Reason: completed the release-candidate E2E matrix, stabilized prescription degradation coverage, and recorded sanitized voice evidence.
+
+GitHub PR Qualification (2026-08-14)
+- Workstream:
+  - Published the qualified release candidate through the protected-branch workflow and verified the first GitHub Actions run.
+- Changed:
+  - Pushed `codex/mobile-demo` for the first time and opened PR #32 against `main`: https://github.com/Cheems1368/Yaoanshi-v2/pull/32
+  - Filled the repository PR template with risk, rollback, local commands, test counts, coverage, nine E2E scenarios, and sanitized UI/API evidence.
+- Validated:
+  - Immediately before push, `origin/main...HEAD` was 0 behind and 30 ahead; the worktree was clean.
+  - The release diff contained 314 files and no forbidden local files, private keys, JWT bearer values, screenshots, videos, or test input assets.
+  - GitHub CI run #34 completed successfully: https://github.com/Cheems1368/Yaoanshi-v2/actions/runs/31790537870
+  - `CI / Required Quality Gate`, backend tests and coverage, patient app quality, pharmacist build, and doctor build all concluded `success`.
+  - PR #32 had zero review conversations and zero submitted reviews at this check.
+- Open risks:
+  - This progress-only commit will trigger one final CI rerun; mergeability and latest-main status must be reconfirmed after it finishes.
+- Next:
+  - Push this documentation update, wait for the final required gate, update the PR evidence checkbox, and stop once PR #32 is current and mergeable. Do not merge.
+
+Last Updated
+- 2026-08-14 Asia/Shanghai
+- Reason: recorded PR #32 creation and the successful first GitHub required quality gate.
+
+PR #32 Review Remediation (2026-08-14)
+- Workstream:
+  - Addressed four automated review conversations covering Android microphone permission, self-reported medication authorization, plan-item ownership, and the pharmacist transfer workflow.
+- Changed:
+  - Declared Android audio permissions; Capacitor 7's existing `BridgeWebChromeClient` supplies the runtime permission request when WebView requests audio capture.
+  - Required every professional self-reported-medication operation to validate the path work order, pharmacist visibility, and the medication's work-order/patient association.
+  - Required transferred plan items to exist in the same tenant and belong to a medication plan for the same patient.
+  - Replaced the dead `/patients/{id}/medication-plan` navigation with the existing `/patient/info` plan surface; the target fetches server-side prefill data, saves the plan, and writes the resulting plan-item ID back as `TRANSFERRED`.
+  - Extended `e2e:medication-family` to exercise the complete pharmacist UI transfer and status-writeback path.
+- Validated:
+  - `AdminSelfReportedMedicationServiceTest` passed 9/9, including cross-work-order, wrong-pharmacist, cross-patient plan-item, and valid-transfer cases.
+  - Updated `e2e:medication-family` passed with a real persisted plan item and final `TRANSFERRED` status.
+  - Full backend gate passed 143/143 with 61.82% JaCoCo line coverage; the 60% threshold remains unchanged.
+  - Patient ESLint, Vitest 3/3, type check/build, pharmacist build, doctor build, and `git diff --check` passed.
+  - Android `:app:processDebugMainManifest` passed and the merged manifest contains `MODIFY_AUDIO_SETTINGS` and `RECORD_AUDIO`.
+- Open risks:
+  - Full Android `assembleDebug` requires JDK 21 for Capacitor Android 7; the current shell only has JDK 17. The manifest merge itself passed, and no project toolchain setting was weakened.
+  - Final GitHub CI and conversation resolution remain pending for this remediation commit.
+- Next:
+  - Run all local gates, push the remediation, resolve the four review threads with evidence, and wait for the final required quality gate. Do not merge.
+
+Last Updated
+- 2026-08-14 Asia/Shanghai
+- Reason: implemented and locally exercised all four PR #32 review fixes.

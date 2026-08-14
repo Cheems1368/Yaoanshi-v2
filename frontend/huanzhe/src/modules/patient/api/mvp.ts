@@ -24,6 +24,15 @@ export interface FilePresignResponse {
   sizeBytes: number
 }
 
+export interface FileAssetDTO {
+  id: number
+  objectKey: string
+  originalFilename: string
+  contentType: string
+  sizeBytes: number
+  businessType: string
+}
+
 export interface PrescriptionAttachmentDTO {
   id: number
   fileAssetId: number
@@ -50,7 +59,26 @@ export interface PrescriptionDTO {
   rejectReason?: string | null
   ocrStatus?: string | null
   ocrConfidence?: string | null
+  ocrRawText?: string | null
+  ocrFailureReason?: string | null
   attachments: PrescriptionAttachmentDTO[]
+  items?: PrescriptionItemDTO[] | null
+}
+
+export interface PrescriptionItemDTO {
+  id: number
+  drugName: string
+  drugSpec?: string | null
+  dosage?: string | null
+  frequency?: string | null
+  route?: string | null
+  durationDays?: number | null
+  source?: string | null
+}
+
+export interface PlanItemSummaryDTO {
+  drugName: string
+  dosage?: string | null
 }
 
 export interface MedicationPlanDTO {
@@ -68,6 +96,7 @@ export interface MedicationPlanDTO {
   createdByPharmacistId?: number | null
   confirmedAt?: string | null
   createdAt?: string | null
+  items?: PlanItemSummaryDTO[] | null
 }
 
 export interface DoseTaskDTO {
@@ -79,6 +108,10 @@ export interface DoseTaskDTO {
   scheduledAt?: string | null
   status: string
   notificationStatus?: string | null
+  reminderStage?: 'UPCOMING' | 'DUE' | 'FAMILY_REMINDER_DUE' | 'OVERDUE' | 'HANDLED' | string | null
+  overdueMinutes?: number | null
+  familyReminderDue?: boolean | null
+  familyBindingCount?: number | null
   lastEffectiveCheckinId?: number | null
   lockedAfter?: string | null
   drugName: string
@@ -129,7 +162,35 @@ export interface HelpOrderDTO {
   rejectReason?: string | null
   serviceNotice?: string | null
   createdAt?: string | null
+  attachmentFileAssetIds?: number[]
+  voiceAttachment?: HelpOrderVoiceAttachmentPayload
   events?: HelpOrderEventDTO[]
+}
+
+export interface HelpOrderVoiceTranscriptDTO {
+  status: 'PENDING' | 'SUCCESS' | 'FAILED' | 'UNCONFIGURED' | string
+  text?: string | null
+  provider?: string | null
+  errorCode?: string | null
+  transcribedAt?: string | null
+}
+
+export interface HelpOrderVoiceAttachmentPayload {
+  playbackFileAssetId: number
+  transcriptSourceFileAssetId: number
+  durationSeconds: number
+}
+
+export interface HelpOrderAttachmentDTO {
+  id?: number | null
+  fileAssetId: number
+  attachmentType: string
+  originalFilename: string
+  mimeType: string
+  sizeBytes: number
+  downloadUrl: string
+  durationSeconds?: number | null
+  voiceTranscript?: HelpOrderVoiceTranscriptDTO | null
 }
 
 export interface HelpOrderEventDTO {
@@ -142,6 +203,7 @@ export interface HelpOrderEventDTO {
   operatorName?: string | null
   content?: string | null
   attachmentFileAssetId?: number | null
+  attachments?: HelpOrderAttachmentDTO[]
   eventAt?: string | null
 }
 
@@ -151,7 +213,32 @@ export interface AppDdiAlert {
   drugA: string
   drugB: string
   message: string
+  patientSummary?: string | null
   recommendedAction?: string | null
+}
+
+export interface SelfReportedMedicationDTO {
+  id: number
+  patientId: number
+  drugName: string
+  dosage?: string | null
+  status: 'PENDING' | 'ACTIVE' | 'STOPPED' | 'TRANSFERRED' | string
+  notes?: string | null
+  operatorType: string
+  operatorAccountId: number
+  workOrderId?: number | null
+  transferredPlanItemId?: number | null
+  createdAt?: string | null
+}
+
+export interface SelfReportedDrugEntry {
+  drugName: string
+  dosage?: string
+}
+
+export interface SelfReportedMedicationCreateRequest {
+  drugs: SelfReportedDrugEntry[]
+  notes?: string
 }
 
 export interface AppDdiScreenResult {
@@ -163,6 +250,24 @@ export interface PageResult<T> {
   pageSize: number
   total: number
   list: T[]
+}
+
+export interface EducationContentCardDTO {
+  id: number
+  contentCode: string
+  title: string
+  summary?: string | null
+  body?: string | null
+  category?: string | null
+  categoryName?: string | null
+  diagnosisTags?: string[] | null
+  drugTags?: string[] | null
+  populationTags?: string[] | null
+  source?: string | null
+  reviewStatus?: string | null
+  reviewedBy?: string | null
+  reviewedAt?: string | null
+  updatedAt?: string | null
 }
 
 export interface PatientProfileDTO {
@@ -187,6 +292,7 @@ export interface PatientProfileDTO {
   realNameVerifiedTime?: string
   createdAt?: string
   updatedAt?: string
+  operatorType?: string
   emergencyContact?: {
     name?: string
     phone?: string
@@ -324,8 +430,67 @@ export const helpOrderService = {
     return httpService.post<HelpOrderDTO>('/app-api/help-orders', payload)
   },
 
-  replyHelpOrder(id: number, payload: { content: string }) {
+  replyHelpOrder(
+    id: number,
+    payload: { content?: string; attachmentFileAssetIds?: number[]; voiceAttachment?: HelpOrderVoiceAttachmentPayload }
+  ) {
     return httpService.post<HelpOrderDTO>(`/app-api/help-orders/${id}/reply`, payload)
+  },
+
+  presignImage(payload: { filename: string; contentType: string; sizeBytes: number; businessType: 'HELP_ORDER_IMAGE' }) {
+    return httpService.post<FilePresignResponse>('/app-api/files/presign', payload)
+  },
+
+  registerImage(payload: {
+    objectKey: string
+    originalFilename: string
+    contentType: string
+    sizeBytes: number
+    sha256?: string
+    businessType: 'HELP_ORDER_IMAGE'
+  }) {
+    return httpService.post<FileAssetDTO>('/app-api/files/register', payload)
+  },
+
+  presignAudio(payload: {
+    filename: string
+    contentType: string
+    sizeBytes: number
+    businessType: 'HELP_ORDER_AUDIO' | 'HELP_ORDER_AUDIO_TRANSCRIPT_SOURCE'
+  }) {
+    return httpService.post<FilePresignResponse>('/app-api/files/presign', payload)
+  },
+
+  registerAudio(payload: {
+    objectKey: string
+    originalFilename: string
+    contentType: string
+    sizeBytes: number
+    sha256?: string
+    businessType: 'HELP_ORDER_AUDIO' | 'HELP_ORDER_AUDIO_TRANSCRIPT_SOURCE'
+  }) {
+    return httpService.post<FileAssetDTO>('/app-api/files/register', payload)
+  },
+
+  transcribeAttachment(orderId: number, attachmentId: number) {
+    return httpService.post<HelpOrderVoiceTranscriptDTO>(
+      `/app-api/help-orders/${orderId}/attachments/${attachmentId}/transcribe`,
+      {}
+    )
+  },
+
+  async uploadToPresignedUrl(uploadUrl: string, file: File, contentType: string) {
+    const response = await fetch(uploadUrl, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': contentType
+      },
+      body: file
+    })
+
+    if (!response.ok) {
+      throw new Error('IMAGE_UPLOAD_FAILED')
+    }
   }
 }
 
@@ -351,6 +516,51 @@ export const ddiService = {
   }
 }
 
+export interface DrugCatalogDTO {
+  id: number
+  nameCn: string
+  nameEn?: string | null
+  pinyinInitials: string
+  category?: string | null
+}
+
+export const drugCatalogService = {
+  search(q: string, limit = 10) {
+    return httpService.get<DrugCatalogDTO[]>('/app-api/drugs/search', { q, limit })
+  }
+}
+
+export const aiConsentService = {
+  getConsentStatus() {
+    return httpService.get<boolean>('/app-api/ai/consent')
+  },
+
+  grantConsent() {
+    return httpService.post<boolean>('/app-api/ai/consent', {})
+  }
+}
+
+export const selfReportedMedicationService = {
+  create(payload: SelfReportedMedicationCreateRequest, priority = 'NORMAL') {
+    return httpService.post<SelfReportedMedicationDTO[]>(
+      `/app-api/self-reported-medications?priority=${priority}`,
+      payload
+    )
+  },
+
+  list() {
+    return httpService.get<SelfReportedMedicationDTO[]>('/app-api/self-reported-medications')
+  },
+
+  withdraw(id: number) {
+    return httpService.post<void>(`/app-api/self-reported-medications/${id}/withdraw`, {})
+  },
+
+  stop(id: number) {
+    return httpService.post<void>(`/app-api/self-reported-medications/${id}/stop`, {})
+  }
+}
+
 export const prescriptionService = {
   list(params?: { status?: string; pageNo?: number; pageSize?: number }) {
     return httpService.get<PageResult<PrescriptionDTO>>('/app-api/prescriptions', params)
@@ -358,6 +568,20 @@ export const prescriptionService = {
 
   presignUpload(payload: { filename: string; contentType: string; sizeBytes: number; businessType: 'PRESCRIPTION' }) {
     return httpService.post<FilePresignResponse>('/app-api/files/presign', payload)
+  },
+
+  async uploadToPresignedUrl(uploadUrl: string, file: File, contentType: string) {
+    const response = await fetch(uploadUrl, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': contentType
+      },
+      body: file
+    })
+
+    if (!response.ok) {
+      throw new Error('IMAGE_UPLOAD_FAILED')
+    }
   },
 
   registerUpload(payload: {
@@ -368,5 +592,19 @@ export const prescriptionService = {
     sha256?: string
   }) {
     return httpService.post<PrescriptionDTO>('/app-api/prescriptions/uploads', payload)
+  }
+}
+
+export const educationService = {
+  recommendations(limit = 5) {
+    return httpService.get<EducationContentCardDTO[]>('/app-api/education/recommendations', { limit })
+  },
+
+  list(params?: { keyword?: string; category?: string; pageNo?: number; pageSize?: number }) {
+    return httpService.get<PageResult<EducationContentCardDTO>>('/app-api/education/cards', params)
+  },
+
+  detail(id: number) {
+    return httpService.get<EducationContentCardDTO>(`/app-api/education/cards/${id}`)
   }
 }

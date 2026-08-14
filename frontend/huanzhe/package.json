@@ -13,27 +13,33 @@
     "e2e:prescription-review": "node scripts/e2e-prescription-review.mjs",
     "e2e:medication-family": "node scripts/e2e-medication-family.mjs",
     "e2e:helporder-collab": "node scripts/e2e-helporder-collab.mjs",
+    "e2e:helporder-mobile": "node scripts/e2e-helporder-mobile-decision.mjs",
     "e2e:pharmacist-patient": "node scripts/e2e-pharmacist-patient.mjs",
     "e2e:admin-notifications": "node scripts/e2e-admin-notifications.mjs",
     "e2e:challenge-cup": "node scripts/e2e-challenge-cup.mjs",
     "e2e:challenge-cup:live": "node scripts/e2e-challenge-cup-live.mjs",
     "test:unit": "vitest",
     "test:unit:ci": "vitest run",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "android:sync": "cap sync android",
+    "android:build": "powershell -ExecutionPolicy Bypass -File scripts/build-android-debug.ps1",
+    "android:live": "powershell -ExecutionPolicy Bypass -File scripts/run-android-live.ps1"
   },
   "dependencies": {
-    "@capacitor/camera": "^7.0.2",
-    "@capacitor/core": "^7.4.3",
+    "@capacitor/core": "7.4.3",
     "@ionic/vue": "^8.0.0",
     "@ionic/vue-router": "^8.0.0",
     "axios": "^1.11.0",
     "ionicons": "^7.0.0",
+    "lucide-vue-next": "^1.0.0",
     "vue": "^3.3.0",
     "vue-router": "^4.2.0"
   },
   "devDependencies": {
-    "@vitejs/plugin-legacy": "^5.0.0",
-    "@vitejs/plugin-vue": "^4.0.0",
+    "@capacitor/android": "7.4.3",
+    "@capacitor/cli": "7.4.3",
+    "@vitejs/plugin-legacy": "^6.0.0",
+    "@vitejs/plugin-vue": "^5.2.0",
     "@vue/eslint-config-typescript": "^12.0.0",
     "@vue/test-utils": "^2.3.0",
     "eslint": "^8.35.0",
@@ -42,11 +48,9 @@
     "playwright": "^1.58.2",
     "terser": "^5.4.0",
     "typescript": "~5.6.2",
-    "vite": "~5.2.0",
+    "vite": "^6.2.0",
     "vitest": "^0.34.6",
     "vue-tsc": "^2.1.10"
   },
-  "overrides": {
-    "rollup": "4.44.0"
-  }
+  "overrides": {}
 }

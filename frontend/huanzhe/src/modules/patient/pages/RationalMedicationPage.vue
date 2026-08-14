@@ -16,6 +16,31 @@
           <p>按疾病或药物主题快速查看核心用法、风险提示和联合用药注意事项。</p>
         </section>
 
+        <section v-if="recommendationLoading || recommendations.length || recommendationError" class="recommendation-section">
+          <div class="section-head">
+            <h3>为你推荐</h3>
+            <ion-spinner v-if="recommendationLoading" name="crescent" />
+          </div>
+          <ion-card v-if="recommendationError" class="empty-card">
+            <ion-card-content>{{ recommendationError }}</ion-card-content>
+          </ion-card>
+          <article
+            v-for="card in recommendations"
+            :key="card.id"
+            class="education-card"
+            @click="openEducationCard(card.id)"
+          >
+            <div class="category-head">
+              <h3>{{ card.title }}</h3>
+              <ion-badge v-if="card.categoryName || card.category">{{ card.categoryName || card.category }}</ion-badge>
+            </div>
+            <p>{{ card.summary || '点击查看已审核的用药教育内容。' }}</p>
+            <div class="tag-row">
+              <ion-chip v-for="tag in mergedTags(card)" :key="`${card.id}-${tag}`" size="small">{{ tag }}</ion-chip>
+            </div>
+          </article>
+        </section>
+
         <ion-searchbar
           v-model="searchText"
           placeholder="搜索分类、主题或药品"
@@ -69,13 +94,18 @@ import {
   IonHeader,
   IonPage,
   IonSearchbar,
+  IonSpinner,
   IonTitle,
   IonToolbar
 } from '@ionic/vue'
 import { rationalMedicationData } from '@/modules/patient/data/rationalMedication'
+import { educationService, type EducationContentCardDTO } from '@/modules/patient/api/mvp'
 
 const router = useRouter()
 const searchText = ref('')
+const recommendations = ref<EducationContentCardDTO[]>([])
+const recommendationLoading = ref(false)
+const recommendationError = ref('')
 
 const filteredCategories = computed(() => {
   return rationalMedicationData.searchCategories(searchText.value)
@@ -85,107 +115,153 @@ const openCategory = (categoryId: string) => {
   router.push(`/drug-category/${categoryId}`)
 }
 
+const openEducationCard = (id: number) => {
+  router.push(`/education/cards/${id}`)
+}
+
+const mergedTags = (card: EducationContentCardDTO) => {
+  return [...(card.diagnosisTags || []), ...(card.drugTags || []), ...(card.populationTags || [])].slice(0, 4)
+}
+
 const resetSearch = () => {
   searchText.value = ''
 }
+
+const loadRecommendations = async () => {
+  recommendationLoading.value = true
+  recommendationError.value = ''
+  try {
+    const response = await educationService.recommendations(5)
+    recommendations.value = response.data || []
+  } catch (error) {
+    recommendations.value = []
+    recommendationError.value = error instanceof Error ? error.message : '推荐内容加载失败'
+  } finally {
+    recommendationLoading.value = false
+  }
+}
+
+loadRecommendations()
 </script>
 
 <style scoped>
 .page-header {
-  --background: #2979ff;
-  --color: #ffffff;
+  --background: var(--patient-primary);
+  --color: var(--patient-text-inverse);
 }
 
 .page-content {
-  --background: linear-gradient(180deg, #eff6ff 0%, #ffffff 36%, #f8fafc 100%);
+  --background: linear-gradient(180deg, var(--patient-primary-light) 0%, var(--patient-bg-card) 36%, var(--patient-bg-page) 100%);
 }
 
 .container {
-  padding: 16px;
+  padding: var(--patient-space-4);
 }
 
 .intro-card {
-  padding: 18px;
-  border-radius: 16px;
-  background: #ffffff;
-  box-shadow: 0 2px 12px rgba(15, 23, 42, 0.08);
-  margin-bottom: 14px;
+  padding: var(--patient-space-5);
+  border-radius: var(--patient-radius-lg);
+  background: var(--patient-bg-card);
+  box-shadow: var(--patient-shadow-md);
+  margin-bottom: var(--patient-space-4);
 }
 
 .intro-card h2 {
-  margin: 0 0 8px;
-  font-size: 20px;
-  color: #0f172a;
+  margin: 0 0 var(--patient-space-2);
+  font-size: var(--patient-font-subtitle);
+  color: var(--patient-text-primary);
 }
 
 .intro-card p {
   margin: 0;
-  color: #475569;
-  line-height: 1.6;
+  color: var(--patient-text-secondary);
+  line-height: var(--patient-leading-relaxed);
 }
 
 .search-bar {
-  --background: #ffffff;
-  --border-radius: 12px;
-  --box-shadow: 0 2px 10px rgba(15, 23, 42, 0.08);
-  margin-bottom: 16px;
+  --background: var(--patient-bg-card);
+  --border-radius: var(--patient-radius-md);
+  --box-shadow: var(--patient-shadow-sm);
+  margin-bottom: var(--patient-space-4);
 }
 
 .category-grid {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 12px;
+  gap: var(--patient-space-3);
 }
 
-.category-card {
-  background: #ffffff;
-  border-radius: 14px;
-  border: 1px solid #dbeafe;
-  padding: 14px;
-  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.06);
+.recommendation-section {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--patient-space-3);
+  margin-bottom: var(--patient-space-4);
+}
+
+.section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.section-head h3 {
+  margin: 0;
+  color: var(--patient-text-primary);
+  font-size: var(--patient-font-subtitle);
+}
+
+.category-card,
+.education-card {
+  background: var(--patient-bg-card);
+  border-radius: var(--patient-radius-lg);
+  border: 1px solid var(--patient-border-light);
+  padding: var(--patient-space-4);
+  box-shadow: var(--patient-shadow-sm);
 }
 
 .category-head {
   display: flex;
   justify-content: space-between;
-  gap: 10px;
-  margin-bottom: 8px;
+  gap: var(--patient-space-3);
+  margin-bottom: var(--patient-space-2);
 }
 
-.category-card h3 {
+.category-card h3,
+.education-card h3 {
   margin: 0;
-  color: #1e293b;
-  font-size: 18px;
+  color: var(--patient-text-primary);
+  font-size: var(--patient-font-subtitle);
 }
 
-.category-card p {
-  margin: 0 0 10px;
-  color: #64748b;
-  line-height: 1.5;
+.category-card p,
+.education-card p {
+  margin: 0 0 var(--patient-space-3);
+  color: var(--patient-text-muted);
+  line-height: var(--patient-leading-normal);
 }
 
 .tag-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: var(--patient-space-2);
 }
 
 ion-chip {
-  --background: #dbeafe;
-  --color: #1d4ed8;
+  --background: var(--patient-primary-light);
+  --color: var(--patient-primary);
   height: 28px;
 }
 
 .empty-card {
-  border-radius: 14px;
+  border-radius: var(--patient-radius-lg);
   text-align: center;
 }
 
 .empty-card h3 {
-  color: #0f172a;
+  color: var(--patient-text-primary);
 }
 
 .empty-card p {
-  color: #64748b;
+  color: var(--patient-text-muted);
 }
 </style>

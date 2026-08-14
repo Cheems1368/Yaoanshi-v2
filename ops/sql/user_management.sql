@@ -1,6 +1,10 @@
 ﻿-- =============================================
 -- 鐢ㄦ埛绠＄悊鍒濆鍖栬剼鏈?
 -- 鑸熷北鍒嗗矝鍖荤枟绠＄悊绯荤粺
+-- DEPRECATED: use D:/yaoanshi/ops/scripts/ensure-local-professional-test-accounts.ps1
+-- for local professional test accounts. This old script only creates users and can
+-- leave doctor/pharmacist role bindings inconsistent.
+
 -- =============================================
 
 USE medicine;

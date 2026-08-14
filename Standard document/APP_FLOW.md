@@ -8,7 +8,7 @@ Rules:
 
 - All flow descriptions in this document use plain English.
 - This document defines the expected user navigation for MVP.
-- Legacy pages inside `docs/` or old front-end code are reference only.
+- Old front-end code can be inspected for current implementation state, but it is not a flow authority.
 - If a legacy route conflicts with this document, this document wins.
 
 ## 2. Product surfaces
@@ -81,7 +81,9 @@ Current MVP route list for the patient app:
 - `/drug-detail/:id` - Drug Detail Screen
 - `/drug-category/:id` - Drug Category Screen
 - `/rational-medication` - Rational Medication Education Screen
+- `/education/cards/:id` - Reviewed Education Card Detail Screen
 - `/ai-assistant` - AI Medication Assistant Screen
+- `/self-reported-medications` - Self-Reported Medication Screen
 
 ### 4.3 Patient App screen list
 
@@ -281,11 +283,14 @@ Success:
 - Create the help order
 - After successful submit, enter the help order detail conversation
 - Show that the pharmacist will handle it during service hours if submitted after hours
+- For image help orders, pre-sign, upload, register the file, then submit the order with up to three image file IDs
+- For voice help orders, the user fills title/category first, holds the voice button, releases to send the audio original, and enters the detail conversation
 
 Error:
 
 - Show validation message when the title is missing
 - Show upload failure if an image fails
+- Show voice send failure if recording, upload, or file registration fails
 - Allow retry
 
 #### Help Order Detail / Conversation Screen
@@ -307,6 +312,10 @@ Success:
 - Load the latest event stream
 - Show new pharmacist or doctor replies
 - Allow text follow-up while the order is still open
+- Show image thumbnails in the relevant conversation bubble
+- Show voice playback, duration, transcription status, and transcription result under the relevant conversation bubble
+- Allow follow-up messages with text, images, or one voice recording, as long as at least one of them is present
+- Patient/family can tap "transcribe" or "retry transcribe" on an audio message; if speech credentials are missing or provider fails, the original audio remains playable
 
 Error:
 
@@ -429,7 +438,7 @@ Route: `/rational-medication`
 
 Purpose:
 
-- Show education content
+- Show static medication navigation plus reviewed education recommendations from backend-v2
 
 Trigger:
 
@@ -437,11 +446,14 @@ Trigger:
 
 Success:
 
-- Content is displayed
+- Recommended `REVIEWED` cards are shown at the top using patient diagnosis, active medications, elderly tags, and GENERAL fallback
+- User can open `/education/cards/:id` to read card body and review metadata
+- Static category browsing remains available below recommendations
 
 Error:
 
 - Show load failure
+- Recommendation load failure does not block static category browsing
 
 #### AI Medication Assistant Screen
 
@@ -463,6 +475,38 @@ Success:
 Error:
 
 - Show AI service failure with one-click retry
+
+#### Self-Reported Medication Screen
+
+Route: `/self-reported-medications`
+
+Purpose:
+
+- Let the patient record medications taken outside the formal medication plan
+- Trigger DDI screening before submission
+- View and manage self-reported medication records
+
+Trigger:
+
+- User taps "记录新药品" (Record New Drug) quick entry on Home page
+
+Main actions:
+
+1. View list of self-reported medication records (PENDING / ACTIVE / STOPPED / TRANSFERRED)
+2. Tap "新增" to open entry form: drug name (required), dosage, notes
+3. Before submit: system calls DDI screening; if alerts exist, show alert dialog (see section 7.4.2)
+4. Submit → `POST /app-api/self-reported-medications`
+5. PENDING records can be withdrawn → `POST /app-api/self-reported-medications/{id}/withdraw`
+
+Success:
+
+- Record is created and review work order is auto-created for pharmacist
+- User sees the updated record list with status
+
+Error:
+
+- Show DDI screening failure gracefully (do not block submission)
+- Show save failure and allow retry
 
 ### 4.4 Patient App primary flow
 
@@ -503,12 +547,14 @@ Trigger:
 Steps:
 
 1. User opens `/medication-reminder`
-2. User selects the result: on time, delayed, missed, or skipped
-3. User optionally adds a note
-4. User submits
-5. System saves the record
-6. Home data refreshes
-7. System shows the next reminder
+2. App shows each task reminder stage: upcoming, due, overdue, family reminder due, or handled
+3. If the task is at least 30 minutes overdue and the patient has an active family binding, the patient sees that family has been reminded
+4. User selects the result: on time, delayed, missed, or skipped
+5. User optionally adds a note
+6. User submits
+7. System saves the record
+8. Home data refreshes
+9. System shows the next reminder
 
 Success:
 
@@ -581,18 +627,21 @@ Error:
 Trigger:
 
 - Family account logs in to help the patient
+- A pending dose task is at least 30 minutes overdue and family reminder is due
 
 Steps:
 
 1. Family account logs in through `/login`
 2. Bound care view opens
 3. Family account sees pending tasks and help orders
-4. Family account completes a dose record or submits a help order
-5. System stores the operator type as family account
+4. Overdue dose tasks with active family reminder are highlighted as needing family assistance
+5. Family account completes a dose record or submits a help order
+6. System stores the operator type as family account
 
 Success:
 
 - The same patient flow is completed with family assistance
+- After family check-in, the task returns to handled reminder state
 
 Error:
 
@@ -624,6 +673,7 @@ Authoritative MVP route list for pharmacist-facing navigation:
 - `/prescription/prescriptions` - Prescription List Screen
 - `/prescription/prescriptionDetail` - Prescription Detail / OCR Review Screen
 - `/ddi/rules` - DDI Rule Management Screen (P0+ enhancement)
+- `/education/content` - Reviewed Education Content Management Screen (T4)
 - `/user/profile` - User Profile Screen
 
 Non-MVP legacy menu groups must stay hidden for trial users.
@@ -722,9 +772,12 @@ Error:
 
 Route: `/system/help-order`
 
+Mobile route: `/mobile/workorders`
+
 Purpose:
 
 - Show all help orders assigned to the pharmacist
+- On mobile Web, provide the full pharmacist workflow: list pending orders, open detail, view image/voice attachments, claim, reply, trigger voice transcription, escalate to doctor, reject, and close
 
 Trigger:
 
@@ -734,6 +787,7 @@ Trigger:
 Success:
 
 - User opens a help order detail screen
+- Mobile Web receives help-order WebSocket events, refreshes the list, and shows an in-page prompt
 
 Error:
 
@@ -749,6 +803,8 @@ Purpose:
 - respond,
 - reject,
 - or escalate to doctor
+- View image attachments on mobile Web without entering the desktop workstation layout
+- Use the same status-based action rules on desktop and mobile Web: `SUBMITTED` allows claim/reply/escalate; `PHARMACIST_IN_PROGRESS` allows reply/escalate/reject/close; `WAITING_DOCTOR`, `CLOSED`, and `REJECTED` are read-only
 
 Trigger:
 
@@ -764,6 +820,10 @@ Success:
 
 - Status changes to pharmacist processing, completed, rejected, or waiting for doctor
 - Timeline and audit data are updated
+- For the first image-help-order phase, pharmacist text reply is visible in the patient conversation detail
+- Pharmacist can play help-order voice messages, view transcription state/result, and trigger transcription or retry
+- Pharmacist mobile Web can claim, reply, transcribe, escalate, reject, and close without switching to the desktop route
+- Doctor views can play voice messages and view transcription results, but cannot trigger transcription
 
 Error:
 
@@ -949,6 +1009,7 @@ Current MVP route list for doctor-facing navigation:
 - `/login` - Login Screen
 - `/doctor-dashboard` - Doctor Dashboard Screen
 - `/workorders` - Escalated Work Order Queue Screen
+- `/mobile/workorders` - Doctor Mobile Escalated Work Order Screen
 - `/profile` - User Profile Screen
 
 The following are not part of the normal doctor MVP navigation:
@@ -1023,6 +1084,31 @@ Error:
 
 - Show queue load failure
 
+#### Doctor Mobile Escalated Work Order Screen
+
+Route: `/mobile/workorders`
+
+Purpose:
+
+- Let doctors process escalated help orders on mobile Web during trial/demo walkthroughs
+- Show the patient minimum context needed for a decision
+- Submit a structured doctor decision
+
+Trigger:
+
+- Doctor opens the mobile Web route directly
+- Doctor receives a help-order notification and opens the mobile route
+
+Success:
+
+- Doctor sees escalated order detail, images, timeline, and patient context
+- Doctor chooses `ADOPTED` or `NOT_ADOPTED`, enters the conclusion, and submits
+- Patient and pharmacist can see the final doctor conclusion in the timeline
+
+Error:
+
+- Show load or save failure and allow retry
+
 #### User Profile Screen
 
 Route: `/profile`
@@ -1055,16 +1141,16 @@ Trigger:
 Steps:
 
 1. Doctor logs in if needed
-2. Go to `/workorders`
+2. Go to `/workorders` on desktop or `/mobile/workorders` on mobile Web
 3. Open the escalated item
-4. Review pharmacist notes and patient context
-5. Write back the decision
-6. Complete or reject the order
+4. Review pharmacist notes, patient images, and patient context
+5. Select `ADOPTED` or `NOT_ADOPTED`
+6. Write the final doctor conclusion and submit the decision
 
 Success:
 
 - Patient and pharmacist can see the updated outcome
-- The order is closed by the current doctor handler
+- The order is closed by the doctor decision action
 
 Error:
 
@@ -1131,7 +1217,7 @@ Applies to:
 Trigger:
 
 - Patient uploads a new prescription
-- Patient is about to add a new medication (future self-service flow)
+- Patient submits a new self-reported medication via `/self-reported-medications`
 
 Behavior:
 
@@ -1166,9 +1252,68 @@ Success:
 
 - Rules are listed in a searchable table (drug name, severity filter)
 - Pharmacist can create new rules or edit existing ones
+- Pharmacist can download header-only CSV templates
+- Pharmacist can upload CSV, preview row-level create/update/error/warning results, then apply only when there are no errors
 - Changes take effect immediately for subsequent screenings
 
-### 7.5 OCR low confidence
+#### 7.4.4 Reviewed education content management (T4)
+
+Applies to:
+
+- Pharmacist Web
+
+New route: `/education/content`
+
+Purpose:
+
+- Import and review structured patient education cards without inventing medical content in the app
+
+Success:
+
+- Pharmacist lists cards by keyword, category, and review status
+- CSV import previews row-level results and applies overwrite by `contentCode`
+- Only `REVIEWED` cards are returned to the patient app
+
+### 7.5 NEW_MEDICATION_REVIEW work order handling (pharmacist-side)
+
+Applies to:
+
+- Pharmacist Web
+
+Trigger:
+
+- Patient submits a self-reported medication
+- Pharmacist receives a `NEW_MEDICATION_REVIEW` category work order notification
+
+Behavior (in Help Order Detail `OrderDetail`):
+
+1. `OrderDetail` detects `category = NEW_MEDICATION_REVIEW` and embeds `SelfReportedMedicationsPanel`
+2. Panel displays: drug name, dosage, notes, submission time, and any DDI alerts from the original screening
+3. Pharmacist chooses one of three actions:
+
+   **Action A: Acknowledge** (confirm receipt)
+   - Call `POST /admin-api/help-orders/{id}/acknowledge`
+   - Self-reported medication status → `ACTIVE`
+   - Drug is now included in DDI screening background for this patient
+
+   **Action B: Reject**
+   - Call `POST /admin-api/help-orders/{id}/reject-medication` with reason
+   - Self-reported medication status → `STOPPED`
+   - Rejection reason is stored and work order is closed
+
+   **Action C: Transfer to plan**
+   - Call `GET /admin-api/help-orders/{id}/transfer-prefill` to get prefill data
+   - Open or navigate to `MedicationPlanPanel` with prefilled drug/dosage
+   - Pharmacist completes plan item details and activates plan
+   - Call `POST /admin-api/help-orders/{id}/mark-transferred`
+   - Self-reported medication status → `TRANSFERRED`
+
+DDI check before plan activation:
+
+- Before pharmacist activates a plan, `MedicationPlanPanel` calls `GET /admin-api/medication-plans/{id}/ddi-check`
+- If alerts exist, show confirmation dialog: pharmacist must acknowledge before activating
+
+### 7.7 OCR low confidence
 
 Applies to:
 

@@ -12,10 +12,12 @@ public interface PrescriptionOcrRecordMapper {
 
     @Insert("""
             INSERT INTO prescription_ocr_record (
-                prescription_id, provider, request_payload_json, response_payload_json, confidence, status, manual_fallback_used, executed_at,
+                prescription_id, provider, request_payload_json, response_payload_json, extracted_text, failure_reason, structured_items_json,
+                confidence, status, manual_fallback_used, executed_at,
                 creator, create_time, updater, update_time, deleted, tenant_id
             ) VALUES (
-                #{prescriptionId}, #{provider}, #{requestPayloadJson}, #{responsePayloadJson}, #{confidence}, #{status}, #{manualFallbackUsed}, #{executedAt},
+                #{prescriptionId}, #{provider}, #{requestPayloadJson}, #{responsePayloadJson}, #{extractedText}, #{failureReason}, #{structuredItemsJson},
+                #{confidence}, #{status}, #{manualFallbackUsed}, #{executedAt},
                 #{creator}, #{createTime}, #{updater}, #{updateTime}, #{deleted}, #{tenantId}
             )
             """)
@@ -23,7 +25,8 @@ public interface PrescriptionOcrRecordMapper {
     int insert(PrescriptionOcrRecord record);
 
     @Select("""
-            SELECT id, prescription_id, provider, request_payload_json, response_payload_json, confidence, status, manual_fallback_used, executed_at,
+            SELECT id, prescription_id, provider, request_payload_json, response_payload_json, extracted_text, failure_reason, structured_items_json,
+                   confidence, status, manual_fallback_used, executed_at,
                    creator, create_time, updater, update_time, deleted, tenant_id
             FROM prescription_ocr_record
             WHERE tenant_id = #{tenantId} AND prescription_id = #{prescriptionId} AND deleted = 0

@@ -10,19 +10,24 @@
     </ion-header>
 
     <ion-content class="page-content">
+      <ion-refresher slot="fixed" @ionRefresh="handleRefresh($event)">
+        <ion-refresher-content></ion-refresher-content>
+      </ion-refresher>
       <div class="container">
         <ion-card class="overview-card">
           <ion-card-content class="overview-grid">
-            <div>
+            <div class="overview-item">
               <div class="overview-number">{{ tasks.length }}</div>
               <div class="overview-label">今日任务</div>
             </div>
-            <div>
-              <div class="overview-number">{{ completedCount }}</div>
+            <div class="overview-divider"></div>
+            <div class="overview-item">
+              <div class="overview-number overview-number--done">{{ completedCount }}</div>
               <div class="overview-label">已服药</div>
             </div>
-            <div>
-              <div class="overview-number">{{ pendingCount }}</div>
+            <div class="overview-divider"></div>
+            <div class="overview-item">
+              <div class="overview-number overview-number--pending">{{ pendingCount }}</div>
               <div class="overview-label">待处理</div>
             </div>
           </ion-card-content>
@@ -35,23 +40,22 @@
           </ion-card-header>
         </ion-card>
 
-        <div v-if="loading" class="empty-state">
+        <div v-if="loading" class="loading-state">
           <ion-spinner name="crescent" />
         </div>
 
-        <ion-card v-else-if="!activePlan" class="empty-card">
-          <ion-card-content class="empty-state">
-            <ion-icon :icon="documentTextOutline" class="empty-icon" />
-            <p class="empty-text">暂无生效用药计划，等待药师建计划</p>
-          </ion-card-content>
-        </ion-card>
+        <EmptyState
+          v-else-if="!activePlan"
+          type="no-plan"
+          title="暂无生效用药计划"
+          description="等待药师建立计划，或发起求助"
+        />
 
-        <ion-card v-else-if="tasks.length === 0" class="empty-card">
-          <ion-card-content class="empty-state">
-            <ion-icon :icon="checkmarkCircleOutline" class="empty-icon" />
-            <p class="empty-text">今天没有待执行任务</p>
-          </ion-card-content>
-        </ion-card>
+        <EmptyState
+          v-else-if="tasks.length === 0"
+          type="no-records"
+          title="今天没有待执行任务"
+        />
 
         <ion-card v-for="task in tasks" :key="task.id" class="task-card">
           <ion-card-content>
@@ -61,6 +65,13 @@
                 <div class="task-meta">{{ task.dosage }} · {{ formatTime(task.scheduledAt) }}</div>
                 <div v-if="task.instructions || task.mealRelation" class="task-extra">
                   {{ task.instructions || task.mealRelation }}
+                </div>
+                <div
+                  v-if="reminderNotice(task)"
+                  class="task-reminder"
+                  :class="`task-reminder--${task.reminderStage || 'none'}`"
+                >
+                  {{ reminderNotice(task) }}
                 </div>
               </div>
               <ion-badge :color="statusColor(task.status)">{{ statusText(task.status) }}</ion-badge>
@@ -107,8 +118,9 @@ import {
   IonCardTitle,
   IonContent,
   IonHeader,
-  IonIcon,
   IonPage,
+  IonRefresher,
+  IonRefresherContent,
   IonSpinner,
   IonTitle,
   IonToast,
@@ -116,13 +128,13 @@ import {
   onIonViewWillEnter
 } from '@ionic/vue'
 import { computed, ref } from 'vue'
-import { checkmarkCircleOutline, documentTextOutline } from 'ionicons/icons'
-import { medicationService, type DoseTaskDTO, type MedicationPlanDTO } from '@/modules/patient/api/mvp'
+import { appAuthService, medicationService, type DoseTaskDTO, type MedicationPlanDTO } from '@/modules/patient/api/mvp'
 import { patientSession } from '@/app/session'
 
 const loading = ref(false)
 const activePlan = ref<MedicationPlanDTO | null>(null)
 const tasks = ref<DoseTaskDTO[]>([])
+const currentAccountType = ref('PATIENT')
 const submittingTaskId = ref<number | null>(null)
 const showToast = ref(false)
 const toastMessage = ref('')
@@ -138,12 +150,14 @@ const showMessage = (message: string) => {
 const loadTasks = async () => {
   loading.value = true
   try {
-    const [planResponse, taskResponse] = await Promise.all([
+    const [planResponse, taskResponse, accountResponse] = await Promise.all([
       medicationService.getActiveMedicationPlan(),
-      medicationService.getTodayDoseTasks()
+      medicationService.getTodayDoseTasks(),
+      appAuthService.getCurrentAccount()
     ])
     activePlan.value = planResponse.data ?? null
     tasks.value = taskResponse.data ?? []
+    currentAccountType.value = String((accountResponse.data as any)?.accountType || 'PATIENT').toUpperCase()
     patientSession.setActivePlanStatus(Boolean(planResponse.data))
   } catch (error: any) {
     activePlan.value = null
@@ -168,10 +182,7 @@ const saveResult = async (task: DoseTaskDTO, result: 'TAKEN' | 'MISSED') => {
     if (task.lastEffectiveCheckinId) {
       await medicationService.correctCheckin(task.lastEffectiveCheckinId, payload)
     } else {
-      await medicationService.submitCheckin({
-        doseTaskId: task.id,
-        ...payload
-      })
+      await medicationService.submitCheckin({ doseTaskId: task.id, ...payload })
     }
 
     showMessage(result === 'TAKEN' ? '已记录为已服药' : '已记录为漏服')
@@ -192,12 +203,7 @@ const formatTime = (value?: string | null) => {
 }
 
 const statusText = (status: string) => {
-  const map: Record<string, string> = {
-    PENDING: '待执行',
-    COMPLETED: '已服药',
-    MISSED: '漏服',
-    SKIPPED: '跳过'
-  }
+  const map: Record<string, string> = { PENDING: '待执行', COMPLETED: '已服药', MISSED: '漏服', SKIPPED: '跳过' }
   return map[status] || status
 }
 
@@ -208,71 +214,167 @@ const statusColor = (status: string) => {
   return 'medium'
 }
 
+const formatOverdue = (minutes?: number | null) => {
+  const value = Math.max(minutes ?? 0, 0)
+  if (value < 60) return `${value} 分钟`
+  const hours = Math.floor(value / 60)
+  const rest = value % 60
+  return rest > 0 ? `${hours} 小时 ${rest} 分钟` : `${hours} 小时`
+}
+
+const reminderNotice = (task: DoseTaskDTO) => {
+  if (task.reminderStage === 'FAMILY_REMINDER_DUE') {
+    return currentAccountType.value === 'FAMILY'
+      ? `已超过 ${formatOverdue(task.overdueMinutes)}，需要你协助记录`
+      : `已超过 ${formatOverdue(task.overdueMinutes)}，已提醒家属协助`
+  }
+  if (task.reminderStage === 'OVERDUE') {
+    return `已超过 ${formatOverdue(task.overdueMinutes)}，请尽快记录`
+  }
+  if (task.reminderStage === 'DUE') {
+    return '已到服药时间，请及时记录'
+  }
+  if (task.reminderStage === 'UPCOMING') {
+    return '尚未到服药时间'
+  }
+  return ''
+}
+
+async function handleRefresh(event: CustomEvent) {
+  try {
+    await loadTasks()
+  } finally {
+    (event.target as HTMLIonRefresherElement).complete()
+  }
+}
+
 onIonViewWillEnter(loadTasks)
 </script>
 
 <style scoped>
 .page-content {
-  --background: #f6f8fb;
+  --background: var(--patient-bg-page);
 }
 
 .container {
-  padding: 16px;
+  padding: var(--patient-space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--patient-space-3);
 }
 
-.overview-card,
-.plan-card,
-.task-card,
-.empty-card {
-  border-radius: 18px;
-  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+/* ── 概览卡片 ── */
+.overview-card {
+  margin: 0;
 }
 
 .overview-grid {
   display: flex;
-  justify-content: space-between;
+  align-items: center;
+  justify-content: space-around;
+  padding: var(--patient-space-4) var(--patient-space-3) var(--patient-space-3);
+}
+
+.overview-item {
+  flex: 1;
   text-align: center;
 }
 
 .overview-number {
-  font-size: 28px;
-  font-weight: 700;
-  color: #1d4ed8;
+  font-size: var(--patient-font-page-title);
+  font-weight: var(--patient-font-bold);
+  line-height: var(--patient-leading-tight);
+  color: var(--patient-primary);
 }
 
-.overview-label,
-.task-meta,
-.task-extra,
-.empty-text {
-  color: #64748b;
+.overview-number--done {
+  color: var(--patient-success);
+}
+
+.overview-number--pending {
+  color: var(--patient-warning);
+}
+
+.overview-label {
+  font-size: var(--patient-font-helper);
+  color: var(--patient-text-secondary);
+  margin-top: var(--patient-space-1);
+}
+
+.overview-divider {
+  width: 1px;
+  height: 40px;
+  background: var(--patient-border);
+  flex-shrink: 0;
+}
+
+/* ── 计划卡片 ── */
+.plan-card {
+  margin: 0;
+}
+
+/* ── 加载状态 ── */
+.loading-state {
+  padding: var(--patient-space-8) var(--patient-space-4);
+  text-align: center;
+}
+
+/* ── 任务卡片 ── */
+.task-card {
+  margin: 0;
 }
 
 .task-header {
   display: flex;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--patient-space-3);
   align-items: flex-start;
 }
 
 .task-title {
-  font-size: 18px;
-  font-weight: 700;
-  color: #0f172a;
+  font-size: var(--patient-font-subtitle);
+  font-weight: var(--patient-font-bold);
+  color: var(--patient-text-primary);
+  line-height: var(--patient-leading-tight);
+}
+
+.task-meta {
+  font-size: var(--patient-font-helper);
+  color: var(--patient-text-secondary);
+  margin-top: var(--patient-space-1);
+  line-height: var(--patient-leading-normal);
+}
+
+.task-extra {
+  font-size: var(--patient-font-caption);
+  color: var(--patient-text-muted);
+  margin-top: var(--patient-space-1);
+}
+
+.task-reminder {
+  margin-top: var(--patient-space-2);
+  padding: var(--patient-space-2) var(--patient-space-3);
+  border-radius: var(--patient-radius-md);
+  font-size: var(--patient-font-helper);
+  line-height: var(--patient-leading-normal);
+  color: var(--patient-text-primary);
+  background: var(--patient-bg-page);
+}
+
+.task-reminder--DUE,
+.task-reminder--UPCOMING {
+  color: var(--patient-text-secondary);
+}
+
+.task-reminder--OVERDUE,
+.task-reminder--FAMILY_REMINDER_DUE {
+  color: var(--patient-warning);
+  background: color-mix(in srgb, var(--patient-warning) 12%, var(--patient-bg-card));
 }
 
 .task-actions {
   display: flex;
-  gap: 12px;
-  margin-top: 16px;
-}
-
-.empty-state {
-  text-align: center;
-  padding: 32px 12px;
-}
-
-.empty-icon {
-  font-size: 36px;
-  color: #94a3b8;
+  gap: var(--patient-space-3);
+  margin-top: var(--patient-space-4);
 }
 </style>

@@ -8,9 +8,51 @@ Rules:
 
 1. This document defines execution order, not product scope or architecture rationale.
 2. `Standard document/PRD.md`, `APP_FLOW.md`, `TECH_STACK.md`, `FRONTEND_GUIDELINES.md`, and `BACKEND_STRUCTURE.md` are mandatory inputs for every implementation phase.
-3. `docs/` is reference only and must not override this file.
-4. This document covers `P0` only.
+3. The removed `docs/` tree must not be recreated as a knowledge base, reference store, or plan output location.
+4. This document covers `P0` and `P0+` MVP phases, plus the Post-P0 trial readiness sprint.
 5. `P2` and later capabilities must stay in backlog and must not enter the primary build sequence.
+
+## 1.5 Execution Status Summary (as of 2026-08-14)
+
+| Phase | Description | Status |
+|-------|-------------|--------|
+| Phase 0 | Repo and Environment Baseline | ✅ Complete |
+| Phase 1 | backend-v2 Foundation | ✅ Complete |
+| Phase 2 | Frontend Foundation | ✅ Complete |
+| Phase 3 | MVP Core Flows | ✅ Complete |
+| Phase 4 | Integration, QA, and Trial Readiness | ✅ API integration complete; browser UI walkthrough remaining |
+| Phase 5 | DDI Enhancement (P0+) | ✅ Complete |
+| Phase 6 | Self-Reported Medication Domain (P0+) | ✅ Complete |
+| Phase 7 | Drug Catalog and Pinyin Initials Search (P0+) | ✅ Complete |
+| Phase 8 | Post-P0 Trial Readiness Sprint (A–H) | ✅ Complete |
+
+**Current active work:** Phase T5 implementation is complete on `codex/mobile-demo`; the release candidate is being validated and has not yet been delivered through a mergeable GitHub PR. No next product phase has been started.
+
+**Flyway current latest:** V12 (`V12__help_order_voice_transcription.sql`). Next new migration must be V13.
+
+**Known open items:**
+- `MEDICINE_OCR_API_KEY` must be set in `.env.local` for live OCR (graceful fallback if omitted)
+- SEC-002 partially open: refresh tokens remain sessionStorage-managed (future follow-up)
+- Ops cleanup: `ops/sql/sec-003-clear-legacy-patient-id-card-masked.sql` needs to be run
+
+## 1.6 Post-P0 Trial Demo Closed-Loop Sequence
+
+The post-P0 trial/demo work is phase-based, not tied to fixed calendar weeks. Each phase must preserve existing patient, pharmacist, and doctor flows while adding the smallest demonstrable closed loop.
+
+| Phase | Goal | Required validation |
+|-------|------|---------------------|
+| Phase T0 | Standard document sync for trial/demo scope | `BACKEND_STRUCTURE.md`, `APP_FLOW.md`, and this file describe the same contracts and sequence |
+| Phase T1 | Image help-order loop: patient text+image -> pharmacist mobile Web reply -> patient detail sees reply | backend targeted help-order tests, patient build, pharmacist build, manual mobile-width walkthrough |
+| Phase T2 | Doctor mobile Web collaboration and structured `ADOPTED` / `NOT_ADOPTED` decision events | doctor/pharmacist help-order tests, doctor mobile build, and mobile-width walkthrough |
+| Phase T3 | Medication reminder and family second-reminder demo path | backend reminder-stage tests, patient build, and medication/family E2E script |
+| Phase T4 | OCR hardening, CSV rule import, reviewed education recommendation | ✅ backend targeted tests, pharmacist build, patient build |
+| Phase T5 | Help-order voice message + XFYUN transcription | ✅ backend targeted tests, patient/pharmacist/doctor builds, Docker live voice walkthrough |
+
+Rules:
+
+1. T1 must land before T2-T5 implementation work.
+2. New database migrations continue from the latest existing Flyway version; after `V12__help_order_voice_transcription.sql`, the next migration is `V13`.
+3. Temporary execution plans stay in conversation; durable sequence changes belong here.
 
 ## 2. Implementation Rules
 
@@ -524,7 +566,7 @@ cd D:\yaoanshi\frontend\yisheng\web-admin; npm run build
 4. object storage unavailable
 5. Redis unavailable
 
-## 7. Phase 4: Integration, QA, and Trial Readiness
+## 7. Phase 4: Integration, QA, and Trial Readiness ✅ (API complete; browser walkthrough remaining)
 
 ### Inputs
 
@@ -584,6 +626,17 @@ Action:
 3. Prepare known-issues list.
 4. Prepare rollback notes.
 
+**Completed (2026-03-27):**
+- backend-v2: `mvn compile` ✅, `mvn test` 97/97 ✅ (4 broken test files fixed in `4fc16db`)
+- frontend/huanzhe: `npm run build` ✅
+- frontend/pharmacist: `npm run build` ✅
+- frontend/yisheng/web-admin: `npm run build` ✅
+- Docker stack: MySQL, Redis, MinIO, Nginx all running (infrastructure fixes committed in `fdb3233`)
+- API integration: all patient and admin endpoints verified (send-otp, login, auth/me, bind-patient, medication-plans, dose-tasks, ai/consent, self-reported-medications, prescriptions, ddi/screen, assessments, help-orders, drugs/search)
+- AI consent bug fix (commit `fdb3233`): `AiChatService` was parsing JWT sub as Long for account ID; fixed to resolve account by mobile via `selectActiveByMobile` first
+
+**Remaining:** Browser-level UI testing — manual walk-through of all 3 frontends.
+
 ### Deliverables
 
 1. End-to-end validated MVP trial build
@@ -642,10 +695,10 @@ Action:
    - Beta-blockers + severe bradycardia
 4. Generate SQL INSERT scripts for `drug_contraindication` table.
 
-Collaboration:
+AI collaboration:
 
-- Claude: define rule content (drug pairs, severity, message text) — reference `BACKEND_STRUCTURE.md` 4.9
-- Codex: batch generate SQL scripts + unit tests
+- Confirm rule content (drug pairs, severity, message text) against `BACKEND_STRUCTURE.md` 4.9 before generation.
+- Generate SQL scripts and unit tests only after the rule content is clear.
 
 ### Step 5.2: Patient-side DDI screening backend
 
@@ -662,11 +715,11 @@ Action:
 4. Create `drug_contraindication` table DDL in local schema bootstrap.
 5. Add unit tests for screening service.
 
-Collaboration:
+AI collaboration:
 
-- Claude: define API constraints + screening logic design
-- Codex: generate service/controller/DTO skeleton + tests
-- Claude: review product alignment
+- Confirm API constraints and screening logic against `BACKEND_STRUCTURE.md`.
+- Generate service, controller, DTO, and tests after the contract is clear.
+- Review product alignment against `PRD.md` and `APP_FLOW.md`.
 
 ### Step 5.3: Patient-side DDI alert frontend
 
@@ -680,10 +733,10 @@ Action:
 3. "取消" option can navigate to help order creation with pre-filled context.
 4. Graceful degradation: if DDI screening API fails, proceed without blocking.
 
-Collaboration:
+AI collaboration:
 
-- Claude: frontend implementation + browser acceptance
-- Codex: quality review + test coverage
+- Implement the frontend flow and run browser acceptance.
+- Add quality review and test coverage appropriate to the behavior changed.
 
 ### Step 5.4: Pharmacist DDI rule management
 
@@ -697,11 +750,11 @@ Action:
    - Create/edit form in drawer or dialog
    - Separate tabs for DDI rules and contraindication rules
 
-Collaboration:
+AI collaboration:
 
-- Claude: define constraints + frontend implementation
-- Codex: generate backend CRUD skeleton + tests
-- Claude: browser acceptance
+- Confirm constraints before implementation.
+- Implement backend CRUD, frontend UI, and tests within the documented contracts.
+- Run browser acceptance for the management page.
 
 ### Validation commands
 
@@ -728,13 +781,281 @@ cd D:\yaoanshi\frontend\pharmacist; npm run build
 
 ---
 
-## 9. Backlog After P0+
+## 9. Phase 6: Self-Reported Medication Domain (P0+ 自报用药)
 
-The following are intentionally excluded from the primary execution sequence:
+### Goal
 
-1. science education content library
-2. content operation capability
-3. more disease-path expansion (DDI rules for hypertension, diabetes, etc.)
-4. non-MVP capability expansion
-5. any work that reopens legacy backend refactor
+Allow patients to record medications taken outside the formal plan, with DDI screening on entry, automatic pharmacist review work order creation, and pharmacist handling flows (acknowledge / reject / transfer-to-plan). Extend DDI rule richness with patient-friendly summaries and clinical detail fields.
+
+**Status: Code-complete as of 2026-03-19. This phase documents the implementation after the fact.**
+
+### Step 6.1: Backend — self-reported medication table + state machine + services
+
+Action:
+
+1. V6 Flyway migration:
+   - Create `self_reported_medication` table (see `BACKEND_STRUCTURE.md` 4.5)
+   - Extend `ddi_rule` with 4 fields: `patient_summary`, `mechanism_desc`, `alternative_recommendation`, `reference_source`
+   - Extend `drug_contraindication` with `patient_summary`
+   - Extend `ddi_screening_log` with `self_reported_medication_id`
+2. Implement `AppSelfReportedMedicationService`:
+   - submit (create record + auto-create NEW_MEDICATION_REVIEW work order)
+   - list (paged, filterable by status)
+   - withdraw (patient stops PENDING record)
+3. Implement `AdminSelfReportedMedicationService`:
+   - acknowledge (PENDING → ACTIVE)
+   - reject (PENDING/ACTIVE → STOPPED)
+   - transfer-prefill (read-only prefill data)
+   - mark-transferred (ACTIVE → TRANSFERRED)
+
+Reference: `BACKEND_STRUCTURE.md` 4.5 (`self_reported_medication` table), 4.9 (DDI extensions)
+
+### Step 6.2: Backend — patient and admin endpoints
+
+Action:
+
+1. Patient endpoints (via `AppSelfReportedMedicationController`):
+   - `POST /app-api/self-reported-medications`
+   - `GET /app-api/self-reported-medications`
+   - `POST /app-api/self-reported-medications/{id}/withdraw`
+   - `POST /app-api/self-reported-medications/{id}/stop`
+2. Admin endpoints in `AdminHelpOrderController`:
+   - `GET /admin-api/help-orders/self-reported-medications`
+   - `POST /admin-api/help-orders/{id}/acknowledge`
+   - `POST /admin-api/help-orders/{id}/reject-medication`
+   - `GET /admin-api/help-orders/{id}/transfer-prefill`
+   - `POST /admin-api/help-orders/{id}/mark-transferred`
+3. Admin endpoint in `AdminMedicationPlanController`:
+   - `GET /admin-api/medication-plans/{id}/ddi-check`
+4. Update `AppDdiScreeningService`:
+   - Include ACTIVE self-reported medications as background drugs in screening
+
+Reference: `BACKEND_STRUCTURE.md` 6.1 (self-reported endpoints), 6.2 (admin help-order and plan endpoints)
+
+### Step 6.3: Frontend — patient SelfReportedMedicationPage
+
+Action:
+
+1. Create `SelfReportedMedicationPage.vue` at `/self-reported-medications`
+2. Entry form: drug name (required), dosage, notes
+3. Before submit: call `POST /app-api/ddi/screen` with drug name; show HIGH/MEDIUM alert dialog if hits
+4. Submit via `POST /app-api/self-reported-medications`
+5. List view: display all records with status badge
+6. PENDING records: show "撤回" button → `POST /withdraw`
+7. Add `selfReportedMedicationService` to `mvp.ts` with typed DTOs
+8. Add `/self-reported-medications` route and "记录新药品" quick entry on Home page (6th quick action)
+
+Reference: `APP_FLOW.md` 4.3 (Self-Reported Medication Screen), 7.4.2 (DDI alert dialog)
+
+### Step 6.4: Frontend — pharmacist SelfReportedMedicationsPanel + work order integration
+
+Action:
+
+1. Create `SelfReportedMedicationsPanel.vue` component:
+   - Show drug details (name, dosage, notes, submission time)
+   - Show DDI alert summary if present
+   - Action buttons: 确认接收 / 拒绝（附原因）/ 转入计划
+2. Update `OrderDetail.vue`: embed panel when `category = NEW_MEDICATION_REVIEW`
+3. Update `useWorkOrders.js`: add `NEW_MEDICATION_REVIEW` category display text
+4. Update `workorders.js` API: add 5 self-reported medication admin endpoints
+5. Update `MedicationPlanPanel.vue`: call `GET /admin-api/medication-plans/{id}/ddi-check` before activation; show confirmation dialog if alerts exist
+6. Update `medicationPlans.js` API: add `getMedicationPlanDdiCheck` method
+7. Update `DdiRules.vue` drawer form: add 4 new fields (patientSummary / mechanismDesc / alternativeRecommendation / referenceSource)
+
+Reference: `APP_FLOW.md` 7.5 (NEW_MEDICATION_REVIEW handling flow)
+
+### Validation commands
+
+```powershell
+mvn -q "-Dtest=AdminDdiServiceTest,AppDdiScreeningServiceTest" test -f D:\yaoanshi\backend-v2\pom.xml
+mvn -q test -f D:\yaoanshi\backend-v2\pom.xml
+cd D:\yaoanshi\frontend\huanzhe; npm run build
+cd D:\yaoanshi\frontend\pharmacist; npm run build
+cd D:\yaoanshi\frontend\yisheng\web-admin; npm run build
+```
+
+### Done when
+
+1. V6 Flyway migration runs cleanly on a fresh schema.
+2. Patient can submit self-reported medication with DDI screening and DDI alert dialog.
+3. NEW_MEDICATION_REVIEW work order is auto-created and pushed to pharmacist.
+4. Pharmacist can acknowledge / reject / transfer self-reported medications via work order detail.
+5. Plan activation DDI check includes self-reported drugs.
+6. All unit tests pass, all three frontend builds pass.
+
+### Blockers / Dependencies
+
+1. `AppDdiScreeningService` must be updated to include ACTIVE self-reported medications before Step 6.2 can be verified end to end.
+
+---
+
+## 10. Phase 7: Drug Catalog and Pinyin Initials Search (P0+ 药品目录拼音检索)
+
+### Inputs
+
+- `BACKEND_STRUCTURE.md` section 4.10 (`drug_catalog` table)
+- `BACKEND_STRUCTURE.md` section 6.1 (`/app-api/drugs/search`)
+- `BACKEND_STRUCTURE.md` section 6.2 (`/admin-api/drugs/search`)
+- completed Phase 6 outputs (self-reported medication domain)
+
+### Background
+
+Drug name entry currently relies on free-text inputs with no autocomplete. This phase introduces a shared drug catalog that supports:
+
+1. Chinese name fuzzy match (e.g., `阿司` → 阿司匹林)
+2. Pinyin initials prefix match (e.g., `aspl` → 阿司匹林)
+
+Pinyin initials are pre-computed at insert time using `PinyinUtils` (backed by `pinyin4j 2.5.1`) and stored in `drug_catalog.pinyin_initials`. The catalog is a search-aid only; free-text drug names remain valid everywhere.
+
+### Steps
+
+#### 7.1 Backend: drug catalog table and seed
+
+Action:
+
+1. Create `drug_catalog` table via `V7__drug_catalog.sql` per `BACKEND_STRUCTURE.md` 4.10.
+2. Pre-seed 41 common cardiovascular and clinical drugs with pre-computed `pinyin_initials`.
+3. Add `PinyinUtils` under `com.medicine.common.util` using `pinyin4j 2.5.1` for future new-entry indexing.
+
+#### 7.2 Backend: search endpoints
+
+Action:
+
+1. Implement `GET /app-api/drugs/search?q=&limit=` → `CommonResult<List<DrugCatalogDTO>>`.
+2. Implement `GET /admin-api/drugs/search?q=&limit=` → same shape.
+3. Search matches `name_cn LIKE CONCAT(q, '%')` OR `pinyin_initials LIKE CONCAT(q, '%')` OR `name_cn LIKE CONCAT('%', q, '%')`, ordered by priority.
+4. Results capped at 20 entries per request.
+
+#### 7.3 Frontend — patient app
+
+Action:
+
+1. Add `drugCatalogService.search(q, limit)` to `src/modules/patient/api/mvp.ts`.
+2. Update `SelfReportedMedicationPage.vue` drug name input with 280ms debounce autocomplete:
+   - Show suggestion list with drug name + category label.
+   - Tap to fill input, hide list on blur (150ms delay to allow click to register).
+
+#### 7.4 Frontend — pharmacist web
+
+Action:
+
+1. Create `src/modules/pharmacist/api/drugs.js` with `searchDrugs(q, limit)`.
+2. Update `DdiRules.vue`: replace `el-input` with `el-autocomplete` for **drug A**, **drug B**, and **drug name** (contraindication form) fields, using `fetch-suggestions` callback to `searchDrugs`.
+
+### Deliverables
+
+1. `V7__drug_catalog.sql` with 41-drug seed
+2. `DrugCatalogMapper`, `DrugCatalogService`, `AppDrugCatalogController`, `AdminDrugCatalogController`
+3. `PinyinUtils` utility
+4. `drugCatalogService` in patient app + autocomplete UI in `SelfReportedMedicationPage.vue`
+5. `drugs.js` in pharmacist web + `el-autocomplete` on all three DDI rule drug name inputs
+
+### Validation commands
+
+```powershell
+mvn -q -DskipTests compile -f D:\yaoanshi\backend-v2\pom.xml
+cd D:\yaoanshi\frontend\huanzhe; npm run build
+cd D:\yaoanshi\frontend\pharmacist; npm run build
+```
+
+### Done when
+
+1. Backend compiles cleanly with pinyin4j on classpath.
+2. `GET /app-api/drugs/search?q=aspl` returns 阿司匹林 in `data`.
+3. `GET /admin-api/drugs/search?q=hfl` returns 华法林 in `data`.
+4. Both frontend builds pass.
+5. Patient app drug name input shows suggestions on typing `aspl`.
+6. Pharmacist DDI rule drawer drug name fields show autocomplete suggestions.
+
+### Blockers / Dependencies
+
+1. V7 migration requires V6 migration applied first.
+2. `pinyin4j 2.5.1` must be resolvable from Maven Central or local cache.
+
+---
+
+---
+
+## 11. Phase 8: Post-P0 Trial Readiness Sprint ✅ Complete (2026-03-27)
+
+### Goal
+
+Harden the platform for trial/demo within ~1 month. Eight sub-phases executed after the P0/P0+ code freeze.
+
+### Phase A — Commit Baseline ✅
+
+Committed all Phase 6+7 backend + frontend + standard doc changes (57 files) to `main`. Commit: `f9274e5`.
+
+### Phase B — MinIO S3 Object Storage Integration ✅ (commit `e6178c9`)
+
+- `ops/docker-compose.yml`: MinIO service (9000/9001) + backend-v2 storage env vars
+- `pom.xml`: `software.amazon.awssdk:s3:2.25.60`
+- `S3CompatibleObjectStorageImpl`: real AWS SDK v2 impl, `@Profile(!test)`, PostConstruct bucket init
+- `S3CompatibleObjectStorageStub`: demoted to `@Profile(test)`
+- `ObjectStorageProperties`: region field added
+- `application.yml`: `medicine.storage` config block
+- `run-local-with-env.ps1` + `.env.local.example`: `MEDICINE_STORAGE_*` vars documented
+
+### Phase C — DeepSeek-OCR Integration ✅ (commit `201525c`)
+
+- `OcrProperties`: `@ConfigurationProperties` for `medicine.ocr.*`
+- `OcrService` interface + `OcrResult` (success/extractedText/confidence/responseJson)
+- `DeepSeekOcrService`: SiliconFlow vision API (`deepseek-ai/deepseek-vl2`), graceful fallback if key missing
+- `AppPrescriptionService`: replaced `MANUAL_REVIEW_REQUIRED` stub; `DEEPSEEK_OCR` on success, `MANUAL_REVIEW_REQUIRED + manualFallbackUsed=true` on failure
+- `application.yml`: `medicine.ocr.*` config block
+
+### Phase D — SEC-005 AI Consent Gate ✅ (commit `5f69a4d`)
+
+- `V8__ai_consent.sql`: `ai_consent_granted_at DATETIME NULL` added to `app_account`
+- `AppAccount` domain + `AppAccountMapper`: `selectAiConsentGrantedAt` + `updateAiConsent`
+- `ErrorCode`: `AI_CONSENT_REQUIRED (40031)`
+- `AiChatService`: consent check before upstream call; `checkConsentStatus` / `grantConsent`; bug-fix: resolve account by mobile via `selectActiveByMobile` (not JWT sub parsed as Long)
+- `AiChatController`: `GET/POST /app-api/ai/consent`
+- Patient app: `aiConsentService` in `mvp.ts`; `IonAlert` consent dialog on `AiAssistantPage` first entry
+
+### Phase E — ARC-001/003 Map → Explicit DTO Migration ✅ (commit `036a39f`)
+
+New DTOs: `AppPatientSummaryDTO`, `AppCurrentAccountDTO`, `AppFamilyBindingDTO`, `AppLogoutRequest`, `TransferPrefillDTO`.
+Controllers updated: `AppAuthController`, `AppPatientController`, `AdminHelpOrderController`.
+Response field names preserved; backward-compatible.
+
+### Phase F — CI/CD GitHub Actions ✅ (commit `f285037`)
+
+`.github/workflows/build.yml`: 4 parallel jobs (backend compile+test, 3 frontend builds). Triggers on push/PR to `main`. Maven + npm cache enabled.
+
+### Phase G — Patient App UI/UX Polish ✅ (commit `c5feb36`)
+
+- `variables.css`: 12 semantic `--patient-*` color tokens added
+- `HomePage`, `MedicationReminderPage`, `HelpOrderPage`, `SelfReportedMedicationPage`: hardcoded hex → CSS tokens + `IonRefresher` pull-to-refresh added
+- `ProfilePage`: avatar path fixed (`/src/picture/` → `@/shared/assets/images/` via Vite import)
+
+### Phase H — Pharmacist/Doctor Minor Fixes ✅
+
+- `DdiRules.vue`: `submitRuleForm` + `submitContraindicationForm` — added catch block with `ElMessage.error` on API failure
+- `PharmacistDashboard.vue`: WS-triggered `loadDashboard()` debounced 300ms
+- `Layout.vue` (doctor): removed "Phase 2" subtitle; `.workspace overflow-x: hidden`
+- `index.scss` (doctor): `body overflow-x: hidden`
+
+### Infrastructure Notes (post-Phase 8)
+
+- Docker stack: MySQL `13306`, Redis `16379`, MinIO `9000/9001`, legacy server `48080`
+- Runtime fixes applied during integration testing (committed in `fdb3233`):
+  - `ops/docker-security-audit/redis/redis.conf`: `protected-mode no` (was blocking cross-container Redis connection)
+  - `ops/docker-security-audit/nginx-dev.conf`: upstream → `backend-v2` (was referencing wrong service name)
+  - `ops/sql/mysql/ruoyi-vue-pro.sql` imported: `system_users` + `system_role` + `system_user_role` tables
+
+---
+
+## 12. Backlog After P0+
+
+The following items are intentionally excluded from the primary execution sequence:
+
+1. Science education content library
+2. Content operation capability
+3. More disease-path expansion (DDI rules for hypertension, diabetes, etc.)
+4. Non-MVP capability expansion
+5. Any work that reopens legacy backend refactor
+6. SEC-002: Refresh token rotation hardening (currently sessionStorage-managed; deferred)
+7. Ops cleanup: `ops/sql/sec-003-clear-legacy-patient-id-card-masked.sql` (historical `id_card_masked` rows)
+8. S3 presigned URL upload end-to-end browser test (Phase B, pending manual verification)
 

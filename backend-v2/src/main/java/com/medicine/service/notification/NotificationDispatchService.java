@@ -25,7 +25,9 @@ public class NotificationDispatchService {
             "HELP_ORDER_REPLY",
             "HELP_ORDER_ESCALATED",
             "HELP_ORDER_REJECTED",
-            "HELP_ORDER_CLOSED"
+            "HELP_ORDER_CLOSED",
+            "SELF_MEDICATION_ACKNOWLEDGED",
+            "SELF_MEDICATION_REJECTED"
     );
 
     private final NotificationLogMapper notificationLogMapper;

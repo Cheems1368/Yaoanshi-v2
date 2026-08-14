@@ -96,9 +96,19 @@ try {
       waitForExpiryMs,
       refreshProbe,
       refreshTokenRotated: Boolean(beforeRefresh.refreshToken && afterRefresh.refreshToken && beforeRefresh.refreshToken !== afterRefresh.refreshToken),
-      beforeRefresh,
-      afterRefresh,
-      afterLogout
+      beforeRefresh: {
+        refreshTokenPresent: Boolean(beforeRefresh.refreshToken),
+        deviceId: beforeRefresh.deviceId
+      },
+      afterRefresh: {
+        refreshTokenPresent: Boolean(afterRefresh.refreshToken),
+        deviceId: afterRefresh.deviceId,
+        bindingStatus: afterRefresh.bindingStatus
+      },
+      afterLogout: {
+        refreshTokenPresent: Boolean(afterLogout.refreshToken),
+        bindingStatus: afterLogout.bindingStatus
+      }
     })
   )
 } finally {

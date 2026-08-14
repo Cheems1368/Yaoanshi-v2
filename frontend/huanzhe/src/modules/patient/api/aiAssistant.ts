@@ -13,6 +13,7 @@ export interface AiChatResponse {
   reply: string
   model: string
   requestId: string
+  suggestions?: string[]
 }
 
 export const aiAssistantService = {

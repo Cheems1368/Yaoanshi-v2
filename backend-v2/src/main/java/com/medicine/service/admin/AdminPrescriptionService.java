@@ -1,5 +1,6 @@
 package com.medicine.service.admin;
 
+import com.medicine.api.dto.ddi.AdminDdiRiskCardDTO;
 import com.medicine.api.dto.prescription.DdiScreeningConfirmRequest;
 import com.medicine.api.dto.prescription.PrescriptionConfirmRequest;
 import com.medicine.api.dto.prescription.PrescriptionDTO;
@@ -23,6 +24,7 @@ import com.medicine.repository.prescription.PrescriptionAttachmentMapper;
 import com.medicine.repository.prescription.PrescriptionItemMapper;
 import com.medicine.repository.prescription.PrescriptionMapper;
 import com.medicine.repository.prescription.PrescriptionOcrRecordMapper;
+import com.medicine.service.app.AppDdiScreeningService;
 import com.medicine.service.auth.JwtClaims;
 import com.medicine.service.auth.ProfessionalIdentityService;
 import org.springframework.stereotype.Service;
@@ -51,6 +53,7 @@ public class AdminPrescriptionService {
     private final DdiRuleMapper ddiRuleMapper;
     private final DdiScreeningLogMapper ddiScreeningLogMapper;
     private final ProfessionalIdentityService professionalIdentityService;
+    private final AppDdiScreeningService appDdiScreeningService;
 
     public AdminPrescriptionService(
             PrescriptionMapper prescriptionMapper,
@@ -60,7 +63,8 @@ public class AdminPrescriptionService {
             FileAssetMapper fileAssetMapper,
             DdiRuleMapper ddiRuleMapper,
             DdiScreeningLogMapper ddiScreeningLogMapper,
-            ProfessionalIdentityService professionalIdentityService
+            ProfessionalIdentityService professionalIdentityService,
+            AppDdiScreeningService appDdiScreeningService
     ) {
         this.prescriptionMapper = prescriptionMapper;
         this.prescriptionItemMapper = prescriptionItemMapper;
@@ -70,6 +74,7 @@ public class AdminPrescriptionService {
         this.ddiRuleMapper = ddiRuleMapper;
         this.ddiScreeningLogMapper = ddiScreeningLogMapper;
         this.professionalIdentityService = professionalIdentityService;
+        this.appDdiScreeningService = appDdiScreeningService;
     }
 
     public PageResult<PrescriptionDTO> getPrescriptions(JwtClaims claims, String keyword, String status, int pageNo, int pageSize) {
@@ -116,6 +121,7 @@ public class AdminPrescriptionService {
                 log.setPatientId(prescription.getPatientId());
                 log.setPrescriptionId(prescriptionId);
                 log.setMatchedRuleId(rule.getId());
+                applyRuleSnapshot(log, rule);
                 log.setSeverity(rule.getSeverity());
                 log.setConfirmStatus("PENDING_CONFIRM");
                 applyAudit(log, now, operator, claims.getTenantId());
@@ -155,7 +161,7 @@ public class AdminPrescriptionService {
         return getPrescriptionDetail(claims, prescriptionId);
     }
 
-    public PrescriptionDTO.DdiScreeningDTO confirmScreening(JwtClaims claims, Long screeningId, DdiScreeningConfirmRequest request) {
+    public AdminDdiRiskCardDTO confirmScreening(JwtClaims claims, Long screeningId, DdiScreeningConfirmRequest request) {
         PharmacistProfile pharmacistProfile = professionalIdentityService.getOrCreatePharmacistProfile(claims);
         DdiScreeningLog log = ddiScreeningLogMapper.selectByIdAndTenant(claims.getTenantId(), screeningId);
         if (log == null) {
@@ -173,7 +179,9 @@ public class AdminPrescriptionService {
                 now
         );
         DdiScreeningLog refreshed = ddiScreeningLogMapper.selectByIdAndTenant(claims.getTenantId(), screeningId);
-        DdiRule rule = ddiRuleMapper.selectById(claims.getTenantId(), refreshed.getMatchedRuleId());
+        DdiRule rule = hasRuleSnapshot(refreshed)
+                ? null
+                : ddiRuleMapper.selectById(claims.getTenantId(), refreshed.getMatchedRuleId());
         return toDdiDto(refreshed, rule);
     }
 
@@ -242,6 +250,8 @@ public class AdminPrescriptionService {
         dto.setOcrConfidence(ocrRecord == null || ocrRecord.getConfidence() == null
                 ? null
                 : ocrRecord.getConfidence().setScale(2, RoundingMode.HALF_UP).toPlainString());
+        dto.setOcrRawText(ocrRecord == null ? null : ocrRecord.getExtractedText());
+        dto.setOcrFailureReason(ocrRecord == null ? null : ocrRecord.getFailureReason());
 
         if (!includeDetails) {
             dto.setAttachments(List.of());
@@ -290,24 +300,102 @@ public class AdminPrescriptionService {
         }).toList();
     }
 
-    private List<PrescriptionDTO.DdiScreeningDTO> loadScreenings(Long tenantId, Long prescriptionId) {
-        Map<Long, DdiRule> ruleMap = ddiRuleMapper.selectActiveRules(tenantId).stream()
-                .collect(Collectors.toMap(DdiRule::getId, rule -> rule, (left, right) -> left, LinkedHashMap::new));
-        return ddiScreeningLogMapper.selectByPrescriptionId(tenantId, prescriptionId).stream()
+    private List<AdminDdiRiskCardDTO> loadScreenings(Long tenantId, Long prescriptionId) {
+        Map<Long, DdiScreeningLog> latestByRuleId = new LinkedHashMap<>();
+        for (DdiScreeningLog log : ddiScreeningLogMapper.selectByPrescriptionId(tenantId, prescriptionId)) {
+            if (log.getMatchedRuleId() == null) {
+                continue;
+            }
+            DdiScreeningLog current = latestByRuleId.get(log.getMatchedRuleId());
+            if (current == null || (log.getId() != null && current.getId() != null && log.getId() > current.getId())) {
+                latestByRuleId.put(log.getMatchedRuleId(), log);
+            }
+        }
+        List<DdiScreeningLog> activeLogs = latestByRuleId.values().stream()
+                .filter(log -> !"ABORTED".equals(log.getConfirmStatus()))
+                .toList();
+        List<Long> fallbackRuleIds = activeLogs.stream()
+                .filter(log -> !hasRuleSnapshot(log))
+                .map(DdiScreeningLog::getMatchedRuleId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+        Map<Long, DdiRule> ruleMap = fallbackRuleIds.isEmpty()
+                ? Map.of()
+                : ddiRuleMapper.selectByIds(tenantId, fallbackRuleIds).stream()
+                        .collect(Collectors.toMap(DdiRule::getId, rule -> rule, (left, right) -> left, LinkedHashMap::new));
+        return activeLogs.stream()
                 .map(log -> toDdiDto(log, ruleMap.get(log.getMatchedRuleId())))
                 .toList();
     }
 
-    private PrescriptionDTO.DdiScreeningDTO toDdiDto(DdiScreeningLog log, DdiRule rule) {
-        PrescriptionDTO.DdiScreeningDTO dto = new PrescriptionDTO.DdiScreeningDTO();
-        dto.setId(log.getId());
-        dto.setMatchedRuleId(log.getMatchedRuleId());
-        dto.setSeverity(log.getSeverity());
+    private AdminDdiRiskCardDTO toDdiDto(DdiScreeningLog log, DdiRule rule) {
+        AdminDdiRiskCardDTO dto = hasRuleSnapshot(log)
+                ? toSnapshotRiskCard(log)
+                : (rule == null ? new AdminDdiRiskCardDTO() : appDdiScreeningService.toInteractionRiskCard(rule));
+        dto.setScreeningId(log.getId());
+        if (dto.getCardKey() == null) {
+            dto.setCardKey("screening|" + log.getId());
+        }
+        dto.setRuleId(log.getMatchedRuleId());
+        if (dto.getRuleCode() == null) {
+            dto.setRuleCode(log.getRuleCode());
+        }
+        if (dto.getAlertType() == null) {
+            dto.setAlertType("INTERACTION");
+        }
         dto.setConfirmStatus(log.getConfirmStatus());
-        dto.setMessage(rule == null ? null : rule.getMessage());
-        dto.setRecommendedAction(rule == null ? null : rule.getRecommendedAction());
         dto.setConfirmationNote(log.getConfirmationNote());
+        if (dto.getSeverity() == null) {
+            dto.setSeverity(log.getSeverity());
+        }
         return dto;
+    }
+
+    private void applyRuleSnapshot(DdiScreeningLog log, DdiRule rule) {
+        log.setRuleCode(rule.getRuleCode());
+        log.setRuleStatusAtScreening(rule.getStatus());
+        log.setDrugAName(rule.getDrugAName());
+        log.setDrugBName(rule.getDrugBName());
+        log.setMessage(rule.getMessage());
+        log.setRecommendedAction(rule.getRecommendedAction());
+        log.setMechanismDesc(rule.getMechanismDesc());
+        log.setAlternativeRecommendation(rule.getAlternativeRecommendation());
+        log.setReferenceSource(rule.getReferenceSource());
+        log.setPatientSummary(rule.getPatientSummary());
+    }
+
+    private boolean hasRuleSnapshot(DdiScreeningLog log) {
+        return StringUtils.hasText(log.getRuleCode())
+                || StringUtils.hasText(log.getMessage())
+                || StringUtils.hasText(log.getMechanismDesc())
+                || StringUtils.hasText(log.getRecommendedAction())
+                || StringUtils.hasText(log.getPatientSummary());
+    }
+
+    private AdminDdiRiskCardDTO toSnapshotRiskCard(DdiScreeningLog log) {
+        AdminDdiRiskCardDTO dto = new AdminDdiRiskCardDTO();
+        dto.setCardKey(buildSnapshotCardKey(log));
+        dto.setRuleCode(log.getRuleCode());
+        dto.setAlertType("INTERACTION");
+        dto.setSeverity(log.getSeverity());
+        dto.setDrugA(log.getDrugAName());
+        dto.setDrugB(log.getDrugBName());
+        dto.setMessage(log.getMessage());
+        dto.setRecommendedAction(log.getRecommendedAction());
+        dto.setMechanismDesc(log.getMechanismDesc());
+        dto.setAlternativeRecommendation(log.getAlternativeRecommendation());
+        dto.setReferenceSource(log.getReferenceSource());
+        dto.setPatientSummary(log.getPatientSummary());
+        return dto;
+    }
+
+    private String buildSnapshotCardKey(DdiScreeningLog log) {
+        return String.join("|",
+                "interaction",
+                normalizeDrugName(log.getRuleCode()),
+                normalizeDrugName(log.getDrugAName()),
+                normalizeDrugName(log.getDrugBName()));
     }
 
     private void applyAudit(BaseEntity entity, LocalDateTime now, String operator, Long tenantId) {

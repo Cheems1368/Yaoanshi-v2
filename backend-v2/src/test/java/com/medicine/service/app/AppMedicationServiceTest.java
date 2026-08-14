@@ -8,6 +8,7 @@ import com.medicine.domain.identity.AppAccount;
 import com.medicine.domain.identity.Patient;
 import com.medicine.domain.medication.MedicationCheckinRecord;
 import com.medicine.domain.medication.MedicationDoseTask;
+import com.medicine.repository.identity.PatientFamilyBindingMapper;
 import com.medicine.repository.medication.MedicationCheckinRecordMapper;
 import com.medicine.repository.medication.MedicationDoseTaskMapper;
 import com.medicine.repository.medication.MedicationPlanEventMapper;
@@ -21,8 +22,10 @@ import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -49,6 +52,9 @@ class AppMedicationServiceTest {
 
     @Mock
     private MedicationCheckinRecordMapper medicationCheckinRecordMapper;
+
+    @Mock
+    private PatientFamilyBindingMapper patientFamilyBindingMapper;
 
     @Mock
     private AppPatientService appPatientService;
@@ -103,6 +109,83 @@ class AppMedicationServiceTest {
         assertThat(result.getEffective()).isTrue();
     }
 
+    @Test
+    void shouldReturnUpcomingReminderStageBeforeScheduledTime() {
+        LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
+        when(appPatientService.requireAccessContext("13800138000")).thenReturn(accessContext());
+        when(patientFamilyBindingMapper.countActiveByPatientId(1L, 201L)).thenReturn(1);
+        when(medicationDoseTaskMapper.selectTodayByPatientId(eq(1L), eq(201L), any(LocalDate.class)))
+                .thenReturn(List.of(doseTask(601L, "PENDING", now.plusMinutes(10))));
+
+        var result = appMedicationService.getTodayDoseTasks("13800138000", null);
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getReminderStage()).isEqualTo("UPCOMING");
+        assertThat(result.get(0).getOverdueMinutes()).isZero();
+        assertThat(result.get(0).getFamilyReminderDue()).isFalse();
+        assertThat(result.get(0).getFamilyBindingCount()).isEqualTo(1);
+    }
+
+    @Test
+    void shouldReturnDueReminderStageBeforeFamilyDelay() {
+        LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
+        when(appPatientService.requireAccessContext("13800138000")).thenReturn(accessContext());
+        when(patientFamilyBindingMapper.countActiveByPatientId(1L, 201L)).thenReturn(1);
+        when(medicationDoseTaskMapper.selectTodayByPatientId(eq(1L), eq(201L), any(LocalDate.class)))
+                .thenReturn(List.of(doseTask(601L, "PENDING", now.minusMinutes(10))));
+
+        var result = appMedicationService.getTodayDoseTasks("13800138000", null);
+
+        assertThat(result.get(0).getReminderStage()).isEqualTo("DUE");
+        assertThat(result.get(0).getOverdueMinutes()).isBetween(10L, 11L);
+        assertThat(result.get(0).getFamilyReminderDue()).isFalse();
+    }
+
+    @Test
+    void shouldReturnFamilyReminderDueWhenOverdueAndFamilyBound() {
+        LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
+        when(appPatientService.requireAccessContext("13800138000")).thenReturn(accessContext());
+        when(patientFamilyBindingMapper.countActiveByPatientId(1L, 201L)).thenReturn(2);
+        when(medicationDoseTaskMapper.selectTodayByPatientId(eq(1L), eq(201L), any(LocalDate.class)))
+                .thenReturn(List.of(doseTask(601L, "PENDING", now.minusMinutes(31))));
+
+        var result = appMedicationService.getTodayDoseTasks("13800138000", null);
+
+        assertThat(result.get(0).getReminderStage()).isEqualTo("FAMILY_REMINDER_DUE");
+        assertThat(result.get(0).getOverdueMinutes()).isGreaterThanOrEqualTo(31L);
+        assertThat(result.get(0).getFamilyReminderDue()).isTrue();
+        assertThat(result.get(0).getFamilyBindingCount()).isEqualTo(2);
+    }
+
+    @Test
+    void shouldReturnOverdueWhenNoFamilyBound() {
+        LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
+        when(appPatientService.requireAccessContext("13800138000")).thenReturn(accessContext());
+        when(patientFamilyBindingMapper.countActiveByPatientId(1L, 201L)).thenReturn(0);
+        when(medicationDoseTaskMapper.selectTodayByPatientId(eq(1L), eq(201L), any(LocalDate.class)))
+                .thenReturn(List.of(doseTask(601L, "PENDING", now.minusMinutes(31))));
+
+        var result = appMedicationService.getTodayDoseTasks("13800138000", null);
+
+        assertThat(result.get(0).getReminderStage()).isEqualTo("OVERDUE");
+        assertThat(result.get(0).getFamilyReminderDue()).isFalse();
+        assertThat(result.get(0).getFamilyBindingCount()).isZero();
+    }
+
+    @Test
+    void shouldReturnHandledStageAfterTaskHandled() {
+        LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
+        when(appPatientService.requireAccessContext("13800138000")).thenReturn(accessContext());
+        when(patientFamilyBindingMapper.countActiveByPatientId(1L, 201L)).thenReturn(1);
+        when(medicationDoseTaskMapper.selectTodayByPatientId(eq(1L), eq(201L), any(LocalDate.class)))
+                .thenReturn(List.of(doseTask(601L, "COMPLETED", now.minusMinutes(31))));
+
+        var result = appMedicationService.getTodayDoseTasks("13800138000", null);
+
+        assertThat(result.get(0).getReminderStage()).isEqualTo("HANDLED");
+        assertThat(result.get(0).getFamilyReminderDue()).isFalse();
+    }
+
     private AppPatientService.AccessContext accessContext() {
         AppAccount account = new AppAccount();
         account.setId(101L);
@@ -131,6 +214,23 @@ class AppMedicationServiceTest {
         task.setPatientId(201L);
         task.setLockedAfter(lockedAfter);
         task.setStatus("COMPLETED");
+        return task;
+    }
+
+    private MedicationDoseTask doseTask(Long id, String status, LocalDateTime scheduledAt) {
+        MedicationDoseTask task = new MedicationDoseTask();
+        task.setId(id);
+        task.setPatientId(201L);
+        task.setPlanId(301L);
+        task.setPlanItemId(401L);
+        task.setTaskDate(scheduledAt.toLocalDate());
+        task.setScheduledAt(scheduledAt);
+        task.setStatus(status);
+        task.setNotificationStatus("PENDING");
+        task.setLockedAfter(scheduledAt.plusHours(24));
+        task.setDrugName("Amlodipine");
+        task.setDosage("5mg");
+        task.setFrequencyCode("QD");
         return task;
     }
 }

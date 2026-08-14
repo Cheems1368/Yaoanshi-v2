@@ -2,9 +2,11 @@ package com.medicine.api.controller;
 
 import com.medicine.api.dto.helporder.HelpOrderDTO;
 import com.medicine.api.dto.helporder.HelpOrderReplyRequest;
+import com.medicine.api.dto.helporder.HelpOrderVoiceTranscriptDTO;
 import com.medicine.common.model.CommonResult;
 import com.medicine.common.model.PageResult;
 import com.medicine.service.app.AppHelpOrderService;
+import com.medicine.service.helporder.HelpOrderVoiceTranscriptionService;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -20,9 +22,11 @@ import java.security.Principal;
 public class AppHelpOrderController {
 
     private final AppHelpOrderService appHelpOrderService;
+    private final HelpOrderVoiceTranscriptionService voiceTranscriptionService;
 
-    public AppHelpOrderController(AppHelpOrderService appHelpOrderService) {
+    public AppHelpOrderController(AppHelpOrderService appHelpOrderService, HelpOrderVoiceTranscriptionService voiceTranscriptionService) {
         this.appHelpOrderService = appHelpOrderService;
+        this.voiceTranscriptionService = voiceTranscriptionService;
     }
 
     @PostMapping
@@ -53,5 +57,14 @@ public class AppHelpOrderController {
             Principal principal
     ) {
         return CommonResult.ok(appHelpOrderService.reply(principal.getName(), id, request));
+    }
+
+    @PostMapping("/{id}/attachments/{attachmentId}/transcribe")
+    public CommonResult<HelpOrderVoiceTranscriptDTO> transcribe(
+            @PathVariable("id") Long id,
+            @PathVariable("attachmentId") Long attachmentId,
+            Principal principal
+    ) {
+        return CommonResult.ok(voiceTranscriptionService.transcribeForApp(principal.getName(), id, attachmentId));
     }
 }

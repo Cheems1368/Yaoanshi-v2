@@ -1,6 +1,7 @@
 package com.medicine.service.admin;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.medicine.api.dto.ddi.AdminDdiScreenResult;
 import com.medicine.api.dto.medication.DoseTaskDTO;
 import com.medicine.api.dto.medication.MedicationPlanDTO;
 import com.medicine.common.exception.BusinessException;
@@ -14,9 +15,11 @@ import com.medicine.repository.medication.MedicationDoseTaskMapper;
 import com.medicine.repository.medication.MedicationPlanEventMapper;
 import com.medicine.repository.medication.MedicationPlanItemMapper;
 import com.medicine.repository.medication.MedicationPlanMapper;
+import com.medicine.service.app.AppDdiScreeningService;
 import com.medicine.service.auth.JwtClaims;
 import com.medicine.service.auth.ProfessionalIdentityService;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.time.LocalDate;
@@ -24,10 +27,14 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.time.format.DateTimeParseException;
 import java.util.List;
+import java.util.regex.Pattern;
 
 @Service
 public class AdminMedicationPlanService {
+
+    private static final Pattern HH_MM_PATTERN = Pattern.compile("^([01]\\d|2[0-3]):[0-5]\\d$");
 
     private static final long DEFAULT_TENANT_ID = 1L;
 
@@ -36,6 +43,7 @@ public class AdminMedicationPlanService {
     private final MedicationPlanEventMapper medicationPlanEventMapper;
     private final MedicationDoseTaskMapper medicationDoseTaskMapper;
     private final ProfessionalIdentityService professionalIdentityService;
+    private final AppDdiScreeningService appDdiScreeningService;
     private final ObjectMapper objectMapper;
 
     public AdminMedicationPlanService(
@@ -44,6 +52,7 @@ public class AdminMedicationPlanService {
             MedicationPlanEventMapper medicationPlanEventMapper,
             MedicationDoseTaskMapper medicationDoseTaskMapper,
             ProfessionalIdentityService professionalIdentityService,
+            AppDdiScreeningService appDdiScreeningService,
             ObjectMapper objectMapper
     ) {
         this.medicationPlanMapper = medicationPlanMapper;
@@ -51,9 +60,11 @@ public class AdminMedicationPlanService {
         this.medicationPlanEventMapper = medicationPlanEventMapper;
         this.medicationDoseTaskMapper = medicationDoseTaskMapper;
         this.professionalIdentityService = professionalIdentityService;
+        this.appDdiScreeningService = appDdiScreeningService;
         this.objectMapper = objectMapper;
     }
 
+    @Transactional
     public MedicationPlanDTO createPlan(JwtClaims claims, MedicationPlanDTO request) {
         Long pharmacistId = professionalIdentityService.getOrCreatePharmacistProfile(claims).getId();
         MedicationPlan latest = medicationPlanMapper.selectLatestByPatientId(DEFAULT_TENANT_ID, request.getPatientId());
@@ -80,6 +91,7 @@ public class AdminMedicationPlanService {
         return getPlan(claims, plan.getId());
     }
 
+    @Transactional
     public MedicationPlanDTO updatePlan(JwtClaims claims, Long id, MedicationPlanDTO request) {
         professionalIdentityService.getOrCreatePharmacistProfile(claims);
         MedicationPlan existing = requirePlan(id);
@@ -96,12 +108,30 @@ public class AdminMedicationPlanService {
         return createPlan(claims, copy);
     }
 
+    @Transactional
     public MedicationPlanDTO activatePlan(JwtClaims claims, Long id) {
         Long pharmacistId = professionalIdentityService.getOrCreatePharmacistProfile(claims).getId();
         MedicationPlan plan = requirePlan(id);
         LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
         activateInternal(plan, pharmacistId, now);
         return getPlan(claims, id);
+    }
+
+    public AdminDdiScreenResult ddiCheckForPlan(JwtClaims claims, Long id) {
+        professionalIdentityService.getOrCreatePharmacistProfile(claims);
+        MedicationPlan plan = requirePlan(id);
+        List<MedicationPlanItem> items = medicationPlanItemMapper.selectByPlanId(DEFAULT_TENANT_ID, plan.getId());
+        List<String> drugNames = items.stream()
+                .map(MedicationPlanItem::getDrugName)
+                .filter(StringUtils::hasText)
+                .distinct()
+                .toList();
+        if (drugNames.isEmpty()) {
+            AdminDdiScreenResult empty = new AdminDdiScreenResult();
+            empty.setAlerts(List.of());
+            return empty;
+        }
+        return appDdiScreeningService.screenPlanDrugsDetailed(plan.getPatientId(), drugNames);
     }
 
     public MedicationPlanDTO getPlan(JwtClaims claims, Long id) {
@@ -155,12 +185,19 @@ public class AdminMedicationPlanService {
             List<String> timePoints = parseTimePoints(item.getTimePointsJson());
             for (LocalDate cursor = start; !cursor.isAfter(end); cursor = cursor.plusDays(1)) {
                 for (String timePoint : timePoints) {
+                    LocalTime parsedTime;
+                    try {
+                        parsedTime = LocalTime.parse(timePoint.trim());
+                    } catch (DateTimeParseException e) {
+                        throw new BusinessException(ErrorCode.MED_PLAN_INVALID_TIME_POINT.getCode(),
+                                "药品「" + item.getDrugName() + "」的服药时间「" + timePoint + "」格式错误，需为 HH:mm");
+                    }
                     MedicationDoseTask task = new MedicationDoseTask();
                     task.setPatientId(plan.getPatientId());
                     task.setPlanId(plan.getId());
                     task.setPlanItemId(item.getId());
                     task.setTaskDate(cursor);
-                    task.setScheduledAt(LocalDateTime.of(cursor, LocalTime.parse(timePoint)));
+                    task.setScheduledAt(LocalDateTime.of(cursor, parsedTime));
                     task.setStatus("PENDING");
                     task.setNotificationStatus("PENDING");
                     task.setLastEffectiveCheckinId(null);
@@ -184,6 +221,7 @@ public class AdminMedicationPlanService {
         }
         int sortOrder = 0;
         for (MedicationPlanDTO.ItemDTO itemDto : items) {
+            validateTimePoints(itemDto.getTimePoints(), itemDto.getDrugName());
             MedicationPlanItem item = new MedicationPlanItem();
             item.setPlanId(plan.getId());
             item.setDrugName(requireText(itemDto.getDrugName()));
@@ -197,6 +235,19 @@ public class AdminMedicationPlanService {
             item.setSortOrder(sortOrder++);
             applyAudit(item, "admin-med-plan", now);
             medicationPlanItemMapper.insert(item);
+        }
+    }
+
+    private void validateTimePoints(List<String> timePoints, String drugName) {
+        if (timePoints == null || timePoints.isEmpty()) {
+            throw new BusinessException(ErrorCode.MED_PLAN_INVALID_TIME_POINT.getCode(),
+                    "药品「" + (drugName != null ? drugName.trim() : "") + "」缺少服药时间，请填写 HH:mm 格式，例如 08:00,20:00");
+        }
+        for (String tp : timePoints) {
+            if (tp == null || !HH_MM_PATTERN.matcher(tp.trim()).matches()) {
+                throw new BusinessException(ErrorCode.MED_PLAN_INVALID_TIME_POINT.getCode(),
+                        "药品「" + (drugName != null ? drugName.trim() : "") + "」的服药时间「" + tp + "」格式错误，需为 HH:mm（24小时制），例如 08:00,20:00");
+            }
         }
     }
 

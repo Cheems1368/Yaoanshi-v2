@@ -10,6 +10,10 @@ public class DrugContraindicationDTO {
     private String severity;
     private String message;
     private String recommendedAction;
+    private String mechanismDesc;
+    private String alternativeRecommendation;
+    private String referenceSource;
+    private String patientSummary;
     private String status;
     private Long maintainedByPharmacistId;
     private String updatedAt;
@@ -76,6 +80,38 @@ public class DrugContraindicationDTO {
 
     public void setRecommendedAction(String recommendedAction) {
         this.recommendedAction = recommendedAction;
+    }
+
+    public String getMechanismDesc() {
+        return mechanismDesc;
+    }
+
+    public void setMechanismDesc(String mechanismDesc) {
+        this.mechanismDesc = mechanismDesc;
+    }
+
+    public String getAlternativeRecommendation() {
+        return alternativeRecommendation;
+    }
+
+    public void setAlternativeRecommendation(String alternativeRecommendation) {
+        this.alternativeRecommendation = alternativeRecommendation;
+    }
+
+    public String getReferenceSource() {
+        return referenceSource;
+    }
+
+    public void setReferenceSource(String referenceSource) {
+        this.referenceSource = referenceSource;
+    }
+
+    public String getPatientSummary() {
+        return patientSummary;
+    }
+
+    public void setPatientSummary(String patientSummary) {
+        this.patientSummary = patientSummary;
     }
 
     public String getStatus() {

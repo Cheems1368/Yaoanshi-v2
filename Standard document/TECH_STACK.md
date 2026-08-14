@@ -7,7 +7,7 @@ This file is the authoritative technology stack document for the project.
 Rules:
 
 1. `Standard document/TECH_STACK.md` is the source of truth for future development.
-2. Legacy manifests and old `docs/` files are reference only.
+2. Existing manifests can be inspected for current implementation state, but standard versions must come from this file.
 3. Version ranges such as `^`, `~`, `latest`, `mysql:8`, `redis:6-alpine`, and `nginx:alpine` are not acceptable as a standard definition.
 4. When code and this document conflict:
    - Existing legacy code is treated as `Legacy Frozen`
@@ -53,6 +53,7 @@ Exact response shape:
 - Primary API style: JSON over HTTP/HTTPS
 - Realtime notification for Web: WebSocket
 - OCR input transport: multipart file upload
+- Help-order speech-to-text provider: XFYUN voice dictation streaming WebAPI, proxied by `backend-v2`; credentials are environment variables only
 
 ### 3.4 Port baseline
 
@@ -347,7 +348,7 @@ Build and dev dependencies resolved from `package-lock.json`:
 | `@typescript-eslint/eslint-plugin` | `5.62.0` |
 | `@typescript-eslint/parser` | `5.62.0` |
 | `@vitejs/plugin-legacy` | `4.1.1` |
-| `@vitejs/plugin-vue` | `4.6.2` |
+| `@vitejs/plugin-vue` | `5.2.4` |
 | `@vitejs/plugin-vue-jsx` | `3.1.0` |
 | `autoprefixer` | `10.4.21` |
 | `bpmn-js` | `8.10.0` |
@@ -365,7 +366,7 @@ Build and dev dependencies resolved from `package-lock.json`:
 | `prettier` | `2.8.8` |
 | `rimraf` | `5.0.10` |
 | `rollup` | `3.29.5` |
-| `sass` | `1.92.0` |
+| `sass` | `1.98.0` |
 | `stylelint` | `15.11.0` |
 | `stylelint-config-recommended` | `12.0.0` |
 | `stylelint-config-recommended-vue` | `1.6.1` |
@@ -376,7 +377,7 @@ Build and dev dependencies resolved from `package-lock.json`:
 | `unplugin-auto-import` | `0.16.7` |
 | `unplugin-element-plus` | `0.7.2` |
 | `unplugin-vue-components` | `0.25.2` |
-| `vite` | `4.3.9` |
+| `vite` | `6.4.1` |
 | `vite-plugin-compression` | `0.5.1` |
 | `vite-plugin-ejs` | `1.7.0` |
 | `vite-plugin-eslint` | `1.8.1` |
@@ -423,9 +424,9 @@ Build and dev dependencies resolved from `package-lock.json`:
 
 | Package | Exact version |
 |---|---|
-| `@vitejs/plugin-vue` | `4.6.2` |
-| `vite` | `4.5.14` |
-| `sass` | `1.92.1` |
+| `@vitejs/plugin-vue` | `5.2.4` |
+| `vite` | `6.4.1` |
+| `sass` | `1.98.0` |
 
 Standard route/API binding:
 
@@ -530,4 +531,3 @@ The effective standard to follow now is:
 3. Pharmacist Web development follows the exact locked versions listed for `frontend/pharmacist`.
 4. Doctor Web development follows the exact locked versions listed for `frontend/yisheng/web-admin`.
 5. Any new backend implementation must target the `backend-v2` standard in Section 7 and Section 8.
-

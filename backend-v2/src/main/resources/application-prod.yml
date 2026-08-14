@@ -33,6 +33,7 @@ medicine:
       ticket-ttl-seconds: ${MEDICINE_ADMIN_WS_TICKET_TTL_SECONDS:30}
   storage:
     endpoint: ${MEDICINE_STORAGE_ENDPOINT}
+    public-endpoint: ${MEDICINE_STORAGE_PUBLIC_ENDPOINT:${MEDICINE_STORAGE_ENDPOINT}}
     bucket: ${MEDICINE_STORAGE_BUCKET}
     access-key: ${MEDICINE_STORAGE_ACCESS_KEY}
     secret-key: ${MEDICINE_STORAGE_SECRET_KEY}

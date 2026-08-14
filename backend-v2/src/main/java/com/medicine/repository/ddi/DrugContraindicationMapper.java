@@ -14,7 +14,8 @@ import java.util.List;
 public interface DrugContraindicationMapper {
 
     @Select("""
-            SELECT id, rule_code, drug_name, condition_type, condition_value, severity, message, recommended_action, status,
+            SELECT id, rule_code, drug_name, condition_type, condition_value, severity, message, recommended_action,
+                   mechanism_desc, alternative_recommendation, reference_source, patient_summary, status,
                    maintained_by_pharmacist_id, creator, create_time, updater, update_time, deleted, tenant_id
             FROM drug_contraindication
             WHERE tenant_id = #{tenantId} AND deleted = 0 AND status = 'ACTIVE'
@@ -23,7 +24,8 @@ public interface DrugContraindicationMapper {
     List<DrugContraindication> selectActiveRules(@Param("tenantId") Long tenantId);
 
     @Select("""
-            SELECT id, rule_code, drug_name, condition_type, condition_value, severity, message, recommended_action, status,
+            SELECT id, rule_code, drug_name, condition_type, condition_value, severity, message, recommended_action,
+                   mechanism_desc, alternative_recommendation, reference_source, patient_summary, status,
                    maintained_by_pharmacist_id, creator, create_time, updater, update_time, deleted, tenant_id
             FROM drug_contraindication
             WHERE tenant_id = #{tenantId} AND id = #{id} AND deleted = 0
@@ -32,8 +34,19 @@ public interface DrugContraindicationMapper {
     DrugContraindication selectById(@Param("tenantId") Long tenantId, @Param("id") Long id);
 
     @Select("""
+            SELECT id, rule_code, drug_name, condition_type, condition_value, severity, message, recommended_action,
+                   mechanism_desc, alternative_recommendation, reference_source, patient_summary, status,
+                   maintained_by_pharmacist_id, creator, create_time, updater, update_time, deleted, tenant_id
+            FROM drug_contraindication
+            WHERE tenant_id = #{tenantId} AND rule_code = #{ruleCode} AND deleted = 0
+            LIMIT 1
+            """)
+    DrugContraindication selectByRuleCode(@Param("tenantId") Long tenantId, @Param("ruleCode") String ruleCode);
+
+    @Select("""
             <script>
-            SELECT id, rule_code, drug_name, condition_type, condition_value, severity, message, recommended_action, status,
+            SELECT id, rule_code, drug_name, condition_type, condition_value, severity, message, recommended_action,
+                   mechanism_desc, alternative_recommendation, reference_source, patient_summary, status,
                    maintained_by_pharmacist_id, creator, create_time, updater, update_time, deleted, tenant_id
             FROM drug_contraindication
             WHERE tenant_id = #{tenantId} AND deleted = 0
@@ -94,10 +107,12 @@ public interface DrugContraindicationMapper {
 
     @Insert("""
             INSERT INTO drug_contraindication (
-                rule_code, drug_name, condition_type, condition_value, severity, message, recommended_action, status,
+                rule_code, drug_name, condition_type, condition_value, severity, message, recommended_action,
+                mechanism_desc, alternative_recommendation, reference_source, patient_summary, status,
                 maintained_by_pharmacist_id, creator, create_time, updater, update_time, deleted, tenant_id
             ) VALUES (
-                #{ruleCode}, #{drugName}, #{conditionType}, #{conditionValue}, #{severity}, #{message}, #{recommendedAction}, #{status},
+                #{ruleCode}, #{drugName}, #{conditionType}, #{conditionValue}, #{severity}, #{message}, #{recommendedAction},
+                #{mechanismDesc}, #{alternativeRecommendation}, #{referenceSource}, #{patientSummary}, #{status},
                 #{maintainedByPharmacistId}, #{creator}, #{createTime}, #{updater}, #{updateTime}, #{deleted}, #{tenantId}
             )
             """)
@@ -112,6 +127,10 @@ public interface DrugContraindicationMapper {
                 severity = #{severity},
                 message = #{message},
                 recommended_action = #{recommendedAction},
+                mechanism_desc = #{mechanismDesc},
+                alternative_recommendation = #{alternativeRecommendation},
+                reference_source = #{referenceSource},
+                patient_summary = #{patientSummary},
                 status = #{status},
                 maintained_by_pharmacist_id = #{maintainedByPharmacistId},
                 updater = #{updater},

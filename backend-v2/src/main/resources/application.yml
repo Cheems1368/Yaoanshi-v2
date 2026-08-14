@@ -58,6 +58,22 @@ medicine:
       ticket-ttl-seconds: ${MEDICINE_APP_WS_TICKET_TTL_SECONDS:30}
   storage:
     endpoint: ${MEDICINE_STORAGE_ENDPOINT:http://127.0.0.1:9000}
-    bucket: ${MEDICINE_STORAGE_BUCKET:yaoshian-mvp}
-    access-key: ${MEDICINE_STORAGE_ACCESS_KEY:}
-    secret-key: ${MEDICINE_STORAGE_SECRET_KEY:}
+    public-endpoint: ${MEDICINE_STORAGE_PUBLIC_ENDPOINT:${MEDICINE_STORAGE_ENDPOINT:http://127.0.0.1:9000}}
+    bucket: ${MEDICINE_STORAGE_BUCKET:yaoanshi-mvp}
+    access-key: ${MEDICINE_STORAGE_ACCESS_KEY:minioadmin}
+    secret-key: ${MEDICINE_STORAGE_SECRET_KEY:minioadmin}
+    region: ${MEDICINE_STORAGE_REGION:us-east-1}
+  ocr:
+    base-url: ${MEDICINE_OCR_BASE_URL:https://api.siliconflow.cn/v1/chat/completions}
+    api-key: ${MEDICINE_OCR_API_KEY:}
+    model: ${MEDICINE_OCR_MODEL:deepseek-ai/deepseek-vl2}
+    timeout-ms: ${MEDICINE_OCR_TIMEOUT_MS:30000}
+  speech:
+    xfyun:
+      app-id: ${MEDICINE_XFYUN_APP_ID:}
+      api-key: ${MEDICINE_XFYUN_API_KEY:}
+      api-secret: ${MEDICINE_XFYUN_API_SECRET:}
+      base-url: ${MEDICINE_XFYUN_BASE_URL:wss://iat-api.xfyun.cn/v2/iat}
+      primary-domain: ${MEDICINE_XFYUN_PRIMARY_DOMAIN:xfime-mianqie}
+      fallback-domain: ${MEDICINE_XFYUN_FALLBACK_DOMAIN:iat}
+      timeout-ms: ${MEDICINE_XFYUN_TIMEOUT_MS:30000}

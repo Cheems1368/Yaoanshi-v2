@@ -38,13 +38,13 @@ const routes: Array<RouteRecordRaw> = [
         meta: { requiresAuth: true }
       },
       {
-        path: 'help-order',
-        component: () => import('@/modules/patient/pages/HelpOrderPage.vue'),
+        path: 'medication',
+        component: () => import('@/modules/patient/pages/MedicationTabPage.vue'),
         meta: { requiresAuth: true, requiresBinding: true }
       },
       {
-        path: 'prescription',
-        component: () => import('@/modules/patient/pages/PrescriptionPage.vue'),
+        path: 'help-order',
+        component: () => import('@/modules/patient/pages/HelpOrderPage.vue'),
         meta: { requiresAuth: true, requiresBinding: true }
       },
       {
@@ -53,6 +53,15 @@ const routes: Array<RouteRecordRaw> = [
         meta: { requiresAuth: true }
       }
     ]
+  },
+  {
+    path: '/tabs/prescription',
+    redirect: '/prescription'
+  },
+  {
+    path: '/prescription',
+    component: () => import('@/modules/patient/pages/PrescriptionPage.vue'),
+    meta: { requiresAuth: true, requiresBinding: true }
   },
   {
     path: '/medication-reminder',
@@ -72,7 +81,12 @@ const routes: Array<RouteRecordRaw> = [
   {
     path: '/rational-medication',
     component: () => import('@/modules/patient/pages/RationalMedicationPage.vue'),
-    meta: { requiresAuth: true }
+    meta: { requiresAuth: true, requiresBinding: true }
+  },
+  {
+    path: '/education/cards/:id',
+    component: () => import('@/modules/patient/pages/EducationCardDetailPage.vue'),
+    meta: { requiresAuth: true, requiresBinding: true }
   },
   {
     path: '/drug-detail/:id',
@@ -88,6 +102,11 @@ const routes: Array<RouteRecordRaw> = [
     path: '/ai-assistant',
     component: () => import('@/modules/patient/pages/AiAssistantPage.vue'),
     meta: { requiresAuth: true }
+  },
+  {
+    path: '/self-reported-medications',
+    component: () => import('@/modules/patient/pages/SelfReportedMedicationPage.vue'),
+    meta: { requiresAuth: true, requiresBinding: true }
   }
 ]
 

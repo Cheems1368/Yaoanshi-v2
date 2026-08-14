@@ -1,9 +1,11 @@
 package com.medicine.api.controller;
 
 import com.medicine.api.dto.auth.AppLoginRequest;
+import com.medicine.api.dto.auth.AppLogoutRequest;
 import com.medicine.api.dto.auth.OtpSendRequest;
 import com.medicine.api.dto.auth.RefreshTokenRequest;
 import com.medicine.api.dto.auth.TokenPair;
+import com.medicine.api.dto.identity.AppCurrentAccountDTO;
 import com.medicine.common.model.CommonResult;
 import com.medicine.service.auth.AppAuthService;
 import com.medicine.service.auth.JwtClaims;
@@ -13,8 +15,6 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-
-import java.util.Map;
 
 @RestController
 @RequestMapping("/app-api/auth")
@@ -42,12 +42,12 @@ public class AppAuthController {
     }
 
     @PostMapping("/logout")
-    public CommonResult<Boolean> logout(@RequestBody Map<String, String> request, Authentication authentication) {
-        return CommonResult.ok(appAuthService.logout(authentication.getName(), request.get("deviceId")));
+    public CommonResult<Boolean> logout(@RequestBody AppLogoutRequest request, Authentication authentication) {
+        return CommonResult.ok(appAuthService.logout(authentication.getName(), request.getDeviceId()));
     }
 
     @GetMapping("/me")
-    public CommonResult<Map<String, Object>> me(Authentication authentication) {
+    public CommonResult<AppCurrentAccountDTO> me(Authentication authentication) {
         String deviceId = null;
         if (authentication.getDetails() instanceof JwtClaims claims) {
             deviceId = claims.getDeviceId();

@@ -1,11 +1,12 @@
 package com.medicine.api.controller;
 
+import com.medicine.api.dto.common.CsvImportResultDTO;
+import com.medicine.api.dto.ddi.AdminDdiRiskCardDTO;
 import com.medicine.api.dto.ddi.AdminDdiRuleDTO;
 import com.medicine.api.dto.ddi.AdminDdiRuleUpsertRequest;
 import com.medicine.api.dto.ddi.DrugContraindicationDTO;
 import com.medicine.api.dto.ddi.DrugContraindicationUpsertRequest;
 import com.medicine.api.dto.prescription.DdiScreeningConfirmRequest;
-import com.medicine.api.dto.prescription.PrescriptionDTO;
 import com.medicine.common.model.CommonResult;
 import com.medicine.common.model.PageResult;
 import com.medicine.service.admin.AdminDdiService;
@@ -20,6 +21,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 @RestController
 @RequestMapping("/admin-api/ddi")
@@ -64,6 +66,16 @@ public class AdminDdiController {
         return CommonResult.ok(adminDdiService.updateRule(claims, id, request));
     }
 
+    @PostMapping("/rules/imports")
+    public CommonResult<CsvImportResultDTO> importRules(
+            @RequestParam("file") MultipartFile file,
+            @RequestParam(value = "dryRun", defaultValue = "true") boolean dryRun,
+            Authentication authentication
+    ) {
+        JwtClaims claims = (JwtClaims) authentication.getDetails();
+        return CommonResult.ok(adminDdiService.importRules(claims, file, dryRun));
+    }
+
     @GetMapping("/contraindications")
     public CommonResult<PageResult<DrugContraindicationDTO>> listContraindications(
             @RequestParam(value = "keyword", required = false) String keyword,
@@ -96,8 +108,18 @@ public class AdminDdiController {
         return CommonResult.ok(adminDdiService.updateContraindication(claims, id, request));
     }
 
+    @PostMapping("/contraindications/imports")
+    public CommonResult<CsvImportResultDTO> importContraindications(
+            @RequestParam("file") MultipartFile file,
+            @RequestParam(value = "dryRun", defaultValue = "true") boolean dryRun,
+            Authentication authentication
+    ) {
+        JwtClaims claims = (JwtClaims) authentication.getDetails();
+        return CommonResult.ok(adminDdiService.importContraindications(claims, file, dryRun));
+    }
+
     @PostMapping("/screenings/{id}/confirm")
-    public CommonResult<PrescriptionDTO.DdiScreeningDTO> confirm(
+    public CommonResult<AdminDdiRiskCardDTO> confirm(
             @PathVariable("id") Long id,
             @RequestBody(required = false) DdiScreeningConfirmRequest request,
             Authentication authentication

@@ -1,27 +1,35 @@
 package com.medicine.service.app;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.medicine.api.dto.helporder.HelpOrderAttachmentDTO;
 import com.medicine.api.dto.helporder.HelpOrderDTO;
 import com.medicine.api.dto.helporder.HelpOrderReplyRequest;
 import com.medicine.common.exception.BusinessException;
 import com.medicine.common.exception.ErrorCode;
 import com.medicine.common.model.PageResult;
+import com.medicine.domain.file.FileAsset;
 import com.medicine.domain.helporder.HelpOrder;
 import com.medicine.domain.helporder.HelpOrderEvent;
+import com.medicine.domain.helporder.HelpOrderEventAttachment;
 import com.medicine.domain.identity.AppAccount;
 import com.medicine.domain.identity.DoctorProfile;
 import com.medicine.domain.identity.Patient;
 import com.medicine.domain.identity.PharmacistProfile;
+import com.medicine.repository.file.FileAssetMapper;
+import com.medicine.repository.helporder.HelpOrderEventAttachmentMapper;
 import com.medicine.repository.helporder.HelpOrderEventMapper;
 import com.medicine.repository.helporder.HelpOrderMapper;
 import com.medicine.repository.identity.AppAccountMapper;
 import com.medicine.repository.identity.DoctorProfileMapper;
 import com.medicine.repository.identity.PharmacistProfileMapper;
 import com.medicine.service.auth.AppPatientService;
+import com.medicine.service.helporder.HelpOrderVoiceTranscriptionService;
 import com.medicine.service.notification.NotificationDispatchService;
+import com.medicine.service.storage.S3CompatibleObjectStorage;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
@@ -32,40 +40,56 @@ import java.util.concurrent.ThreadLocalRandom;
 public class AppHelpOrderService {
 
     private static final long DEFAULT_TENANT_ID = 1L;
+    private static final int MAX_EVENT_ATTACHMENTS = 3;
+    private static final Duration HELP_ORDER_DOWNLOAD_TTL = Duration.ofMinutes(15);
 
     private final HelpOrderMapper helpOrderMapper;
     private final HelpOrderEventMapper helpOrderEventMapper;
+    private final HelpOrderEventAttachmentMapper helpOrderEventAttachmentMapper;
+    private final FileAssetMapper fileAssetMapper;
+    private final S3CompatibleObjectStorage objectStorage;
     private final NotificationDispatchService notificationDispatchService;
     private final AppPatientService appPatientService;
     private final AppAccountMapper appAccountMapper;
     private final PharmacistProfileMapper pharmacistProfileMapper;
     private final DoctorProfileMapper doctorProfileMapper;
     private final ObjectMapper objectMapper;
+    private final HelpOrderVoiceTranscriptionService voiceTranscriptionService;
 
     public AppHelpOrderService(
             HelpOrderMapper helpOrderMapper,
             HelpOrderEventMapper helpOrderEventMapper,
+            HelpOrderEventAttachmentMapper helpOrderEventAttachmentMapper,
+            FileAssetMapper fileAssetMapper,
+            S3CompatibleObjectStorage objectStorage,
             NotificationDispatchService notificationDispatchService,
             AppPatientService appPatientService,
             AppAccountMapper appAccountMapper,
             PharmacistProfileMapper pharmacistProfileMapper,
             DoctorProfileMapper doctorProfileMapper,
-            ObjectMapper objectMapper
+            ObjectMapper objectMapper,
+            HelpOrderVoiceTranscriptionService voiceTranscriptionService
     ) {
         this.helpOrderMapper = helpOrderMapper;
         this.helpOrderEventMapper = helpOrderEventMapper;
+        this.helpOrderEventAttachmentMapper = helpOrderEventAttachmentMapper;
+        this.fileAssetMapper = fileAssetMapper;
+        this.objectStorage = objectStorage;
         this.notificationDispatchService = notificationDispatchService;
         this.appPatientService = appPatientService;
         this.appAccountMapper = appAccountMapper;
         this.pharmacistProfileMapper = pharmacistProfileMapper;
         this.doctorProfileMapper = doctorProfileMapper;
         this.objectMapper = objectMapper;
+        this.voiceTranscriptionService = voiceTranscriptionService;
     }
 
     public HelpOrderDTO create(String subject, HelpOrderDTO request) {
         AppPatientService.AccessContext context = appPatientService.requireAccessContext(subject);
         Patient patient = context.patient();
         LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
+        List<FileAsset> attachments = validateAttachmentFiles(context, request.getAttachmentFileAssetIds());
+        HelpOrderVoiceTranscriptionService.VoiceFiles voiceFiles = voiceTranscriptionService.validateVoiceFiles(context, request.getVoiceAttachment());
 
         HelpOrder order = new HelpOrder();
         order.setOrderNo(generateOrderNo());
@@ -74,7 +98,7 @@ public class AppHelpOrderService {
         order.setSubmittedById(context.appAccount().getId());
         order.setCategory(normalizeCategory(request.getCategory()));
         order.setTitle(requireText(request.getTitle()));
-        order.setDescription(blankToNull(request.getDescription()));
+        order.setDescription(request.getDescription() == null ? "" : request.getDescription().trim());
         order.setStatus("SUBMITTED");
         order.setPriority(normalizePriority(request.getPriority()));
         order.setRequiresOfflineEmergency(Boolean.TRUE.equals(request.getRequiresOfflineEmergency()));
@@ -89,7 +113,7 @@ public class AppHelpOrderService {
         applyAudit(order, "app-help-order", now);
         helpOrderMapper.insert(order);
 
-        appendEvent(order.getId(), "SUBMITTED", null, "SUBMITTED", context.operatorType(), context.appAccount().getId(), blankToNull(request.getDescription()), now);
+        appendEvent(order.getId(), "SUBMITTED", null, "SUBMITTED", context.operatorType(), context.appAccount().getId(), order.getDescription(), attachments, voiceFiles, now);
         createNotification(
                 "PHARMACIST",
                 patient.getBoundByPharmacistId(),
@@ -112,7 +136,12 @@ public class AppHelpOrderService {
         }
 
         LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
-        String content = requireText(request == null ? null : request.getContent());
+        List<FileAsset> attachments = validateAttachmentFiles(context, request == null ? null : request.getAttachmentFileAssetIds());
+        HelpOrderVoiceTranscriptionService.VoiceFiles voiceFiles = voiceTranscriptionService.validateVoiceFiles(context, request == null ? null : request.getVoiceAttachment());
+        String content = request == null ? null : blankToNull(request.getContent());
+        if (!StringUtils.hasText(content) && attachments.isEmpty() && voiceFiles == null) {
+            throw new BusinessException(400, "BAD_REQUEST");
+        }
         appendEvent(
                 order.getId(),
                 "PATIENT_REPLY",
@@ -121,6 +150,8 @@ public class AppHelpOrderService {
                 context.operatorType(),
                 context.appAccount().getId(),
                 content,
+                attachments,
+                voiceFiles,
                 now
         );
         createNotification(
@@ -208,8 +239,23 @@ public class AppHelpOrderService {
         dto.setOperatorName(resolveOperatorName(event.getOperatorType(), event.getOperatorId()));
         dto.setContent(event.getContent());
         dto.setAttachmentFileAssetId(event.getAttachmentFileAssetId());
+        dto.setAttachments(loadAttachmentDtos(event));
+        dto.setDecisionResult(extractDecisionResult(event.getMetadataJson()));
         dto.setEventAt(formatDateTime(event.getCreateTime()));
         return dto;
+    }
+
+    private String extractDecisionResult(String metadataJson) {
+        if (!StringUtils.hasText(metadataJson)) {
+            return null;
+        }
+        try {
+            Map<?, ?> metadata = objectMapper.readValue(metadataJson, Map.class);
+            Object value = metadata.get("decisionResult");
+            return value == null ? null : value.toString();
+        } catch (Exception ex) {
+            return null;
+        }
     }
 
     private void appendEvent(
@@ -220,6 +266,8 @@ public class AppHelpOrderService {
             String operatorType,
             Long operatorId,
             String content,
+            List<FileAsset> attachments,
+            HelpOrderVoiceTranscriptionService.VoiceFiles voiceFiles,
             LocalDateTime now
     ) {
         HelpOrderEvent event = new HelpOrderEvent();
@@ -229,11 +277,92 @@ public class AppHelpOrderService {
         event.setToStatus(toStatus);
         event.setOperatorType(operatorType);
         event.setOperatorId(operatorId == null ? 0L : operatorId);
-        event.setContent(blankToNull(content));
+        event.setContent(content == null ? "" : content.trim());
         event.setAttachmentFileAssetId(null);
         event.setMetadataJson(null);
         applyAudit(event, "app-help-order", now);
         helpOrderEventMapper.insert(event);
+        appendAttachments(event.getId(), helpOrderId, attachments, voiceFiles, now);
+    }
+
+    private void appendAttachments(
+            Long eventId,
+            Long helpOrderId,
+            List<FileAsset> attachments,
+            HelpOrderVoiceTranscriptionService.VoiceFiles voiceFiles,
+            LocalDateTime now
+    ) {
+        for (int i = 0; i < attachments.size(); i++) {
+            HelpOrderEventAttachment attachment = new HelpOrderEventAttachment();
+            attachment.setHelpOrderEventId(eventId);
+            attachment.setFileAssetId(attachments.get(i).getId());
+            attachment.setAttachmentType("IMAGE");
+            attachment.setSortOrder(i);
+            applyAudit(attachment, "app-help-order", now);
+            helpOrderEventAttachmentMapper.insert(attachment);
+        }
+        if (voiceFiles != null) {
+            HelpOrderEventAttachment voiceAttachment = new HelpOrderEventAttachment();
+            voiceAttachment.setHelpOrderEventId(eventId);
+            voiceAttachment.setFileAssetId(voiceFiles.playback().getId());
+            voiceAttachment.setAttachmentType("AUDIO");
+            voiceAttachment.setSortOrder(attachments.size());
+            applyAudit(voiceAttachment, "app-help-order", now);
+            helpOrderEventAttachmentMapper.insert(voiceAttachment);
+            voiceTranscriptionService.createPendingTranscript(DEFAULT_TENANT_ID, helpOrderId, voiceAttachment.getId(), voiceFiles, now);
+        }
+    }
+
+    private List<FileAsset> validateAttachmentFiles(AppPatientService.AccessContext context, List<Long> fileAssetIds) {
+        if (fileAssetIds == null || fileAssetIds.isEmpty()) {
+            return List.of();
+        }
+        List<Long> normalizedIds = fileAssetIds.stream()
+                .filter(id -> id != null && id > 0)
+                .distinct()
+                .toList();
+        if (normalizedIds.size() > MAX_EVENT_ATTACHMENTS) {
+            throw new BusinessException(ErrorCode.FILE_UPLOAD_TOO_LARGE.getCode(), ErrorCode.FILE_UPLOAD_TOO_LARGE.getMessage());
+        }
+        return normalizedIds.stream()
+                .map(id -> requireOwnedHelpOrderImage(context, id))
+                .toList();
+    }
+
+    private FileAsset requireOwnedHelpOrderImage(AppPatientService.AccessContext context, Long fileAssetId) {
+        FileAsset fileAsset = fileAssetMapper.selectByIdAndTenant(DEFAULT_TENANT_ID, fileAssetId);
+        if (fileAsset == null || !"HELP_ORDER_IMAGE".equals(fileAsset.getBusinessType())) {
+            throw new BusinessException(ErrorCode.FILE_UPLOAD_INVALID_TYPE.getCode(), ErrorCode.FILE_UPLOAD_INVALID_TYPE.getMessage());
+        }
+        if (!context.operatorType().equals(fileAsset.getUploadedByType())
+                || !context.appAccount().getId().equals(fileAsset.getUploadedById())) {
+            throw new BusinessException(ErrorCode.HELP_ORDER_PERMISSION_DENIED.getCode(), ErrorCode.HELP_ORDER_PERMISSION_DENIED.getMessage());
+        }
+        return fileAsset;
+    }
+
+    private List<HelpOrderAttachmentDTO> loadAttachmentDtos(HelpOrderEvent event) {
+        List<HelpOrderAttachmentDTO> attachments = helpOrderEventAttachmentMapper.selectDtosByEventId(DEFAULT_TENANT_ID, event.getId());
+        if (attachments.isEmpty() && event.getAttachmentFileAssetId() != null) {
+            FileAsset legacyFile = fileAssetMapper.selectByIdAndTenant(DEFAULT_TENANT_ID, event.getAttachmentFileAssetId());
+            if (legacyFile == null) {
+                return List.of();
+            }
+            HelpOrderAttachmentDTO dto = new HelpOrderAttachmentDTO();
+            dto.setId(null);
+            dto.setFileAssetId(legacyFile.getId());
+            dto.setAttachmentType("IMAGE");
+            dto.setOriginalFilename(legacyFile.getOriginalFilename());
+            dto.setMimeType(legacyFile.getMimeType());
+            dto.setSizeBytes(legacyFile.getSizeBytes());
+            dto.setDownloadUrl(objectStorage.createPresignedDownloadUrl(legacyFile.getObjectKey(), HELP_ORDER_DOWNLOAD_TTL));
+            return List.of(dto);
+        }
+        attachments.forEach(attachment -> attachment.setDownloadUrl(
+                objectStorage.createPresignedDownloadUrl(attachment.getDownloadUrl(), HELP_ORDER_DOWNLOAD_TTL)
+        ));
+        attachments.forEach(attachment -> voiceTranscriptionService.attachTranscript(DEFAULT_TENANT_ID, attachment));
+        return attachments;
     }
 
     private void createNotification(

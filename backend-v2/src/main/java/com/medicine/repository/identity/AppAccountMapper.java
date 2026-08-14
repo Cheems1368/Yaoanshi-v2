@@ -1,6 +1,7 @@
 package com.medicine.repository.identity;
 
 import com.medicine.domain.identity.AppAccount;
+import java.time.LocalDateTime;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Options;
@@ -60,4 +61,10 @@ public interface AppAccountMapper {
             WHERE id = #{id}
             """)
     int updateLoginInfo(AppAccount appAccount);
+
+    @Select("SELECT ai_consent_granted_at FROM app_account WHERE id = #{id} AND deleted = 0")
+    LocalDateTime selectAiConsentGrantedAt(@Param("id") Long id);
+
+    @Update("UPDATE app_account SET ai_consent_granted_at = #{grantedAt} WHERE id = #{id}")
+    int updateAiConsent(@Param("id") Long id, @Param("grantedAt") LocalDateTime grantedAt);
 }

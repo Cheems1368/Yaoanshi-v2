@@ -4,6 +4,8 @@ import router from './router';
 import { appAuthService, patientService } from '@/modules/patient/api/mvp'
 
 import { IonicVue } from '@ionic/vue';
+import AppIcon from '@/shared/components/AppIcon.vue'
+import EmptyState from '@/shared/components/EmptyState.vue'
 
 /* Core CSS required for Ionic components to work properly */
 import '@ionic/vue/css/core.css';
@@ -47,7 +49,9 @@ if (import.meta.env.DEV && typeof window !== 'undefined') {
 
 const app = createApp(App)
   .use(IonicVue)
-  .use(router);
+  .use(router)
+  .component('AppIcon', AppIcon)
+  .component('EmptyState', EmptyState);
 
 router.isReady().then(() => {
   app.mount('#app');

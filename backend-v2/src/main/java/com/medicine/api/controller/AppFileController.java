@@ -1,5 +1,7 @@
 package com.medicine.api.controller;
 
+import com.medicine.api.dto.file.FileAssetDTO;
+import com.medicine.api.dto.file.FileRegisterRequest;
 import com.medicine.api.dto.prescription.FilePresignRequest;
 import com.medicine.api.dto.prescription.FilePresignResponse;
 import com.medicine.common.model.CommonResult;
@@ -8,6 +10,8 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.security.Principal;
 
 @RestController
 @RequestMapping("/app-api/files")
@@ -22,5 +26,10 @@ public class AppFileController {
     @PostMapping("/presign")
     public CommonResult<FilePresignResponse> presign(@RequestBody FilePresignRequest request) {
         return CommonResult.ok(appFileService.presign(request));
+    }
+
+    @PostMapping("/register")
+    public CommonResult<FileAssetDTO> register(@RequestBody FileRegisterRequest request, Principal principal) {
+        return CommonResult.ok(appFileService.register(principal.getName(), request));
     }
 }

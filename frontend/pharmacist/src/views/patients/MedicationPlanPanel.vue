@@ -77,14 +77,14 @@
             <el-input v-model="item.drugSpec" placeholder="规格" />
             <el-input v-model="item.dosage" placeholder="剂量" />
             <el-select v-model="item.frequencyCode" placeholder="频次">
-              <el-option label="QD" value="QD" />
-              <el-option label="BID" value="BID" />
-              <el-option label="TID" value="TID" />
-              <el-option label="QID" value="QID" />
-              <el-option label="HS" value="HS" />
-              <el-option label="PRN" value="PRN" />
+              <el-option label="QD (每日一次)" value="QD" />
+              <el-option label="BID (每日两次)" value="BID" />
+              <el-option label="TID (每日三次)" value="TID" />
+              <el-option label="QID (每日四次)" value="QID" />
+              <el-option label="HS (睡前)" value="HS" />
+              <el-option label="PRN (必要时)" value="PRN" />
             </el-select>
-            <el-input v-model="item.timePointsText" placeholder="例如 08:00,20:00" />
+            <el-input v-model="item.timePointsText" placeholder="服药时间，多个用逗号分隔，如 08:00,14:00,20:00" />
             <el-select v-model="item.mealRelation" placeholder="与进餐关系">
               <el-option label="餐后" value="AFTER_MEAL" />
               <el-option label="餐前" value="BEFORE_MEAL" />
@@ -108,6 +108,16 @@
         启用当前版本
       </el-button>
     </div>
+
+    <!-- DDI 告警确认对话框 -->
+    <el-dialog v-model="ddiDialogVisible" title="用药风险提示" width="520px" :close-on-click-modal="false">
+      <p class="ddi-dialog-intro">启用该计划前检测到以下药物相互作用风险，请确认后继续：</p>
+      <AdminDdiRiskCardList v-model="expandedDdiAlertKey" :alerts="pendingDdiAlerts" />
+      <template #footer>
+        <el-button @click="ddiDialogVisible = false">取消启用</el-button>
+        <el-button type="warning" :loading="activating" @click="doActivate">已知晓风险，确认启用</el-button>
+      </template>
+    </el-dialog>
 
     <section class="tasks-section">
       <div class="section-header">
@@ -141,15 +151,22 @@
 
 <script setup>
 import { computed, reactive, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import AdminDdiRiskCardList from '@/components/ddi/AdminDdiRiskCardList.vue'
 import {
   activateMedicationPlan,
   createMedicationPlan,
   getMedicationPlan,
   getMedicationPlanAdherenceReport,
+  getMedicationPlanDdiCheck,
   getMedicationPlanTasks,
   updateMedicationPlan
 } from '@/modules/pharmacist/api/medicationPlans'
+import {
+  getSelfReportedMedicationTransferPrefill,
+  markSelfReportedMedicationTransferred
+} from '@/modules/pharmacist/api/workorders'
 
 const props = defineProps({
   patientId: {
@@ -164,12 +181,20 @@ const props = defineProps({
 
 const emit = defineEmits(['plan-updated'])
 
+const route = useRoute()
+const router = useRouter()
 const loading = ref(false)
 const saving = ref(false)
 const activating = ref(false)
 const errorMessage = ref('')
 const taskRows = ref([])
 const adherenceReport = ref('')
+
+const ddiDialogVisible = ref(false)
+const pendingDdiAlerts = ref([])
+const pendingActivatePlanId = ref(null)
+const expandedDdiAlertKey = ref('')
+const pendingTransfer = ref(null)
 
 const createEmptyItem = () => ({
   drugName: '',
@@ -238,9 +263,70 @@ const resetDraft = () => {
   })
 }
 
+const applyTransferPrefill = async () => {
+  const workOrderId = route.query.workOrderId
+  const selfReportedMedicationId = route.query.selfReportedMedicationId
+  if (!workOrderId || !selfReportedMedicationId || pendingTransfer.value) {
+    return
+  }
+
+  try {
+    const response = await getSelfReportedMedicationTransferPrefill(workOrderId, selfReportedMedicationId)
+    const prefill = response.data
+    if (String(prefill.patientId) !== String(props.patientId)) {
+      throw new Error('自报药物与当前患者不匹配')
+    }
+
+    let itemIndex = form.items.findIndex((item) => item.drugName?.trim() === prefill.drugName?.trim())
+    if (itemIndex < 0) {
+      const target = form.items.length === 1 && !form.items[0].drugName ? form.items[0] : createEmptyItem()
+      if (target !== form.items[0]) {
+        form.items.push(target)
+      }
+      itemIndex = form.items.indexOf(target)
+      target.drugName = prefill.drugName || ''
+      target.dosage = prefill.dosage || ''
+    }
+    if (!form.planName) {
+      form.planName = '自报药物转入计划'
+    }
+    pendingTransfer.value = { workOrderId, selfReportedMedicationId, itemIndex }
+    ElMessage.info('已预填自报药物，保存计划后将自动完成状态回写')
+  } catch (error) {
+    errorMessage.value = error.message || '自报药物预填失败，请返回工单重试'
+  }
+}
+
+const completePendingTransfer = async (plan) => {
+  if (!pendingTransfer.value) {
+    return
+  }
+  const context = pendingTransfer.value
+  const planItemId = plan?.items?.[context.itemIndex]?.id
+  if (!planItemId) {
+    throw new Error('用药计划已保存，但未找到对应计划项，未回写自报药物状态')
+  }
+  try {
+    await markSelfReportedMedicationTransferred(
+      context.workOrderId,
+      context.selfReportedMedicationId,
+      planItemId
+    )
+  } catch (error) {
+    throw new Error(`用药计划已保存，但自报药物状态回写失败：${error.message || '请返回工单重试'}`)
+  }
+  pendingTransfer.value = null
+  const query = { ...route.query }
+  delete query.workOrderId
+  delete query.selfReportedMedicationId
+  await router.replace({ query })
+  ElMessage.success('自报药物已转入正式用药计划')
+}
+
 const loadPlan = async (planId) => {
   if (!planId) {
     resetDraft()
+    await applyTransferPrefill()
     return
   }
   loading.value = true
@@ -255,6 +341,7 @@ const loadPlan = async (planId) => {
   } finally {
     loading.value = false
   }
+  await applyTransferPrefill()
 }
 
 const loadDerivedData = async (planId) => {
@@ -322,6 +409,7 @@ const buildPayload = (status) => {
   if (items.some((item) => !item.dosage || !item.frequencyCode || item.timePoints.length === 0)) {
     throw new Error('每条药品项都需要填写剂量、频次和服药时间')
   }
+  validateAllTimePoints(form.items)
 
   return {
     patientId: props.patientId,
@@ -344,8 +432,9 @@ const persistPlan = async (status) => {
       ? await updateMedicationPlan(form.id, payload)
       : await createMedicationPlan(payload)
     hydratePlan(response.data)
-    await loadDerivedData(response.data.id)
     emit('plan-updated', response.data)
+    await completePendingTransfer(response.data)
+    await loadDerivedData(response.data.id)
     ElMessage.success(status === 'ACTIVE' ? '用药计划已保存并启用' : '用药计划草稿已保存')
   } catch (error) {
     errorMessage.value = error.message || '用药计划保存失败，请稍后重试'
@@ -359,13 +448,51 @@ const saveDraft = async () => {
 }
 
 const saveAndActivate = async () => {
-  await persistPlan('ACTIVE')
+  // Save as draft first to get an id, then run DDI check before activating
+  saving.value = true
+  errorMessage.value = ''
+  try {
+    const payload = buildPayload('DRAFT')
+    const response = form.id
+      ? await updateMedicationPlan(form.id, payload)
+      : await createMedicationPlan(payload)
+    hydratePlan(response.data)
+    emit('plan-updated', response.data)
+    await completePendingTransfer(response.data)
+  } catch (error) {
+    errorMessage.value = error.message || '用药计划保存失败，请稍后重试'
+    saving.value = false
+    return
+  } finally {
+    saving.value = false
+  }
+  // Now trigger activation with DDI check
+  await activateCurrentVersion()
 }
 
 const activateCurrentVersion = async () => {
-  if (!form.id) {
-    return
+  if (!form.id) return
+  errorMessage.value = ''
+  try {
+    const ddiRes = await getMedicationPlanDdiCheck(form.id)
+    const alerts = ddiRes.data?.alerts ?? []
+    if (alerts.length > 0) {
+      pendingDdiAlerts.value = alerts
+      expandedDdiAlertKey.value = ''
+      pendingActivatePlanId.value = form.id
+      ddiDialogVisible.value = true
+    } else {
+      await doActivate()
+    }
+  } catch {
+    // DDI check failure is non-blocking — proceed with activation
+    await doActivate()
   }
+}
+
+const doActivate = async () => {
+  ddiDialogVisible.value = false
+  if (!form.id) return
   activating.value = true
   errorMessage.value = ''
   try {
@@ -404,11 +531,32 @@ const taskStatusText = (status) => {
   return map[status] || status || '--'
 }
 
+const HH_MM_RE = /^([01]\d|2[0-3]):[0-5]\d$/
+
 const splitTimePoints = (value) =>
   (value || '')
+    .replace(/，/g, ',')
     .split(',')
     .map((entry) => entry.trim())
     .filter(Boolean)
+
+const validateAllTimePoints = (items) => {
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i]
+    if (!item.drugName?.trim()) continue
+    const points = splitTimePoints(item.timePointsText)
+    if (points.length === 0) {
+      throw new Error(`药品项 #${i + 1}「${item.drugName}」缺少服药时间`)
+    }
+    for (const tp of points) {
+      if (!HH_MM_RE.test(tp)) {
+        throw new Error(
+          `药品项 #${i + 1}「${item.drugName}」的服药时间「${tp}」格式错误，需为 HH:mm（24小时制），如 08:00、20:00`
+        )
+      }
+    }
+  }
+}
 
 const toIsoString = (value) => {
   if (!value) {
@@ -454,6 +602,16 @@ watch(
   border-radius: var(--pro-radius-lg);
   background: var(--pro-bg-primary);
   box-shadow: var(--pro-shadow-sm);
+}
+
+.ddi-alert-list {
+  max-height: min(60vh, 560px);
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.ddi-alert-list > .ddi-alert-item {
+  display: none;
 }
 
 .panel-header,
@@ -532,5 +690,79 @@ watch(
   .summary-grid {
     display: grid;
   }
+}
+
+.ddi-dialog-intro {
+  margin: 0;
+  color: var(--pro-text-secondary);
+  font-size: 13px;
+}
+
+:deep(.el-dialog) {
+  display: flex;
+  max-height: calc(100vh - 48px);
+  flex-direction: column;
+  margin-top: 24px !important;
+  margin-bottom: 24px;
+}
+
+:deep(.el-dialog__body) {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  display: grid;
+  gap: 16px;
+}
+
+:deep(.el-dialog__footer) {
+  flex: 0 0 auto;
+}
+
+.ddi-alert-list {
+  display: grid;
+  gap: 12px;
+  max-height: 340px;
+  overflow-y: auto;
+}
+
+.ddi-alert-item {
+  padding: 12px;
+  border-radius: 8px;
+  border-left: 4px solid transparent;
+}
+
+.ddi-high {
+  background: var(--pro-danger-bg);
+  border-left-color: var(--pro-danger);
+}
+
+.ddi-medium {
+  background: var(--pro-warning-bg);
+  border-left-color: var(--pro-warning);
+}
+
+.ddi-alert-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.ddi-drug-pair {
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--pro-text-primary);
+}
+
+.ddi-message {
+  margin: 0 0 4px;
+  font-size: 13px;
+  color: var(--pro-text-primary);
+}
+
+.ddi-action {
+  margin: 0;
+  font-size: 12px;
+  color: var(--pro-text-secondary);
 }
 </style>

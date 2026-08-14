@@ -45,6 +45,14 @@ export function getMedicationPlanTasks(id, params) {
   })
 }
 
+export function getMedicationPlanDdiCheck(id) {
+  return request({
+    baseURL: backendV2BaseUrl,
+    url: `/admin-api/medication-plans/${id}/ddi-check`,
+    method: 'get'
+  })
+}
+
 export function getMedicationPlanAdherenceReport(id, params) {
   return request({
     baseURL: backendV2BaseUrl,

@@ -18,7 +18,7 @@ const runId = createRunId()
 const patientBaseUrl = process.env.E2E_PATIENT_BASE_URL || 'http://127.0.0.1:3001'
 const pharmacistBaseUrl = process.env.E2E_PHARMACIST_BASE_URL || 'http://127.0.0.1:3003'
 const backendBaseUrl = process.env.E2E_BACKEND_BASE_URL || 'http://127.0.0.1:8080'
-const legacyBaseUrl = process.env.E2E_LEGACY_BASE_URL || 'http://127.0.0.1:48080'
+const legacyBaseUrl = process.env.E2E_LEGACY_BASE_URL || backendBaseUrl
 const pharmacistUsername = process.env.E2E_PHARMACIST_USERNAME || 'pharmacist'
 const pharmacistPassword = process.env.E2E_PHARMACIST_PASSWORD || '123456'
 const patientIdentity = createPatientIdentity(runId, 'Prescription Patient')
@@ -69,13 +69,13 @@ try {
   await primePatientPage(patientPage, patientBaseUrl, patientSession, { bound: true, hasActivePlan: false })
   await patientPage.goto(`${patientBaseUrl}/tabs/prescription`, { waitUntil: 'networkidle' })
 
-  await patientPage.locator('input[type="file"]').setInputFiles({
+  await patientPage.locator('input[type="file"]:not([capture])').setInputFiles({
     name: `prescription-${runId}.png`,
     mimeType: 'image/png',
     buffer: tinyPngBuffer
   })
-  await patientPage.locator('.drug-names-input').fill('Warfarin')
-  await patientPage.locator('.upload-submit-button').click()
+  await patientPage.locator('ion-textarea textarea').fill('Warfarin')
+  await patientPage.getByRole('button', { name: '提交登记' }).click()
   await patientPage.locator('.ddi-modal').waitFor()
   await patientPage.locator('.severity-pill--high').first().waitFor()
 
@@ -86,16 +86,28 @@ try {
   const uploadedPayload = await uploadResponse.json()
   const uploadedPrescriptionId = uploadedPayload.data.id
   await patientPage.locator('.record-card').first().waitFor()
+  await patientPage.locator('.ddi-modal').waitFor({ state: 'hidden' })
+  await patientPage.locator('.selected-file').waitFor({ state: 'hidden' })
+  await patientPage.reload({ waitUntil: 'networkidle' })
 
-  await patientPage.route('**/app-api/ddi/screen', (route) => route.abort())
-  await patientPage.locator('input[type="file"]').setInputFiles({
+  await patientPage.route('**/app-api/ddi/screen', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ code: 500, msg: 'E2E simulated DDI service unavailable' })
+    })
+  )
+  await patientPage.locator('input[type="file"]:not([capture])').setInputFiles({
     name: `prescription-degraded-${runId}.png`,
     mimeType: 'image/png',
     buffer: tinyPngBuffer
   })
-  await patientPage.locator('.drug-names-input').fill('Warfarin')
+  await patientPage.locator('.selected-file').filter({ hasText: `prescription-degraded-${runId}.png` }).waitFor()
+  await patientPage.locator('ion-textarea textarea').fill('Warfarin')
+  const degradedScreeningPromise = patientPage.waitForResponse((response) => response.url().includes('/app-api/ddi/screen'))
   const degradedUploadPromise = patientPage.waitForResponse((response) => response.url().includes('/app-api/prescriptions/uploads'))
-  await patientPage.locator('.upload-submit-button').click()
+  await patientPage.getByRole('button', { name: '提交登记' }).click()
+  await degradedScreeningPromise
   const degradedUploadResponse = await degradedUploadPromise
   const degradedUploadPayload = await degradedUploadResponse.json()
   const degradedPrescriptionId = degradedUploadPayload.data.id
@@ -131,10 +143,13 @@ try {
   await prescriptionRow.waitFor()
   await prescriptionRow.locator('.el-button').first().click()
   await pharmacistPage.locator('.el-drawer').last().waitFor()
-  const ddiCards = pharmacistPage.locator('.ddi-card')
+  const ddiCards = pharmacistPage.locator('.ddi-risk-card')
   await ddiCards.first().waitFor()
 
-  const screeningId = detailWithScreening.payload.data.pendingDdiScreenings[0].id
+  const screeningId = detailWithScreening.payload.data.pendingDdiScreenings[0].screeningId
+  if (!screeningId) {
+    throw new Error(`Prescription ${uploadedPrescriptionId} returned a DDI screening without screeningId`)
+  }
   const pharmacistActionSession = await professionalLogin(legacyBaseUrl, {
     username: pharmacistUsername,
     password: pharmacistPassword,

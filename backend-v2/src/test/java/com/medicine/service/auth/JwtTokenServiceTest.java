@@ -91,4 +91,23 @@ class JwtTokenServiceTest {
         assertThat(claims).isNotNull();
         assertThat(ChronoUnit.SECONDS.between(claims.getIssuedAt(), claims.getExpiresAt())).isBetween(1L, 2L);
     }
+
+    @Test
+    void shouldRoundTripProfessionalEffectiveRole() {
+        String token = jwtTokenService.generateProfessionalAccessToken(
+                "doctor",
+                100L,
+                1L,
+                "Doctor A",
+                List.of("admin"),
+                "doctor"
+        );
+
+        JwtClaims claims = jwtTokenService.parse(token);
+
+        assertThat(claims).isNotNull();
+        assertThat(claims.isProfessional()).isTrue();
+        assertThat(claims.getRoles()).containsExactly("admin");
+        assertThat(claims.getEffectiveRole()).isEqualTo("doctor");
+    }
 }

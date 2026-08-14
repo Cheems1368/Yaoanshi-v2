@@ -15,6 +15,7 @@
         />
         <el-select v-model="query.status" clearable placeholder="全部状态" class="query-select">
           <el-option label="待复核" value="UPLOADED" />
+          <el-option label="OCR 已预填" value="OCR_DONE" />
           <el-option label="已复核" value="PHARMACIST_CONFIRMED" />
           <el-option label="已驳回" value="REJECTED" />
         </el-select>
@@ -91,6 +92,22 @@
           </div>
         </section>
 
+        <section v-if="detail.ocrRawText || detail.ocrFailureReason" class="detail-section">
+          <h3>OCR 识别详情</h3>
+          <el-alert
+            v-if="detail.ocrFailureReason"
+            type="warning"
+            :closable="false"
+            :title="`OCR 需要人工兜底：${detail.ocrFailureReason}`"
+            show-icon
+          />
+          <el-collapse v-if="detail.ocrRawText">
+            <el-collapse-item title="查看 OCR 原文" name="ocr-raw">
+              <pre class="ocr-raw">{{ detail.ocrRawText }}</pre>
+            </el-collapse-item>
+          </el-collapse>
+        </section>
+
         <section class="detail-section">
           <h3>附件信息</h3>
           <div v-if="detail.attachments.length" class="attachment-list">
@@ -112,11 +129,16 @@
 
         <section class="detail-section">
           <div class="section-header">
-            <h3>人工录入药品项</h3>
+            <h3>药品项（OCR 预填 / 人工确认）</h3>
             <el-button @click="addItem">新增药品项</el-button>
           </div>
           <div class="item-list">
             <article v-for="(item, index) in editableItems" :key="index" class="item-card">
+              <div class="item-heading">
+                <el-tag size="small" :type="item.source === 'OCR' ? 'success' : 'info'" effect="plain">
+                  {{ item.source === 'OCR' ? 'OCR 草稿' : '人工录入' }}
+                </el-tag>
+              </div>
               <div class="item-grid">
                 <el-input v-model="item.drugName" placeholder="药品名称" />
                 <el-input v-model="item.drugSpec" placeholder="规格" />
@@ -141,26 +163,14 @@
             show-icon
             class="ddi-banner"
           />
-          <div class="ddi-list">
-            <article v-for="screening in detail.pendingDdiScreenings" :key="screening.id" class="ddi-card">
-              <div class="ddi-header">
-                <strong>{{ screening.severity }} 风险</strong>
-                <el-tag :type="screening.confirmStatus === 'CONFIRMED_CONTINUE' ? 'success' : 'danger'" effect="plain">
-                  {{ screening.confirmStatus === 'CONFIRMED_CONTINUE' ? '已确认' : '待确认' }}
-                </el-tag>
-              </div>
-              <p>{{ screening.message || '检测到高风险相互作用' }}</p>
-              <p>{{ screening.recommendedAction || '请药师明确记录继续使用理由。' }}</p>
-              <el-button
-                v-if="screening.confirmStatus !== 'CONFIRMED_CONTINUE'"
-                type="warning"
-                plain
-                @click="handleConfirmScreening(screening.id)"
-              >
-                确认继续
-              </el-button>
-            </article>
-          </div>
+          <AdminDdiRiskCardList
+            v-model="expandedScreeningKey"
+            :alerts="detail.pendingDdiScreenings"
+            :show-confirm-button="true"
+            :show-confirm-state="true"
+            :show-confirmation-note="true"
+            @confirm="handleConfirmScreening"
+          />
         </section>
 
         <section class="drawer-actions">
@@ -177,6 +187,7 @@
 import { reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import AdminDdiRiskCardList from '@/components/ddi/AdminDdiRiskCardList.vue'
 import {
   confirmDdiScreening,
   confirmPrescription,
@@ -195,6 +206,7 @@ const total = ref(0)
 const detailVisible = ref(false)
 const detail = ref(null)
 const editableItems = ref([])
+const expandedScreeningKey = ref('')
 
 const query = reactive({
   keyword: '',
@@ -230,6 +242,7 @@ const openDetail = async (id) => {
   try {
     const response = await getPrescriptionDetail(id)
     detail.value = response.data
+    expandedScreeningKey.value = ''
     editableItems.value = response.data.items?.length
       ? response.data.items.map((item) => ({
           drugName: item.drugName || '',
@@ -237,7 +250,8 @@ const openDetail = async (id) => {
           dosage: item.dosage || '',
           frequency: item.frequency || '',
           route: item.route || '',
-          durationDays: item.durationDays || 7
+          durationDays: item.durationDays || 7,
+          source: item.source || 'MANUAL'
         }))
       : [createEmptyItem()]
   } catch (error) {
@@ -254,7 +268,8 @@ const createEmptyItem = () => ({
   dosage: '',
   frequency: '',
   route: '',
-  durationDays: 7
+  durationDays: 7,
+  source: 'MANUAL'
 })
 
 const addItem = () => {
@@ -297,6 +312,7 @@ const reloadCurrentDetail = async () => {
   }
   const response = await getPrescriptionDetail(detail.value.id)
   detail.value = response.data
+  expandedScreeningKey.value = ''
 }
 
 const handleConfirm = async () => {
@@ -386,6 +402,8 @@ const statusText = (status) => {
   switch (status) {
     case 'UPLOADED':
       return '待复核'
+    case 'OCR_DONE':
+      return 'OCR 已预填'
     case 'PHARMACIST_CONFIRMED':
       return '已复核'
     case 'REJECTED':
@@ -397,6 +415,8 @@ const statusText = (status) => {
 
 const ocrStatusText = (status) => {
   switch (status) {
+    case 'HIGH_CONFIDENCE':
+      return '高置信度，识别完成'
     case 'LOW_CONFIDENCE':
       return '低置信度，转人工复核'
     case 'SUCCESS':
@@ -460,6 +480,10 @@ loadPrescriptions()
   gap: 16px;
 }
 
+.ddi-list {
+  display: none;
+}
+
 .summary-grid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
@@ -492,6 +516,23 @@ loadPrescriptions()
 
 .drawer-actions {
   justify-content: flex-end;
+}
+
+.item-heading {
+  display: flex;
+  justify-content: flex-start;
+  margin-bottom: 2px;
+}
+
+.ocr-raw {
+  margin: 0;
+  padding: 12px;
+  border-radius: var(--pro-radius-sm);
+  background: var(--pro-bg-secondary);
+  color: var(--pro-text-primary);
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.6;
 }
 
 .ddi-banner {

@@ -11,7 +11,9 @@ import org.springframework.context.annotation.Configuration;
         JwtProperties.class,
         LegacyAuthDataSourceProperties.class,
         MedicineDataSourceProperties.class,
-        ObjectStorageProperties.class
+        ObjectStorageProperties.class,
+        OcrProperties.class,
+        SpeechProperties.class
 })
 public class BackendPropertiesConfig {
 }

@@ -4,7 +4,7 @@
       <div class="bind-container">
         <header class="page-header">
           <ion-button fill="clear" class="back-btn" @click="goBack">
-            <ion-icon :icon="chevronBackOutline" />
+            <AppIcon name="chevronBackOutline" :size="22" />
           </ion-button>
           <div>
             <p class="eyebrow">患者绑定</p>
@@ -70,13 +70,11 @@ import { useRouter } from 'vue-router'
 import {
   IonButton,
   IonContent,
-  IonIcon,
   IonInput,
   IonLoading,
   IonPage,
   IonToast
 } from '@ionic/vue'
-import { chevronBackOutline } from 'ionicons/icons'
 import { patientSession } from '@/app/session'
 import { medicationService, patientService } from '@/modules/patient/api/mvp'
 import { userDataService } from '@/services/userDataService'
@@ -225,21 +223,21 @@ const goBack = () => {
 
 <style scoped>
 .bind-content {
-  --background: linear-gradient(180deg, #dbeafe 0%, #ffffff 38%, #f8fafc 100%);
+  --background: linear-gradient(180deg, var(--patient-primary-light) 0%, var(--patient-bg-card) 38%, var(--patient-bg-page) 100%);
 }
 
 .bind-container {
   max-width: 520px;
   margin: 0 auto;
-  padding: 20px 16px 32px;
+  padding: var(--patient-space-5) var(--patient-space-4) var(--patient-space-8);
 }
 
 .page-header {
   display: grid;
   grid-template-columns: auto 1fr;
-  gap: 12px;
+  gap: var(--patient-space-3);
   align-items: start;
-  margin-bottom: 20px;
+  margin-bottom: var(--patient-space-5);
 }
 
 .back-btn {
@@ -247,34 +245,34 @@ const goBack = () => {
 }
 
 .eyebrow {
-  margin: 0 0 8px;
-  color: #2563eb;
-  font-size: 13px;
-  font-weight: 700;
+  margin: 0 0 var(--patient-space-2);
+  color: var(--patient-primary);
+  font-size: var(--patient-font-caption);
+  font-weight: var(--patient-font-bold);
   letter-spacing: 0.08em;
 }
 
 .page-header h1 {
-  margin: 0 0 8px;
-  font-size: 28px;
-  color: #0f172a;
+  margin: 0 0 var(--patient-space-2);
+  font-size: var(--patient-font-page-title);
+  color: var(--patient-text-primary);
 }
 
 .page-header p {
   margin: 0;
-  color: #475569;
-  line-height: 1.6;
+  color: var(--patient-text-secondary);
+  line-height: var(--patient-leading-relaxed);
 }
 
 .form-card {
-  padding: 18px 16px;
-  border-radius: 18px;
-  background: #ffffff;
-  box-shadow: 0 12px 24px rgba(15, 36, 80, 0.08);
+  padding: var(--patient-space-5) var(--patient-space-4);
+  border-radius: var(--patient-radius-xl);
+  background: var(--patient-bg-card);
+  box-shadow: var(--patient-shadow-md);
 }
 
 .form-item {
-  margin-bottom: 18px;
+  margin-bottom: var(--patient-space-5);
 }
 
 .form-item:last-child {
@@ -283,40 +281,40 @@ const goBack = () => {
 
 .form-item label {
   display: block;
-  margin-bottom: 8px;
-  font-size: 15px;
-  font-weight: 600;
-  color: #1f2937;
+  margin-bottom: var(--patient-space-2);
+  font-size: var(--patient-font-helper);
+  font-weight: var(--patient-font-semibold);
+  color: var(--patient-text-primary);
 }
 
 .form-input {
-  --background: #f8fafc;
-  --border-color: #dbeafe;
-  --border-radius: 14px;
-  --padding-start: 14px;
-  --padding-end: 14px;
-  --padding-top: 12px;
-  --padding-bottom: 12px;
-  color: #0f172a;
-  border: 1px solid #dbeafe;
-  border-radius: 14px;
+  --background: var(--patient-bg-page);
+  --border-color: var(--patient-border-light);
+  --border-radius: var(--patient-radius-lg);
+  --padding-start: var(--patient-space-4);
+  --padding-end: var(--patient-space-4);
+  --padding-top: var(--patient-space-3);
+  --padding-bottom: var(--patient-space-3);
+  color: var(--patient-text-primary);
+  border: 1px solid var(--patient-border-light);
+  border-radius: var(--patient-radius-lg);
 }
 
 .submit-section {
-  margin-top: 20px;
+  margin-top: var(--patient-space-5);
 }
 
 .submit-btn {
-  --background: linear-gradient(135deg, #2563eb, #1d4ed8);
-  --border-radius: 14px;
-  height: 48px;
-  font-weight: 700;
+  --background: linear-gradient(135deg, var(--patient-primary), var(--patient-primary-dark));
+  --border-radius: var(--patient-radius-lg);
+  height: var(--patient-space-12);
+  font-weight: var(--patient-font-bold);
 }
 
 .help-text {
-  margin: 12px 0 0;
-  color: #64748b;
-  font-size: 13px;
-  line-height: 1.6;
+  margin: var(--patient-space-3) 0 0;
+  color: var(--patient-text-muted);
+  font-size: var(--patient-font-caption);
+  line-height: var(--patient-leading-relaxed);
 }
 </style>

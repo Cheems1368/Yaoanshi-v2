@@ -9,7 +9,7 @@ This document is the only authoritative front-end design system for the project.
 Rules:
 
 1. `Standard document/FRONTEND_GUIDELINES.md` is the source of truth for all future UI work.
-2. Existing styles in `docs/`, legacy pages, and scattered page-level CSS are reference only.
+2. Existing legacy pages and scattered page-level CSS can be inspected for current state, but they do not define the design system.
 3. When a screen conflicts with this document, this document wins.
 4. Every visual decision in MVP must be traceable to a token, component rule, or layout rule in this file.
 
@@ -145,18 +145,18 @@ Fallback stack:
 
 #### Patient App base
 
-- Base font size: `16px`
+- Base font size: `17px` (optimized for elderly users 60+)
 
 Recommended scale:
 
-| Token | Size |
-|---|---|
-| `patient-caption` | `12px` |
-| `patient-helper` | `14px` |
-| `patient-body` | `16px` |
-| `patient-subtitle` | `18px` |
-| `patient-title` | `20px` |
-| `patient-page-title` | `24px` |
+| Token | CSS Variable | Size |
+|---|---|---|
+| `patient-caption` | `--patient-font-caption` | `13px` |
+| `patient-helper` | `--patient-font-helper` | `15px` |
+| `patient-body` | `--patient-font-body` | `17px` |
+| `patient-subtitle` | `--patient-font-subtitle` | `19px` |
+| `patient-title` | `--patient-font-title` | `22px` |
+| `patient-page-title` | `--patient-font-page-title` | `26px` |
 
 #### Professional surfaces base
 
@@ -280,6 +280,30 @@ Professional surfaces minimum interactive height:
 Professional table default row height:
 
 `44px`
+
+### 2.10 Font weight tokens
+
+| Token | CSS Variable | Value | Usage |
+|---|---|---|---|
+| `font-regular` | `--patient-font-regular` | `400` | Body text, secondary labels |
+| `font-medium` | `--patient-font-medium` | `500` | List item primary text, minor emphasis |
+| `font-semibold` | `--patient-font-semibold` | `600` | Buttons, card titles, key numbers |
+| `font-bold` | `--patient-font-bold` | `700` | Page titles, section headers |
+
+### 2.11 Line height tokens
+
+| Token | CSS Variable | Value | Usage |
+|---|---|---|---|
+| `leading-tight` | `--patient-leading-tight` | `1.3` | Large display numbers, single-line titles |
+| `leading-normal` | `--patient-leading-normal` | `1.5` | Body text default |
+| `leading-relaxed` | `--patient-leading-relaxed` | `1.7` | Long-form text, help descriptions |
+
+### 2.12 Border tokens
+
+| Token | CSS Variable | Value | Usage |
+|---|---|---|---|
+| `border-light` | `--patient-border-light` | `1px solid rgba(41, 121, 255, 0.08)` | Card edges, gentle dividers |
+| `border-default` | `--patient-border-default` | `1px solid #e2e8f0` | Form inputs, list separators |
 
 ## 3. Layout Rules
 
@@ -461,9 +485,15 @@ Rules:
 
 Bottom Tab rules for Patient App:
 
-1. Use clear labels
+1. Use clear labels and large tap zones
 2. Maximum of four primary tabs in MVP
 3. Active tab uses brand-primary
+4. Tab structure (MVP): 首页 / 用药 / 求助 / 我的
+   - 首页: Today overview, quick actions, status summary
+   - 用药: Medication reminders + records (segment switcher inside)
+   - 求助: Help order list and creation
+   - 我的: Profile, family binding, settings
+5. Prescription upload is a quick action on 首页, not a tab
 
 Side Navigation rules for professional surfaces:
 
@@ -485,10 +515,12 @@ The patient surface is:
 Patient theme rules:
 
 1. Use Ionic token mapping for all core colors.
-2. Base text size is `16px`.
+2. Base text size is `17px` (elderly-optimized).
 3. Minimum interactive target is `48px`.
 4. Soft gradient background is allowed.
 5. Dense admin-like tables and control clusters are not allowed.
+6. All `--patient-*` color tokens must resolve to `#2979FF` for primary (not `#2563eb` or `#3B82F6`).
+7. Spacing must use `--patient-space-*` tokens. Arbitrary values like `13px`, `18px`, `22px` are not allowed.
 
 ### 5.2 Professional Theme
 
@@ -633,7 +665,43 @@ Rules:
 | Page Header | patient / professional |
 | Navigation | bottom-tab / side-nav / top-toolbar |
 
-## 10. Validation checklist
+## 10. Elderly-Friendly Design Principles
+
+The primary patient population is stroke follow-up patients aged 60+. All patient UI decisions must pass these checks:
+
+### 10.1 Text readability
+
+1. Base body font size is `17px` minimum
+2. Never use text below `13px` in any patient-facing context
+3. Line height for body text is `1.5` minimum
+4. Primary text color must achieve ≥ 7:1 contrast ratio against page background
+5. Secondary text must achieve ≥ 4.5:1 contrast ratio
+
+### 10.2 Touch targets
+
+1. Every interactive element must have a minimum tap area of `48px × 48px`
+2. Quick action cards must be generous: recommended minimum `80px` height
+3. Primary action buttons must span full content width or be at least `240px` wide
+4. Tab bar buttons must not be below `56px` height
+
+### 10.3 Layout clarity
+
+1. One primary action per screen section — no competing CTAs
+2. Quick action cards use large icons (minimum `48px`) + large label (minimum `17px`)
+3. Prefer 2-column grid for quick actions (浙里办 pattern): large icon above, label below
+4. Generous vertical spacing between sections: minimum `--patient-space-5` (20px)
+5. Card grouping must be visually obvious — clear white card on grey page background
+
+### 10.4 Prohibited patterns for patient UI
+
+1. No tiny text links as primary actions
+2. No icon-only buttons without labels
+3. No more than 6 quick action entries on one screen
+4. No hover-only affordances (touch devices have no hover)
+5. No custom decorative animations (floating, bouncing, staggered fade-in)
+6. No `!important` overrides to force visual effects
+
+## 11. Validation checklist
 
 This document is valid only if all of the following are true:
 

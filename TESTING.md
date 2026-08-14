@@ -76,11 +76,16 @@ npm run e2e:auth-expiry
 npm run e2e:prescription-review
 npm run e2e:medication-family
 npm run e2e:helporder-collab
+npm run e2e:helporder-mobile
 npm run e2e:pharmacist-patient
 npm run e2e:admin-notifications
 ```
 
-E2E 结果应在 PR 的“测试证据”中记录：环境、测试账号类型、场景、结果和失败截图。真实 OCR、语音、短信或 AI 服务只能通过环境变量或批准的密钥工具注入，禁止写入仓库。
+`e2e:helporder-mobile` 覆盖患者图片/语音工单、药师移动端认领/回复/升级/驳回/关闭、医生结构化 `ADOPTED` / `NOT_ADOPTED` 决策，以及患者最终结果可见性。真实语音服务仍需通过已批准的本地凭据做一次浏览器录音、上传和转写人工取证；无凭据时必须验证可恢复的降级路径。
+
+`e2e:medication-family` 除用药任务、患者/家属打卡和解绑权限外，还覆盖药师从自报药物工单进入有效患者计划页、服务端预填、保存计划项以及 `TRANSFERRED` 状态回写。
+
+E2E 结果应在 PR 的“测试证据”中记录：环境、测试账号类型、命令、测试数、覆盖率、场景结果和脱敏截图。真实 OCR、语音、短信或 AI 服务只能通过环境变量或批准的密钥工具注入，禁止写入仓库或日志。
 
 ## 5. 发布前检查
 

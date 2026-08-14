@@ -2,78 +2,101 @@
   <ion-page>
     <ion-header>
       <ion-toolbar>
+        <ion-buttons slot="start">
+          <ion-back-button default-href="/home" />
+        </ion-buttons>
         <ion-title>处方上传</ion-title>
       </ion-toolbar>
     </ion-header>
 
     <ion-content class="page-content">
       <div class="page-container">
-        <section class="section-card">
-          <h2 class="section-title">上传登记说明</h2>
-          <p class="section-desc">当前先完成处方图片登记和药师复核流转，不依赖真实对象存储上传成功。</p>
-          <p class="section-note">如本地对象存储未接入，当前页面仍可完成登记；图片回看会显示“待对象存储接入”。</p>
-        </section>
+        <ion-card>
+          <ion-card-header>
+            <ion-card-title>上传登记说明</ion-card-title>
+          </ion-card-header>
+          <ion-card-content>
+            <p class="desc-text">当前先完成处方图片登记和药师复核流转，不依赖真实对象存储上传成功。</p>
+            <p class="note-text">如本地对象存储未接入，当前页面仍可完成登记；图片回看会显示"待对象存储接入"。</p>
+          </ion-card-content>
+        </ion-card>
 
-        <section class="section-card">
-          <h2 class="section-title">选择处方图片</h2>
-          <input
-            ref="fileInputRef"
-            class="hidden-input"
-            type="file"
-            accept="image/png,image/jpeg,image/webp"
-            @change="handleFileChange"
-          />
+        <ion-card>
+          <ion-card-header>
+            <ion-card-title>选择处方图片</ion-card-title>
+          </ion-card-header>
+          <ion-card-content>
+            <input
+              ref="cameraInputRef"
+              class="hidden-input"
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              capture="environment"
+              @change="handleFileChange"
+            />
 
-          <div class="upload-actions">
-            <ion-button expand="block" @click="triggerFilePicker">选择图片</ion-button>
-          </div>
+            <input
+              ref="galleryInputRef"
+              class="hidden-input"
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              @change="handleFileChange"
+            />
 
-          <div v-if="selectedFile" class="selected-file">
-            <div class="file-meta">
-              <strong>{{ selectedFile.name }}</strong>
-              <span>{{ formatSize(selectedFile.size) }}</span>
+            <div class="upload-action-grid">
+              <ion-button expand="block" @click="triggerCameraPicker">拍照上传</ion-button>
+              <ion-button expand="block" fill="outline" @click="triggerGalleryPicker">相册/电子处方</ion-button>
             </div>
-            <img v-if="previewUrl" :src="previewUrl" alt="处方预览" class="preview-image" />
-
-            <div class="drug-input-block">
-              <label class="field-label" for="candidate-drug-names">本次新增药物</label>
-              <textarea
-                id="candidate-drug-names"
-                v-model="candidateDrugNamesText"
-                class="drug-names-input"
-                rows="4"
-                placeholder="例如：华法林、奥美拉唑。多个药物请用换行、逗号或顿号分隔"
-              />
-              <p class="field-hint">用于上传前用药风险提醒；若暂时无法确认药名，可直接提交，系统会跳过本次提醒。</p>
-            </div>
-
-            <ion-button class="upload-submit-button" expand="block" :disabled="uploading" @click="submitUpload">
-              {{ uploading ? '正在登记...' : '提交登记' }}
-            </ion-button>
-          </div>
-        </section>
-
-        <section class="section-card">
-          <h2 class="section-title">处方登记记录</h2>
-          <div v-if="historyLoading" class="empty-state">
-            <p>加载处方记录中...</p>
-          </div>
-          <div v-else-if="uploadRecords.length === 0" class="empty-state">
-            <p>还没有登记记录，先选择一张处方图片。</p>
-          </div>
-          <div v-else class="record-list">
-            <article v-for="record in uploadRecords" :key="record.id" class="record-card">
-              <div class="record-header">
-                <strong>处方 #{{ record.id }}</strong>
-                <span class="status-tag">{{ mapStatus(record.status) }}</span>
+            <div v-if="selectedFile" class="selected-file">
+              <div class="file-meta">
+                <strong>{{ selectedFile.name }}</strong>
+                <span>{{ formatSize(selectedFile.size) }}</span>
               </div>
-              <p>患者：{{ record.patientName }} / {{ record.hospitalPatientId }}</p>
-              <p>OCR 状态：{{ mapOcrStatus(record.ocrStatus) }}</p>
-              <p>提交时间：{{ formatDate(record.createdAt) }}</p>
-              <p>附件：{{ record.attachments[0]?.originalFilename || '待对象存储接入' }}</p>
-            </article>
-          </div>
-        </section>
+              <img v-if="previewUrl" :src="previewUrl" alt="处方预览" class="preview-image" />
+
+              <ion-item lines="none" class="drug-item">
+                <ion-label position="stacked">本次新增药物</ion-label>
+                <ion-textarea
+                  v-model="candidateDrugNamesText"
+                  :rows="4"
+                  auto-grow
+                  placeholder="例如：华法林、奥美拉唑。多个药物请用换行、逗号或顿号分隔"
+                />
+              </ion-item>
+              <p class="field-hint">用于上传前用药风险提醒；若暂时无法确认药名，可直接提交，系统会跳过本次提醒。</p>
+
+              <ion-button expand="block" :disabled="uploading" @click="submitUpload">
+                {{ uploading ? '正在登记...' : '提交登记' }}
+              </ion-button>
+            </div>
+          </ion-card-content>
+        </ion-card>
+
+        <ion-card>
+          <ion-card-header>
+            <ion-card-title>处方登记记录</ion-card-title>
+          </ion-card-header>
+          <ion-card-content>
+            <div v-if="historyLoading" class="empty-state">
+              <p>加载处方记录中...</p>
+            </div>
+            <div v-else-if="uploadRecords.length === 0" class="empty-state">
+              <p>还没有登记记录，先选择一张处方图片。</p>
+            </div>
+            <div v-else class="record-list">
+              <article v-for="record in uploadRecords" :key="record.id" class="record-card">
+                <div class="record-header">
+                  <strong>处方 #{{ record.id }}</strong>
+                  <span class="status-tag">{{ mapStatus(record.status) }}</span>
+                </div>
+                <p>患者：{{ record.patientName }} / {{ record.hospitalPatientId }}</p>
+                <p>OCR 状态：{{ mapOcrStatus(record.ocrStatus) }}</p>
+                <p>提交时间：{{ formatDate(record.createdAt) }}</p>
+                <p>附件：{{ record.attachments[0]?.originalFilename || '待对象存储接入' }}</p>
+              </article>
+            </div>
+          </ion-card-content>
+        </ion-card>
       </div>
 
       <ion-loading :is-open="uploading" message="正在登记处方..." :duration="0" />
@@ -92,7 +115,11 @@
           </div>
 
           <div class="ddi-alert-list">
-            <article v-for="(alert, index) in pendingDdiAlerts" :key="`${alert.type}-${alert.drugA}-${alert.drugB}-${index}`" class="ddi-alert-card">
+            <article
+              v-for="(alert, index) in pendingDdiAlerts"
+              :key="`${alert.type}-${alert.drugA}-${alert.drugB}-${index}`"
+              class="ddi-alert-card"
+            >
               <div class="ddi-alert-top">
                 <span :class="['severity-pill', severityClass(alert.severity)]">{{ severityLabel(alert.severity) }}</span>
                 <span class="alert-type">{{ alertTypeLabel(alert.type) }}</span>
@@ -120,12 +147,21 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import {
+  IonBackButton,
   IonButton,
+  IonButtons,
+  IonCard,
+  IonCardContent,
+  IonCardHeader,
+  IonCardTitle,
   IonContent,
   IonHeader,
+  IonItem,
+  IonLabel,
   IonLoading,
   IonModal,
   IonPage,
+  IonTextarea,
   IonTitle,
   IonToast,
   IonToolbar
@@ -141,7 +177,8 @@ import {
 const MAX_SIZE_BYTES = 10 * 1024 * 1024
 
 const router = useRouter()
-const fileInputRef = ref<HTMLInputElement | null>(null)
+const cameraInputRef = ref<HTMLInputElement | null>(null)
+const galleryInputRef = ref<HTMLInputElement | null>(null)
 const selectedFile = ref<File | null>(null)
 const previewUrl = ref('')
 const candidateDrugNamesText = ref('')
@@ -154,6 +191,7 @@ const showDdiModal = ref(false)
 const pendingDdiAlerts = ref<AppDdiAlert[]>([])
 const pendingUploadFile = ref<File | null>(null)
 const pendingUploadDrugNames = ref<string[]>([])
+const allowedContentTypes = new Set(['image/jpeg', 'image/png', 'image/webp'])
 
 const pendingDrugNamesLabel = computed(() => pendingUploadDrugNames.value.join('、') || '--')
 
@@ -193,13 +231,40 @@ const resetSelection = () => {
   candidateDrugNamesText.value = ''
   revokePreview()
   clearDdiPromptState()
-  if (fileInputRef.value) {
-    fileInputRef.value.value = ''
+  if (cameraInputRef.value) {
+    cameraInputRef.value.value = ''
+  }
+  if (galleryInputRef.value) {
+    galleryInputRef.value.value = ''
   }
 }
 
-const triggerFilePicker = () => {
-  fileInputRef.value?.click()
+const triggerCameraPicker = () => {
+  cameraInputRef.value?.click()
+}
+
+const triggerGalleryPicker = () => {
+  galleryInputRef.value?.click()
+}
+
+const resolveSupportedContentType = (file: File) => {
+  const declaredType = file.type.trim().toLowerCase()
+  if (allowedContentTypes.has(declaredType)) {
+    return declaredType
+  }
+
+  const lowerName = file.name.trim().toLowerCase()
+  if (lowerName.endsWith('.jpg') || lowerName.endsWith('.jpeg')) {
+    return 'image/jpeg'
+  }
+  if (lowerName.endsWith('.png')) {
+    return 'image/png'
+  }
+  if (lowerName.endsWith('.webp')) {
+    return 'image/webp'
+  }
+
+  return ''
 }
 
 const handleFileChange = (event: Event) => {
@@ -208,7 +273,7 @@ const handleFileChange = (event: Event) => {
   if (!file) {
     return
   }
-  if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+  if (!resolveSupportedContentType(file)) {
     resetSelection()
     showMessage('仅支持 JPG、PNG、WEBP 图片')
     return
@@ -280,17 +345,26 @@ const buildConsultDescription = (file: File | null, newDrugNames: string[], aler
 }
 
 const registerUpload = async (file: File, options?: { screeningDegraded?: boolean; acknowledgedRisk?: boolean }) => {
+  const contentType = resolveSupportedContentType(file)
+
   const presign = await prescriptionService.presignUpload({
     filename: file.name,
-    contentType: file.type,
+    contentType,
     sizeBytes: file.size,
     businessType: 'PRESCRIPTION'
   })
 
+  try {
+    await prescriptionService.uploadToPresignedUrl(presign.data.uploadUrl, file, contentType)
+  } catch {
+    showMessage('图片上传失败，请检查网络后重试')
+    return
+  }
+
   const result = await prescriptionService.registerUpload({
     objectKey: presign.data.objectKey,
     originalFilename: file.name,
-    contentType: file.type,
+    contentType,
     sizeBytes: file.size
   })
 
@@ -407,6 +481,8 @@ const mapStatus = (status?: string | null) => {
 
 const mapOcrStatus = (status?: string | null) => {
   switch (status) {
+    case 'HIGH_CONFIDENCE':
+      return '高置信度，识别完成'
     case 'LOW_CONFIDENCE':
       return '低置信度，转人工复核'
     case 'SUCCESS':
@@ -427,191 +503,171 @@ onMounted(() => {
 
 <style scoped>
 .page-content {
-  --background: #f5f7fb;
+  --background: var(--patient-bg-page);
 }
 
 .page-container {
   max-width: 560px;
   margin: 0 auto;
-  padding: 16px;
+  padding: var(--patient-space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--patient-space-3);
 }
 
-.section-card {
-  background: #fff;
-  border-radius: 18px;
-  padding: 18px;
-  margin-bottom: 16px;
-  box-shadow: 0 8px 20px rgba(15, 36, 80, 0.08);
-}
-
-.section-title {
-  margin: 0 0 8px;
-  font-size: 18px;
-  font-weight: 600;
-  color: #1f2937;
-}
-
-.section-desc,
-.section-note,
+.desc-text,
 .record-card p,
 .empty-state p {
-  margin: 6px 0 0;
-  color: #4b5563;
-  line-height: 1.6;
+  margin: var(--patient-space-2) 0 0;
+  color: var(--patient-text-secondary);
+  line-height: var(--patient-leading-relaxed);
+  font-size: var(--patient-font-body);
 }
 
-.section-note,
+.note-text,
 .field-hint {
-  font-size: 13px;
-  color: #6b7280;
+  margin: var(--patient-space-2) 0 0;
+  font-size: var(--patient-font-caption);
+  color: var(--patient-text-secondary);
+  line-height: var(--patient-leading-relaxed);
 }
 
 .hidden-input {
   display: none;
 }
 
-.upload-actions {
-  margin-top: 12px;
+.upload-action-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--patient-space-3);
 }
 
 .selected-file {
   display: grid;
-  gap: 12px;
-  margin-top: 16px;
+  gap: var(--patient-space-3);
+  margin-top: var(--patient-space-4);
 }
 
 .file-meta {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 12px;
-  color: #1f2937;
+  gap: var(--patient-space-3);
+  color: var(--patient-text-primary);
+  font-size: var(--patient-font-body);
 }
 
 .preview-image {
   width: 100%;
-  border-radius: 14px;
+  border-radius: var(--patient-radius-md);
   object-fit: cover;
-  border: 1px solid #dbe3f0;
+  border: var(--patient-border-default);
 }
 
-.drug-input-block {
-  display: grid;
-  gap: 8px;
-}
-
-.field-label {
-  font-size: 14px;
-  font-weight: 600;
-  color: #1f2937;
-}
-
-.drug-names-input {
-  width: 100%;
-  min-height: 108px;
-  padding: 12px 14px;
-  border: 1px solid #dbe3f0;
-  border-radius: 14px;
-  resize: vertical;
-  font: inherit;
-  line-height: 1.6;
-  color: #1f2937;
-  background: #f8fafc;
-}
-
-.drug-names-input:focus {
-  outline: 2px solid rgba(37, 99, 235, 0.14);
-  border-color: #93c5fd;
+.drug-item {
+  --padding-start: 0;
+  --inner-padding-end: 0;
 }
 
 .record-list {
   display: grid;
-  gap: 12px;
-  margin-top: 8px;
+  gap: var(--patient-space-3);
+  margin-top: var(--patient-space-2);
 }
 
 .record-card {
-  border: 1px solid #dbe3f0;
-  border-radius: 14px;
-  padding: 14px;
-  background: #f8fafc;
+  border: var(--patient-border-default);
+  border-radius: var(--patient-radius-md);
+  padding: var(--patient-space-3) var(--patient-space-4);
+  background: var(--patient-bg-page);
 }
 
 .record-header {
   display: flex;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--patient-space-3);
   align-items: center;
-  color: #111827;
+  color: var(--patient-text-primary);
+  font-size: var(--patient-font-body);
 }
 
 .status-tag {
-  padding: 4px 10px;
+  padding: var(--patient-space-1) var(--patient-space-3);
   border-radius: 999px;
-  background: #dbeafe;
-  color: #1d4ed8;
-  font-size: 12px;
+  background: var(--patient-primary-light);
+  color: var(--patient-primary);
+  font-size: var(--patient-font-caption);
+  white-space: nowrap;
+}
+
+.empty-state {
+  text-align: center;
+  padding: var(--patient-space-6) var(--patient-space-3);
 }
 
 ion-modal {
   --width: min(92vw, 560px);
   --height: auto;
-  --border-radius: 24px;
+  --border-radius: var(--patient-radius-xl);
 }
 
 .ddi-modal {
-  padding: 20px 18px 24px;
-  background: #fff;
+  padding: var(--patient-space-5) var(--patient-space-4) var(--patient-space-6);
+  background: var(--patient-bg-card);
 }
 
 .ddi-modal-header h2 {
   margin: 0;
-  font-size: 20px;
-  color: #0f172a;
+  font-size: var(--patient-font-title);
+  color: var(--patient-text-primary);
+  font-weight: var(--patient-font-bold);
 }
 
 .ddi-modal-header p,
 .ddi-modal-summary {
-  margin: 10px 0 0;
-  color: #475569;
-  line-height: 1.6;
+  margin: var(--patient-space-2) 0 0;
+  color: var(--patient-text-secondary);
+  line-height: var(--patient-leading-relaxed);
+  font-size: var(--patient-font-body);
 }
 
 .ddi-alert-list {
   display: grid;
-  gap: 12px;
-  margin-top: 16px;
+  gap: var(--patient-space-3);
+  margin-top: var(--patient-space-4);
 }
 
 .ddi-alert-card {
-  padding: 14px;
-  border-radius: 16px;
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
+  padding: var(--patient-space-3) var(--patient-space-4);
+  border-radius: var(--patient-radius-md);
+  background: var(--patient-bg-page);
+  border: var(--patient-border-default);
 }
 
 .ddi-alert-top {
   display: flex;
-  gap: 8px;
+  gap: var(--patient-space-2);
   align-items: center;
-  margin-bottom: 8px;
+  margin-bottom: var(--patient-space-2);
 }
 
 .ddi-alert-card h3 {
   margin: 0;
-  font-size: 16px;
-  color: #0f172a;
+  font-size: var(--patient-font-body);
+  color: var(--patient-text-primary);
+  font-weight: var(--patient-font-semibold);
 }
 
 .ddi-alert-card p {
-  margin: 8px 0 0;
-  color: #475569;
-  line-height: 1.6;
+  margin: var(--patient-space-2) 0 0;
+  color: var(--patient-text-secondary);
+  line-height: var(--patient-leading-relaxed);
+  font-size: var(--patient-font-body);
 }
 
 .ddi-recommendation {
-  color: #0f172a;
-  font-weight: 500;
+  color: var(--patient-text-primary);
+  font-weight: var(--patient-font-medium);
 }
 
 .severity-pill,
@@ -620,35 +676,35 @@ ion-modal {
   align-items: center;
   justify-content: center;
   min-height: 26px;
-  padding: 0 10px;
+  padding: 0 var(--patient-space-3);
   border-radius: 999px;
-  font-size: 12px;
-  font-weight: 600;
+  font-size: var(--patient-font-caption);
+  font-weight: var(--patient-font-semibold);
 }
 
 .severity-pill--high {
-  background: #fee2e2;
-  color: #b91c1c;
+  background: var(--medical-high-risk-bg);
+  color: var(--medical-high-risk-text);
 }
 
 .severity-pill--medium {
-  background: #ffedd5;
-  color: #c2410c;
+  background: var(--medical-medium-risk-bg);
+  color: var(--medical-medium-risk-text);
 }
 
 .severity-pill--default {
-  background: #e2e8f0;
-  color: #334155;
+  background: var(--patient-border);
+  color: var(--patient-text-secondary);
 }
 
 .alert-type {
-  background: #e0f2fe;
-  color: #0369a1;
+  background: var(--patient-primary-light);
+  color: var(--patient-primary);
 }
 
 .ddi-modal-actions {
   display: grid;
-  gap: 10px;
-  margin-top: 18px;
+  gap: var(--patient-space-2);
+  margin-top: var(--patient-space-4);
 }
 </style>

@@ -1,5 +1,6 @@
 package com.medicine.service.app;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.medicine.api.dto.prescription.PrescriptionDTO;
 import com.medicine.api.dto.prescription.PrescriptionUploadRequest;
 import com.medicine.common.model.PageResult;
@@ -14,8 +15,10 @@ import com.medicine.repository.file.FileAssetMapper;
 import com.medicine.repository.identity.AppAccountMapper;
 import com.medicine.repository.identity.PatientMapper;
 import com.medicine.repository.prescription.PrescriptionAttachmentMapper;
+import com.medicine.repository.prescription.PrescriptionItemMapper;
 import com.medicine.repository.prescription.PrescriptionMapper;
 import com.medicine.repository.prescription.PrescriptionOcrRecordMapper;
+import com.medicine.service.ocr.OcrService;
 import com.medicine.service.storage.S3CompatibleObjectStorage;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -48,13 +51,22 @@ class AppPrescriptionServiceTest {
     private PrescriptionAttachmentMapper prescriptionAttachmentMapper;
 
     @Mock
+    private PrescriptionItemMapper prescriptionItemMapper;
+
+    @Mock
     private PrescriptionOcrRecordMapper prescriptionOcrRecordMapper;
 
     @Mock
     private S3CompatibleObjectStorage objectStorage;
 
+    @Mock
+    private OcrService ocrService;
+
     @Spy
     private ObjectStorageProperties objectStorageProperties = new ObjectStorageProperties();
+
+    @Spy
+    private ObjectMapper objectMapper = new ObjectMapper();
 
     @InjectMocks
     private AppPrescriptionService appPrescriptionService;
@@ -75,6 +87,8 @@ class AppPrescriptionServiceTest {
         when(appAccountMapper.selectActiveByMobile(1L, "13800138000")).thenReturn(account);
         when(patientMapper.selectByAppAccountId(1L, 101L)).thenReturn(patient);
         when(objectStorage.createPresignedDownloadUrl("prescriptions/mock.jpg")).thenReturn("download-url");
+        when(objectStorage.readObjectBytes("prescriptions/mock.jpg")).thenReturn("image-bytes".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        when(ocrService.performOcr(any(byte[].class), any())).thenReturn(OcrService.OcrResult.failure(""));
 
         doAnswer(invocation -> {
             FileAsset fileAsset = invocation.getArgument(0);
@@ -97,6 +111,7 @@ class AppPrescriptionServiceTest {
             return 1;
         }).when(prescriptionOcrRecordMapper).insert(any(PrescriptionOcrRecord.class));
         when(prescriptionOcrRecordMapper.selectLatestByPrescriptionId(1L, 401L)).thenReturn(latestOcrRecord);
+        when(prescriptionItemMapper.selectByPrescriptionId(1L, 401L)).thenReturn(java.util.List.of());
 
         PrescriptionUploadRequest request = new PrescriptionUploadRequest();
         request.setObjectKey("prescriptions/mock.jpg");
@@ -157,6 +172,7 @@ class AppPrescriptionServiceTest {
         when(prescriptionAttachmentMapper.selectByPrescriptionId(1L, 401L)).thenReturn(java.util.List.of(attachment));
         when(fileAssetMapper.selectByIdAndTenant(1L, 301L)).thenReturn(fileAsset);
         when(prescriptionOcrRecordMapper.selectLatestByPrescriptionId(1L, 401L)).thenReturn(ocrRecord);
+        when(prescriptionItemMapper.selectByPrescriptionId(1L, 401L)).thenReturn(java.util.List.of());
 
         PageResult<PrescriptionDTO> result = appPrescriptionService.getPrescriptions("13800138000", null, 1, 20);
 

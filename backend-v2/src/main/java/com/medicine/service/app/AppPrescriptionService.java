@@ -1,5 +1,6 @@
 package com.medicine.service.app;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.medicine.api.dto.prescription.PrescriptionDTO;
 import com.medicine.api.dto.prescription.PrescriptionUploadRequest;
 import com.medicine.common.exception.BusinessException;
@@ -12,14 +13,19 @@ import com.medicine.domain.identity.AppAccount;
 import com.medicine.domain.identity.Patient;
 import com.medicine.domain.prescription.Prescription;
 import com.medicine.domain.prescription.PrescriptionAttachment;
+import com.medicine.domain.prescription.PrescriptionItem;
 import com.medicine.domain.prescription.PrescriptionOcrRecord;
 import com.medicine.repository.file.FileAssetMapper;
 import com.medicine.repository.identity.AppAccountMapper;
 import com.medicine.repository.identity.PatientMapper;
 import com.medicine.repository.prescription.PrescriptionAttachmentMapper;
+import com.medicine.repository.prescription.PrescriptionItemMapper;
 import com.medicine.repository.prescription.PrescriptionMapper;
 import com.medicine.repository.prescription.PrescriptionOcrRecordMapper;
+import com.medicine.service.ocr.OcrService;
 import com.medicine.service.storage.S3CompatibleObjectStorage;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -28,10 +34,13 @@ import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 @Service
 public class AppPrescriptionService {
+
+    private static final Logger log = LoggerFactory.getLogger(AppPrescriptionService.class);
 
     private static final long DEFAULT_TENANT_ID = 1L;
     private static final long MAX_SIZE_BYTES = 10L * 1024L * 1024L;
@@ -42,9 +51,12 @@ public class AppPrescriptionService {
     private final FileAssetMapper fileAssetMapper;
     private final PrescriptionMapper prescriptionMapper;
     private final PrescriptionAttachmentMapper prescriptionAttachmentMapper;
+    private final PrescriptionItemMapper prescriptionItemMapper;
     private final PrescriptionOcrRecordMapper prescriptionOcrRecordMapper;
     private final S3CompatibleObjectStorage objectStorage;
     private final ObjectStorageProperties objectStorageProperties;
+    private final OcrService ocrService;
+    private final ObjectMapper objectMapper;
 
     public AppPrescriptionService(
             AppAccountMapper appAccountMapper,
@@ -52,18 +64,24 @@ public class AppPrescriptionService {
             FileAssetMapper fileAssetMapper,
             PrescriptionMapper prescriptionMapper,
             PrescriptionAttachmentMapper prescriptionAttachmentMapper,
+            PrescriptionItemMapper prescriptionItemMapper,
             PrescriptionOcrRecordMapper prescriptionOcrRecordMapper,
             S3CompatibleObjectStorage objectStorage,
-            ObjectStorageProperties objectStorageProperties
+            ObjectStorageProperties objectStorageProperties,
+            OcrService ocrService,
+            ObjectMapper objectMapper
     ) {
         this.appAccountMapper = appAccountMapper;
         this.patientMapper = patientMapper;
         this.fileAssetMapper = fileAssetMapper;
         this.prescriptionMapper = prescriptionMapper;
         this.prescriptionAttachmentMapper = prescriptionAttachmentMapper;
+        this.prescriptionItemMapper = prescriptionItemMapper;
         this.prescriptionOcrRecordMapper = prescriptionOcrRecordMapper;
         this.objectStorage = objectStorage;
         this.objectStorageProperties = objectStorageProperties;
+        this.ocrService = ocrService;
+        this.objectMapper = objectMapper;
     }
 
     public PageResult<PrescriptionDTO> getPrescriptions(String subject, String status, int pageNo, int pageSize) {
@@ -133,12 +151,34 @@ public class AppPrescriptionService {
         applyAudit(attachment, now, "app-prescription");
         prescriptionAttachmentMapper.insert(attachment);
 
+        OcrService.OcrResult ocrResult = performOcrFromStoredObject(fileAsset);
         PrescriptionOcrRecord ocrRecord = new PrescriptionOcrRecord();
         ocrRecord.setPrescriptionId(prescription.getId());
-        ocrRecord.setProvider("MANUAL_REVIEW_REQUIRED");
-        ocrRecord.setConfidence(BigDecimal.ZERO);
-        ocrRecord.setStatus("LOW_CONFIDENCE");
-        ocrRecord.setManualFallbackUsed(false);
+        if (ocrResult.isSuccess()) {
+            ocrRecord.setProvider("DEEPSEEK_OCR");
+            ocrRecord.setConfidence(ocrResult.getConfidence());
+            boolean highConfidence = ocrResult.getConfidence().compareTo(new BigDecimal("0.80")) >= 0 && !ocrResult.getItems().isEmpty();
+            ocrRecord.setStatus(highConfidence
+                    ? "HIGH_CONFIDENCE" : "LOW_CONFIDENCE");
+            ocrRecord.setResponsePayloadJson(ocrResult.getResponseJson());
+            ocrRecord.setExtractedText(ocrResult.getExtractedText());
+            ocrRecord.setStructuredItemsJson(writeStructuredItems(ocrResult.getItems()));
+            ocrRecord.setManualFallbackUsed(false);
+            if (highConfidence) {
+                writeOcrDraftItems(prescription.getId(), ocrResult.getItems(), now);
+                prescription.setStatus("OCR_DONE");
+                prescription.setOcrConfidence(ocrResult.getConfidence());
+                prescription.setUpdater("app-prescription");
+                prescription.setUpdateTime(now);
+                prescriptionMapper.updateOcrResult(prescription);
+            }
+        } else {
+            ocrRecord.setProvider("MANUAL_REVIEW_REQUIRED");
+            ocrRecord.setConfidence(BigDecimal.ZERO);
+            ocrRecord.setStatus("LOW_CONFIDENCE");
+            ocrRecord.setFailureReason(ocrResult.getFailureReason());
+            ocrRecord.setManualFallbackUsed(true);
+        }
         ocrRecord.setExecutedAt(now);
         applyAudit(ocrRecord, now, "app-prescription");
         prescriptionOcrRecordMapper.insert(ocrRecord);
@@ -157,7 +197,56 @@ public class AppPrescriptionService {
         prescription.setHospitalPatientId(patient.getHospitalPatientId());
         PrescriptionDTO dto = toSummaryDto(prescription);
         dto.setAttachments(List.of(attachmentDTO));
+        dto.setItems(loadItems(prescription.getId()));
         return dto;
+    }
+
+    private void writeOcrDraftItems(Long prescriptionId, List<OcrService.OcrItem> items, LocalDateTime now) {
+        int sortOrder = 0;
+        for (OcrService.OcrItem ocrItem : items) {
+            PrescriptionItem item = new PrescriptionItem();
+            item.setPrescriptionId(prescriptionId);
+            item.setDrugName(ocrItem.getDrugName());
+            item.setDrugSpec(ocrItem.getDrugSpec());
+            item.setDosage(ocrItem.getDosage());
+            item.setFrequency(ocrItem.getFrequency());
+            item.setRoute(ocrItem.getRoute());
+            item.setDurationDays(ocrItem.getDurationDays());
+            item.setNormalizedJson(writeJson(Map.of(
+                    "note", ocrItem.getNote() == null ? "" : ocrItem.getNote(),
+                    "confidence", ocrItem.getConfidence() == null ? BigDecimal.ZERO : ocrItem.getConfidence()
+            )));
+            item.setSource("OCR");
+            item.setSortOrder(sortOrder++);
+            applyAudit(item, now, "app-prescription-ocr");
+            prescriptionItemMapper.insert(item);
+        }
+    }
+
+    private String writeStructuredItems(List<OcrService.OcrItem> items) {
+        return writeJson(items);
+    }
+
+    private String writeJson(Object value) {
+        try {
+            return objectMapper.writeValueAsString(value);
+        } catch (Exception ex) {
+            return "[]";
+        }
+    }
+
+    private OcrService.OcrResult performOcrFromStoredObject(FileAsset fileAsset) {
+        try {
+            byte[] imageBytes = objectStorage.readObjectBytes(fileAsset.getObjectKey());
+            if (imageBytes.length == 0) {
+                log.warn("OCR image object is empty, objectKey={}", fileAsset.getObjectKey());
+                return OcrService.OcrResult.failure("IMAGE_OBJECT_EMPTY");
+            }
+            return ocrService.performOcr(imageBytes, fileAsset.getMimeType());
+        } catch (Exception ex) {
+            log.warn("OCR image read failed, objectKey={}, reason={}", fileAsset.getObjectKey(), ex.getMessage());
+            return OcrService.OcrResult.failure("IMAGE_READ_FAILED");
+        }
     }
 
     private AppAccount requireAccount(String subject) {
@@ -199,8 +288,10 @@ public class AppPrescriptionService {
         dto.setOcrConfidence(ocrRecord == null || ocrRecord.getConfidence() == null
                 ? null
                 : ocrRecord.getConfidence().setScale(2, RoundingMode.HALF_UP).toPlainString());
+        dto.setOcrRawText(ocrRecord == null ? null : ocrRecord.getExtractedText());
+        dto.setOcrFailureReason(ocrRecord == null ? null : ocrRecord.getFailureReason());
         dto.setAttachments(loadAttachments(prescription.getId()));
-        dto.setItems(List.of());
+        dto.setItems(loadItems(prescription.getId()));
         dto.setPendingDdiScreenings(List.of());
         return dto;
     }
@@ -219,6 +310,21 @@ public class AppPrescriptionService {
                 dto.setObjectKey(fileAsset.getObjectKey());
                 dto.setDownloadUrl(fileAsset.getPublicUrl());
             }
+            return dto;
+        }).toList();
+    }
+
+    private List<PrescriptionDTO.ItemDTO> loadItems(Long prescriptionId) {
+        return prescriptionItemMapper.selectByPrescriptionId(DEFAULT_TENANT_ID, prescriptionId).stream().map(item -> {
+            PrescriptionDTO.ItemDTO dto = new PrescriptionDTO.ItemDTO();
+            dto.setId(item.getId());
+            dto.setDrugName(item.getDrugName());
+            dto.setDrugSpec(item.getDrugSpec());
+            dto.setDosage(item.getDosage());
+            dto.setFrequency(item.getFrequency());
+            dto.setRoute(item.getRoute());
+            dto.setDurationDays(item.getDurationDays());
+            dto.setSource(item.getSource());
             return dto;
         }).toList();
     }

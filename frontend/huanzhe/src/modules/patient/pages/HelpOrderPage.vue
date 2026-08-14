@@ -7,6 +7,9 @@
     </ion-header>
 
     <ion-content class="page-content">
+      <ion-refresher slot="fixed" @ionRefresh="handleRefresh($event)">
+        <ion-refresher-content></ion-refresher-content>
+      </ion-refresher>
       <div class="page-container">
         <ion-card class="form-card">
           <ion-card-header>
@@ -44,6 +47,57 @@
               <ion-label class="checkbox-label">存在紧急风险，需要线下急诊提醒</ion-label>
             </ion-item>
 
+            <div class="image-uploader">
+              <div class="privacy-warning">上传前请确认图片中不要拍入姓名、身份证、病历号等敏感信息。</div>
+              <div class="image-actions">
+                <ion-button fill="outline" size="small" :disabled="selectedImages.length >= 3" @click="openCameraInput">
+                  拍照
+                </ion-button>
+                <ion-button fill="outline" size="small" :disabled="selectedImages.length >= 3" @click="openGalleryInput">
+                  选择图片
+                </ion-button>
+                <span class="image-count">{{ selectedImages.length }}/3</span>
+              </div>
+              <input
+                ref="cameraInput"
+                class="file-input"
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                capture="environment"
+                @change="handleImageInput"
+              />
+              <input
+                ref="galleryInput"
+                class="file-input"
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                multiple
+                @change="handleImageInput"
+              />
+              <div v-if="selectedImages.length" class="image-preview-list">
+                <div v-for="image in selectedImages" :key="image.id" class="image-preview">
+                  <img :src="image.previewUrl" :alt="image.file.name" />
+                  <button type="button" class="image-remove" :disabled="submitting" @click="removeImage(image.id)">移除</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="voice-uploader">
+              <button
+                type="button"
+                class="voice-hold-button"
+                :class="{ 'voice-hold-button--recording': recording }"
+                :disabled="submitting || voiceBusy || !canSubmit"
+                @pointerdown.prevent="startVoice"
+                @pointerup.prevent="finishVoice"
+                @pointercancel.prevent="cancelVoice"
+                @contextmenu.prevent
+              >
+                {{ recording ? '松开发送语音' : voiceBusy ? '语音发送中...' : '按住说话' }}
+              </button>
+              <div class="voice-hint">语音最长 60 秒，发送后可在详情中点击“转文字”。</div>
+            </div>
+
             <ion-button expand="block" :disabled="submitting || !canSubmit" @click="submitOrder">
               {{ submitting ? '提交中...' : '提交工单' }}
             </ion-button>
@@ -55,14 +109,11 @@
             <ion-card-title>我的工单</ion-card-title>
           </ion-card-header>
           <ion-card-content>
-            <div v-if="loading" class="empty-state">
+            <div v-if="loading" class="loading-state">
               <ion-spinner name="crescent" />
             </div>
 
-            <div v-else-if="orders.length === 0" class="empty-state">
-              <ion-icon :icon="chatboxEllipsesOutline" class="empty-icon" />
-              <p class="empty-text">还没有提交过工单</p>
-            </div>
+            <EmptyState v-else-if="orders.length === 0" type="no-orders" />
 
             <div v-else class="order-list">
               <button
@@ -108,11 +159,12 @@ import {
   IonCheckbox,
   IonContent,
   IonHeader,
-  IonIcon,
   IonInput,
   IonItem,
   IonLabel,
   IonPage,
+  IonRefresher,
+  IonRefresherContent,
   IonSelect,
   IonSelectOption,
   IonSpinner,
@@ -123,9 +175,10 @@ import {
   onIonViewWillEnter
 } from '@ionic/vue'
 import { computed, ref } from 'vue'
-import { chatboxEllipsesOutline } from 'ionicons/icons'
 import { useRoute, useRouter } from 'vue-router'
 import { helpOrderService, type HelpOrderDTO } from '@/modules/patient/api/mvp'
+import { cancelVoiceRecording, startVoiceRecording, stopVoiceRecording } from '@/modules/patient/composables/useVoiceRecorder'
+import { uploadHelpOrderVoice } from '@/modules/patient/composables/useHelpOrderVoiceUpload'
 
 const route = useRoute()
 const router = useRouter()
@@ -134,6 +187,20 @@ const submitting = ref(false)
 const orders = ref<HelpOrderDTO[]>([])
 const showToast = ref(false)
 const toastMessage = ref('')
+const recording = ref(false)
+const voiceBusy = ref(false)
+const cameraInput = ref<HTMLInputElement | null>(null)
+const galleryInput = ref<HTMLInputElement | null>(null)
+const selectedImages = ref<SelectedImage[]>([])
+
+const allowedImageTypes = new Set(['image/jpeg', 'image/png', 'image/webp'])
+const maxImageSizeBytes = 10 * 1024 * 1024
+
+interface SelectedImage {
+  id: string
+  file: File
+  previewUrl: string
+}
 
 const form = ref({
   category: 'MEDICATION_CONSULTATION',
@@ -196,10 +263,32 @@ const resetForm = () => {
     description: '',
     requiresOfflineEmergency: false
   }
+  clearImages()
 }
 
 const openDetail = (id: number) => {
   void router.push(`/help-order/${id}`)
+}
+
+const createOrder = async (extraPayload: Record<string, unknown> = {}) => {
+  const attachmentFileAssetIds = await uploadSelectedImages()
+  const response = await helpOrderService.createHelpOrder({
+    category: form.value.category,
+    title: form.value.title.trim(),
+    description: form.value.description.trim() || undefined,
+    priority: form.value.requiresOfflineEmergency ? 'URGENT' : 'NORMAL',
+    requiresOfflineEmergency: form.value.requiresOfflineEmergency,
+    attachmentFileAssetIds,
+    ...extraPayload
+  })
+  const createdId = response.data?.id
+  resetForm()
+  if (createdId) {
+    void router.push(`/help-order/${createdId}`)
+    return
+  }
+  showMessage('工单已提交')
+  await loadOrders()
 }
 
 const submitOrder = async () => {
@@ -210,26 +299,123 @@ const submitOrder = async () => {
 
   submitting.value = true
   try {
-    const response = await helpOrderService.createHelpOrder({
-      category: form.value.category,
-      title: form.value.title.trim(),
-      description: form.value.description.trim() || undefined,
-      priority: form.value.requiresOfflineEmergency ? 'URGENT' : 'NORMAL',
-      requiresOfflineEmergency: form.value.requiresOfflineEmergency
-    })
-    const createdId = response.data?.id
-    resetForm()
-    if (createdId) {
-      void router.push(`/help-order/${createdId}`)
-      return
-    }
-    showMessage('工单已提交')
-    await loadOrders()
+    await createOrder()
   } catch (error: any) {
     showMessage(error?.message || '提交失败')
   } finally {
     submitting.value = false
   }
+}
+
+const startVoice = async () => {
+  if (submitting.value || voiceBusy.value) return
+  if (!canSubmit.value) {
+    showMessage('请先填写标题')
+    return
+  }
+  try {
+    await startVoiceRecording(() => {
+      void finishVoice()
+    })
+    recording.value = true
+  } catch (error: any) {
+    showMessage(error?.message === 'VOICE_RECORDER_UNSUPPORTED' ? '当前环境不支持录音' : '无法启动麦克风')
+  }
+}
+
+const finishVoice = async () => {
+  if (!recording.value || voiceBusy.value) return
+  recording.value = false
+  voiceBusy.value = true
+  submitting.value = true
+  try {
+    const recordingResult = await stopVoiceRecording()
+    const voiceAttachment = await uploadHelpOrderVoice(recordingResult)
+    await createOrder({ voiceAttachment })
+  } catch (error: any) {
+    showMessage(error?.message || '语音发送失败')
+  } finally {
+    voiceBusy.value = false
+    submitting.value = false
+  }
+}
+
+const cancelVoice = () => {
+  if (!recording.value) return
+  recording.value = false
+  cancelVoiceRecording()
+  showMessage('已取消语音')
+}
+
+const openCameraInput = () => {
+  cameraInput.value?.click()
+}
+
+const openGalleryInput = () => {
+  galleryInput.value?.click()
+}
+
+const handleImageInput = (event: Event) => {
+  const input = event.target as HTMLInputElement
+  const files = Array.from(input.files ?? [])
+  input.value = ''
+  if (!files.length) return
+
+  for (const file of files) {
+    if (selectedImages.value.length >= 3) {
+      showMessage('单条消息最多上传 3 张图片')
+      break
+    }
+    if (!allowedImageTypes.has(file.type)) {
+      showMessage('仅支持 JPG、PNG、WebP 图片')
+      continue
+    }
+    if (file.size > maxImageSizeBytes) {
+      showMessage('单张图片不能超过 10MB')
+      continue
+    }
+    selectedImages.value.push({
+      id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+      file,
+      previewUrl: URL.createObjectURL(file)
+    })
+  }
+}
+
+const removeImage = (id: string) => {
+  const image = selectedImages.value.find((item) => item.id === id)
+  if (image) {
+    URL.revokeObjectURL(image.previewUrl)
+  }
+  selectedImages.value = selectedImages.value.filter((item) => item.id !== id)
+}
+
+const clearImages = () => {
+  selectedImages.value.forEach((image) => URL.revokeObjectURL(image.previewUrl))
+  selectedImages.value = []
+}
+
+const uploadSelectedImages = async () => {
+  const ids: number[] = []
+  for (const image of selectedImages.value) {
+    const contentType = image.file.type
+    const presign = await helpOrderService.presignImage({
+      filename: image.file.name || 'help-order-image.jpg',
+      contentType,
+      sizeBytes: image.file.size,
+      businessType: 'HELP_ORDER_IMAGE'
+    })
+    await helpOrderService.uploadToPresignedUrl(presign.data.uploadUrl, image.file, contentType)
+    const registered = await helpOrderService.registerImage({
+      objectKey: presign.data.objectKey,
+      originalFilename: image.file.name || presign.data.filename,
+      contentType,
+      sizeBytes: image.file.size,
+      businessType: 'HELP_ORDER_IMAGE'
+    })
+    ids.push(registered.data.id)
+  }
+  return ids
 }
 
 const statusText = (status: string) => {
@@ -274,6 +460,14 @@ const formatDateTime = (value?: string | null) => {
   return Number.isNaN(date.getTime()) ? value : date.toLocaleString('zh-CN', { hour12: false })
 }
 
+async function handleRefresh(event: CustomEvent) {
+  try {
+    await loadOrders()
+  } finally {
+    (event.target as HTMLIonRefresherElement).complete()
+  }
+}
+
 onIonViewWillEnter(async () => {
   await applyPrefillFromQuery()
   await loadOrders()
@@ -282,68 +476,159 @@ onIonViewWillEnter(async () => {
 
 <style scoped>
 .page-content {
-  --background: #f6f8fb;
+  --background: var(--patient-bg-page);
 }
 
 .page-container {
-  padding: 16px;
+  padding: var(--patient-space-4);
 }
 
 .form-card,
 .list-card {
-  border-radius: 18px;
-  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+  border-radius: var(--patient-radius-lg);
+  box-shadow: var(--patient-shadow-sm);
 }
 
 .checkbox-label {
-  margin-left: 12px;
+  margin-left: var(--patient-space-3);
+}
+
+.image-uploader {
+  display: grid;
+  gap: var(--patient-space-3);
+  margin: var(--patient-space-4) 0;
+}
+
+.voice-uploader {
+  display: grid;
+  gap: var(--patient-space-2);
+  margin: var(--patient-space-4) 0;
+}
+
+.voice-hold-button {
+  width: 100%;
+  min-height: 48px;
+  border: 0;
+  border-radius: var(--patient-radius-lg);
+  background: var(--patient-primary);
+  color: var(--patient-text-inverse);
+  font-size: var(--patient-font-body);
+  font-weight: var(--patient-font-semibold);
+  touch-action: none;
+}
+
+.voice-hold-button--recording {
+  background: var(--patient-danger);
+}
+
+.voice-hold-button:disabled {
+  opacity: 0.58;
+}
+
+.voice-hint {
+  color: var(--patient-text-secondary);
+  font-size: var(--patient-font-helper);
+}
+
+.privacy-warning {
+  padding: var(--patient-space-3);
+  border-radius: var(--patient-radius-md);
+  background: rgba(245, 158, 11, 0.12);
+  color: var(--patient-warning);
+  font-size: var(--patient-font-helper);
+  line-height: var(--patient-leading-normal);
+}
+
+.image-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--patient-space-2);
+  flex-wrap: wrap;
+}
+
+.image-count {
+  color: var(--patient-text-secondary);
+  font-size: var(--patient-font-helper);
+}
+
+.file-input {
+  display: none;
+}
+
+.image-preview-list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--patient-space-2);
+}
+
+.image-preview {
+  position: relative;
+  aspect-ratio: 1;
+  overflow: hidden;
+  border-radius: var(--patient-radius-md);
+  background: var(--patient-bg-page);
+}
+
+.image-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.image-remove {
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  border: 0;
+  border-radius: var(--patient-radius-sm);
+  padding: 4px 6px;
+  background: rgba(15, 23, 42, 0.72);
+  color: #fff;
+  font-size: 12px;
+}
+
+.loading-state {
+  text-align: center;
+  padding: var(--patient-space-8) var(--patient-space-3);
 }
 
 .order-list {
   display: grid;
-  gap: 14px;
+  gap: var(--patient-space-3);
 }
 
 .order-item {
   width: 100%;
-  padding: 14px;
+  padding: var(--patient-space-4);
   border: 0;
-  border-radius: 14px;
-  background: #f8fafc;
+  border-radius: var(--patient-radius-md);
+  background: var(--patient-bg-page);
   text-align: left;
+  min-height: 64px;
 }
 
 .order-top {
   display: flex;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--patient-space-3);
   align-items: flex-start;
 }
 
 .order-title {
-  font-size: 16px;
-  font-weight: 700;
-  color: #0f172a;
+  font-size: var(--patient-font-body);
+  font-weight: var(--patient-font-bold);
+  color: var(--patient-text-primary);
 }
 
 .order-meta,
-.order-desc,
-.empty-text {
-  color: #64748b;
+.order-desc {
+  color: var(--patient-text-secondary);
 }
 
 .order-desc {
-  margin: 10px 0;
+  margin: var(--patient-space-2) 0;
   white-space: pre-wrap;
 }
 
-.empty-state {
-  text-align: center;
-  padding: 32px 12px;
-}
-
-.empty-icon {
-  font-size: 36px;
-  color: #94a3b8;
-}
 </style>

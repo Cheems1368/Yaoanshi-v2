@@ -108,6 +108,18 @@ Set-EnvIfMissing -Name "MEDICINE_DB_PASSWORD" -Value $dbPassword
 Set-EnvIfMissing -Name "MEDICINE_LEGACY_DB_PASSWORD" -Value (Get-EnvValue "MEDICINE_DB_PASSWORD")
 Set-EnvIfMissing -Name "MEDICINE_REDIS_PORT" -Value "16379"
 Set-EnvIfMissing -Name "MEDICINE_JWT_SECRET" -Value "local-dev-jwt-secret-change-me"
+Set-EnvIfMissing -Name "MEDICINE_STORAGE_ENDPOINT" -Value "http://127.0.0.1:9000"
+Set-EnvIfMissing -Name "MEDICINE_STORAGE_ACCESS_KEY" -Value "minioadmin"
+Set-EnvIfMissing -Name "MEDICINE_STORAGE_SECRET_KEY" -Value "minioadmin"
+Set-EnvIfMissing -Name "MEDICINE_STORAGE_BUCKET" -Value "yaoanshi-mvp"
+Set-EnvIfMissing -Name "MEDICINE_STORAGE_REGION" -Value "us-east-1"
+Set-EnvIfMissing -Name "MEDICINE_OCR_BASE_URL" -Value "https://api.siliconflow.cn/v1/chat/completions"
+Set-EnvIfMissing -Name "MEDICINE_OCR_MODEL" -Value "deepseek-ai/deepseek-vl2"
+Set-EnvIfMissing -Name "MEDICINE_OCR_TIMEOUT_MS" -Value "30000"
+Set-EnvIfMissing -Name "MEDICINE_XFYUN_BASE_URL" -Value "wss://iat-api.xfyun.cn/v2/iat"
+Set-EnvIfMissing -Name "MEDICINE_XFYUN_PRIMARY_DOMAIN" -Value "xfime-mianqie"
+Set-EnvIfMissing -Name "MEDICINE_XFYUN_FALLBACK_DOMAIN" -Value "iat"
+Set-EnvIfMissing -Name "MEDICINE_XFYUN_TIMEOUT_MS" -Value "30000"
 
 if (-not [string]::IsNullOrWhiteSpace($SpringProfile)) {
     [System.Environment]::SetEnvironmentVariable("SPRING_PROFILES_ACTIVE", $SpringProfile, 'Process')
@@ -118,7 +130,7 @@ if (-not [string]::IsNullOrWhiteSpace($SpringProfile)) {
 
 Write-Host "Loaded env file: $envFilePath"
 foreach ($name in $loaded) {
-    $displayValue = if ($name -like '*API_KEY*' -or $name -like '*SECRET*') { '<set>' } else { [System.Environment]::GetEnvironmentVariable($name, 'Process') }
+    $displayValue = if ($name -like '*KEY*' -or $name -like '*SECRET*' -or $name -like '*PASSWORD*' -or $name -like '*APP_ID*') { '<set>' } else { [System.Environment]::GetEnvironmentVariable($name, 'Process') }
     Write-Host ("  {0}={1}" -f $name, $displayValue)
 }
 
@@ -128,6 +140,14 @@ if ($NoStart) {
 }
 
 $pomPath = [System.IO.Path]::GetFullPath((Join-Path (Split-Path -Parent $PSScriptRoot) "pom.xml"))
+$mavenGlobalSettingsPath = [System.IO.Path]::GetFullPath((Join-Path (Split-Path -Parent $PSScriptRoot) ".mvn\global-settings.xml"))
 Write-Host ("Starting backend-v2 with Maven (profile={0})..." -f [System.Environment]::GetEnvironmentVariable("SPRING_PROFILES_ACTIVE", 'Process'))
-& mvn spring-boot:run -f $pomPath
+$mavenArgs = @()
+if (Test-Path $mavenGlobalSettingsPath) {
+    # Bypass broken machine-wide mirrors and use repo-pinned Maven settings instead.
+    Write-Host ("Using repo Maven global settings: {0}" -f $mavenGlobalSettingsPath)
+    $mavenArgs += @("-gs", $mavenGlobalSettingsPath)
+}
+$mavenArgs += @("spring-boot:run", "-f", $pomPath)
+& mvn @mavenArgs
 exit $LASTEXITCODE

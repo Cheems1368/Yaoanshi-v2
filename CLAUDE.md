@@ -1,4 +1,4 @@
-﻿# CLAUDE.md
+# CLAUDE.md
 
 ## 0. 语言与沟通规则
 
@@ -32,11 +32,10 @@ Authoritative source mapping:
 
 Additional precedence rules:
 
-1. `docs/` is reference only.
-2. If `docs/` conflicts with any file in `Standard document/`, `Standard document/` wins.
-3. `CLAUDE.md` governs Claude session behavior; `CODEX.md` governs Codex session behavior.
+1. `Standard document/*.md` is the only project knowledge base.
+2. The `docs/` tree has been removed and must not be consulted as project knowledge, reference storage, or a plan output location.
+3. `CLAUDE.md`, `CODEX.md`, and `AGENTS.md` share the same operating protocol; they do not create separate product or implementation authority.
 4. Formal product, design, technical, and backend details still belong to the formal documents listed above.
-5. Dual-agent collaboration plan: `docs/DUAL_AGENT_COLLABORATION.md`
 
 ## 2. Mandatory Read Order
 
@@ -45,15 +44,25 @@ Every AI session must follow this default read order:
 1. Read `CLAUDE.md`
 2. Read `progress.txt`
 3. Read `Standard document/IMPLEMENTATION_PLAN.md`
-4. Read only the task-relevant formal documents from `Standard document/`
+4. Select task-relevant formal documents from the matrix below
 5. Inspect repository files before making assumptions
+
+Task-to-document lookup matrix:
+
+1. Product scope, user stories, success criteria, non-goals: `Standard document/PRD.md`
+2. Pages, routes, user flows, triggers, success/error paths: `Standard document/APP_FLOW.md`
+3. Dependencies, versions, build tools, runtime requirements: `Standard document/TECH_STACK.md`
+4. UI tokens, components, layout, responsive rules: `Standard document/FRONTEND_GUIDELINES.md`
+5. Database, API, DTO, auth, storage, migrations: `Standard document/BACKEND_STRUCTURE.md`
+6. Build order, phase sequence, validation gates: `Standard document/IMPLEMENTATION_PLAN.md`
 
 Required behavior:
 
 1. Do not start implementation from memory alone.
-2. Do not assume legacy `docs/` is current truth.
+2. Do not recreate or consult `docs/` for project knowledge.
 3. Do not invent missing project rules if a formal document already defines them.
 4. Use `progress.txt` as the current execution memory and state source.
+5. Temporary implementation plans stay in the conversation; only durable build sequence changes belong in `Standard document/IMPLEMENTATION_PLAN.md`.
 
 ## 3. Project Snapshot
 
@@ -65,11 +74,11 @@ Active product surfaces:
 2. Pharmacist Web: `frontend/pharmacist`
 3. Doctor Web: `frontend/yisheng/web-admin`
 
-### 3.2 Dual-agent role
+### 3.2 Unified AI collaboration model
 
-Claude is the product/data/frontend/verification host. It defines correct answers, implements frontend, runs browser acceptance, and manages ops delivery. It does NOT serve as the primary high-frequency backend constructor — that role belongs to Codex.
+All AI assistants working in this repository follow the same workflow: read the session manual, read `progress.txt`, consult the task-relevant formal documents, inspect the repo, state the files and plan before editing, implement the smallest safe diff, validate, and update progress when work is completed.
 
-Full collaboration protocol: `docs/DUAL_AGENT_COLLABORATION.md`
+No assistant may redefine product requirements, invent contracts, or bypass the formal documents because of its tool identity.
 
 ### 3.3 Backend zones
 
@@ -94,6 +103,21 @@ All new backend responses must use:
 
 `CommonResult<T>`
 
+### 3.7 WebSocket endpoints
+
+1. Professional notifications: `/ws/admin-notifications` (ticket-authenticated)
+2. Patient notifications: `/ws/app-notifications` (ticket-authenticated)
+
+Both paths require a short-lived one-time socket ticket obtained from `/admin-api/notifications/socket-ticket` or `/app-api/notifications/socket-ticket` before opening the WebSocket connection. Bearer tokens must not appear in WebSocket URLs.
+
+### 3.8 AI assistant
+
+1. Backend endpoint: `POST /app-api/ai/chat`
+2. Patient app route: `/ai-assistant`
+3. AI provider configuration: `medicine.ai.base-url` / `medicine.ai.api-key` / `medicine.ai.model`
+4. Current default provider: SiliconFlow `/v1/chat/completions`, model `zai-org/GLM-4.5-Air`
+5. Local secrets: `backend-v2/.env.local` (gitignored); loaded by `backend-v2/scripts/run-local-with-env.ps1`
+
 ## 4. Allowed / Forbidden Actions
 
 ### 4.1 Always allowed
@@ -111,9 +135,10 @@ All new backend responses must use:
 3. Do not invent endpoints, DTOs, file paths, package roots, or dependency versions
 4. Do not let page components build URLs directly
 5. Do not add undefined colors, radii, breakpoints, or ad-hoc CSS systems
-6. Do not treat `docs/` as source of truth
+6. Do not use or recreate `docs/` as project knowledge, reference storage, or plan output
 7. Do not silently rename public DTOs or route prefixes
 8. Do not create new visual systems outside `FRONTEND_GUIDELINES.md`
+9. Do not skip Flyway migration version numbers or modify already-applied migration files
 
 ### 4.3 Default implementation attitude
 
@@ -139,6 +164,7 @@ For exact versions, always read `Standard document/TECH_STACK.md`.
 2. Persistence: MyBatis Plus
 3. Cache/session support: Redis
 4. API docs: SpringDoc
+5. Drug catalog pinyin search: pinyin4j 2.5.1
 
 ### 5.3 Legacy
 
@@ -159,6 +185,8 @@ For exact versions, always read `Standard document/TECH_STACK.md`.
    - `common`
 3. New backend DTO naming must align with `Standard document/BACKEND_STRUCTURE.md`
 4. Do not expose entities directly from controllers
+5. Schema changes must use Flyway migrations under `backend-v2/src/main/resources/db/migration/` with convention `V{N}__{description}.sql`. Current latest applied version: V8.
+6. Active sub-domain packages include: `drug` (drug catalog), `medication` (self-reported medication)
 
 ### 6.2 Frontend rules
 
@@ -217,6 +245,7 @@ Required backend rules:
    - legacy user bridge
    - professional identity mapped from existing legacy user tables
 5. All schema, table, DTO, and endpoint work must match `BACKEND_STRUCTURE.md`
+6. Schema evolution uses Flyway. Never alter already-applied migrations (V1–V8).
 
 Public names that must not be renamed without updating the formal contract:
 
@@ -227,6 +256,19 @@ Public names that must not be renamed without updating the formal contract:
 5. `CheckinRecordDTO`
 6. `PrescriptionDTO`
 7. `HelpOrderDTO`
+8. `SelfReportedMedicationDTO`
+9. `SelfReportedMedicationCreateRequest`
+10. `DrugCatalogDTO`
+11. `AppDdiAlert`
+12. `AppDdiScreenResult`
+13. `AdminDdiRuleDTO`
+14. `AdminDdiRuleUpsertRequest`
+15. `NotificationLogDTO`
+16. `AppPatientProfileDTO`
+17. `AppPatientHealthProfileDTO`
+18. `AdminPatientDetailDTO`
+19. `KnowledgeAssessmentDTO`
+20. `SatisfactionSurveyDTO`
 
 ## 9. Session Workflow and Output Contract
 
@@ -235,7 +277,7 @@ Every AI session should follow this default workflow:
 1. Read `CLAUDE.md`
 2. Read `progress.txt`
 3. Read `Standard document/IMPLEMENTATION_PLAN.md`
-4. Identify task-relevant formal documents
+4. Identify task-relevant formal documents using the lookup matrix in Section 2
 5. Inspect repository files before making assumptions
 6. State target files and editing plan before making changes
 7. Prefer small diffs
@@ -252,9 +294,8 @@ Output requirements for implementation work:
 
 Relationship between session files:
 
-1. `CLAUDE.md` = Claude operating manual
-2. `CODEX.md` = Codex operating manual
-3. `progress.txt` = shared execution memory and state source
+1. `CLAUDE.md`, `CODEX.md`, and `AGENTS.md` = shared AI operating protocol for this repository
+2. `progress.txt` = shared execution memory and state source
 
 `CLAUDE.md` does not contain:
 
@@ -264,4 +305,3 @@ Relationship between session files:
 4. full implementation phase detail
 
 Those details remain in the formal documents and must be referenced there instead of being reinvented here.
-

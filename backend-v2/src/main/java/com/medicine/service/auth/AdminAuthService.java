@@ -75,9 +75,9 @@ public class AdminAuthService {
         }
 
         List<String> roles = safeList(professionalIdentityRepository.selectRoleCodesByUserId(resolvedTenantId, user.getId()));
-        validateRequestedRole(role, roles);
+        String effectiveRole = resolveEffectiveRole(role, roles);
 
-        return issueTokenPair(user, resolvedTenantId, roles);
+        return issueTokenPair(user, resolvedTenantId, roles, effectiveRole);
     }
 
     public TokenPair refreshToken(String refreshTokenValue) {
@@ -106,7 +106,8 @@ public class AdminAuthService {
         }
 
         List<String> roles = safeList(professionalIdentityRepository.selectRoleCodesByUserId(claims.getTenantId(), claims.getUserId()));
-        return issueTokenPair(user, claims.getTenantId(), roles);
+        String effectiveRole = resolveEffectiveRole(claims.getEffectiveRole(), roles);
+        return issueTokenPair(user, claims.getTenantId(), roles, effectiveRole);
     }
 
     public AdminPermissionInfoDTO getPermissionInfo(Long tenantId, Long userId) {
@@ -136,21 +137,23 @@ public class AdminAuthService {
         return true;
     }
 
-    private TokenPair issueTokenPair(SystemUser user, Long tenantId, List<String> roles) {
+    private TokenPair issueTokenPair(SystemUser user, Long tenantId, List<String> roles, String effectiveRole) {
         String displayName = StringUtils.hasText(user.getNickname()) ? user.getNickname() : user.getUsername();
         String accessToken = jwtTokenService.generateProfessionalAccessToken(
                 user.getUsername(),
                 user.getId(),
                 tenantId,
                 displayName,
-                roles
+                roles,
+                effectiveRole
         );
         String refreshToken = jwtTokenService.generateProfessionalRefreshToken(
                 user.getUsername(),
                 user.getId(),
                 tenantId,
                 displayName,
-                roles
+                roles,
+                effectiveRole
         );
 
         JwtClaims refreshClaims = jwtTokenService.parse(refreshToken);
@@ -175,7 +178,7 @@ public class AdminAuthService {
         return tokenPair;
     }
 
-    private void validateRequestedRole(String role, List<String> roles) {
+    private String resolveEffectiveRole(String role, List<String> roles) {
         Set<String> normalizedRoles = roles.stream()
                 .filter(StringUtils::hasText)
                 .map(value -> value.toLowerCase(Locale.ROOT))
@@ -189,7 +192,7 @@ public class AdminAuthService {
 
         String requestedRole = normalize(role).toLowerCase(Locale.ROOT);
         if (!StringUtils.hasText(requestedRole)) {
-            return;
+            return pharmacist ? "pharmacist" : "doctor";
         }
         if ("pharmacist".equals(requestedRole) && !pharmacist) {
             throw new BusinessException(ErrorCode.PROFESSIONAL_ROLE_MISMATCH.getCode(), ErrorCode.PROFESSIONAL_ROLE_MISMATCH.getMessage());
@@ -197,6 +200,10 @@ public class AdminAuthService {
         if ("doctor".equals(requestedRole) && !doctor) {
             throw new BusinessException(ErrorCode.PROFESSIONAL_ROLE_MISMATCH.getCode(), ErrorCode.PROFESSIONAL_ROLE_MISMATCH.getMessage());
         }
+        if (!"pharmacist".equals(requestedRole) && !"doctor".equals(requestedRole)) {
+            throw new BusinessException(ErrorCode.PROFESSIONAL_ROLE_MISMATCH.getCode(), ErrorCode.PROFESSIONAL_ROLE_MISMATCH.getMessage());
+        }
+        return requestedRole;
     }
 
     private List<String> safeList(List<String> values) {

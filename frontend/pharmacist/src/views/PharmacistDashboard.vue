@@ -65,6 +65,12 @@ import { getPrescriptions } from '@/modules/pharmacist/api/prescriptions'
 import { getWorkOrders } from '@/modules/pharmacist/api/workorders'
 import { ADMIN_NOTIFICATION_EVENT } from '@/utils/adminNotifications'
 
+let dashboardDebounceTimer = null
+const debouncedLoadDashboard = () => {
+  clearTimeout(dashboardDebounceTimer)
+  dashboardDebounceTimer = setTimeout(loadDashboard, 300)
+}
+
 const loading = ref(false)
 const errorMessage = ref('')
 const workOrderTotal = ref(0)
@@ -109,7 +115,7 @@ const handleAdminNotification = (event) => {
   if (!event?.detail?.businessType?.startsWith('HELP_ORDER_')) {
     return
   }
-  loadDashboard()
+  debouncedLoadDashboard()
 }
 
 const statusText = (status) => {
@@ -144,6 +150,7 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  clearTimeout(dashboardDebounceTimer)
   window.removeEventListener(ADMIN_NOTIFICATION_EVENT, handleAdminNotification)
 })
 </script>

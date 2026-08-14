@@ -103,7 +103,7 @@ const handleLogin = async () => {
   padding: 20px;
   display: grid;
   place-items: center;
-  background: linear-gradient(180deg, #dbeaff 0%, #ffffff 48%, #f5f7fa 100%);
+  background: linear-gradient(180deg, var(--pro-brand-secondary) 0%, var(--pro-bg-primary) 48%, var(--pro-bg-secondary) 100%);
 }
 
 .login-box {
@@ -111,7 +111,7 @@ const handleLogin = async () => {
   max-width: 420px;
   padding: 40px;
   border-radius: var(--pro-radius-lg);
-  background: #ffffff;
+  background: var(--pro-bg-primary);
   box-shadow: var(--pro-shadow-md);
 }
 

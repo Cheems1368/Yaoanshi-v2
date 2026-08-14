@@ -25,7 +25,6 @@
           </el-button>
           <div>
             <h1>{{ currentPageTitle }}</h1>
-            <p>Phase 2 仅提供升级工单处理与账号信息，不保留其他管理菜单。</p>
           </div>
         </div>
 
@@ -115,7 +114,15 @@ const handleCommand = async (command) => {
 
 .sidebar {
   border-right: 1px solid var(--pro-border-color);
-  background: linear-gradient(180deg, #ffffff 0%, #f5f7fa 100%);
+  background: linear-gradient(180deg, var(--pro-bg-primary) 0%, var(--pro-bg-secondary) 100%);
+  overflow: hidden;
+  transition: width 160ms ease;
+  min-width: 0;
+}
+
+.workspace {
+  min-width: 0;
+  overflow-x: hidden;
 }
 
 .brand {
@@ -134,7 +141,7 @@ const handleCommand = async (command) => {
   place-items: center;
   border-radius: 14px;
   background: var(--pro-brand-primary);
-  color: #ffffff;
+  color: var(--pro-text-inverse);
   font-family: var(--pro-title-font-family);
   font-weight: 700;
   box-shadow: var(--pro-shadow-sm);
@@ -175,6 +182,7 @@ const handleCommand = async (command) => {
 
 .workspace {
   min-width: 0;
+  overflow-x: hidden;
 }
 
 .header {

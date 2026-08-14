@@ -36,6 +36,14 @@ export function replyWorkOrder(id, data) {
   })
 }
 
+export function transcribeWorkOrderAttachment(orderId, attachmentId) {
+  return request({
+    baseURL: backendV2BaseUrl,
+    url: `/admin-api/help-orders/${orderId}/attachments/${attachmentId}/transcribe`,
+    method: 'post'
+  })
+}
+
 export function escalateWorkOrder(id, data) {
   return request({
     baseURL: backendV2BaseUrl,
@@ -60,5 +68,47 @@ export function rejectWorkOrder(id, data) {
     url: `/admin-api/help-orders/${id}/reject`,
     method: 'post',
     data
+  })
+}
+
+export function getSelfReportedMedicationsForWorkOrder(workOrderId) {
+  return request({
+    baseURL: backendV2BaseUrl,
+    url: `/admin-api/help-orders/${workOrderId}/self-reported-medications`,
+    method: 'get'
+  })
+}
+
+export function acknowledgeSelfReportedMedication(workOrderId, srmId) {
+  return request({
+    baseURL: backendV2BaseUrl,
+    url: `/admin-api/help-orders/${workOrderId}/self-reported-medications/${srmId}/acknowledge`,
+    method: 'post'
+  })
+}
+
+export function rejectSelfReportedMedication(workOrderId, srmId, reason) {
+  return request({
+    baseURL: backendV2BaseUrl,
+    url: `/admin-api/help-orders/${workOrderId}/self-reported-medications/${srmId}/reject`,
+    method: 'post',
+    data: { reason }
+  })
+}
+
+export function getSelfReportedMedicationTransferPrefill(workOrderId, srmId) {
+  return request({
+    baseURL: backendV2BaseUrl,
+    url: `/admin-api/help-orders/${workOrderId}/self-reported-medications/${srmId}/transfer-prefill`,
+    method: 'get'
+  })
+}
+
+export function markSelfReportedMedicationTransferred(workOrderId, srmId, planItemId) {
+  return request({
+    baseURL: backendV2BaseUrl,
+    url: `/admin-api/help-orders/${workOrderId}/self-reported-medications/${srmId}/mark-transferred`,
+    method: 'post',
+    params: { planItemId }
   })
 }

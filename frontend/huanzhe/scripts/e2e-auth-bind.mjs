@@ -34,12 +34,12 @@ try {
   await page.getByRole('button', { name: '登录' }).click()
 
   await page.waitForURL(/\/realname$/, { timeout: 15000 })
-  await page.getByRole('heading', { name: 'Bind Patient Identity' }).waitFor()
+  await page.getByRole('heading', { name: '绑定患者身份' }).waitFor()
 
   await page.locator('ion-input#name input').fill(patientName)
   await page.locator('ion-input#mobile input').fill(mobile)
   await page.locator('ion-input#hospitalPatientId input').fill(hospitalPatientId)
-  await page.getByRole('button', { name: 'Submit Binding' }).click()
+  await page.getByRole('button', { name: '提交绑定' }).click()
 
   await page.waitForURL(/\/tabs\/home$/, { timeout: 15000 })
 
