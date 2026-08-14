@@ -25,7 +25,7 @@ Branch / Context
 Current State
 - 2026-08-14 update: T1-T5 business work is committed, protected by local branch `codex/backup-mobile-demo-20260814`, and rebased onto the latest `origin/main`; the PR has not yet been created.
 - GitHub `main` branch protection and CI governance are officially enabled. The governance-enablement baseline was 92 backend tests with 64.33% JaCoCo line coverage; the enforced floor is 60%.
-- Current release candidate: 139 backend tests pass with 61.29% JaCoCo line coverage; patient ESLint, 3 Vitest tests, type check/production build, pharmacist build, and doctor build pass locally.
+- Current release candidate: 139 backend tests pass with 61.29% JaCoCo line coverage; patient ESLint, 3 Vitest tests, type check/production build, pharmacist build, and doctor build pass locally. All nine required E2E scenarios pass in one serial run; configured and unconfigured voice-transcription paths are evidenced locally.
 - 2026-08-01 update: Phase T5 complete. Pharmacist mobile work-order actions, Docker MIME/XFYUN runtime, live transcription, three-role mobile flow, and viewport acceptance all passed.
 - 2026-05-12 update: Phase T0/T1 complete for post-P0 trial/demo closed loop: Standard document sync plus patient text/image help-order loop.
 - Current implementation includes backend-v2 multi-image help-order attachments, patient image upload/reply UI, and pharmacist `/mobile/workorders`.
@@ -35,17 +35,16 @@ Current State
 - Last session (2026-03-27): Phase A–F completed (see below)
 
 In Progress
-- Release-candidate E2E evidence, first push, GitHub PR creation, required-check monitoring, and review-conversation resolution.
+- Final clean-tree gate confirmation, latest-main synchronization, first push, GitHub PR creation, required-check monitoring, and review-conversation resolution.
 - Product scope is frozen for this Goal; no next product phase has been started.
 
 Next
-- Run the required local E2E matrix and collect sanitized browser/mobile evidence.
 - Reconfirm the branch is based on the latest `origin/main`, push `codex/mobile-demo`, and open a PR targeting `main`.
 - Keep the PR current until `CI / Required Quality Gate` is green and every review conversation is resolved; stop at mergeable and do not merge.
 
 Last Updated
 - 2026-08-14 Asia/Shanghai
-- Reason: synchronized the T1-T5 release candidate with the protected `main` testing baseline and started PR qualification.
+- Reason: completed local gate and E2E qualification; preparing the protected GitHub PR.
 
 Completed This Sprint
 
@@ -676,3 +675,28 @@ T1-T5 Release Candidate and Test Governance Sync (2026-08-14)
 Last Updated
 - 2026-08-14 Asia/Shanghai
 - Reason: preserved and rebased T1-T5, inherited the protected-main quality gate, recorded fresh candidate metrics, and began PR qualification.
+
+Release Candidate E2E Qualification (2026-08-14)
+- Workstream:
+  - Refreshed the release-candidate browser flows against the current backend-v2 and three current frontends, without changing API contracts or product behavior.
+- Changed:
+  - Updated stale Chinese UI selectors and professional queue-card selectors in the formal E2E scripts.
+  - Made backend-v2 the default professional-auth source for the affected scenarios, removing the obsolete local dependency on port 48080.
+  - Isolated the two prescription uploads so DDI-confirmation UI teardown cannot race the simulated degradation case.
+  - Redacted refresh-token values from authentication test output; evidence now records only token presence and rotation state.
+- Validated:
+  - One serial run passed all nine required scenarios: `auth-bind`, `auth-refresh`, `auth-expiry`, `prescription-review`, `medication-family`, `helporder-collab`, `helporder-mobile`, `pharmacist-patient`, and `admin-notifications`.
+  - `prescription-review` also passed twice consecutively before the full matrix, including DDI confirmation, degradation fallback, pharmacist confirmation, and rejection.
+  - Real Chromium `MediaRecorder` evidence passed with an approved local audio input: upload and XFYUN transcription reached `SUCCESS` with non-empty text, pharmacist mobile claimed and escalated the order, and doctor mobile displayed the audio and transcript.
+  - A temporary backend with no XFYUN credentials verified the same browser recording/upload path degrades to `UNCONFIGURED` with no transcript. The temporary service was stopped afterward.
+  - Sanitized patient, pharmacist, and doctor screenshots remain local under `.playwright-mcp/` and are excluded from Git; approved credentials and token values are absent from repository output.
+  - After the E2E changes, patient ESLint, Vitest 3/3, type check, production build, Node syntax checks, and `git diff --check` passed.
+- Open risks:
+  - The feature branch has not yet been pushed and no PR exists; GitHub required checks, latest-main status, and review-conversation state remain pending.
+  - Live ASR wording remains provider/input dependent; acceptance checks status, non-empty text, and end-to-end role visibility rather than verbatim transcription.
+- Next:
+  - Re-run the final repository gates from a clean candidate, synchronize the latest `origin/main`, open the PR, and continue until the required gate is green and the PR is mergeable. Do not merge.
+
+Last Updated
+- 2026-08-14 Asia/Shanghai
+- Reason: completed the release-candidate E2E matrix, stabilized prescription degradation coverage, and recorded sanitized voice evidence.
