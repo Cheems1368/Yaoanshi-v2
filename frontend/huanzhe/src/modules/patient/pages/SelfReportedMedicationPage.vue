@@ -187,7 +187,7 @@ const proxyPatientName = ref('')
 
 const drugs = ref([{ drugName: '', dosage: '', suggestions: [] as DrugCatalogDTO[] }])
 
-let drugInputTimers: ReturnType<typeof setTimeout>[] = []
+const drugInputTimers: ReturnType<typeof setTimeout>[] = []
 
 const onDrugNameInput = (index: number, event: CustomEvent) => {
   const q = (event.detail?.value ?? '').trim()
@@ -368,7 +368,7 @@ async function handleRefresh(event: CustomEvent) {
   try {
     await loadList()
   } finally {
-    ;(event.target as HTMLIonRefresherElement).complete()
+    (event.target as HTMLIonRefresherElement).complete()
   }
 }
 

@@ -464,7 +464,7 @@ async function handleRefresh(event: CustomEvent) {
   try {
     await loadOrders()
   } finally {
-    ;(event.target as HTMLIonRefresherElement).complete()
+    (event.target as HTMLIonRefresherElement).complete()
   }
 }
 

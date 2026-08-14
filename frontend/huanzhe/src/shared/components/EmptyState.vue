@@ -65,7 +65,7 @@
 </template>
 
 <script setup lang="ts">
-const props = withDefaults(defineProps<{
+withDefaults(defineProps<{
   type?: 'no-data' | 'no-plan' | 'no-records' | 'no-orders' | 'no-results'
   title?: string
   description?: string

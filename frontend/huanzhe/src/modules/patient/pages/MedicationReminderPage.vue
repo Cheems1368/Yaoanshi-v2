@@ -244,7 +244,7 @@ async function handleRefresh(event: CustomEvent) {
   try {
     await loadTasks()
   } finally {
-    ;(event.target as HTMLIonRefresherElement).complete()
+    (event.target as HTMLIonRefresherElement).complete()
   }
 }
 
