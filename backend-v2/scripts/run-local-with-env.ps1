@@ -116,6 +116,10 @@ Set-EnvIfMissing -Name "MEDICINE_STORAGE_REGION" -Value "us-east-1"
 Set-EnvIfMissing -Name "MEDICINE_OCR_BASE_URL" -Value "https://api.siliconflow.cn/v1/chat/completions"
 Set-EnvIfMissing -Name "MEDICINE_OCR_MODEL" -Value "deepseek-ai/deepseek-vl2"
 Set-EnvIfMissing -Name "MEDICINE_OCR_TIMEOUT_MS" -Value "30000"
+Set-EnvIfMissing -Name "MEDICINE_XFYUN_BASE_URL" -Value "wss://iat-api.xfyun.cn/v2/iat"
+Set-EnvIfMissing -Name "MEDICINE_XFYUN_PRIMARY_DOMAIN" -Value "xfime-mianqie"
+Set-EnvIfMissing -Name "MEDICINE_XFYUN_FALLBACK_DOMAIN" -Value "iat"
+Set-EnvIfMissing -Name "MEDICINE_XFYUN_TIMEOUT_MS" -Value "30000"
 
 if (-not [string]::IsNullOrWhiteSpace($SpringProfile)) {
     [System.Environment]::SetEnvironmentVariable("SPRING_PROFILES_ACTIVE", $SpringProfile, 'Process')
@@ -126,7 +130,7 @@ if (-not [string]::IsNullOrWhiteSpace($SpringProfile)) {
 
 Write-Host "Loaded env file: $envFilePath"
 foreach ($name in $loaded) {
-    $displayValue = if ($name -like '*API_KEY*' -or $name -like '*SECRET*') { '<set>' } else { [System.Environment]::GetEnvironmentVariable($name, 'Process') }
+    $displayValue = if ($name -like '*KEY*' -or $name -like '*SECRET*' -or $name -like '*PASSWORD*' -or $name -like '*APP_ID*') { '<set>' } else { [System.Environment]::GetEnvironmentVariable($name, 'Process') }
     Write-Host ("  {0}={1}" -f $name, $displayValue)
 }
 

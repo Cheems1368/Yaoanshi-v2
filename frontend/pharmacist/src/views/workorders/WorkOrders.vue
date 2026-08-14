@@ -42,6 +42,7 @@
           @reject="handleReject"
           @close="handleClose"
           @save-draft="handleSaveDraft"
+          @refresh="selectOrder"
         />
       </div>
     </div>

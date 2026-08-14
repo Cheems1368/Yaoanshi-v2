@@ -284,11 +284,13 @@ Success:
 - After successful submit, enter the help order detail conversation
 - Show that the pharmacist will handle it during service hours if submitted after hours
 - For image help orders, pre-sign, upload, register the file, then submit the order with up to three image file IDs
+- For voice help orders, the user fills title/category first, holds the voice button, releases to send the audio original, and enters the detail conversation
 
 Error:
 
 - Show validation message when the title is missing
 - Show upload failure if an image fails
+- Show voice send failure if recording, upload, or file registration fails
 - Allow retry
 
 #### Help Order Detail / Conversation Screen
@@ -311,7 +313,9 @@ Success:
 - Show new pharmacist or doctor replies
 - Allow text follow-up while the order is still open
 - Show image thumbnails in the relevant conversation bubble
-- Allow follow-up messages with text or images, as long as at least one of them is present
+- Show voice playback, duration, transcription status, and transcription result under the relevant conversation bubble
+- Allow follow-up messages with text, images, or one voice recording, as long as at least one of them is present
+- Patient/family can tap "transcribe" or "retry transcribe" on an audio message; if speech credentials are missing or provider fails, the original audio remains playable
 
 Error:
 
@@ -773,7 +777,7 @@ Mobile route: `/mobile/workorders`
 Purpose:
 
 - Show all help orders assigned to the pharmacist
-- On mobile Web, provide the trial minimum workflow: list pending orders, open detail, view image attachments, and reply with text
+- On mobile Web, provide the full pharmacist workflow: list pending orders, open detail, view image/voice attachments, claim, reply, trigger voice transcription, escalate to doctor, reject, and close
 
 Trigger:
 
@@ -800,6 +804,7 @@ Purpose:
 - reject,
 - or escalate to doctor
 - View image attachments on mobile Web without entering the desktop workstation layout
+- Use the same status-based action rules on desktop and mobile Web: `SUBMITTED` allows claim/reply/escalate; `PHARMACIST_IN_PROGRESS` allows reply/escalate/reject/close; `WAITING_DOCTOR`, `CLOSED`, and `REJECTED` are read-only
 
 Trigger:
 
@@ -816,6 +821,9 @@ Success:
 - Status changes to pharmacist processing, completed, rejected, or waiting for doctor
 - Timeline and audit data are updated
 - For the first image-help-order phase, pharmacist text reply is visible in the patient conversation detail
+- Pharmacist can play help-order voice messages, view transcription state/result, and trigger transcription or retry
+- Pharmacist mobile Web can claim, reply, transcribe, escalate, reject, and close without switching to the desktop route
+- Doctor views can play voice messages and view transcription results, but cannot trigger transcription
 
 Error:
 

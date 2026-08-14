@@ -92,6 +92,74 @@ class AppFileServiceTest {
     }
 
     @Test
+    void shouldPresignHelpOrderAudioSourceWithoutDownloadUrl() {
+        when(objectStorage.createPresignedUploadUrl(anyString())).thenAnswer(invocation -> "upload:" + invocation.getArgument(0));
+
+        FilePresignRequest request = new FilePresignRequest();
+        request.setFilename("voice-source.wav");
+        request.setContentType("audio/wav");
+        request.setSizeBytes(16000L);
+        request.setBusinessType("HELP_ORDER_AUDIO_TRANSCRIPT_SOURCE");
+
+        FilePresignResponse response = appFileService.presign(request);
+
+        assertThat(response.getObjectKey()).contains("help-orders/audio-transcript-source/");
+        assertThat(response.getUploadUrl()).startsWith("upload:");
+        assertThat(response.getDownloadUrl()).isNull();
+    }
+
+    @Test
+    void shouldNormalizeParameterizedAudioContentTypeForPresignAndRegister() {
+        when(objectStorage.createPresignedUploadUrl(anyString())).thenAnswer(invocation -> "upload:" + invocation.getArgument(0));
+        when(appPatientService.requireAccessContext("13800138000")).thenReturn(accessContext());
+        when(fileAssetMapper.insert(any(FileAsset.class))).thenAnswer(invocation -> {
+            FileAsset fileAsset = invocation.getArgument(0);
+            fileAsset.setId(99L);
+            return 1;
+        });
+
+        FilePresignRequest presignRequest = new FilePresignRequest();
+        presignRequest.setFilename("voice.webm");
+        presignRequest.setContentType("audio/webm;codecs=opus");
+        presignRequest.setSizeBytes(4096L);
+        presignRequest.setBusinessType("HELP_ORDER_AUDIO");
+
+        FilePresignResponse presignResponse = appFileService.presign(presignRequest);
+
+        assertThat(presignResponse.getObjectKey()).contains("help-orders/audio/");
+        assertThat(presignResponse.getContentType()).isEqualTo("audio/webm");
+        assertThat(presignResponse.getUploadUrl()).startsWith("upload:");
+        assertThat(presignResponse.getDownloadUrl()).isNull();
+
+        FileRegisterRequest registerRequest = new FileRegisterRequest();
+        registerRequest.setObjectKey(presignResponse.getObjectKey());
+        registerRequest.setOriginalFilename("voice.webm");
+        registerRequest.setContentType("audio/webm;codecs=opus");
+        registerRequest.setSizeBytes(4096L);
+        registerRequest.setBusinessType("HELP_ORDER_AUDIO");
+
+        var result = appFileService.register("13800138000", registerRequest);
+
+        assertThat(result.getId()).isEqualTo(99L);
+        assertThat(result.getContentType()).isEqualTo("audio/webm");
+        assertThat(result.getBusinessType()).isEqualTo("HELP_ORDER_AUDIO");
+        verify(fileAssetMapper).insert(any(FileAsset.class));
+    }
+
+    @Test
+    void shouldRejectParameterizedUnsupportedContentType() {
+        FilePresignRequest request = new FilePresignRequest();
+        request.setFilename("rx.pdf");
+        request.setContentType("application/pdf; charset=utf-8");
+        request.setSizeBytes(1024L);
+        request.setBusinessType("PRESCRIPTION");
+
+        assertThatThrownBy(() -> appFileService.presign(request))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("FILE_UPLOAD_INVALID_TYPE");
+    }
+
+    @Test
     void shouldRegisterHelpOrderImageForCurrentAppAccount() {
         when(appPatientService.requireAccessContext("13800138000")).thenReturn(accessContext());
         when(fileAssetMapper.insert(any(FileAsset.class))).thenAnswer(invocation -> {
@@ -111,6 +179,29 @@ class AppFileServiceTest {
 
         assertThat(result.getId()).isEqualTo(77L);
         assertThat(result.getBusinessType()).isEqualTo("HELP_ORDER_IMAGE");
+        verify(fileAssetMapper).insert(any(FileAsset.class));
+    }
+
+    @Test
+    void shouldRegisterHelpOrderPlaybackAudioForCurrentAppAccount() {
+        when(appPatientService.requireAccessContext("13800138000")).thenReturn(accessContext());
+        when(fileAssetMapper.insert(any(FileAsset.class))).thenAnswer(invocation -> {
+            FileAsset fileAsset = invocation.getArgument(0);
+            fileAsset.setId(88L);
+            return 1;
+        });
+
+        FileRegisterRequest request = new FileRegisterRequest();
+        request.setObjectKey("help-orders/audio/2026-05-12/voice.webm");
+        request.setOriginalFilename("voice.webm");
+        request.setContentType("audio/webm");
+        request.setSizeBytes(4096L);
+        request.setBusinessType("HELP_ORDER_AUDIO");
+
+        var result = appFileService.register("13800138000", request);
+
+        assertThat(result.getId()).isEqualTo(88L);
+        assertThat(result.getBusinessType()).isEqualTo("HELP_ORDER_AUDIO");
         verify(fileAssetMapper).insert(any(FileAsset.class));
     }
 

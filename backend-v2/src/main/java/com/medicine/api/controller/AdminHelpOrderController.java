@@ -6,6 +6,7 @@ import com.medicine.api.dto.helporder.HelpOrderDoctorDecisionRequest;
 import com.medicine.api.dto.helporder.HelpOrderEscalateRequest;
 import com.medicine.api.dto.helporder.HelpOrderRejectRequest;
 import com.medicine.api.dto.helporder.HelpOrderReplyRequest;
+import com.medicine.api.dto.helporder.HelpOrderVoiceTranscriptDTO;
 import com.medicine.api.dto.medication.SelfReportedMedicationDTO;
 import com.medicine.api.dto.medication.SelfReportedMedicationRejectRequest;
 import com.medicine.api.dto.medication.TransferPrefillDTO;
@@ -14,6 +15,7 @@ import com.medicine.common.model.PageResult;
 import com.medicine.service.admin.AdminHelpOrderService;
 import com.medicine.service.admin.AdminSelfReportedMedicationService;
 import com.medicine.service.auth.JwtClaims;
+import com.medicine.service.helporder.HelpOrderVoiceTranscriptionService;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -31,13 +33,16 @@ public class AdminHelpOrderController {
 
     private final AdminHelpOrderService adminHelpOrderService;
     private final AdminSelfReportedMedicationService adminSelfReportedMedicationService;
+    private final HelpOrderVoiceTranscriptionService voiceTranscriptionService;
 
     public AdminHelpOrderController(
             AdminHelpOrderService adminHelpOrderService,
-            AdminSelfReportedMedicationService adminSelfReportedMedicationService
+            AdminSelfReportedMedicationService adminSelfReportedMedicationService,
+            HelpOrderVoiceTranscriptionService voiceTranscriptionService
     ) {
         this.adminHelpOrderService = adminHelpOrderService;
         this.adminSelfReportedMedicationService = adminSelfReportedMedicationService;
+        this.voiceTranscriptionService = voiceTranscriptionService;
     }
 
     @GetMapping
@@ -103,6 +108,15 @@ public class AdminHelpOrderController {
             Authentication authentication
     ) {
         return CommonResult.ok(adminHelpOrderService.doctorDecision((JwtClaims) authentication.getDetails(), id, request));
+    }
+
+    @PostMapping("/{id}/attachments/{attachmentId}/transcribe")
+    public CommonResult<HelpOrderVoiceTranscriptDTO> transcribe(
+            @PathVariable("id") Long id,
+            @PathVariable("attachmentId") Long attachmentId,
+            Authentication authentication
+    ) {
+        return CommonResult.ok(voiceTranscriptionService.transcribeForAdmin((JwtClaims) authentication.getDetails(), id, attachmentId));
     }
 
     @GetMapping("/{id}/self-reported-medications")

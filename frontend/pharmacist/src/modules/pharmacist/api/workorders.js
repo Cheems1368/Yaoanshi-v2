@@ -36,6 +36,14 @@ export function replyWorkOrder(id, data) {
   })
 }
 
+export function transcribeWorkOrderAttachment(orderId, attachmentId) {
+  return request({
+    baseURL: backendV2BaseUrl,
+    url: `/admin-api/help-orders/${orderId}/attachments/${attachmentId}/transcribe`,
+    method: 'post'
+  })
+}
+
 export function escalateWorkOrder(id, data) {
   return request({
     baseURL: backendV2BaseUrl,

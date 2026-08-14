@@ -81,16 +81,38 @@
                     </div>
                     <div v-if="event.content" class="event-content">{{ event.content }}</div>
                     <div v-if="event.attachments?.length" class="event-attachments">
-                      <a
-                        v-for="attachment in event.attachments"
-                        :key="attachment.fileAssetId"
-                        class="event-attachment"
-                        :href="attachment.downloadUrl"
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                        <img :src="attachment.downloadUrl" :alt="attachment.originalFilename" />
-                      </a>
+                      <template v-for="attachment in event.attachments" :key="attachment.fileAssetId">
+                        <a
+                          v-if="attachment.attachmentType !== 'AUDIO'"
+                          class="event-attachment"
+                          :href="attachment.downloadUrl"
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          <img :src="attachment.downloadUrl" :alt="attachment.originalFilename" />
+                        </a>
+                        <div v-else class="voice-attachment">
+                          <div class="voice-player-row">
+                            <audio :src="attachment.downloadUrl" controls preload="metadata" />
+                            <span>{{ attachment.durationSeconds || 1 }}″</span>
+                          </div>
+                          <div v-if="attachment.voiceTranscript?.text" class="voice-transcript">
+                            转写：{{ attachment.voiceTranscript.text }}
+                          </div>
+                          <div v-else class="voice-transcript voice-transcript--muted">
+                            {{ voiceStatusText(attachment.voiceTranscript?.status) }}
+                          </div>
+                          <button
+                            v-if="attachment.id && canTranscribe(attachment)"
+                            type="button"
+                            class="voice-transcribe"
+                            :disabled="transcribingIds.has(attachment.id)"
+                            @click="transcribeVoice(attachment.id)"
+                          >
+                            {{ transcribingIds.has(attachment.id) ? '转写中...' : transcriptActionText(attachment.voiceTranscript?.status) }}
+                          </button>
+                        </div>
+                      </template>
                     </div>
                   </div>
                 </div>
@@ -132,6 +154,18 @@
               </ion-button>
               <span class="image-count">{{ selectedImages.length }}/3</span>
             </div>
+            <button
+              type="button"
+              class="voice-hold-button"
+              :class="{ 'voice-hold-button--recording': recording }"
+              :disabled="replying || voiceBusy"
+              @pointerdown.prevent="startVoice"
+              @pointerup.prevent="finishVoice"
+              @pointercancel.prevent="cancelVoice"
+              @contextmenu.prevent
+            >
+              {{ recording ? '松开发送语音' : voiceBusy ? '语音发送中...' : '按住说话' }}
+            </button>
             <input
               ref="cameraInput"
               class="file-input"
@@ -186,7 +220,14 @@ import {
 } from '@ionic/vue'
 import { computed, ref } from 'vue'
 import { useRoute } from 'vue-router'
-import { helpOrderService, type HelpOrderDTO, type HelpOrderEventDTO } from '@/modules/patient/api/mvp'
+import {
+  helpOrderService,
+  type HelpOrderAttachmentDTO,
+  type HelpOrderDTO,
+  type HelpOrderEventDTO
+} from '@/modules/patient/api/mvp'
+import { cancelVoiceRecording, startVoiceRecording, stopVoiceRecording } from '@/modules/patient/composables/useVoiceRecorder'
+import { uploadHelpOrderVoice } from '@/modules/patient/composables/useHelpOrderVoiceUpload'
 import { patientSession } from '@/app/session'
 import { APP_NOTIFICATION_EVENT, createAppNotificationClient } from '@/utils/appNotifications'
 
@@ -197,6 +238,9 @@ const replying = ref(false)
 const replyContent = ref('')
 const showToast = ref(false)
 const toastMessage = ref('')
+const recording = ref(false)
+const voiceBusy = ref(false)
+const transcribingIds = ref<Set<number>>(new Set())
 const cameraInput = ref<HTMLInputElement | null>(null)
 const galleryInput = ref<HTMLInputElement | null>(null)
 const selectedImages = ref<SelectedImage[]>([])
@@ -251,18 +295,74 @@ const sendReply = async () => {
 
   replying.value = true
   try {
-    const attachmentFileAssetIds = await uploadSelectedImages()
-    const response = await helpOrderService.replyHelpOrder(orderId.value, {
-      content: replyContent.value.trim() || undefined,
-      attachmentFileAssetIds
-    })
-    order.value = response.data ?? order.value
-    replyContent.value = ''
-    clearImages()
+    await sendReplyPayload()
   } catch (error: any) {
     showMessage(error?.message || '发送失败')
   } finally {
     replying.value = false
+  }
+}
+
+const sendReplyPayload = async (extraPayload: Record<string, unknown> = {}) => {
+  const attachmentFileAssetIds = await uploadSelectedImages()
+  const response = await helpOrderService.replyHelpOrder(orderId.value, {
+    content: replyContent.value.trim() || undefined,
+    attachmentFileAssetIds,
+    ...extraPayload
+  })
+  order.value = response.data ?? order.value
+  replyContent.value = ''
+  clearImages()
+}
+
+const startVoice = async () => {
+  if (replying.value || voiceBusy.value || isTerminalStatus.value) return
+  try {
+    await startVoiceRecording(() => {
+      void finishVoice()
+    })
+    recording.value = true
+  } catch (error: any) {
+    showMessage(error?.message === 'VOICE_RECORDER_UNSUPPORTED' ? '当前环境不支持录音' : '无法启动麦克风')
+  }
+}
+
+const finishVoice = async () => {
+  if (!recording.value || voiceBusy.value) return
+  recording.value = false
+  voiceBusy.value = true
+  replying.value = true
+  try {
+    const recordingResult = await stopVoiceRecording()
+    const voiceAttachment = await uploadHelpOrderVoice(recordingResult)
+    await sendReplyPayload({ voiceAttachment })
+  } catch (error: any) {
+    showMessage(error?.message || '语音发送失败')
+  } finally {
+    voiceBusy.value = false
+    replying.value = false
+  }
+}
+
+const cancelVoice = () => {
+  if (!recording.value) return
+  recording.value = false
+  cancelVoiceRecording()
+  showMessage('已取消语音')
+}
+
+const transcribeVoice = async (attachmentId: number) => {
+  if (transcribingIds.value.has(attachmentId)) return
+  transcribingIds.value = new Set([...transcribingIds.value, attachmentId])
+  try {
+    await helpOrderService.transcribeAttachment(orderId.value, attachmentId)
+    await loadDetail(true)
+  } catch (error: any) {
+    showMessage(error?.message || '转文字失败，可听原音')
+  } finally {
+    const next = new Set(transcribingIds.value)
+    next.delete(attachmentId)
+    transcribingIds.value = next
   }
 }
 
@@ -421,6 +521,22 @@ const formatDateTime = (value?: string | null) => {
   if (!value) return '--'
   const date = new Date(value)
   return Number.isNaN(date.getTime()) ? value : date.toLocaleString('zh-CN', { hour12: false })
+}
+
+const voiceStatusText = (status?: string | null) => {
+  if (status === 'UNCONFIGURED') return '转文字暂不可用，可听原音'
+  if (status === 'FAILED') return '转文字失败，可听原音'
+  if (status === 'PENDING') return '尚未转文字'
+  return '尚未转文字'
+}
+
+const canTranscribe = (attachment: HelpOrderAttachmentDTO) => {
+  const status = attachment.voiceTranscript?.status
+  return attachment.attachmentType === 'AUDIO' && status !== 'SUCCESS' && status !== 'UNCONFIGURED'
+}
+
+const transcriptActionText = (status?: string | null) => {
+  return status === 'FAILED' ? '重试转文字' : '转文字'
 }
 
 const eventRowClass = (event: HelpOrderEventDTO) => {
@@ -651,6 +767,59 @@ onIonViewDidLeave(() => {
   display: block;
 }
 
+.voice-attachment {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: var(--patient-space-2);
+  min-width: min(280px, 100%);
+  padding: var(--patient-space-3);
+  border-radius: var(--patient-radius-md);
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.event-bubble--incoming .voice-attachment {
+  background: var(--patient-bg-page);
+}
+
+.voice-player-row {
+  display: flex;
+  align-items: center;
+  gap: var(--patient-space-2);
+}
+
+.voice-player-row audio {
+  width: min(240px, 100%);
+  height: 36px;
+}
+
+.voice-player-row span,
+.voice-transcript {
+  font-size: var(--patient-font-helper);
+}
+
+.voice-transcript {
+  line-height: var(--patient-leading-normal);
+  white-space: pre-wrap;
+}
+
+.voice-transcript--muted {
+  opacity: 0.8;
+}
+
+.voice-transcribe {
+  justify-self: start;
+  border: 0;
+  border-radius: var(--patient-radius-sm);
+  padding: 6px 10px;
+  background: rgba(15, 23, 42, 0.12);
+  color: inherit;
+  font-size: var(--patient-font-helper);
+}
+
+.voice-transcribe:disabled {
+  opacity: 0.58;
+}
+
 .composer-toolbar {
   --padding-top: var(--patient-space-2);
   --padding-bottom: var(--patient-space-2);
@@ -703,6 +872,26 @@ onIonViewDidLeave(() => {
   align-items: center;
   gap: var(--patient-space-2);
   flex-wrap: wrap;
+}
+
+.voice-hold-button {
+  width: 100%;
+  min-height: 42px;
+  border: 0;
+  border-radius: var(--patient-radius-lg);
+  background: var(--patient-primary);
+  color: var(--patient-text-inverse);
+  font-size: var(--patient-font-body);
+  font-weight: var(--patient-font-semibold);
+  touch-action: none;
+}
+
+.voice-hold-button--recording {
+  background: var(--patient-danger);
+}
+
+.voice-hold-button:disabled {
+  opacity: 0.58;
 }
 
 .image-count {

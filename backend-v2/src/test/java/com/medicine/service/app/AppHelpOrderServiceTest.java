@@ -3,6 +3,7 @@ package com.medicine.service.app;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.medicine.api.dto.helporder.HelpOrderDTO;
 import com.medicine.api.dto.helporder.HelpOrderReplyRequest;
+import com.medicine.api.dto.helporder.HelpOrderVoiceAttachmentRequest;
 import com.medicine.common.exception.BusinessException;
 import com.medicine.common.exception.ErrorCode;
 import com.medicine.domain.file.FileAsset;
@@ -19,6 +20,7 @@ import com.medicine.repository.identity.AppAccountMapper;
 import com.medicine.repository.identity.DoctorProfileMapper;
 import com.medicine.repository.identity.PharmacistProfileMapper;
 import com.medicine.service.auth.AppPatientService;
+import com.medicine.service.helporder.HelpOrderVoiceTranscriptionService;
 import com.medicine.service.notification.NotificationDispatchService;
 import com.medicine.service.storage.S3CompatibleObjectStorage;
 import org.junit.jupiter.api.Test;
@@ -38,6 +40,7 @@ import static org.assertj.core.api.Assertions.catchThrowableOfType;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -73,6 +76,9 @@ class AppHelpOrderServiceTest {
 
     @Mock
     private DoctorProfileMapper doctorProfileMapper;
+
+    @Mock
+    private HelpOrderVoiceTranscriptionService voiceTranscriptionService;
 
     @Spy
     private ObjectMapper objectMapper = new ObjectMapper();
@@ -195,9 +201,56 @@ class AppHelpOrderServiceTest {
 
         assertThat(result.getId()).isEqualTo(910L);
         ArgumentCaptor<HelpOrderEventAttachment> attachmentCaptor = ArgumentCaptor.forClass(HelpOrderEventAttachment.class);
-        verify(helpOrderEventAttachmentMapper, org.mockito.Mockito.times(2)).insert(attachmentCaptor.capture());
+        verify(helpOrderEventAttachmentMapper, times(2)).insert(attachmentCaptor.capture());
         assertThat(attachmentCaptor.getAllValues()).extracting(HelpOrderEventAttachment::getFileAssetId)
                 .containsExactly(10L, 11L);
+    }
+
+    @Test
+    void shouldCreateHelpOrderWithSingleVoiceAttachment() {
+        AppPatientService.AccessContext context = accessContext();
+        AtomicReference<HelpOrder> insertedOrder = new AtomicReference<>();
+        HelpOrderVoiceAttachmentRequest voiceRequest = new HelpOrderVoiceAttachmentRequest();
+        voiceRequest.setPlaybackFileAssetId(20L);
+        voiceRequest.setTranscriptSourceFileAssetId(21L);
+        voiceRequest.setDurationSeconds(6);
+        HelpOrderVoiceTranscriptionService.VoiceFiles voiceFiles =
+                new HelpOrderVoiceTranscriptionService.VoiceFiles(helpOrderAudio(20L, "HELP_ORDER_AUDIO"), helpOrderAudio(21L, "HELP_ORDER_AUDIO_TRANSCRIPT_SOURCE"), 6);
+
+        when(appPatientService.requireAccessContext("13800138000")).thenReturn(context);
+        when(voiceTranscriptionService.validateVoiceFiles(context, voiceRequest)).thenReturn(voiceFiles);
+        when(helpOrderMapper.insert(any(HelpOrder.class))).thenAnswer(invocation -> {
+            HelpOrder order = invocation.getArgument(0);
+            order.setId(920L);
+            insertedOrder.set(order);
+            return 1;
+        });
+        when(helpOrderEventMapper.insert(any(HelpOrderEvent.class))).thenAnswer(invocation -> {
+            HelpOrderEvent event = invocation.getArgument(0);
+            event.setId(720L);
+            return 1;
+        });
+        when(helpOrderEventAttachmentMapper.insert(any(HelpOrderEventAttachment.class))).thenAnswer(invocation -> {
+            HelpOrderEventAttachment attachment = invocation.getArgument(0);
+            attachment.setId(820L);
+            return 1;
+        });
+        when(helpOrderMapper.selectById(1L, 920L)).thenAnswer(invocation -> insertedOrder.get());
+        when(helpOrderEventMapper.selectByHelpOrderId(1L, 920L)).thenReturn(List.of());
+
+        HelpOrderDTO request = new HelpOrderDTO();
+        request.setCategory("MEDICATION_CONSULTATION");
+        request.setTitle("语音求助");
+        request.setVoiceAttachment(voiceRequest);
+
+        HelpOrderDTO result = appHelpOrderService.create("13800138000", request);
+
+        assertThat(result.getId()).isEqualTo(920L);
+        ArgumentCaptor<HelpOrderEventAttachment> attachmentCaptor = ArgumentCaptor.forClass(HelpOrderEventAttachment.class);
+        verify(helpOrderEventAttachmentMapper).insert(attachmentCaptor.capture());
+        assertThat(attachmentCaptor.getValue().getAttachmentType()).isEqualTo("AUDIO");
+        assertThat(attachmentCaptor.getValue().getFileAssetId()).isEqualTo(20L);
+        verify(voiceTranscriptionService).createPendingTranscript(eq(1L), eq(920L), eq(820L), eq(voiceFiles), any(LocalDateTime.class));
     }
 
     @Test
@@ -308,6 +361,19 @@ class AppHelpOrderServiceTest {
         fileAsset.setObjectKey("help-orders/images/test-" + id + ".png");
         fileAsset.setOriginalFilename("test-" + id + ".png");
         fileAsset.setMimeType("image/png");
+        fileAsset.setSizeBytes(1024L);
+        return fileAsset;
+    }
+
+    private FileAsset helpOrderAudio(Long id, String businessType) {
+        FileAsset fileAsset = new FileAsset();
+        fileAsset.setId(id);
+        fileAsset.setBusinessType(businessType);
+        fileAsset.setUploadedByType("PATIENT");
+        fileAsset.setUploadedById(101L);
+        fileAsset.setObjectKey("help-orders/audio/test-" + id + ".webm");
+        fileAsset.setOriginalFilename("test-" + id + ".webm");
+        fileAsset.setMimeType("audio/webm");
         fileAsset.setSizeBytes(1024L);
         return fileAsset;
     }

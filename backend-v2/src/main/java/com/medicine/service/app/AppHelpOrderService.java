@@ -23,6 +23,7 @@ import com.medicine.repository.identity.AppAccountMapper;
 import com.medicine.repository.identity.DoctorProfileMapper;
 import com.medicine.repository.identity.PharmacistProfileMapper;
 import com.medicine.service.auth.AppPatientService;
+import com.medicine.service.helporder.HelpOrderVoiceTranscriptionService;
 import com.medicine.service.notification.NotificationDispatchService;
 import com.medicine.service.storage.S3CompatibleObjectStorage;
 import org.springframework.stereotype.Service;
@@ -53,6 +54,7 @@ public class AppHelpOrderService {
     private final PharmacistProfileMapper pharmacistProfileMapper;
     private final DoctorProfileMapper doctorProfileMapper;
     private final ObjectMapper objectMapper;
+    private final HelpOrderVoiceTranscriptionService voiceTranscriptionService;
 
     public AppHelpOrderService(
             HelpOrderMapper helpOrderMapper,
@@ -65,7 +67,8 @@ public class AppHelpOrderService {
             AppAccountMapper appAccountMapper,
             PharmacistProfileMapper pharmacistProfileMapper,
             DoctorProfileMapper doctorProfileMapper,
-            ObjectMapper objectMapper
+            ObjectMapper objectMapper,
+            HelpOrderVoiceTranscriptionService voiceTranscriptionService
     ) {
         this.helpOrderMapper = helpOrderMapper;
         this.helpOrderEventMapper = helpOrderEventMapper;
@@ -78,6 +81,7 @@ public class AppHelpOrderService {
         this.pharmacistProfileMapper = pharmacistProfileMapper;
         this.doctorProfileMapper = doctorProfileMapper;
         this.objectMapper = objectMapper;
+        this.voiceTranscriptionService = voiceTranscriptionService;
     }
 
     public HelpOrderDTO create(String subject, HelpOrderDTO request) {
@@ -85,6 +89,7 @@ public class AppHelpOrderService {
         Patient patient = context.patient();
         LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
         List<FileAsset> attachments = validateAttachmentFiles(context, request.getAttachmentFileAssetIds());
+        HelpOrderVoiceTranscriptionService.VoiceFiles voiceFiles = voiceTranscriptionService.validateVoiceFiles(context, request.getVoiceAttachment());
 
         HelpOrder order = new HelpOrder();
         order.setOrderNo(generateOrderNo());
@@ -108,7 +113,7 @@ public class AppHelpOrderService {
         applyAudit(order, "app-help-order", now);
         helpOrderMapper.insert(order);
 
-        appendEvent(order.getId(), "SUBMITTED", null, "SUBMITTED", context.operatorType(), context.appAccount().getId(), order.getDescription(), attachments, now);
+        appendEvent(order.getId(), "SUBMITTED", null, "SUBMITTED", context.operatorType(), context.appAccount().getId(), order.getDescription(), attachments, voiceFiles, now);
         createNotification(
                 "PHARMACIST",
                 patient.getBoundByPharmacistId(),
@@ -132,8 +137,9 @@ public class AppHelpOrderService {
 
         LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
         List<FileAsset> attachments = validateAttachmentFiles(context, request == null ? null : request.getAttachmentFileAssetIds());
+        HelpOrderVoiceTranscriptionService.VoiceFiles voiceFiles = voiceTranscriptionService.validateVoiceFiles(context, request == null ? null : request.getVoiceAttachment());
         String content = request == null ? null : blankToNull(request.getContent());
-        if (!StringUtils.hasText(content) && attachments.isEmpty()) {
+        if (!StringUtils.hasText(content) && attachments.isEmpty() && voiceFiles == null) {
             throw new BusinessException(400, "BAD_REQUEST");
         }
         appendEvent(
@@ -145,6 +151,7 @@ public class AppHelpOrderService {
                 context.appAccount().getId(),
                 content,
                 attachments,
+                voiceFiles,
                 now
         );
         createNotification(
@@ -260,6 +267,7 @@ public class AppHelpOrderService {
             Long operatorId,
             String content,
             List<FileAsset> attachments,
+            HelpOrderVoiceTranscriptionService.VoiceFiles voiceFiles,
             LocalDateTime now
     ) {
         HelpOrderEvent event = new HelpOrderEvent();
@@ -274,10 +282,16 @@ public class AppHelpOrderService {
         event.setMetadataJson(null);
         applyAudit(event, "app-help-order", now);
         helpOrderEventMapper.insert(event);
-        appendAttachments(event.getId(), attachments, now);
+        appendAttachments(event.getId(), helpOrderId, attachments, voiceFiles, now);
     }
 
-    private void appendAttachments(Long eventId, List<FileAsset> attachments, LocalDateTime now) {
+    private void appendAttachments(
+            Long eventId,
+            Long helpOrderId,
+            List<FileAsset> attachments,
+            HelpOrderVoiceTranscriptionService.VoiceFiles voiceFiles,
+            LocalDateTime now
+    ) {
         for (int i = 0; i < attachments.size(); i++) {
             HelpOrderEventAttachment attachment = new HelpOrderEventAttachment();
             attachment.setHelpOrderEventId(eventId);
@@ -286,6 +300,16 @@ public class AppHelpOrderService {
             attachment.setSortOrder(i);
             applyAudit(attachment, "app-help-order", now);
             helpOrderEventAttachmentMapper.insert(attachment);
+        }
+        if (voiceFiles != null) {
+            HelpOrderEventAttachment voiceAttachment = new HelpOrderEventAttachment();
+            voiceAttachment.setHelpOrderEventId(eventId);
+            voiceAttachment.setFileAssetId(voiceFiles.playback().getId());
+            voiceAttachment.setAttachmentType("AUDIO");
+            voiceAttachment.setSortOrder(attachments.size());
+            applyAudit(voiceAttachment, "app-help-order", now);
+            helpOrderEventAttachmentMapper.insert(voiceAttachment);
+            voiceTranscriptionService.createPendingTranscript(DEFAULT_TENANT_ID, helpOrderId, voiceAttachment.getId(), voiceFiles, now);
         }
     }
 
@@ -337,6 +361,7 @@ public class AppHelpOrderService {
         attachments.forEach(attachment -> attachment.setDownloadUrl(
                 objectStorage.createPresignedDownloadUrl(attachment.getDownloadUrl(), HELP_ORDER_DOWNLOAD_TTL)
         ));
+        attachments.forEach(attachment -> voiceTranscriptionService.attachTranscript(DEFAULT_TENANT_ID, attachment));
         return attachments;
     }
 

@@ -26,7 +26,12 @@
         @refresh="$emit('refresh', detail.id)"
       />
 
-      <OrderTimeline :events="detail.events || []" />
+      <OrderTimeline
+        :order-id="detail.id"
+        :events="detail.events || []"
+        :can-trigger-transcribe="role === 'pharmacist'"
+        @refresh="$emit('refresh', detail.id)"
+      />
 
       <OrderActionBar
         :detail="detail"

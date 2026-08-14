@@ -28,6 +28,7 @@ public class HelpOrderDTO {
     private String serviceNotice;
     private String createdAt;
     private List<Long> attachmentFileAssetIds;
+    private HelpOrderVoiceAttachmentRequest voiceAttachment;
     private PatientContextDTO patientContext;
     private List<EventDTO> events;
 
@@ -229,6 +230,14 @@ public class HelpOrderDTO {
 
     public void setAttachmentFileAssetIds(List<Long> attachmentFileAssetIds) {
         this.attachmentFileAssetIds = attachmentFileAssetIds;
+    }
+
+    public HelpOrderVoiceAttachmentRequest getVoiceAttachment() {
+        return voiceAttachment;
+    }
+
+    public void setVoiceAttachment(HelpOrderVoiceAttachmentRequest voiceAttachment) {
+        this.voiceAttachment = voiceAttachment;
     }
 
     public PatientContextDTO getPatientContext() {

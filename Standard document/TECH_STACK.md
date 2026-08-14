@@ -53,6 +53,7 @@ Exact response shape:
 - Primary API style: JSON over HTTP/HTTPS
 - Realtime notification for Web: WebSocket
 - OCR input transport: multipart file upload
+- Help-order speech-to-text provider: XFYUN voice dictation streaming WebAPI, proxied by `backend-v2`; credentials are environment variables only
 
 ### 3.4 Port baseline
 

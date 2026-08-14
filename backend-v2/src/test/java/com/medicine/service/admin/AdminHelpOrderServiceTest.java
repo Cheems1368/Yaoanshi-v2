@@ -21,6 +21,7 @@ import com.medicine.repository.identity.PatientMapper;
 import com.medicine.repository.identity.PharmacistProfileMapper;
 import com.medicine.service.auth.JwtClaims;
 import com.medicine.service.auth.ProfessionalIdentityService;
+import com.medicine.service.helporder.HelpOrderVoiceTranscriptionService;
 import com.medicine.service.notification.NotificationDispatchService;
 import com.medicine.service.storage.S3CompatibleObjectStorage;
 import org.junit.jupiter.api.Test;
@@ -78,6 +79,9 @@ class AdminHelpOrderServiceTest {
 
     @Mock
     private AppAccountMapper appAccountMapper;
+
+    @Mock
+    private HelpOrderVoiceTranscriptionService voiceTranscriptionService;
 
     @Spy
     private ObjectMapper objectMapper = new ObjectMapper();

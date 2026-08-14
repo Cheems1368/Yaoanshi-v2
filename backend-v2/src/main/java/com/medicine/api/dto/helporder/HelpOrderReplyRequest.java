@@ -6,6 +6,7 @@ public class HelpOrderReplyRequest {
 
     private String content;
     private List<Long> attachmentFileAssetIds;
+    private HelpOrderVoiceAttachmentRequest voiceAttachment;
 
     public String getContent() {
         return content;
@@ -21,5 +22,13 @@ public class HelpOrderReplyRequest {
 
     public void setAttachmentFileAssetIds(List<Long> attachmentFileAssetIds) {
         this.attachmentFileAssetIds = attachmentFileAssetIds;
+    }
+
+    public HelpOrderVoiceAttachmentRequest getVoiceAttachment() {
+        return voiceAttachment;
+    }
+
+    public void setVoiceAttachment(HelpOrderVoiceAttachmentRequest voiceAttachment) {
+        this.voiceAttachment = voiceAttachment;
     }
 }

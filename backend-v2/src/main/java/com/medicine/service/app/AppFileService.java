@@ -24,8 +24,22 @@ import java.util.UUID;
 public class AppFileService {
 
     private static final long MAX_SIZE_BYTES = 10L * 1024L * 1024L;
-    private static final Set<String> ALLOWED_CONTENT_TYPES = Set.of("image/jpeg", "image/png", "image/webp");
-    private static final Set<String> ALLOWED_BUSINESS_TYPES = Set.of("PRESCRIPTION", "HELP_ORDER_IMAGE");
+    private static final Set<String> ALLOWED_IMAGE_CONTENT_TYPES = Set.of("image/jpeg", "image/png", "image/webp");
+    private static final Set<String> ALLOWED_AUDIO_CONTENT_TYPES = Set.of(
+            "audio/webm",
+            "audio/mp4",
+            "audio/mpeg",
+            "audio/wav",
+            "audio/x-wav",
+            "audio/l16",
+            "application/octet-stream"
+    );
+    private static final Set<String> ALLOWED_BUSINESS_TYPES = Set.of(
+            "PRESCRIPTION",
+            "HELP_ORDER_IMAGE",
+            "HELP_ORDER_AUDIO",
+            "HELP_ORDER_AUDIO_TRANSCRIPT_SOURCE"
+    );
 
     private final S3CompatibleObjectStorage objectStorage;
     private final ObjectStorageProperties objectStorageProperties;
@@ -48,14 +62,15 @@ public class AppFileService {
         validateRequest(request);
 
         String businessType = normalizeBusinessType(request.getBusinessType());
-        String objectKey = resolveObjectPrefix(businessType) + "/" + LocalDate.now() + "/" + UUID.randomUUID() + resolveExtension(request.getFilename(), request.getContentType());
+        String contentType = normalizeContentType(request.getContentType());
+        String objectKey = resolveObjectPrefix(businessType) + "/" + LocalDate.now() + "/" + UUID.randomUUID() + resolveExtension(request.getFilename(), contentType);
         FilePresignResponse response = new FilePresignResponse();
         response.setObjectKey(objectKey);
         response.setUploadUrl(objectStorage.createPresignedUploadUrl(objectKey));
         response.setDownloadUrl("PRESCRIPTION".equals(businessType) ? objectStorage.createPresignedDownloadUrl(objectKey) : null);
         response.setBucket(objectStorageProperties.getBucket());
         response.setFilename(request.getFilename().trim());
-        response.setContentType(request.getContentType().trim().toLowerCase());
+        response.setContentType(contentType);
         response.setSizeBytes(request.getSizeBytes());
         return response;
     }
@@ -64,7 +79,7 @@ public class AppFileService {
         validateRegisterRequest(request);
         AppPatientService.AccessContext context = appPatientService.requireAccessContext(subject);
         String businessType = normalizeBusinessType(request.getBusinessType());
-        String contentType = request.getContentType().trim().toLowerCase();
+        String contentType = normalizeContentType(request.getContentType());
         LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
 
         FileAsset fileAsset = new FileAsset();
@@ -102,8 +117,8 @@ public class AppFileService {
         if (!ALLOWED_BUSINESS_TYPES.contains(normalizeBusinessType(request.getBusinessType()))) {
             throw new BusinessException(ErrorCode.FILE_UPLOAD_INVALID_TYPE.getCode(), ErrorCode.FILE_UPLOAD_INVALID_TYPE.getMessage());
         }
-        String contentType = request.getContentType().trim().toLowerCase();
-        if (!ALLOWED_CONTENT_TYPES.contains(contentType)) {
+        String contentType = normalizeContentType(request.getContentType());
+        if (!isAllowedContentType(normalizeBusinessType(request.getBusinessType()), contentType)) {
             throw new BusinessException(ErrorCode.FILE_UPLOAD_INVALID_TYPE.getCode(), ErrorCode.FILE_UPLOAD_INVALID_TYPE.getMessage());
         }
         if (request.getSizeBytes() > MAX_SIZE_BYTES) {
@@ -116,11 +131,13 @@ public class AppFileService {
                 || !StringUtils.hasText(request.getContentType()) || request.getSizeBytes() == null || request.getSizeBytes() <= 0) {
             throw new BusinessException(400, "BAD_REQUEST");
         }
-        if (!"HELP_ORDER_IMAGE".equals(normalizeBusinessType(request.getBusinessType()))) {
+        String businessType = normalizeBusinessType(request.getBusinessType());
+        if (!"HELP_ORDER_IMAGE".equals(businessType)
+                && !"HELP_ORDER_AUDIO".equals(businessType)
+                && !"HELP_ORDER_AUDIO_TRANSCRIPT_SOURCE".equals(businessType)) {
             throw new BusinessException(ErrorCode.FILE_UPLOAD_INVALID_TYPE.getCode(), ErrorCode.FILE_UPLOAD_INVALID_TYPE.getMessage());
         }
         validateRequest(toPresignRequest(request));
-        String businessType = normalizeBusinessType(request.getBusinessType());
         if (!request.getObjectKey().trim().startsWith(resolveObjectPrefix(businessType) + "/")) {
             throw new BusinessException(ErrorCode.FILE_UPLOAD_INVALID_TYPE.getCode(), ErrorCode.FILE_UPLOAD_INVALID_TYPE.getMessage());
         }
@@ -139,8 +156,25 @@ public class AppFileService {
         return StringUtils.hasText(businessType) ? businessType.trim().toUpperCase() : "";
     }
 
+    private String normalizeContentType(String contentType) {
+        if (!StringUtils.hasText(contentType)) {
+            return "";
+        }
+        String normalized = contentType.trim().toLowerCase();
+        int parameterIndex = normalized.indexOf(';');
+        if (parameterIndex >= 0) {
+            normalized = normalized.substring(0, parameterIndex).trim();
+        }
+        return normalized;
+    }
+
     private String resolveObjectPrefix(String businessType) {
-        return "HELP_ORDER_IMAGE".equals(businessType) ? "help-orders/images" : "prescriptions";
+        return switch (businessType) {
+            case "HELP_ORDER_IMAGE" -> "help-orders/images";
+            case "HELP_ORDER_AUDIO" -> "help-orders/audio";
+            case "HELP_ORDER_AUDIO_TRANSCRIPT_SOURCE" -> "help-orders/audio-transcript-source";
+            default -> "prescriptions";
+        };
     }
 
     private String resolveExtension(String filename, String contentType) {
@@ -152,8 +186,19 @@ public class AppFileService {
         return switch (contentType.trim().toLowerCase()) {
             case "image/png" -> ".png";
             case "image/webp" -> ".webp";
+            case "audio/webm" -> ".webm";
+            case "audio/mp4" -> ".m4a";
+            case "audio/mpeg" -> ".mp3";
+            case "audio/wav", "audio/x-wav", "audio/l16", "application/octet-stream" -> ".wav";
             default -> ".jpg";
         };
+    }
+
+    private boolean isAllowedContentType(String businessType, String contentType) {
+        if ("HELP_ORDER_AUDIO".equals(businessType) || "HELP_ORDER_AUDIO_TRANSCRIPT_SOURCE".equals(businessType)) {
+            return ALLOWED_AUDIO_CONTENT_TYPES.contains(contentType);
+        }
+        return ALLOWED_IMAGE_CONTENT_TYPES.contains(contentType);
     }
 
     private void applyAudit(com.medicine.domain.common.BaseEntity entity, String operator, LocalDateTime now) {

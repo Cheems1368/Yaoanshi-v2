@@ -1,5 +1,5 @@
 <template>
-  <section class="action-bar">
+  <section v-if="isTerminal || hasActions" class="action-bar">
     <div v-if="isTerminal" class="action-bar__terminal">
       <el-tag :type="detail.status === 'CLOSED' ? 'success' : 'danger'" size="large" effect="plain">
         {{ detail.status === 'CLOSED' ? '工单已关闭' : '工单已驳回' }}
@@ -138,8 +138,17 @@ const showReply = computed(() => {
 const showEscalate = computed(() =>
   isPharmacist.value && ['SUBMITTED', 'PHARMACIST_IN_PROGRESS'].includes(status.value)
 )
-const showReject = computed(() => !isTerminal.value)
-const showClose = computed(() => !isTerminal.value)
+const showReject = computed(() => {
+  if (isPharmacist.value) return status.value === 'PHARMACIST_IN_PROGRESS'
+  return ['WAITING_DOCTOR', 'DOCTOR_IN_PROGRESS'].includes(status.value)
+})
+const showClose = computed(() => {
+  if (isPharmacist.value) return status.value === 'PHARMACIST_IN_PROGRESS'
+  return ['WAITING_DOCTOR', 'DOCTOR_IN_PROGRESS'].includes(status.value)
+})
+const hasActions = computed(() =>
+  showClaim.value || showReply.value || showEscalate.value || showReject.value || showClose.value
+)
 
 watch(() => props.draft, (draft) => {
   if (draft) {

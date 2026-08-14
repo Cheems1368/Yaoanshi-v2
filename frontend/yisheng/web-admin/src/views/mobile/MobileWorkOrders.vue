@@ -87,15 +87,24 @@
             </el-tag>
             <p v-if="event.content" class="timeline-content">{{ event.content }}</p>
             <div v-if="event.attachments?.length" class="attachment-grid">
-              <a
-                v-for="attachment in event.attachments"
-                :key="attachment.fileAssetId"
-                :href="attachment.downloadUrl"
-                target="_blank"
-                rel="noreferrer"
-              >
-                <img :src="attachment.downloadUrl" :alt="attachment.originalFilename" />
-              </a>
+              <template v-for="attachment in event.attachments" :key="attachment.fileAssetId">
+                <a
+                  v-if="attachment.attachmentType !== 'AUDIO'"
+                  :href="attachment.downloadUrl"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  <img :src="attachment.downloadUrl" :alt="attachment.originalFilename" />
+                </a>
+                <div v-else class="audio-attachment">
+                  <div class="audio-attachment__player">
+                    <audio :src="attachment.downloadUrl" controls preload="metadata" />
+                    <span>{{ attachment.durationSeconds || 1 }}″</span>
+                  </div>
+                  <p v-if="attachment.voiceTranscript?.text">转写：{{ attachment.voiceTranscript.text }}</p>
+                  <p v-else class="audio-attachment__muted">{{ voiceStatusText(attachment.voiceTranscript?.status) }}</p>
+                </div>
+              </template>
             </div>
           </div>
         </article>
@@ -167,6 +176,12 @@ const contextName = computed(() => {
   const parts = [context.name, context.gender, context.age ? `${context.age}岁` : null].filter(Boolean)
   return parts.join(' / ') || '未填写'
 })
+
+function voiceStatusText(status) {
+  if (status === 'UNCONFIGURED') return '转文字暂不可用，可听原音'
+  if (status === 'FAILED') return '转文字失败，可听原音'
+  return '尚未转文字'
+}
 
 async function loadOrders() {
   loading.value = true
@@ -404,9 +419,38 @@ onBeforeUnmount(() => {
   display: block;
 }
 
+.audio-attachment {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: var(--pro-radius-sm);
+  background: var(--pro-bg-secondary);
+}
+
+.audio-attachment__player {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.audio-attachment__player audio {
+  width: min(260px, 100%);
+  height: 36px;
+}
+
+.audio-attachment p {
+  margin: 0;
+  color: var(--pro-text-primary);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.audio-attachment__muted {
+  color: var(--pro-text-secondary) !important;
+}
+
 .decision-box {
-  position: sticky;
-  bottom: 0;
   display: grid;
   gap: 12px;
   box-shadow: var(--pro-shadow-sm);

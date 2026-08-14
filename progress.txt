@@ -23,6 +23,7 @@ Branch / Context
 - Active surfaces: backend-v2, frontend/huanzhe, frontend/pharmacist, frontend/yisheng/web-admin
 
 Current State
+- 2026-08-01 update: Phase T5 complete. Pharmacist mobile work-order actions, Docker MIME/XFYUN runtime, live transcription, three-role mobile flow, and viewport acceptance all passed.
 - 2026-05-12 update: Phase T0/T1 complete for post-P0 trial/demo closed loop: Standard document sync plus patient text/image help-order loop.
 - Current implementation includes backend-v2 multi-image help-order attachments, patient image upload/reply UI, and pharmacist `/mobile/workorders`.
 - All P0/P0+ phases (Phase 0–7) committed (2026-03-27, commit f9274e5)
@@ -31,18 +32,19 @@ Current State
 - Last session (2026-03-27): Phase A–F completed (see below)
 
 In Progress
-- None for the completed Phase T0/T1 slice; next work is Phase T2 planning/implementation.
+- None. Post-P0 trial/demo phases T0-T5 are complete; no next phase has been started.
 - Phase 4: Integration testing — runtime integration complete
 
 Next
+- Do not start another product phase without an explicit scope decision.
 - Run browser/mobile-width manual walkthrough for the image help-order loop against a live local stack.
 - Plan Phase T2: doctor mobile Web queue/detail, patient minimum context, and structured doctor decision events.
 - End-to-end demo walkthrough (browser-level, manual UI testing)
 - Use `yaoanshi-neat` for future explicit closeout tidy or context recovery requests
 
 Last Updated
-- 2026-05-12 Asia/Shanghai
-- Reason: added project-local `yaoanshi-neat` skill for progress memory and knowledge-state checks.
+- 2026-08-01 Asia/Shanghai
+- Reason: completed T5 pharmacist mobile parity and Docker live acceptance without starting another phase.
 
 Completed This Sprint
 
@@ -553,3 +555,92 @@ Trial Demo Phase T4 Implementation (2026-05-16)
 Last Updated
 - 2026-05-16 Asia/Shanghai
 - Reason: implemented and validated Phase T4 OCR/CSV/education demo slice.
+
+Trial Demo Phase T5 Implementation (2026-05-16)
+- Workstream:
+  - Post-P0 trial/demo closed-loop implementation, fifth slice: help-order voice message plus XFYUN speech-to-text.
+- Changed:
+  - Added `V12__help_order_voice_transcription.sql`, including `help_order_voice_transcript` and `file_asset.business_type` widening for `HELP_ORDER_AUDIO_TRANSCRIPT_SOURCE`.
+  - Added help-order voice DTOs, transcript DTOs, audio file registration support, app/admin transcription endpoints, and idempotent transcript handling.
+  - Added XFYUN streaming speech service with server-side environment variables only, HMAC-SHA256 WebSocket auth, primary `xfime-mianqie`, fallback `iat/mandarin`, missing-key graceful `UNCONFIGURED`, and WAV-to-PCM payload stripping before provider calls.
+  - Patient app now supports hold-to-talk on help-order create/detail, uploads playback audio plus hidden WAV source, sends the original voice message first, plays audio, and lets patient/family trigger or retry transcription.
+  - Pharmacist desktop/mobile timelines can play audio, view transcript state/result, and trigger transcription. Doctor desktop/mobile timelines can play audio and view transcript results without a trigger.
+  - Updated Standard documents and added `reportdocs/T5-voice-sample-report.md`.
+  - Installed FFmpeg via `winget` package `Gyan.FFmpeg` version `8.1.1` and verified `测试语音/*.mp4` can be extracted to mono 16 kHz `pcm_s16le` WAV for ASR-style sample checks.
+- Validated:
+  - `mvn -q "-Dtest=AppFileServiceTest,AppHelpOrderServiceTest,AdminHelpOrderServiceTest,HelpOrderVoiceTranscriptionServiceTest" test -f D:\yaoanshi\backend-v2\pom.xml` passed.
+  - `npm run build --prefix D:\yaoanshi\frontend\huanzhe` passed.
+  - `npm run build --prefix D:\yaoanshi\frontend\pharmacist` passed.
+  - `npm run build --prefix D:\yaoanshi\frontend\yisheng\web-admin` passed.
+  - `git diff --check` passed with only pre-existing Windows LF-to-CRLF warnings.
+  - `ffprobe` + `ffmpeg` sample extraction passed for all six files under `测试语音/`; extraction details are in `reportdocs/T5-voice-sample-report.md`.
+- Open risks:
+  - XFYUN live transcription credentials have been injected into the local environment file by the operator; no secret values are recorded in project documents.
+  - Live transcription still needs a backend restart through `backend-v2/scripts/run-local-with-env.ps1` before the running process can use the injected variables.
+  - Browser/Android WebView microphone permission walkthrough against a live stack was not run in this slice.
+  - Current working tree still includes uncommitted T1/T2/T3/T4 changes plus T5; do not treat all diffs as only T5.
+- Next:
+  - Restart backend-v2, then run a help-order voice live test: patient sends voice, pharmacist triggers transcription, patient/pharmacist/doctor detail all display the transcript.
+
+Last Updated
+- 2026-05-16 Asia/Shanghai
+- Reason: recorded local XFYUN credential injection status and next live transcription validation step.
+
+Trial Demo Phase T5 MIME Fix and Live Verification (2026-07-29)
+- Workstream:
+  - Fixed parameterized browser audio MIME handling and completed the live patient/pharmacist/doctor voice-help-order walkthrough.
+- Root cause and fix:
+  - Real Chromium recording used `audio/webm;codecs=opus`; the backend previously compared the full value against the MIME whitelist and returned `FILE_UPLOAD_INVALID_TYPE`.
+  - `AppFileService` now trims, lowercases, and removes MIME parameters before whitelist validation, extension inference, presign response generation, file registration, persistence, and DTO output.
+  - XFYUN primary-domain transport failures now retry the configured fallback domain in addition to provider error `11200`.
+  - No API, DTO, database schema, or frontend behavior was changed for the MIME fix.
+- Validated:
+  - `mvn -q "-Dtest=AppFileServiceTest,AppHelpOrderServiceTest,HelpOrderVoiceTranscriptionServiceTest,XfyunSpeechTranscriptionServiceTest" test -f D:\yaoanshi\backend-v2\pom.xml` passed.
+  - Parameterized `audio/webm;codecs=opus` presign/register behavior is covered by `AppFileServiceTest`; unsupported parameterized PDF remains rejected.
+  - The first retry accidentally used the stale Docker backend image on port 8080 and reproduced `FILE_UPLOAD_INVALID_TYPE`; verification resumed after stopping that backend container and starting current `backend-v2` sources with `scripts/run-local-with-env.ps1`.
+  - Patient `13816500004` created help order `6` with two playable real-microphone audio messages; the second 11-second message uploaded successfully and returned a non-empty XFYUN `SUCCESS` transcript containing the core complaint of medication use followed by subcutaneous bruising.
+  - Pharmacist reviewed the transcript and escalated help order `6` to the doctor queue with HTTP 200.
+  - Doctor mobile route `/mobile/workorders` displayed both playable audio messages, the successful transcript, and the pharmacist escalation note; no transcription trigger was present.
+- Open risks:
+  - Pharmacist mobile route `/mobile/workorders` currently exposes reply/transcription controls but no claim or escalate control. Escalation was completed through the existing pharmacist desktop work-order UI, so the exact mobile-only escalation path remains incomplete.
+  - The successful transcript captured the core complaint but omitted the final spoken question about stopping medication or contacting a doctor; live ASR wording remains microphone/provider dependent.
+  - Local verification requires host-run `backend-v2`; the existing `medicine-backend-v2:local` Docker image is stale and does not contain this MIME fix.
+  - No XFYUN secret or `.env.local` value is recorded here.
+- Next:
+  - Plan a narrow pharmacist mobile parity fix for claim/escalate actions, then rebuild the local backend image before relying on Docker-only demo startup.
+
+Last Updated
+- 2026-07-29 Asia/Shanghai
+- Reason: recorded the T5 parameterized MIME fix, XFYUN fallback hardening, and live three-role verification outcome.
+
+Trial Demo Phase T5 Completion and Docker Reverification (2026-08-01)
+- Workstream:
+  - Closed the remaining pharmacist mobile action gap and repeated T5 against a newly built Docker backend.
+- Changed:
+  - Pharmacist `/mobile/workorders` now reuses the shared `OrderActionBar` for claim, reply, escalate, reject, and close actions while retaining voice playback/transcription controls.
+  - Shared pharmacist action rules now match backend state rules: `SUBMITTED` shows claim/reply/escalate; `PHARMACIST_IN_PROGRESS` shows reply/escalate/reject/close; `WAITING_DOCTOR`, `CLOSED`, and `REJECTED` are read-only.
+  - Mobile work-order E2E now uses the real pharmacist UI for claim, reply, and escalation, and covers required reject/close branches plus 390x844 and 430x932 horizontal-overflow checks.
+  - Added all seven XFYUN keys to `ops/.env.backend-v2.local.example`; documented separate host-run and Docker env files plus the stale-image restriction for `-SkipDocker`.
+  - Fixed XFYUN authentication on single-digit calendar days by formatting the RFC HTTP date with a two-digit day (`01` instead of Java's permissive `1`); added a regression test.
+  - Doctor mobile decision form now participates in normal document flow so it no longer overlays timeline audio/transcript content.
+  - Updated `Standard document/APP_FLOW.md` to define the full pharmacist mobile action workflow.
+- Validated:
+  - `npm run build --prefix D:\yaoanshi\frontend\pharmacist` passed.
+  - `npm run build --prefix D:\yaoanshi\frontend\yisheng\web-admin` passed.
+  - `npm run e2e:helporder-mobile --prefix D:\yaoanshi\frontend\huanzhe` passed with UI claim/reply/escalate, `REJECTED`, empty-note `CLOSED`, doctor `ADOPTED`, and patient final `CLOSED` assertions.
+  - `mvn -q "-Dtest=AppFileServiceTest,AppHelpOrderServiceTest,AdminHelpOrderServiceTest,HelpOrderVoiceTranscriptionServiceTest,XfyunSpeechTranscriptionServiceTest" test -f D:\yaoanshi\backend-v2\pom.xml` passed.
+  - `docker compose -f D:\yaoanshi\ops\docker-compose.yml up -d --build mysql redis minio backend-v2` rebuilt the current backend image successfully; `/health` returned HTTP 200 and the container was healthy.
+  - Real Chromium recording produced `audio/webm;codecs=opus`, uploaded through MinIO, and created Docker help order 14. Pharmacist-triggered transcription reached `SUCCESS` with non-empty text containing the core semantics: aspirin use followed by subcutaneous bruising and a question about stopping medication/contacting a doctor.
+  - Pharmacist mobile completed claim and escalation to `WAITING_DOCTOR`; doctor mobile displayed playable audio and transcript with zero transcription buttons.
+  - Visual QA passed at 390x844 and 430x932: no horizontal overflow; the doctor decision form starts below the timeline and does not overlap content.
+  - `git diff --check` passed with only existing Windows LF-to-CRLF warnings.
+- Open risks:
+  - XFYUN primary-domain sending can end with `Output closed`; the configured fallback domain completed the accepted live transcription successfully.
+  - ASR wording remains provider/input dependent; this acceptance intentionally checks `SUCCESS`, non-empty text, and core clinical semantics rather than verbatim completeness.
+  - The working tree still contains uncommitted T1-T5 changes; no unrelated changes were cleaned or reverted.
+- Next:
+  - No next product phase started. Await an explicit scope decision.
+
+Last Updated
+- 2026-08-01 Asia/Shanghai
+- Reason: T5 passed code, Docker, real-browser voice, three-role workflow, and mobile viewport acceptance.

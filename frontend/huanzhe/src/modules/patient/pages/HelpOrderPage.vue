@@ -82,6 +82,22 @@
               </div>
             </div>
 
+            <div class="voice-uploader">
+              <button
+                type="button"
+                class="voice-hold-button"
+                :class="{ 'voice-hold-button--recording': recording }"
+                :disabled="submitting || voiceBusy || !canSubmit"
+                @pointerdown.prevent="startVoice"
+                @pointerup.prevent="finishVoice"
+                @pointercancel.prevent="cancelVoice"
+                @contextmenu.prevent
+              >
+                {{ recording ? '松开发送语音' : voiceBusy ? '语音发送中...' : '按住说话' }}
+              </button>
+              <div class="voice-hint">语音最长 60 秒，发送后可在详情中点击“转文字”。</div>
+            </div>
+
             <ion-button expand="block" :disabled="submitting || !canSubmit" @click="submitOrder">
               {{ submitting ? '提交中...' : '提交工单' }}
             </ion-button>
@@ -161,6 +177,8 @@ import {
 import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { helpOrderService, type HelpOrderDTO } from '@/modules/patient/api/mvp'
+import { cancelVoiceRecording, startVoiceRecording, stopVoiceRecording } from '@/modules/patient/composables/useVoiceRecorder'
+import { uploadHelpOrderVoice } from '@/modules/patient/composables/useHelpOrderVoiceUpload'
 
 const route = useRoute()
 const router = useRouter()
@@ -169,6 +187,8 @@ const submitting = ref(false)
 const orders = ref<HelpOrderDTO[]>([])
 const showToast = ref(false)
 const toastMessage = ref('')
+const recording = ref(false)
+const voiceBusy = ref(false)
 const cameraInput = ref<HTMLInputElement | null>(null)
 const galleryInput = ref<HTMLInputElement | null>(null)
 const selectedImages = ref<SelectedImage[]>([])
@@ -250,6 +270,27 @@ const openDetail = (id: number) => {
   void router.push(`/help-order/${id}`)
 }
 
+const createOrder = async (extraPayload: Record<string, unknown> = {}) => {
+  const attachmentFileAssetIds = await uploadSelectedImages()
+  const response = await helpOrderService.createHelpOrder({
+    category: form.value.category,
+    title: form.value.title.trim(),
+    description: form.value.description.trim() || undefined,
+    priority: form.value.requiresOfflineEmergency ? 'URGENT' : 'NORMAL',
+    requiresOfflineEmergency: form.value.requiresOfflineEmergency,
+    attachmentFileAssetIds,
+    ...extraPayload
+  })
+  const createdId = response.data?.id
+  resetForm()
+  if (createdId) {
+    void router.push(`/help-order/${createdId}`)
+    return
+  }
+  showMessage('工单已提交')
+  await loadOrders()
+}
+
 const submitOrder = async () => {
   if (!canSubmit.value) {
     showMessage('请填写标题')
@@ -258,28 +299,52 @@ const submitOrder = async () => {
 
   submitting.value = true
   try {
-    const attachmentFileAssetIds = await uploadSelectedImages()
-    const response = await helpOrderService.createHelpOrder({
-      category: form.value.category,
-      title: form.value.title.trim(),
-      description: form.value.description.trim() || undefined,
-      priority: form.value.requiresOfflineEmergency ? 'URGENT' : 'NORMAL',
-      requiresOfflineEmergency: form.value.requiresOfflineEmergency,
-      attachmentFileAssetIds
-    })
-    const createdId = response.data?.id
-    resetForm()
-    if (createdId) {
-      void router.push(`/help-order/${createdId}`)
-      return
-    }
-    showMessage('工单已提交')
-    await loadOrders()
+    await createOrder()
   } catch (error: any) {
     showMessage(error?.message || '提交失败')
   } finally {
     submitting.value = false
   }
+}
+
+const startVoice = async () => {
+  if (submitting.value || voiceBusy.value) return
+  if (!canSubmit.value) {
+    showMessage('请先填写标题')
+    return
+  }
+  try {
+    await startVoiceRecording(() => {
+      void finishVoice()
+    })
+    recording.value = true
+  } catch (error: any) {
+    showMessage(error?.message === 'VOICE_RECORDER_UNSUPPORTED' ? '当前环境不支持录音' : '无法启动麦克风')
+  }
+}
+
+const finishVoice = async () => {
+  if (!recording.value || voiceBusy.value) return
+  recording.value = false
+  voiceBusy.value = true
+  submitting.value = true
+  try {
+    const recordingResult = await stopVoiceRecording()
+    const voiceAttachment = await uploadHelpOrderVoice(recordingResult)
+    await createOrder({ voiceAttachment })
+  } catch (error: any) {
+    showMessage(error?.message || '语音发送失败')
+  } finally {
+    voiceBusy.value = false
+    submitting.value = false
+  }
+}
+
+const cancelVoice = () => {
+  if (!recording.value) return
+  recording.value = false
+  cancelVoiceRecording()
+  showMessage('已取消语音')
 }
 
 const openCameraInput = () => {
@@ -432,6 +497,37 @@ onIonViewWillEnter(async () => {
   display: grid;
   gap: var(--patient-space-3);
   margin: var(--patient-space-4) 0;
+}
+
+.voice-uploader {
+  display: grid;
+  gap: var(--patient-space-2);
+  margin: var(--patient-space-4) 0;
+}
+
+.voice-hold-button {
+  width: 100%;
+  min-height: 48px;
+  border: 0;
+  border-radius: var(--patient-radius-lg);
+  background: var(--patient-primary);
+  color: var(--patient-text-inverse);
+  font-size: var(--patient-font-body);
+  font-weight: var(--patient-font-semibold);
+  touch-action: none;
+}
+
+.voice-hold-button--recording {
+  background: var(--patient-danger);
+}
+
+.voice-hold-button:disabled {
+  opacity: 0.58;
+}
+
+.voice-hint {
+  color: var(--patient-text-secondary);
+  font-size: var(--patient-font-helper);
 }
 
 .privacy-warning {

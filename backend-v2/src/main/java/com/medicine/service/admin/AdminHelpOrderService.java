@@ -28,6 +28,7 @@ import com.medicine.repository.identity.PatientMapper;
 import com.medicine.repository.identity.PharmacistProfileMapper;
 import com.medicine.service.auth.JwtClaims;
 import com.medicine.service.auth.ProfessionalIdentityService;
+import com.medicine.service.helporder.HelpOrderVoiceTranscriptionService;
 import com.medicine.service.notification.NotificationDispatchService;
 import com.medicine.service.storage.S3CompatibleObjectStorage;
 import org.springframework.stereotype.Service;
@@ -58,6 +59,7 @@ public class AdminHelpOrderService {
     private final PatientMapper patientMapper;
     private final AppAccountMapper appAccountMapper;
     private final ObjectMapper objectMapper;
+    private final HelpOrderVoiceTranscriptionService voiceTranscriptionService;
 
     public AdminHelpOrderService(
             HelpOrderMapper helpOrderMapper,
@@ -71,7 +73,8 @@ public class AdminHelpOrderService {
             DoctorProfileMapper doctorProfileMapper,
             PatientMapper patientMapper,
             AppAccountMapper appAccountMapper,
-            ObjectMapper objectMapper
+            ObjectMapper objectMapper,
+            HelpOrderVoiceTranscriptionService voiceTranscriptionService
     ) {
         this.helpOrderMapper = helpOrderMapper;
         this.helpOrderEventMapper = helpOrderEventMapper;
@@ -85,6 +88,7 @@ public class AdminHelpOrderService {
         this.patientMapper = patientMapper;
         this.appAccountMapper = appAccountMapper;
         this.objectMapper = objectMapper;
+        this.voiceTranscriptionService = voiceTranscriptionService;
     }
 
     public PageResult<HelpOrderDTO> list(JwtClaims claims, String status, int pageNo, int pageSize) {
@@ -536,6 +540,7 @@ public class AdminHelpOrderService {
         attachments.forEach(attachment -> attachment.setDownloadUrl(
                 objectStorage.createPresignedDownloadUrl(attachment.getDownloadUrl(), HELP_ORDER_DOWNLOAD_TTL)
         ));
+        attachments.forEach(attachment -> voiceTranscriptionService.attachTranscript(tenantId, attachment));
         return attachments;
     }
 

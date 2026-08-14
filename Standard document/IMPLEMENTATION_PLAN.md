@@ -26,9 +26,9 @@ Rules:
 | Phase 7 | Drug Catalog and Pinyin Initials Search (P0+) | ✅ Complete |
 | Phase 8 | Post-P0 Trial Readiness Sprint (A–H) | ✅ Complete |
 
-**Current active work:** Post-P0 trial demo closed-loop implementation, starting with the image help-order loop.
+**Current active work:** Phase T5 complete. No next phase has been started.
 
-**Flyway current latest:** V8 (`V8__ai_consent.sql`). Next new migration must be V9.
+**Flyway current latest:** V12 (`V12__help_order_voice_transcription.sql`). Next new migration must be V13.
 
 **Known open items:**
 - `MEDICINE_OCR_API_KEY` must be set in `.env.local` for live OCR (graceful fallback if omitted)
@@ -46,12 +46,12 @@ The post-P0 trial/demo work is phase-based, not tied to fixed calendar weeks. Ea
 | Phase T2 | Doctor mobile Web collaboration and structured `ADOPTED` / `NOT_ADOPTED` decision events | doctor/pharmacist help-order tests, doctor mobile build, and mobile-width walkthrough |
 | Phase T3 | Medication reminder and family second-reminder demo path | backend reminder-stage tests, patient build, and medication/family E2E script |
 | Phase T4 | OCR hardening, CSV rule import, reviewed education recommendation | ✅ backend targeted tests, pharmacist build, patient build |
-| Phase T5 | Voice evaluation and final demo acceptance | voice sample report and full demo walkthrough |
+| Phase T5 | Help-order voice message + XFYUN transcription | ✅ backend targeted tests, patient/pharmacist/doctor builds, Docker live voice walkthrough |
 
 Rules:
 
 1. T1 must land before T2-T5 implementation work.
-2. New database migrations continue from the latest existing Flyway version; after `V10__help_order_event_attachments.sql`, the next migration is `V11`.
+2. New database migrations continue from the latest existing Flyway version; after `V12__help_order_voice_transcription.sql`, the next migration is `V13`.
 3. Temporary execution plans stay in conversation; durable sequence changes belong here.
 
 ## 2. Implementation Rules

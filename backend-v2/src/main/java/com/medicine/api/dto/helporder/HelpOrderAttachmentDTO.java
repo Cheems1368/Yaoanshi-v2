@@ -9,6 +9,8 @@ public class HelpOrderAttachmentDTO {
     private String mimeType;
     private Long sizeBytes;
     private String downloadUrl;
+    private Integer durationSeconds;
+    private HelpOrderVoiceTranscriptDTO voiceTranscript;
 
     public Long getId() {
         return id;
@@ -64,5 +66,21 @@ public class HelpOrderAttachmentDTO {
 
     public void setDownloadUrl(String downloadUrl) {
         this.downloadUrl = downloadUrl;
+    }
+
+    public Integer getDurationSeconds() {
+        return durationSeconds;
+    }
+
+    public void setDurationSeconds(Integer durationSeconds) {
+        this.durationSeconds = durationSeconds;
+    }
+
+    public HelpOrderVoiceTranscriptDTO getVoiceTranscript() {
+        return voiceTranscript;
+    }
+
+    public void setVoiceTranscript(HelpOrderVoiceTranscriptDTO voiceTranscript) {
+        this.voiceTranscript = voiceTranscript;
     }
 }

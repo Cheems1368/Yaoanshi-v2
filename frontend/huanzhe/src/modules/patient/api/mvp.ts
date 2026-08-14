@@ -163,7 +163,22 @@ export interface HelpOrderDTO {
   serviceNotice?: string | null
   createdAt?: string | null
   attachmentFileAssetIds?: number[]
+  voiceAttachment?: HelpOrderVoiceAttachmentPayload
   events?: HelpOrderEventDTO[]
+}
+
+export interface HelpOrderVoiceTranscriptDTO {
+  status: 'PENDING' | 'SUCCESS' | 'FAILED' | 'UNCONFIGURED' | string
+  text?: string | null
+  provider?: string | null
+  errorCode?: string | null
+  transcribedAt?: string | null
+}
+
+export interface HelpOrderVoiceAttachmentPayload {
+  playbackFileAssetId: number
+  transcriptSourceFileAssetId: number
+  durationSeconds: number
 }
 
 export interface HelpOrderAttachmentDTO {
@@ -174,6 +189,8 @@ export interface HelpOrderAttachmentDTO {
   mimeType: string
   sizeBytes: number
   downloadUrl: string
+  durationSeconds?: number | null
+  voiceTranscript?: HelpOrderVoiceTranscriptDTO | null
 }
 
 export interface HelpOrderEventDTO {
@@ -413,7 +430,10 @@ export const helpOrderService = {
     return httpService.post<HelpOrderDTO>('/app-api/help-orders', payload)
   },
 
-  replyHelpOrder(id: number, payload: { content?: string; attachmentFileAssetIds?: number[] }) {
+  replyHelpOrder(
+    id: number,
+    payload: { content?: string; attachmentFileAssetIds?: number[]; voiceAttachment?: HelpOrderVoiceAttachmentPayload }
+  ) {
     return httpService.post<HelpOrderDTO>(`/app-api/help-orders/${id}/reply`, payload)
   },
 
@@ -430,6 +450,33 @@ export const helpOrderService = {
     businessType: 'HELP_ORDER_IMAGE'
   }) {
     return httpService.post<FileAssetDTO>('/app-api/files/register', payload)
+  },
+
+  presignAudio(payload: {
+    filename: string
+    contentType: string
+    sizeBytes: number
+    businessType: 'HELP_ORDER_AUDIO' | 'HELP_ORDER_AUDIO_TRANSCRIPT_SOURCE'
+  }) {
+    return httpService.post<FilePresignResponse>('/app-api/files/presign', payload)
+  },
+
+  registerAudio(payload: {
+    objectKey: string
+    originalFilename: string
+    contentType: string
+    sizeBytes: number
+    sha256?: string
+    businessType: 'HELP_ORDER_AUDIO' | 'HELP_ORDER_AUDIO_TRANSCRIPT_SOURCE'
+  }) {
+    return httpService.post<FileAssetDTO>('/app-api/files/register', payload)
+  },
+
+  transcribeAttachment(orderId: number, attachmentId: number) {
+    return httpService.post<HelpOrderVoiceTranscriptDTO>(
+      `/app-api/help-orders/${orderId}/attachments/${attachmentId}/transcribe`,
+      {}
+    )
   },
 
   async uploadToPresignedUrl(uploadUrl: string, file: File, contentType: string) {

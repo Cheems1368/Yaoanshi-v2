@@ -2,17 +2,44 @@
 
 ## backend-v2 环境文件约定
 
-- `backend-v2/.env.local` 仅供 `backend-v2/scripts/run-local-with-env.ps1` 这类本机 PowerShell 启动脚本使用。
-- `ops/.env.backend-v2.local` 仅供 `ops/docker-compose.yml` 和 Portainer 本地栈使用。
+- `backend-v2/.env.local` 仅供 `backend-v2/scripts/run-local-with-env.ps1` 这类 host-run 本机 PowerShell 启动脚本使用。
+- `ops/.env.backend-v2.local` 仅供 `ops/docker-compose.yml` 和 Portainer 本地栈使用；Docker 不会自动读取 `backend-v2/.env.local`。
 - `ops/.env.backend-v2.local` 是可选文件。缺省情况下，Docker 栈仍可启动；AI/OCR 默认值继续使用 `backend-v2/src/main/resources/application.yml` 中的应用配置。
-- 只有在需要启用或覆盖 AI/OCR secret 时，才需要创建 `ops/.env.backend-v2.local`。
+- 只有在需要启用或覆盖 AI、OCR 或 XFYUN secret 时，才需要创建 `ops/.env.backend-v2.local`。
 - 不要把宿主机地址（例如 `127.0.0.1:13306`、`127.0.0.1:9000`）写进 `ops/.env.backend-v2.local`，容器内地址仍以 `ops/docker-compose.yml` 中的 `mysql`、`redis`、`minio` 为准。
 
 ## 启动前准备
 
 1. 可选：复制 `ops/.env.backend-v2.local.example` 为 `ops/.env.backend-v2.local`
 2. 如需 AI/OCR 增强能力，在 `ops/.env.backend-v2.local` 中填写 `MEDICINE_AI_API_KEY`，并按需填写 `MEDICINE_OCR_API_KEY`
-3. 保持数据库、Redis、MinIO 地址配置继续由 `ops/docker-compose.yml` 提供
+3. host-run 语音转写配置写入 `backend-v2/.env.local`；Docker 语音转写配置单独写入 `ops/.env.backend-v2.local`。这些值不要提交到 Git，也不要假设两份文件会自动同步
+4. 保持数据库、Redis、MinIO 地址配置继续由 `ops/docker-compose.yml` 提供
+
+## 讯飞语音转写配置
+
+host-run 在 `D:/yaoanshi/backend-v2/.env.local` 中补充；Docker 在 `D:/yaoanshi/ops/.env.backend-v2.local` 中补充相同的七个键：
+
+```dotenv
+MEDICINE_XFYUN_APP_ID=replace-with-your-xfyun-app-id
+MEDICINE_XFYUN_API_KEY=replace-with-your-xfyun-api-key
+MEDICINE_XFYUN_API_SECRET=replace-with-your-xfyun-api-secret
+MEDICINE_XFYUN_BASE_URL=wss://iat-api.xfyun.cn/v2/iat
+MEDICINE_XFYUN_PRIMARY_DOMAIN=xfime-mianqie
+MEDICINE_XFYUN_FALLBACK_DOMAIN=iat
+MEDICINE_XFYUN_TIMEOUT_MS=30000
+```
+
+host-run 重新启动本机后端：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File D:\yaoanshi\backend-v2\scripts\run-local-with-env.ps1
+```
+
+Docker 后端必须重新构建后再启动：
+
+```powershell
+docker compose -f D:\yaoanshi\ops\docker-compose.yml up -d --build mysql redis minio backend-v2
+```
 
 ## 最小恢复命令
 
@@ -45,6 +72,8 @@ curl http://localhost:8081/health
 ```powershell
 powershell -ExecutionPolicy Bypass -File D:\yaoanshi\ops\scripts\start-mobile-demo-stack.ps1
 ```
+
+`-SkipDocker` 只适用于已经明确确认后端容器来自最新源码的情况。只要 `backend-v2` 源码、依赖或 Dockerfile 发生变化，就必须去掉 `-SkipDocker` 并重新构建；不得复用旧镜像作为验收结果。
 
 按现场指定的患者手机号和院内 ID 重置演示数据：
 

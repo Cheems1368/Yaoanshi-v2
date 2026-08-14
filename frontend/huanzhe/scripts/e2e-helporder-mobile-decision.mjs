@@ -27,6 +27,7 @@ const patientIdentity = createPatientIdentity(runId, 'Mobile HelpOrder Patient')
 const orderTitle = `服药后皮下淤血 ${runId}`
 const orderDescription = `患者反馈服药后出现皮下淤血，需要药师和医生协同判断 ${runId}`
 const pharmacistReplyText = `药师建议先记录症状并升级医生确认 ${runId}`
+const pharmacistEscalationText = `移动端升级医生说明 ${runId}`
 const doctorDecisionText = `医生采纳药师建议，继续观察并按原方案复诊 ${runId}`
 const patientContext = {
   diagnosis: `脑卒中随访合并高血压 ${runId}`,
@@ -133,24 +134,113 @@ async function createHelpOrderFromPatientUi(page, session) {
   return createdOrder
 }
 
-async function verifyPharmacistMobileReply(page, session, orderId) {
-  await primeProfessionalPage(page, pharmacistBaseUrl, session)
-  await page.goto(`${pharmacistBaseUrl}/mobile/workorders`, { waitUntil: 'networkidle' })
-  await page.locator('.order-card').filter({ hasText: orderTitle }).first().click()
-  await page.locator('.detail-summary').filter({ hasText: orderTitle }).waitFor({ timeout: 15000 })
-  await waitForImageLoaded(page.locator('.attachment-grid img').first(), 'pharmacist mobile attachment')
+async function createHelpOrderByApi(session, title) {
+  const response = await requestJson(`${backendBaseUrl}/app-api/help-orders`, {
+    method: 'POST',
+    headers: appHeaders(session.accessToken),
+    body: {
+      category: 'ADVERSE_REACTION',
+      title,
+      description: `${title} 分支验证`,
+      priority: 'NORMAL',
+      requiresOfflineEmergency: false,
+      attachmentFileAssetIds: []
+    }
+  })
+  assert(response.payload.data?.id, `Create branch help order failed: ${title}`)
+  return response.payload.data
+}
 
-  await page.locator('.reply-box textarea').fill(pharmacistReplyText)
+async function assertNoHorizontalOverflow(page, label) {
+  const dimensions = await page.evaluate(() => ({
+    viewportWidth: window.innerWidth,
+    documentWidth: document.documentElement.scrollWidth
+  }))
+  assert(
+    dimensions.documentWidth <= dimensions.viewportWidth,
+    `${label} overflows horizontally: ${JSON.stringify(dimensions)}`
+  )
+}
+
+async function openPharmacistMobileOrder(page, title) {
+  await page.goto(`${pharmacistBaseUrl}/mobile/workorders`, { waitUntil: 'networkidle' })
+  await page.locator('.order-card').filter({ hasText: title }).first().click()
+  await page.locator('.detail-summary').filter({ hasText: title }).waitFor({ timeout: 15000 })
+}
+
+async function verifyPharmacistMobileActions(page, session, orderId) {
+  await primeProfessionalPage(page, pharmacistBaseUrl, session)
+  await openPharmacistMobileOrder(page, orderTitle)
+  await waitForImageLoaded(page.locator('.attachment-grid img').first(), 'pharmacist mobile attachment')
+  await assertNoHorizontalOverflow(page, 'pharmacist 390px submitted detail')
+
+  const actionButtons = page.locator('.action-bar__buttons')
+  await actionButtons.getByRole('button', { name: '认领', exact: true }).waitFor()
+  assert(await actionButtons.getByRole('button', { name: '驳回', exact: true }).count() === 0, 'Submitted order must not show reject')
+  assert(await actionButtons.getByRole('button', { name: '关闭', exact: true }).count() === 0, 'Submitted order must not show close')
+
+  await Promise.all([
+    page.waitForResponse(
+      (response) => response.url().includes(`/admin-api/help-orders/${orderId}/claim`) && response.request().method() === 'POST'
+    ),
+    actionButtons.getByRole('button', { name: '认领', exact: true }).click()
+  ])
+  await actionButtons.getByRole('button', { name: '驳回', exact: true }).waitFor({ timeout: 15000 })
+  await actionButtons.getByRole('button', { name: '关闭', exact: true }).waitFor({ timeout: 15000 })
+
+  await actionButtons.getByRole('button', { name: '回复', exact: true }).click()
+  await page.locator('.action-bar__input textarea').fill(pharmacistReplyText)
   await Promise.all([
     page.waitForResponse(
       (response) =>
         response.url().includes(`/admin-api/help-orders/${orderId}/reply`) &&
         response.request().method() === 'POST'
     ),
-    page.locator('.reply-box button').filter({ hasText: '回复患者' }).click()
+    page.getByRole('button', { name: '提交回复', exact: true }).click()
   ])
 
   await page.locator('.timeline-content').filter({ hasText: pharmacistReplyText }).waitFor({ timeout: 15000 })
+
+  await actionButtons.getByRole('button', { name: '升级医生', exact: true }).click()
+  await page.locator('.action-bar__input textarea').fill(pharmacistEscalationText)
+  await Promise.all([
+    page.waitForResponse(
+      (response) =>
+        response.url().includes(`/admin-api/help-orders/${orderId}/escalate`) &&
+        response.request().method() === 'POST'
+    ),
+    page.getByRole('button', { name: '确认升级', exact: true }).click()
+  ])
+  await page.locator('.timeline-content').filter({ hasText: pharmacistEscalationText }).waitFor({ timeout: 15000 })
+  await page.locator('.el-tag').filter({ hasText: '待医生处理' }).waitFor({ timeout: 15000 })
+  assert(await page.locator('.action-bar').count() === 0, 'Waiting-doctor order must not show pharmacist actions')
+}
+
+async function verifyPharmacistRejectBranch(page, order) {
+  await openPharmacistMobileOrder(page, order.title)
+  const actionButtons = page.locator('.action-bar__buttons')
+  assert(await actionButtons.getByRole('button', { name: '驳回', exact: true }).count() === 0, 'Unclaimed branch must not show reject')
+  assert(await actionButtons.getByRole('button', { name: '关闭', exact: true }).count() === 0, 'Unclaimed branch must not show close')
+  await actionButtons.getByRole('button', { name: '认领', exact: true }).click()
+  await actionButtons.getByRole('button', { name: '驳回', exact: true }).waitFor({ timeout: 15000 })
+  await actionButtons.getByRole('button', { name: '驳回', exact: true }).click()
+  const rejectSubmit = page.getByRole('button', { name: '确认驳回', exact: true })
+  assert(await rejectSubmit.isDisabled(), 'Reject submit must be disabled without a reason')
+  await page.locator('.action-bar__input textarea').fill(`信息不足，请补充 ${runId}`)
+  await rejectSubmit.click()
+  await page.locator('.el-tag').filter({ hasText: '工单已驳回' }).waitFor({ timeout: 15000 })
+}
+
+async function verifyPharmacistCloseBranch(page, order) {
+  await openPharmacistMobileOrder(page, order.title)
+  const actionButtons = page.locator('.action-bar__buttons')
+  await actionButtons.getByRole('button', { name: '认领', exact: true }).click()
+  await actionButtons.getByRole('button', { name: '关闭', exact: true }).waitFor({ timeout: 15000 })
+  await actionButtons.getByRole('button', { name: '关闭', exact: true }).click()
+  const closeSubmit = page.getByRole('button', { name: '确认关闭', exact: true })
+  assert(!(await closeSubmit.isDisabled()), 'Close submit must allow an empty note')
+  await closeSubmit.click()
+  await page.locator('.el-tag').filter({ hasText: '工单已关闭' }).waitFor({ timeout: 15000 })
 }
 
 async function verifyDoctorMobileDecision(page, session) {
@@ -174,6 +264,7 @@ async function verifyDoctorMobileDecision(page, session) {
   await page.locator('.terminal-note').filter({ hasText: '工单已关闭' }).waitFor({ timeout: 15000 })
   await page.locator('.timeline-content').filter({ hasText: doctorDecisionText }).waitFor({ timeout: 15000 })
   await page.locator('.timeline-item').filter({ hasText: '采纳建议' }).waitFor({ timeout: 15000 })
+  await assertNoHorizontalOverflow(page, 'doctor 430px closed detail')
 }
 
 async function verifyPatientFinalResult(page, orderId) {
@@ -185,7 +276,7 @@ async function verifyPatientFinalResult(page, orderId) {
 
 const browser = await chromium.launch({ headless: true })
 const patientContextBrowser = await browser.newContext({ viewport: { width: 430, height: 932 } })
-const pharmacistContextBrowser = await browser.newContext({ viewport: { width: 430, height: 932 } })
+const pharmacistContextBrowser = await browser.newContext({ viewport: { width: 390, height: 844 } })
 const doctorContextBrowser = await browser.newContext({ viewport: { width: 430, height: 932 } })
 const patientPage = await patientContextBrowser.newPage()
 const pharmacistPage = await pharmacistContextBrowser.newPage()
@@ -207,17 +298,12 @@ try {
   const patientId = await seedPatientContext(patientSession, pharmacistSession)
 
   const createdOrder = await createHelpOrderFromPatientUi(patientPage, patientSession)
-  await verifyPharmacistMobileReply(pharmacistPage, pharmacistSession, createdOrder.id)
+  const rejectedOrder = await createHelpOrderByApi(patientSession, `药师移动端驳回分支 ${runId}`)
+  const closedOrder = await createHelpOrderByApi(patientSession, `药师移动端关闭分支 ${runId}`)
+  await verifyPharmacistMobileActions(pharmacistPage, pharmacistSession, createdOrder.id)
   await patientPage.locator('.event-content').filter({ hasText: pharmacistReplyText }).waitFor({ timeout: 15000 })
-
-  const escalated = await requestJson(`${backendBaseUrl}/admin-api/help-orders/${createdOrder.id}/escalate`, {
-    method: 'POST',
-    headers: adminHeaders(pharmacistSession.accessToken),
-    body: {
-      note: `移动验证升级医生 ${runId}`
-    }
-  })
-  assert(escalated.payload.data.status === 'WAITING_DOCTOR', 'Escalated order should be WAITING_DOCTOR')
+  await verifyPharmacistRejectBranch(pharmacistPage, rejectedOrder)
+  await verifyPharmacistCloseBranch(pharmacistPage, closedOrder)
 
   await verifyDoctorMobileDecision(doctorPage, doctorSession)
 
@@ -251,6 +337,9 @@ try {
       patientId,
       attachmentCount: submittedEvent?.attachments?.length || 0,
       pharmacistReplyVisible: finalDetail.payload.data.events.some((event) => event.content === pharmacistReplyText),
+      pharmacistEscalationVisible: finalDetail.payload.data.events.some((event) => event.content === pharmacistEscalationText),
+      pharmacistRejectBranch: 'REJECTED',
+      pharmacistCloseBranch: 'CLOSED',
       decisionResult: doctorDecisionEvent?.decisionResult,
       finalStatus: finalDetail.payload.data.status,
       patientFinalResultVisible: finalDetail.payload.data.serviceNotice === doctorDecisionText

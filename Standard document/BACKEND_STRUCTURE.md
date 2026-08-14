@@ -330,17 +330,19 @@ Columns:
 | `public_url` | `VARCHAR(512)` | Yes |  |  | signed/public URL cache |
 | `uploaded_by_type` | `VARCHAR(20)` | No |  |  | `PATIENT`, `FAMILY`, `PHARMACIST`, `DOCTOR`, `SYSTEM` |
 | `uploaded_by_id` | `BIGINT` | No |  | `IDX_file_uploader` | logical uploader id |
-| `business_type` | `VARCHAR(32)` | No |  | `IDX_file_business_type` | `PRESCRIPTION`, `HELP_ORDER_IMAGE`, `HELP_ORDER_AUDIO`, `AVATAR`, `OTHER` |
+| `business_type` | `VARCHAR(64)` | No |  | `IDX_file_business_type` | `PRESCRIPTION`, `HELP_ORDER_IMAGE`, `HELP_ORDER_AUDIO`, `HELP_ORDER_AUDIO_TRANSCRIPT_SOURCE`, `AVATAR`, `OTHER` |
 | `scan_status` | `VARCHAR(20)` | No | `'PENDING'` |  | reserved for file scanning |
 | audit columns | standard |  |  |  |  |
 
 Rules:
 
-1. MVP only allows image attachments for work orders and prescription uploads.
+1. MVP allows image attachments for work orders and prescription uploads, plus help-order voice playback/transcription-source audio.
 2. Binary files are stored in S3-compatible object storage only.
 3. DB stores metadata; never store image binary in DB.
 4. Help-order image upload uses `HELP_ORDER_IMAGE`; each image must be JPEG, PNG, or WebP and no larger than 10 MB.
-5. Help-order detail responses must generate short-lived download URLs after checking order visibility. Clients must not store long-lived public URLs for help-order attachments.
+5. Help-order voice playback upload uses `HELP_ORDER_AUDIO`; hidden recognition-source upload uses `HELP_ORDER_AUDIO_TRANSCRIPT_SOURCE`. A single voice message may be at most 60 seconds.
+6. Client `Content-Type` values may include parameters such as `audio/webm;codecs=opus`; backend upload validation and `file_asset.mime_type` storage use the normalized base MIME type such as `audio/webm`.
+7. Help-order detail responses must generate short-lived download URLs after checking order visibility. Clients must not store long-lived public URLs for help-order attachments.
 
 ### 4.4 Prescription domain
 
@@ -645,8 +647,9 @@ Columns:
 Rules:
 
 1. Work order image attachments are linked through `help_order_event_attachment` and `file_asset.business_type = HELP_ORDER_IMAGE`.
-2. MVP help-order messages allow at most three images per event.
-3. After-hours submission is allowed and must still create the order.
+2. Voice playback attachments are linked through `help_order_event_attachment` with `attachment_type = AUDIO`; the hidden recognition source is referenced by `help_order_voice_transcript`.
+3. MVP help-order messages allow at most three images and at most one voice attachment per event.
+4. After-hours submission is allowed and must still create the order.
 
 #### Table: `help_order_event`
 
@@ -688,17 +691,50 @@ Columns:
 | `id` | `BIGINT` | No |  | PK | attachment id |
 | `help_order_event_id` | `BIGINT` | No |  | `IDX_help_order_event_attachment_event` | target event |
 | `file_asset_id` | `BIGINT` | No |  | `IDX_help_order_event_attachment_file` | attached file |
-| `attachment_type` | `VARCHAR(20)` | No |  |  | `IMAGE` |
+| `attachment_type` | `VARCHAR(20)` | No |  |  | `IMAGE`, `AUDIO` |
 | `sort_order` | `INT` | No | `0` |  | display order in one message |
 | audit columns | standard |  |  |  |  |
 
 Rules:
 
-1. A single help-order event may have at most three image attachments.
+1. A single help-order event may have at most three image attachments and at most one audio attachment.
 2. The attached file must belong to the current app operator when the patient or family creates/replies to an order.
 3. Detail DTOs return `attachments: HelpOrderAttachmentDTO[]` on each event. Each attachment includes `id`, `fileAssetId`, `attachmentType`, `originalFilename`, `mimeType`, `sizeBytes`, and a short-lived `downloadUrl`.
-4. Doctor structured decisions are stored as `event_type = DOCTOR_DECISION` with `metadata_json.decisionResult` equal to `ADOPTED` or `NOT_ADOPTED`.
-5. Professional help-order detail may include additive `patientContext` with only minimum non-sensitive context: name, gender, age, primary diagnosis, drug allergy, food allergy, medical-history summary, and current-medication summary.
+4. Audio attachment DTOs additionally include `durationSeconds` and `voiceTranscript` with `status`, `text`, `provider`, and `errorCode`.
+5. Doctor structured decisions are stored as `event_type = DOCTOR_DECISION` with `metadata_json.decisionResult` equal to `ADOPTED` or `NOT_ADOPTED`.
+6. Professional help-order detail may include additive `patientContext` with only minimum non-sensitive context: name, gender, age, primary diagnosis, drug allergy, food allergy, medical-history summary, and current-medication summary.
+
+#### Table: `help_order_voice_transcript`
+
+Purpose:
+
+- store voice transcription state for one help-order audio attachment
+
+Columns:
+
+| Column | Type | Nullable | Default | Index / Constraint | Business rule |
+|---|---|---|---|---|---|
+| `id` | `BIGINT` | No |  | PK | transcript id |
+| `help_order_id` | `BIGINT` | No |  | `IDX_voice_transcript_order` | parent order |
+| `help_order_event_attachment_id` | `BIGINT` | No |  | `UK_voice_transcript_attachment` | playback attachment row |
+| `playback_file_asset_id` | `BIGINT` | No |  |  | `HELP_ORDER_AUDIO` file shown in timeline |
+| `transcript_source_file_asset_id` | `BIGINT` | No |  |  | hidden `HELP_ORDER_AUDIO_TRANSCRIPT_SOURCE` file sent to ASR |
+| `duration_seconds` | `INT` | No |  |  | 1-60 seconds |
+| `provider` | `VARCHAR(32)` | No | `'XFYUN'` |  | speech provider |
+| `status` | `VARCHAR(32)` | No | `'PENDING'` | `IDX_voice_transcript_status` | `PENDING`, `SUCCESS`, `FAILED`, `UNCONFIGURED` |
+| `transcript_text` | `TEXT` | Yes |  |  | returned text on success |
+| `error_code` | `VARCHAR(64)` | Yes |  |  | provider or local error code |
+| `transcribed_by_type` | `VARCHAR(20)` | Yes |  |  | `PATIENT`, `FAMILY`, `PHARMACIST` |
+| `transcribed_by_id` | `BIGINT` | Yes |  |  | triggering operator id |
+| `transcribed_at` | `DATETIME` | Yes |  |  | completion time |
+| audit columns | standard |  |  |  |  |
+
+Rules:
+
+1. Patients/family and pharmacists may trigger transcription; doctors may only listen and view existing transcription results.
+2. Re-clicking a `SUCCESS` transcript returns the existing result and must not call the speech provider again.
+3. If speech provider credentials are absent, voice messages remain sendable and transcript status becomes `UNCONFIGURED`.
+4. XFYUN streaming ASR uses server-side credentials only; clients must never receive `AppID`, `APIKey`, or `APISecret`.
 
 ### 4.7 Notification domain
 
@@ -1027,10 +1063,11 @@ Reminder stage rules:
 |---|---|---|---|---|---|
 | `POST` | `/app-api/files/presign` | Yes | upload intent | upload token/url | none |
 | `POST` | `/app-api/files/register` | Yes | uploaded file metadata | file asset summary | register a previously uploaded object for an allowed business type |
-| `POST` | `/app-api/help-orders` | Yes | `HelpOrderDTO` create body with optional `attachmentFileAssetIds` | created order | write `help_order`, `help_order_event`, attachment links, notification |
+| `POST` | `/app-api/help-orders` | Yes | `HelpOrderDTO` create body with optional `attachmentFileAssetIds` and optional `voiceAttachment` | created order | write `help_order`, `help_order_event`, attachment links, optional voice transcript placeholder, notification |
 | `GET` | `/app-api/help-orders` | Yes | status/category query | paged list | none |
 | `GET` | `/app-api/help-orders/{id}` | Yes | none | order detail + events | none |
-| `POST` | `/app-api/help-orders/{id}/reply` | Yes | `{ content, attachmentFileAssetIds }` | updated order detail | write `help_order_event`, attachment links, notify current handler |
+| `POST` | `/app-api/help-orders/{id}/reply` | Yes | `{ content, attachmentFileAssetIds, voiceAttachment }` | updated order detail | write `help_order_event`, attachment links, optional voice transcript placeholder, notify current handler |
+| `POST` | `/app-api/help-orders/{id}/attachments/{attachmentId}/transcribe` | patient or family participant | none | `HelpOrderVoiceTranscriptDTO` | transcribe one audio attachment if not already successful |
 | `GET` | `/app-api/prescriptions` | Yes | status/page query | paged prescriptions | none |
 | `POST` | `/app-api/prescriptions/uploads` | Yes | upload metadata | prescription summary | write `prescription`, `prescription_attachment`, `prescription_ocr_record` |
 
@@ -1184,6 +1221,7 @@ Search priority:
 | `GET` | `/admin-api/help-orders/{id}` | pharmacist or doctor | none | `HelpOrderDTO` + events | none |
 | `POST` | `/admin-api/help-orders/{id}/claim` | pharmacist | none | claimed order | set handler |
 | `POST` | `/admin-api/help-orders/{id}/reply` | pharmacist or doctor | reply DTO | updated order | append event, update first response if empty |
+| `POST` | `/admin-api/help-orders/{id}/attachments/{attachmentId}/transcribe` | pharmacist | none | `HelpOrderVoiceTranscriptDTO` | transcribe one audio attachment if visible and not already successful |
 | `POST` | `/admin-api/help-orders/{id}/escalate` | pharmacist | doctor id optional | updated order | move to doctor queue, event + notification |
 | `POST` | `/admin-api/help-orders/{id}/reject` | pharmacist or doctor | reject DTO | updated order | set rejected |
 | `POST` | `/admin-api/help-orders/{id}/close` | pharmacist or doctor | close DTO | updated order | close order, trigger satisfaction reminder |
@@ -1266,6 +1304,8 @@ Same query parameters and `DrugCatalogDTO` shape as the app-side endpoint. Used 
    - only one active plan per patient; concurrent activation must fail fast with business conflict
 6. work order close/reject
    - only current handler may close or reject
+7. help-order voice transcription
+   - a `SUCCESS` transcript is idempotent and must be returned without a second provider call
 
 ### 6.4 Error code baseline
 
@@ -1284,6 +1324,8 @@ The document must use stable business codes. Minimum required set:
 | `DOSE_TASK_EDIT_WINDOW_EXPIRED` | correction window passed |
 | `HELP_ORDER_PERMISSION_DENIED` | non-handler action attempted |
 | `HELP_ORDER_STATUS_CONFLICT` | illegal status transition |
+| `HELP_ORDER_VOICE_NOT_FOUND` | voice attachment or transcript record not found |
+| `HELP_ORDER_VOICE_TRANSCRIBE_UNAVAILABLE` | speech transcription cannot be started |
 | `PRESCRIPTION_OCR_LOW_CONFIDENCE` | OCR result requires manual review |
 | `DDI_CONFIRM_REQUIRED` | high-risk interaction requires pharmacist confirmation |
 | `FILE_UPLOAD_INVALID_TYPE` | unsupported file type |

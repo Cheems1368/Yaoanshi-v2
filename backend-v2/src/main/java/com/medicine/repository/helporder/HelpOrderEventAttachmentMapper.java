@@ -26,6 +26,17 @@ public interface HelpOrderEventAttachmentMapper {
     int insert(HelpOrderEventAttachment attachment);
 
     @Select("""
+            SELECT id, help_order_event_id, file_asset_id, attachment_type, sort_order,
+                   creator, create_time, updater, update_time, deleted, tenant_id
+            FROM help_order_event_attachment
+            WHERE tenant_id = #{tenantId}
+              AND id = #{id}
+              AND deleted = 0
+            LIMIT 1
+            """)
+    HelpOrderEventAttachment selectById(@Param("tenantId") Long tenantId, @Param("id") Long id);
+
+    @Select("""
             SELECT hoea.id,
                    hoea.file_asset_id AS fileAssetId,
                    hoea.attachment_type AS attachmentType,
