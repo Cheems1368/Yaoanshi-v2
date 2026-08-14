@@ -23,7 +23,7 @@ Branch / Context
 - Active surfaces: backend-v2, frontend/huanzhe, frontend/pharmacist, frontend/yisheng/web-admin
 
 Current State
-- 2026-08-14 update: T1-T5 business work is committed, protected by local branch `codex/backup-mobile-demo-20260814`, and rebased onto the latest `origin/main`; the PR has not yet been created.
+- 2026-08-14 update: T1-T5 business work is committed, protected by local branch `codex/backup-mobile-demo-20260814`, rebased onto the latest `origin/main`, and published as GitHub PR #32.
 - GitHub `main` branch protection and CI governance are officially enabled. The governance-enablement baseline was 92 backend tests with 64.33% JaCoCo line coverage; the enforced floor is 60%.
 - Current release candidate: 139 backend tests pass with 61.29% JaCoCo line coverage; patient ESLint, 3 Vitest tests, type check/production build, pharmacist build, and doctor build pass locally. All nine required E2E scenarios pass in one serial run; configured and unconfigured voice-transcription paths are evidenced locally.
 - 2026-08-01 update: Phase T5 complete. Pharmacist mobile work-order actions, Docker MIME/XFYUN runtime, live transcription, three-role mobile flow, and viewport acceptance all passed.
@@ -35,16 +35,16 @@ Current State
 - Last session (2026-03-27): Phase A–F completed (see below)
 
 In Progress
-- Final clean-tree gate confirmation, latest-main synchronization, first push, GitHub PR creation, required-check monitoring, and review-conversation resolution.
+- Final documentation-only CI rerun and mergeability confirmation for PR #32.
 - Product scope is frozen for this Goal; no next product phase has been started.
 
 Next
-- Reconfirm the branch is based on the latest `origin/main`, push `codex/mobile-demo`, and open a PR targeting `main`.
-- Keep the PR current until `CI / Required Quality Gate` is green and every review conversation is resolved; stop at mergeable and do not merge.
+- Confirm the documentation-only rerun of `CI / Required Quality Gate` is green, the branch remains current with `main`, and every review conversation is resolved.
+- Stop at mergeable and do not merge PR #32.
 
 Last Updated
 - 2026-08-14 Asia/Shanghai
-- Reason: completed local gate and E2E qualification; preparing the protected GitHub PR.
+- Reason: opened PR #32 after local qualification; completing the final protected-branch checks.
 
 Completed This Sprint
 
@@ -700,3 +700,24 @@ Release Candidate E2E Qualification (2026-08-14)
 Last Updated
 - 2026-08-14 Asia/Shanghai
 - Reason: completed the release-candidate E2E matrix, stabilized prescription degradation coverage, and recorded sanitized voice evidence.
+
+GitHub PR Qualification (2026-08-14)
+- Workstream:
+  - Published the qualified release candidate through the protected-branch workflow and verified the first GitHub Actions run.
+- Changed:
+  - Pushed `codex/mobile-demo` for the first time and opened PR #32 against `main`: https://github.com/Cheems1368/Yaoanshi-v2/pull/32
+  - Filled the repository PR template with risk, rollback, local commands, test counts, coverage, nine E2E scenarios, and sanitized UI/API evidence.
+- Validated:
+  - Immediately before push, `origin/main...HEAD` was 0 behind and 30 ahead; the worktree was clean.
+  - The release diff contained 314 files and no forbidden local files, private keys, JWT bearer values, screenshots, videos, or test input assets.
+  - GitHub CI run #34 completed successfully: https://github.com/Cheems1368/Yaoanshi-v2/actions/runs/31790537870
+  - `CI / Required Quality Gate`, backend tests and coverage, patient app quality, pharmacist build, and doctor build all concluded `success`.
+  - PR #32 had zero review conversations and zero submitted reviews at this check.
+- Open risks:
+  - This progress-only commit will trigger one final CI rerun; mergeability and latest-main status must be reconfirmed after it finishes.
+- Next:
+  - Push this documentation update, wait for the final required gate, update the PR evidence checkbox, and stop once PR #32 is current and mergeable. Do not merge.
+
+Last Updated
+- 2026-08-14 Asia/Shanghai
+- Reason: recorded PR #32 creation and the successful first GitHub required quality gate.
