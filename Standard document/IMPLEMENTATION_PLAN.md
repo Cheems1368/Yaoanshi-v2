@@ -25,8 +25,10 @@ Rules:
 | Phase 6 | Self-Reported Medication Domain (P0+) | ✅ Complete |
 | Phase 7 | Drug Catalog and Pinyin Initials Search (P0+) | ✅ Complete |
 | Phase 8 | Post-P0 Trial Readiness Sprint (A–H) | ✅ Complete |
+| Phase T0–T5 | Trial/demo closed loops through voice help orders | ✅ Delivered through PR #32 (`35b1e8a`) |
+| Phase T6 | Android JDK 21 and enforced APK build gate | 🚧 Implemented on PR #37; final GitHub validation pending |
 
-**Current active work:** Phase T5 implementation is complete on `codex/mobile-demo`; the release candidate is being validated and has not yet been delivered through a mergeable GitHub PR. No next product phase has been started.
+**Current active work:** T1–T5 are merged into `main`. Phase T6 standardizes the Android-only JDK 21 toolchain and adds APK compilation to the required aggregate gate; no new product phase has been started.
 
 **Flyway current latest:** V12 (`V12__help_order_voice_transcription.sql`). Next new migration must be V13.
 
@@ -47,6 +49,7 @@ The post-P0 trial/demo work is phase-based, not tied to fixed calendar weeks. Ea
 | Phase T3 | Medication reminder and family second-reminder demo path | backend reminder-stage tests, patient build, and medication/family E2E script |
 | Phase T4 | OCR hardening, CSV rule import, reviewed education recommendation | ✅ backend targeted tests, pharmacist build, patient build |
 | Phase T5 | Help-order voice message + XFYUN transcription | ✅ backend targeted tests, patient/pharmacist/doctor builds, Docker live voice walkthrough |
+| Phase T6 | Android JDK 21 toolchain and APK gate | Temurin 21.0.12+8, clean Capacitor sync, local `assembleDebug`, CI APK artifact, aggregate quality gate |
 
 Rules:
 

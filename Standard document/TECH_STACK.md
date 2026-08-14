@@ -71,10 +71,12 @@ These are the exact versions detected on the current machine:
 
 | Tool | Exact version |
 |---|---|
-| Node.js | `20.19.4` |
+| Node.js (current shell) | `22.22.3` |
 | npm | `11.6.4` |
 | pnpm | `10.13.1` |
-| Java | `11.0.27` |
+| Java (legacy toolchain) | Oracle `11.0.27` |
+| Java (default/backend toolchain) | Microsoft OpenJDK `17.0.15` |
+| Java (Android `JAVA21_HOME`) | Eclipse Temurin `21.0.12+8` |
 | Maven | `3.9.10` |
 | Docker | `29.1.2` |
 | Docker Compose | `2.40.3-desktop.1` |
@@ -88,19 +90,25 @@ These are the exact versions to be used for future development work:
 | Node.js | `20.19.4` | All front-end projects |
 | npm | `11.6.4` | `frontend/huanzhe`, `frontend/yisheng/web-admin` |
 | pnpm | `10.13.1` | `frontend/pharmacist` if pnpm is used |
+| Java | `11.0.27` | Legacy backend only |
+| Java | `17.0.12` | `backend-v2` build and runtime |
+| JDK | Eclipse Temurin `21.0.12+8` | Patient Capacitor Android build only |
 | Maven | `3.9.10` | All Java projects |
 | Docker | `29.1.2` | Local container runtime |
 | Docker Compose | `2.40.3-desktop.1` | Local orchestration |
 
 ### 4.3 Java policy
 
-- Legacy backend runtime: Java `11.0.27`
-- New backend standard runtime: Java `17.0.12`
+- Legacy backend runtime: Oracle Java `11.0.27`
+- New backend standard runtime: Eclipse Temurin Java `17.0.12`
+- Patient Android build toolchain: Eclipse Temurin JDK `21.0.12+8`
 
 Notes:
 
 - Java 11 is legacy-only.
 - Any new backend service must target Java 17.
+- Java 21 is used only to run Gradle and compile the Capacitor Android project; it does not change the backend Java target or the `eclipse-temurin:17-jre` runtime image baseline.
+- Local development keeps the default `JAVA_HOME` on Java 17 and exposes Java 21 separately through `JAVA21_HOME`.
 
 ## 5. Legacy Frozen
 
@@ -255,6 +263,26 @@ Build and dev dependencies resolved from `package-lock.json`:
 | `vite` | `5.2.14` |
 | `vitest` | `0.34.6` |
 | `vue-tsc` | `2.2.12` |
+
+Android build toolchain:
+
+| Item | Exact value |
+|---|---|
+| Android application ID | `com.yaoanshi.patient` |
+| Capacitor Android | `7.4.3` |
+| Eclipse Temurin JDK | `21.0.12+8` |
+| Gradle Wrapper | `8.11.1` |
+| Android Gradle Plugin | `8.7.2` |
+| compileSdk | `35` |
+| targetSdk | `35` |
+| minSdk | `23` |
+
+Android build rules:
+
+1. Use `JAVA21_HOME` for `npm run android:build`; do not replace the Java 17 backend default.
+2. `npx cap sync android` must not leave unexplained tracked-file changes.
+3. Pull Requests build an unsigned debug APK for deterministic compilation verification; release signing credentials are outside the repository and outside this gate.
+4. The debug APK is retained by GitHub Actions for 14 days and must never be committed.
 
 Standard route/API binding:
 
