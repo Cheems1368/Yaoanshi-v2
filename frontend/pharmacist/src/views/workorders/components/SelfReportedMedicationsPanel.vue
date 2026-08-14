@@ -127,10 +127,10 @@ const confirmReject = async () => {
 const goToTransfer = (med) => {
   if (!props.patientId) return
   router.push({
-    path: `/patients/${props.patientId}/medication-plan`,
+    path: '/patient/info',
     query: {
-      prefillDrugName: med.drugName,
-      prefillDosage: med.dosage || '',
+      id: String(props.patientId),
+      focus: 'plan',
       selfReportedMedicationId: med.id,
       workOrderId: props.orderId
     }

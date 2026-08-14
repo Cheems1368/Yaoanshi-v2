@@ -30,6 +30,14 @@ public interface MedicationPlanItemMapper {
             SELECT id, plan_id, drug_name, drug_spec, dosage, frequency_code, time_points_json, meal_relation, route, instructions, sort_order,
                    creator, create_time, updater, update_time, deleted, tenant_id
             FROM medication_plan_item
+            WHERE tenant_id = #{tenantId} AND id = #{id} AND deleted = 0
+            """)
+    MedicationPlanItem selectById(@Param("tenantId") Long tenantId, @Param("id") Long id);
+
+    @Select("""
+            SELECT id, plan_id, drug_name, drug_spec, dosage, frequency_code, time_points_json, meal_relation, route, instructions, sort_order,
+                   creator, create_time, updater, update_time, deleted, tenant_id
+            FROM medication_plan_item
             WHERE tenant_id = #{tenantId} AND plan_id = #{planId} AND deleted = 0
             ORDER BY sort_order ASC, id ASC
             """)

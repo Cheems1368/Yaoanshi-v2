@@ -9,6 +9,7 @@ import {
   createRunId,
   expectCommonResultFailure,
   primePatientPage,
+  primeProfessionalPage,
   professionalLogin,
   requestJson
 } from './e2e-shared.mjs'
@@ -26,8 +27,10 @@ const familyIdentity = createFamilyIdentity(runId)
 const browser = await chromium.launch({ headless: true })
 const patientContext = await browser.newContext({ viewport: { width: 430, height: 932 } })
 const familyContext = await browser.newContext({ viewport: { width: 430, height: 932 } })
+const pharmacistContext = await browser.newContext({ viewport: { width: 1440, height: 1000 } })
 const patientPage = await patientContext.newPage()
 const familyPage = await familyContext.newPage()
+const pharmacistPage = await pharmacistContext.newPage()
 
 function formatUtcTimePoint(date) {
   return `${String(date.getUTCHours()).padStart(2, '0')}:${String(date.getUTCMinutes()).padStart(2, '0')}`
@@ -66,6 +69,20 @@ try {
     username: pharmacistUsername,
     password: pharmacistPassword,
     role: 'pharmacist'
+  })
+
+  const transferDrugName = `Vitamin D ${runId}`
+  const selfReported = await requestJson(`${backendBaseUrl}/app-api/self-reported-medications`, {
+    method: 'POST',
+    headers: appHeaders(patientSession.accessToken),
+    body: {
+      drugs: [{ drugName: transferDrugName, dosage: '400 IU' }],
+      notes: 'Playwright transfer-to-plan verification'
+    }
+  })
+  const transferRecord = selfReported.payload.data[0]
+  const transferOrder = await requestJson(`${backendBaseUrl}/admin-api/help-orders/${transferRecord.workOrderId}`, {
+    headers: adminHeaders(pharmacistSession.accessToken)
   })
 
   const now = new Date()
@@ -228,6 +245,35 @@ try {
     'PATIENT_BIND_CONFLICT'
   )
 
+  await primeProfessionalPage(pharmacistPage, pharmacistBaseUrl, pharmacistSession)
+  await pharmacistPage.goto(`${pharmacistBaseUrl}/workorders`, { waitUntil: 'networkidle' })
+  const transferOrderCard = pharmacistPage.locator('.queue-card').filter({ hasText: transferOrder.payload.data.title }).first()
+  await transferOrderCard.waitFor()
+  await transferOrderCard.click()
+  const transferPanel = pharmacistPage.locator('.srm-panel').filter({ hasText: transferDrugName })
+  await transferPanel.waitFor()
+  await transferPanel.getByRole('button', { name: '转入正式计划' }).click()
+  await pharmacistPage.waitForURL(/\/patient\/info\?.*focus=plan/)
+  await pharmacistPage.waitForFunction(
+    (drugName) =>
+      Array.from(document.querySelectorAll('input[placeholder="药品名称"]')).some((input) => input.value === drugName),
+    transferDrugName
+  )
+  const markTransferredResponse = pharmacistPage.waitForResponse(
+    (response) =>
+      response.url().includes(`/self-reported-medications/${transferRecord.id}/mark-transferred`) &&
+      response.request().method() === 'POST'
+  )
+  await pharmacistPage.getByRole('button', { name: '保存草稿' }).click()
+  await markTransferredResponse
+  const transferredRecords = await requestJson(`${backendBaseUrl}/app-api/self-reported-medications`, {
+    headers: appHeaders(patientSession.accessToken)
+  })
+  const transferredRecord = transferredRecords.payload.data.find((item) => item.id === transferRecord.id)
+  if (transferredRecord?.status !== 'TRANSFERRED' || !transferredRecord.transferredPlanItemId) {
+    throw new Error(`Expected transferred self-reported medication, got ${JSON.stringify(transferredRecord)}`)
+  }
+
   console.log(
     JSON.stringify({
       success: true,
@@ -251,11 +297,15 @@ try {
       familyHandledReminderStage: handledTask?.reminderStage,
       familyReminderDueAfterCheckin: handledTask?.familyReminderDue,
       familyAccessAfterUnbindCode: afterUnbind.code,
-      familyAccessAfterUnbindMessage: afterUnbind.msg
+      familyAccessAfterUnbindMessage: afterUnbind.msg,
+      transferredSelfReportedMedicationId: transferredRecord.id,
+      transferredPlanItemId: transferredRecord.transferredPlanItemId,
+      transferredStatus: transferredRecord.status
     })
   )
 } finally {
   await patientContext.close()
   await familyContext.close()
+  await pharmacistContext.close()
   await browser.close()
 }

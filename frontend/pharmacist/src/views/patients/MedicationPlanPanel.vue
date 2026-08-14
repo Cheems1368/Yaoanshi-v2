@@ -151,6 +151,7 @@
 
 <script setup>
 import { computed, reactive, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import AdminDdiRiskCardList from '@/components/ddi/AdminDdiRiskCardList.vue'
 import {
@@ -162,6 +163,10 @@ import {
   getMedicationPlanTasks,
   updateMedicationPlan
 } from '@/modules/pharmacist/api/medicationPlans'
+import {
+  getSelfReportedMedicationTransferPrefill,
+  markSelfReportedMedicationTransferred
+} from '@/modules/pharmacist/api/workorders'
 
 const props = defineProps({
   patientId: {
@@ -176,6 +181,8 @@ const props = defineProps({
 
 const emit = defineEmits(['plan-updated'])
 
+const route = useRoute()
+const router = useRouter()
 const loading = ref(false)
 const saving = ref(false)
 const activating = ref(false)
@@ -187,6 +194,7 @@ const ddiDialogVisible = ref(false)
 const pendingDdiAlerts = ref([])
 const pendingActivatePlanId = ref(null)
 const expandedDdiAlertKey = ref('')
+const pendingTransfer = ref(null)
 
 const createEmptyItem = () => ({
   drugName: '',
@@ -255,9 +263,70 @@ const resetDraft = () => {
   })
 }
 
+const applyTransferPrefill = async () => {
+  const workOrderId = route.query.workOrderId
+  const selfReportedMedicationId = route.query.selfReportedMedicationId
+  if (!workOrderId || !selfReportedMedicationId || pendingTransfer.value) {
+    return
+  }
+
+  try {
+    const response = await getSelfReportedMedicationTransferPrefill(workOrderId, selfReportedMedicationId)
+    const prefill = response.data
+    if (String(prefill.patientId) !== String(props.patientId)) {
+      throw new Error('自报药物与当前患者不匹配')
+    }
+
+    let itemIndex = form.items.findIndex((item) => item.drugName?.trim() === prefill.drugName?.trim())
+    if (itemIndex < 0) {
+      const target = form.items.length === 1 && !form.items[0].drugName ? form.items[0] : createEmptyItem()
+      if (target !== form.items[0]) {
+        form.items.push(target)
+      }
+      itemIndex = form.items.indexOf(target)
+      target.drugName = prefill.drugName || ''
+      target.dosage = prefill.dosage || ''
+    }
+    if (!form.planName) {
+      form.planName = '自报药物转入计划'
+    }
+    pendingTransfer.value = { workOrderId, selfReportedMedicationId, itemIndex }
+    ElMessage.info('已预填自报药物，保存计划后将自动完成状态回写')
+  } catch (error) {
+    errorMessage.value = error.message || '自报药物预填失败，请返回工单重试'
+  }
+}
+
+const completePendingTransfer = async (plan) => {
+  if (!pendingTransfer.value) {
+    return
+  }
+  const context = pendingTransfer.value
+  const planItemId = plan?.items?.[context.itemIndex]?.id
+  if (!planItemId) {
+    throw new Error('用药计划已保存，但未找到对应计划项，未回写自报药物状态')
+  }
+  try {
+    await markSelfReportedMedicationTransferred(
+      context.workOrderId,
+      context.selfReportedMedicationId,
+      planItemId
+    )
+  } catch (error) {
+    throw new Error(`用药计划已保存，但自报药物状态回写失败：${error.message || '请返回工单重试'}`)
+  }
+  pendingTransfer.value = null
+  const query = { ...route.query }
+  delete query.workOrderId
+  delete query.selfReportedMedicationId
+  await router.replace({ query })
+  ElMessage.success('自报药物已转入正式用药计划')
+}
+
 const loadPlan = async (planId) => {
   if (!planId) {
     resetDraft()
+    await applyTransferPrefill()
     return
   }
   loading.value = true
@@ -272,6 +341,7 @@ const loadPlan = async (planId) => {
   } finally {
     loading.value = false
   }
+  await applyTransferPrefill()
 }
 
 const loadDerivedData = async (planId) => {
@@ -362,8 +432,9 @@ const persistPlan = async (status) => {
       ? await updateMedicationPlan(form.id, payload)
       : await createMedicationPlan(payload)
     hydratePlan(response.data)
-    await loadDerivedData(response.data.id)
     emit('plan-updated', response.data)
+    await completePendingTransfer(response.data)
+    await loadDerivedData(response.data.id)
     ElMessage.success(status === 'ACTIVE' ? '用药计划已保存并启用' : '用药计划草稿已保存')
   } catch (error) {
     errorMessage.value = error.message || '用药计划保存失败，请稍后重试'
@@ -387,6 +458,7 @@ const saveAndActivate = async () => {
       : await createMedicationPlan(payload)
     hydratePlan(response.data)
     emit('plan-updated', response.data)
+    await completePendingTransfer(response.data)
   } catch (error) {
     errorMessage.value = error.message || '用药计划保存失败，请稍后重试'
     saving.value = false

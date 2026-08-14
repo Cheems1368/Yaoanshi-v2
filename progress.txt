@@ -25,7 +25,7 @@ Branch / Context
 Current State
 - 2026-08-14 update: T1-T5 business work is committed, protected by local branch `codex/backup-mobile-demo-20260814`, rebased onto the latest `origin/main`, and published as GitHub PR #32.
 - GitHub `main` branch protection and CI governance are officially enabled. The governance-enablement baseline was 92 backend tests with 64.33% JaCoCo line coverage; the enforced floor is 60%.
-- Current release candidate: 139 backend tests pass with 61.29% JaCoCo line coverage; patient ESLint, 3 Vitest tests, type check/production build, pharmacist build, and doctor build pass locally. All nine required E2E scenarios pass in one serial run; configured and unconfigured voice-transcription paths are evidenced locally.
+- Current release candidate: 143 backend tests pass with 61.82% JaCoCo line coverage; patient ESLint, 3 Vitest tests, type check/production build, pharmacist build, and doctor build pass locally. All nine required E2E scenarios pass, with the medication-family scenario additionally covering the reviewed transfer workflow; configured and unconfigured voice-transcription paths are evidenced locally.
 - 2026-08-01 update: Phase T5 complete. Pharmacist mobile work-order actions, Docker MIME/XFYUN runtime, live transcription, three-role mobile flow, and viewport acceptance all passed.
 - 2026-05-12 update: Phase T0/T1 complete for post-P0 trial/demo closed loop: Standard document sync plus patient text/image help-order loop.
 - Current implementation includes backend-v2 multi-image help-order attachments, patient image upload/reply UI, and pharmacist `/mobile/workorders`.
@@ -35,16 +35,16 @@ Current State
 - Last session (2026-03-27): Phase A–F completed (see below)
 
 In Progress
-- Final documentation-only CI rerun and mergeability confirmation for PR #32.
+- PR #32 review remediation, final required-gate rerun, and mergeability confirmation.
 - Product scope is frozen for this Goal; no next product phase has been started.
 
 Next
-- Confirm the documentation-only rerun of `CI / Required Quality Gate` is green, the branch remains current with `main`, and every review conversation is resolved.
+- Push the reviewed fixes, confirm the final `CI / Required Quality Gate` is green, keep the branch current with `main`, and resolve every review conversation.
 - Stop at mergeable and do not merge PR #32.
 
 Last Updated
 - 2026-08-14 Asia/Shanghai
-- Reason: opened PR #32 after local qualification; completing the final protected-branch checks.
+- Reason: addressing four actionable PR #32 review comments before final mergeability confirmation.
 
 Completed This Sprint
 
@@ -721,3 +721,28 @@ GitHub PR Qualification (2026-08-14)
 Last Updated
 - 2026-08-14 Asia/Shanghai
 - Reason: recorded PR #32 creation and the successful first GitHub required quality gate.
+
+PR #32 Review Remediation (2026-08-14)
+- Workstream:
+  - Addressed four automated review conversations covering Android microphone permission, self-reported medication authorization, plan-item ownership, and the pharmacist transfer workflow.
+- Changed:
+  - Declared Android audio permissions; Capacitor 7's existing `BridgeWebChromeClient` supplies the runtime permission request when WebView requests audio capture.
+  - Required every professional self-reported-medication operation to validate the path work order, pharmacist visibility, and the medication's work-order/patient association.
+  - Required transferred plan items to exist in the same tenant and belong to a medication plan for the same patient.
+  - Replaced the dead `/patients/{id}/medication-plan` navigation with the existing `/patient/info` plan surface; the target fetches server-side prefill data, saves the plan, and writes the resulting plan-item ID back as `TRANSFERRED`.
+  - Extended `e2e:medication-family` to exercise the complete pharmacist UI transfer and status-writeback path.
+- Validated:
+  - `AdminSelfReportedMedicationServiceTest` passed 9/9, including cross-work-order, wrong-pharmacist, cross-patient plan-item, and valid-transfer cases.
+  - Updated `e2e:medication-family` passed with a real persisted plan item and final `TRANSFERRED` status.
+  - Full backend gate passed 143/143 with 61.82% JaCoCo line coverage; the 60% threshold remains unchanged.
+  - Patient ESLint, Vitest 3/3, type check/build, pharmacist build, doctor build, and `git diff --check` passed.
+  - Android `:app:processDebugMainManifest` passed and the merged manifest contains `MODIFY_AUDIO_SETTINGS` and `RECORD_AUDIO`.
+- Open risks:
+  - Full Android `assembleDebug` requires JDK 21 for Capacitor Android 7; the current shell only has JDK 17. The manifest merge itself passed, and no project toolchain setting was weakened.
+  - Final GitHub CI and conversation resolution remain pending for this remediation commit.
+- Next:
+  - Run all local gates, push the remediation, resolve the four review threads with evidence, and wait for the final required quality gate. Do not merge.
+
+Last Updated
+- 2026-08-14 Asia/Shanghai
+- Reason: implemented and locally exercised all four PR #32 review fixes.

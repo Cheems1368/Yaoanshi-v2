@@ -2,10 +2,15 @@ package com.medicine.service.admin;
 
 import com.medicine.api.dto.medication.SelfReportedMedicationDTO;
 import com.medicine.common.exception.BusinessException;
+import com.medicine.domain.helporder.HelpOrder;
 import com.medicine.domain.identity.PharmacistProfile;
+import com.medicine.domain.medication.MedicationPlan;
+import com.medicine.domain.medication.MedicationPlanItem;
 import com.medicine.domain.medication.SelfReportedMedication;
 import com.medicine.repository.helporder.HelpOrderEventMapper;
 import com.medicine.repository.helporder.HelpOrderMapper;
+import com.medicine.repository.medication.MedicationPlanItemMapper;
+import com.medicine.repository.medication.MedicationPlanMapper;
 import com.medicine.repository.medication.SelfReportedMedicationMapper;
 import com.medicine.service.auth.JwtClaims;
 import com.medicine.service.auth.ProfessionalIdentityService;
@@ -36,6 +41,10 @@ class AdminSelfReportedMedicationServiceTest {
     @Mock
     private HelpOrderEventMapper helpOrderEventMapper;
     @Mock
+    private MedicationPlanItemMapper medicationPlanItemMapper;
+    @Mock
+    private MedicationPlanMapper medicationPlanMapper;
+    @Mock
     private ProfessionalIdentityService professionalIdentityService;
     @Mock
     private NotificationDispatchService notificationDispatchService;
@@ -54,6 +63,8 @@ class AdminSelfReportedMedicationServiceTest {
                 selfReportedMedicationMapper,
                 helpOrderMapper,
                 helpOrderEventMapper,
+                medicationPlanItemMapper,
+                medicationPlanMapper,
                 professionalIdentityService,
                 notificationDispatchService
         );
@@ -72,9 +83,9 @@ class AdminSelfReportedMedicationServiceTest {
     @Test
     void acknowledge_pendingRecord_changesStatusToActiveAndNotifiesPatient() {
         SelfReportedMedication srm = pendingSrm(1L, 42L, "阿司匹林");
-        when(selfReportedMedicationMapper.selectById(1L, 1L)).thenReturn(srm);
+        stubAccessibleWorkOrder(srm);
 
-        SelfReportedMedicationDTO result = service.acknowledge(claims, 1L);
+        SelfReportedMedicationDTO result = service.acknowledge(claims, 99L, 1L);
 
         assertThat(result.getStatus()).isEqualTo("ACTIVE");
 
@@ -92,10 +103,10 @@ class AdminSelfReportedMedicationServiceTest {
     void acknowledge_nonPendingRecord_throwsBusinessException() {
         SelfReportedMedication srm = pendingSrm(1L, 42L, "布洛芬");
         srm.setStatus("ACTIVE");
-        when(selfReportedMedicationMapper.selectById(1L, 1L)).thenReturn(srm);
+        stubAccessibleWorkOrder(srm);
 
         BusinessException ex = catchThrowableOfType(
-                () -> service.acknowledge(claims, 1L),
+                () -> service.acknowledge(claims, 99L, 1L),
                 BusinessException.class);
 
         assertThat(ex).isNotNull();
@@ -108,9 +119,9 @@ class AdminSelfReportedMedicationServiceTest {
     @Test
     void reject_pendingRecord_changesStatusToStoppedAndNotifiesPatient() {
         SelfReportedMedication srm = pendingSrm(1L, 42L, "布洛芬");
-        when(selfReportedMedicationMapper.selectById(1L, 1L)).thenReturn(srm);
+        stubAccessibleWorkOrder(srm);
 
-        SelfReportedMedicationDTO result = service.reject(claims, 1L, "与处方药有相互作用");
+        SelfReportedMedicationDTO result = service.reject(claims, 99L, 1L, "与处方药有相互作用");
 
         assertThat(result.getStatus()).isEqualTo("STOPPED");
 
@@ -129,9 +140,9 @@ class AdminSelfReportedMedicationServiceTest {
     @Test
     void reject_withoutReason_notificationPayloadHasNoDrugName() {
         SelfReportedMedication srm = pendingSrm(1L, 42L, "维生素C");
-        when(selfReportedMedicationMapper.selectById(1L, 1L)).thenReturn(srm);
+        stubAccessibleWorkOrder(srm);
 
-        service.reject(claims, 1L, null);
+        service.reject(claims, 99L, 1L, null);
 
         verify(notificationDispatchService).createAndDispatch(
                 any(), any(), any(), any(), any(), any(),
@@ -144,10 +155,10 @@ class AdminSelfReportedMedicationServiceTest {
     void reject_nonPendingRecord_throwsBusinessException() {
         SelfReportedMedication srm = pendingSrm(1L, 42L, "布洛芬");
         srm.setStatus("ACTIVE");
-        when(selfReportedMedicationMapper.selectById(1L, 1L)).thenReturn(srm);
+        stubAccessibleWorkOrder(srm);
 
         BusinessException ex = catchThrowableOfType(
-                () -> service.reject(claims, 1L, "reason"),
+                () -> service.reject(claims, 99L, 1L, "reason"),
                 BusinessException.class);
 
         assertThat(ex).isNotNull();
@@ -155,7 +166,94 @@ class AdminSelfReportedMedicationServiceTest {
                 any(), any(), any(), any(), any(), any(), any(), any());
     }
 
+    @Test
+    void acknowledge_recordFromDifferentWorkOrder_isRejected() {
+        SelfReportedMedication srm = pendingSrm(1L, 42L, "阿司匹林");
+        srm.setWorkOrderId(100L);
+        when(helpOrderMapper.selectById(1L, 99L)).thenReturn(accessibleWorkOrder());
+        when(selfReportedMedicationMapper.selectById(1L, 1L)).thenReturn(srm);
+
+        BusinessException ex = catchThrowableOfType(
+                () -> service.acknowledge(claims, 99L, 1L),
+                BusinessException.class);
+
+        assertThat(ex).isNotNull();
+        verify(selfReportedMedicationMapper, never()).update(any());
+    }
+
+    @Test
+    void list_workOrderOwnedByAnotherPharmacist_isRejected() {
+        HelpOrder order = accessibleWorkOrder();
+        order.setStatus("PHARMACIST_IN_PROGRESS");
+        order.setCurrentHandlerType("PHARMACIST");
+        order.setCurrentHandlerId(20L);
+        order.setResponsiblePharmacistId(20L);
+        when(helpOrderMapper.selectById(1L, 99L)).thenReturn(order);
+
+        BusinessException ex = catchThrowableOfType(
+                () -> service.listForWorkOrder(claims, 99L),
+                BusinessException.class);
+
+        assertThat(ex).isNotNull();
+        verify(selfReportedMedicationMapper, never()).selectByWorkOrderId(any(), any());
+    }
+
+    @Test
+    void markTransferred_planItemForDifferentPatient_isRejected() {
+        SelfReportedMedication srm = pendingSrm(1L, 42L, "阿司匹林");
+        stubAccessibleWorkOrder(srm);
+        MedicationPlanItem item = new MedicationPlanItem();
+        item.setId(501L);
+        item.setPlanId(601L);
+        MedicationPlan plan = new MedicationPlan();
+        plan.setId(601L);
+        plan.setPatientId(43L);
+        when(medicationPlanItemMapper.selectById(1L, 501L)).thenReturn(item);
+        when(medicationPlanMapper.selectById(1L, 601L)).thenReturn(plan);
+
+        BusinessException ex = catchThrowableOfType(
+                () -> service.markTransferred(claims, 99L, 1L, 501L),
+                BusinessException.class);
+
+        assertThat(ex).isNotNull();
+        verify(selfReportedMedicationMapper, never()).update(any());
+    }
+
+    @Test
+    void markTransferred_matchingPlanItem_updatesRecord() {
+        SelfReportedMedication srm = pendingSrm(1L, 42L, "阿司匹林");
+        stubAccessibleWorkOrder(srm);
+        MedicationPlanItem item = new MedicationPlanItem();
+        item.setId(501L);
+        item.setPlanId(601L);
+        MedicationPlan plan = new MedicationPlan();
+        plan.setId(601L);
+        plan.setPatientId(42L);
+        when(medicationPlanItemMapper.selectById(1L, 501L)).thenReturn(item);
+        when(medicationPlanMapper.selectById(1L, 601L)).thenReturn(plan);
+
+        service.markTransferred(claims, 99L, 1L, 501L);
+
+        assertThat(srm.getStatus()).isEqualTo("TRANSFERRED");
+        assertThat(srm.getTransferredPlanItemId()).isEqualTo(501L);
+        verify(selfReportedMedicationMapper).update(srm);
+    }
+
     // ---- helpers ----
+
+    private void stubAccessibleWorkOrder(SelfReportedMedication srm) {
+        srm.setWorkOrderId(99L);
+        when(helpOrderMapper.selectById(1L, 99L)).thenReturn(accessibleWorkOrder());
+        when(selfReportedMedicationMapper.selectById(1L, 1L)).thenReturn(srm);
+    }
+
+    private HelpOrder accessibleWorkOrder() {
+        HelpOrder order = new HelpOrder();
+        order.setId(99L);
+        order.setPatientId(42L);
+        order.setStatus("SUBMITTED");
+        return order;
+    }
 
     private SelfReportedMedication pendingSrm(Long tenantId, Long patientId, String drugName) {
         SelfReportedMedication srm = new SelfReportedMedication();

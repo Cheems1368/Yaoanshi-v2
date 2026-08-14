@@ -133,7 +133,7 @@ public class AdminHelpOrderController {
             @PathVariable("srmId") Long srmId,
             Authentication authentication
     ) {
-        return CommonResult.ok(adminSelfReportedMedicationService.acknowledge((JwtClaims) authentication.getDetails(), srmId));
+        return CommonResult.ok(adminSelfReportedMedicationService.acknowledge((JwtClaims) authentication.getDetails(), id, srmId));
     }
 
     @PostMapping("/{id}/self-reported-medications/{srmId}/reject")
@@ -144,7 +144,7 @@ public class AdminHelpOrderController {
             Authentication authentication
     ) {
         return CommonResult.ok(adminSelfReportedMedicationService.reject(
-                (JwtClaims) authentication.getDetails(), srmId, request.getReason()));
+                (JwtClaims) authentication.getDetails(), id, srmId, request.getReason()));
     }
 
     @GetMapping("/{id}/self-reported-medications/{srmId}/transfer-prefill")
@@ -153,7 +153,7 @@ public class AdminHelpOrderController {
             @PathVariable("srmId") Long srmId,
             Authentication authentication
     ) {
-        return CommonResult.ok(adminSelfReportedMedicationService.getTransferPrefill((JwtClaims) authentication.getDetails(), srmId));
+        return CommonResult.ok(adminSelfReportedMedicationService.getTransferPrefill((JwtClaims) authentication.getDetails(), id, srmId));
     }
 
     @PostMapping("/{id}/self-reported-medications/{srmId}/mark-transferred")
@@ -163,7 +163,7 @@ public class AdminHelpOrderController {
             @RequestParam("planItemId") Long planItemId,
             Authentication authentication
     ) {
-        adminSelfReportedMedicationService.markTransferred((JwtClaims) authentication.getDetails(), srmId, planItemId);
+        adminSelfReportedMedicationService.markTransferred((JwtClaims) authentication.getDetails(), id, srmId, planItemId);
         return CommonResult.ok(null);
     }
 }
