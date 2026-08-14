@@ -82,8 +82,14 @@ try {
       hospitalPatientId,
       refreshProbe,
       refreshTokenRotated: Boolean(beforeRefresh.refreshToken && afterRefresh.refreshToken && beforeRefresh.refreshToken !== afterRefresh.refreshToken),
-      beforeRefresh,
-      afterRefresh
+      beforeRefresh: {
+        refreshTokenPresent: Boolean(beforeRefresh.refreshToken),
+        deviceId: beforeRefresh.deviceId
+      },
+      afterRefresh: {
+        refreshTokenPresent: Boolean(afterRefresh.refreshToken),
+        deviceId: afterRefresh.deviceId
+      }
     })
   )
 } finally {

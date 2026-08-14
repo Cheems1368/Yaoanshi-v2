@@ -62,7 +62,7 @@ try {
   await familyPage.goto(`${patientBaseUrl}/tabs/help-order`, { waitUntil: 'networkidle' })
 
   const titleInput = familyPage.locator('ion-input input').first()
-  const submitButton = familyPage.locator('.form-card ion-button').first()
+  const submitButton = familyPage.getByRole('button', { name: '提交工单' })
   await titleInput.fill(`Need advice ${runId}`)
   const [orderResponse] = await Promise.all([
     familyPage.waitForResponse(
@@ -97,7 +97,7 @@ try {
         response.url().includes(`/app-api/help-orders/${createdOrder.id}/reply`)
         && response.request().method() === 'POST'
     ),
-    familyPage.locator('.composer ion-button').click()
+    familyPage.getByRole('button', { name: '发送', exact: true }).click()
   ])
   const patientReply = (await patientReplyResponse.json()).data
   const pharmacistEscalate = await requestJson(`${backendBaseUrl}/admin-api/help-orders/${createdOrder.id}/escalate`, {

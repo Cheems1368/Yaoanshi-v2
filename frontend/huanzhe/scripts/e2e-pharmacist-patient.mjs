@@ -3,7 +3,7 @@ import { createPatientIdentity, createPatientSession, createRunId, primeProfessi
 
 const runId = createRunId()
 const backendBaseUrl = process.env.E2E_BACKEND_BASE_URL || 'http://127.0.0.1:8080'
-const legacyBaseUrl = process.env.E2E_LEGACY_BASE_URL || 'http://127.0.0.1:48080'
+const legacyBaseUrl = process.env.E2E_LEGACY_BASE_URL || backendBaseUrl
 const pharmacistBaseUrl = process.env.E2E_PHARMACIST_BASE_URL || 'http://127.0.0.1:3003'
 const pharmacistUsername = process.env.E2E_PHARMACIST_USERNAME || 'pharmacist'
 const pharmacistPassword = process.env.E2E_PHARMACIST_PASSWORD || '123456'

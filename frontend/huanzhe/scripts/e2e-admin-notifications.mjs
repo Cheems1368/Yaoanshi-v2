@@ -12,7 +12,7 @@ import {
 
 const runId = createRunId()
 const backendBaseUrl = process.env.E2E_BACKEND_BASE_URL || 'http://127.0.0.1:8080'
-const legacyBaseUrl = process.env.E2E_LEGACY_BASE_URL || 'http://127.0.0.1:48080'
+const legacyBaseUrl = process.env.E2E_LEGACY_BASE_URL || backendBaseUrl
 const pharmacistBaseUrl = process.env.E2E_PHARMACIST_BASE_URL || 'http://127.0.0.1:3003'
 const doctorBaseUrl = process.env.E2E_DOCTOR_BASE_URL || 'http://127.0.0.1:3002'
 const pharmacistUsername = process.env.E2E_PHARMACIST_USERNAME || 'pharmacist'
@@ -47,19 +47,20 @@ try {
   await pharmacistPage.waitForTimeout(1500)
   await doctorPage.waitForTimeout(1500)
 
+  const orderTitle = `Realtime order ${runId}`
   const createdOrder = await requestJson(`${backendBaseUrl}/app-api/help-orders`, {
     method: 'POST',
     headers: appHeaders(patientSession.accessToken),
     body: {
       category: 'MEDICATION_CONSULTATION',
-      title: `Realtime order ${runId}`,
+      title: orderTitle,
       description: `Realtime notification smoke ${runId}`,
       priority: 'NORMAL',
       requiresOfflineEmergency: false
     }
   })
 
-  const pharmacistRow = pharmacistPage.locator('.el-table__row').filter({ hasText: createdOrder.payload.data.orderNo }).first()
+  const pharmacistRow = pharmacistPage.locator('.queue-card').filter({ hasText: orderTitle }).first()
   await pharmacistRow.waitFor({ timeout: 15000 })
 
   const escalatedOrder = await requestJson(`${backendBaseUrl}/admin-api/help-orders/${createdOrder.payload.data.id}/escalate`, {
@@ -70,7 +71,7 @@ try {
     }
   })
 
-  const doctorRow = doctorPage.locator('.el-table__row').filter({ hasText: createdOrder.payload.data.orderNo }).first()
+  const doctorRow = doctorPage.locator('.queue-card').filter({ hasText: orderTitle }).first()
   await doctorRow.waitFor({ timeout: 15000 })
 
   const doctorReply = await requestJson(`${backendBaseUrl}/admin-api/help-orders/${createdOrder.payload.data.id}/reply`, {
