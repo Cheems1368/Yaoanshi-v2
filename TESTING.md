@@ -10,9 +10,10 @@ GitHub Actions 工作流 `CI` 并行执行：
 | --- | --- | --- |
 | Backend tests and coverage | Spring Boot 编译、JUnit 测试、JaCoCo | 测试全部通过，行覆盖率不低于 60% |
 | Patient app quality | ESLint、Vitest、类型检查、生产构建 | 全部命令退出码为 0 |
+| Patient Android APK | Temurin 21、Web 构建、Capacitor 同步、生成配置漂移检查、`assembleDebug` | APK 构建成功且同步后无 tracked-file 漂移 |
 | Pharmacist web build | 锁定依赖安装、生产构建 | 构建成功 |
 | Doctor web build | 锁定依赖安装、生产构建 | 构建成功 |
-| Required Quality Gate | 汇总以上四项 | 四项均为 success |
+| Required Quality Gate | 汇总以上五项 | 五项均为 success |
 
 分支保护只绑定稳定上下文 `CI / Required Quality Gate`，避免内部作业改名或拆分时意外锁死合并。
 
@@ -33,6 +34,18 @@ npm run lint
 npm run test:unit:ci
 npm run build
 ```
+
+患者端 Android APK（JDK 21 只用于 Android，默认后端 JDK 保持 17）：
+
+```powershell
+$env:JAVA21_HOME = [Environment]::GetEnvironmentVariable('JAVA21_HOME', 'User')
+& "$env:JAVA21_HOME\bin\java.exe" -version
+Set-Location frontend/huanzhe
+npm run android:build
+Test-Path android/app/build/outputs/apk/debug/app-debug.apk
+```
+
+`npm run android:build` 必须使用 Eclipse Temurin `21.0.12+8`，并生成非空的 `app-debug.apk`。执行 `npx cap sync android` 后如出现 tracked-file 变更，必须审查并提交真实配置更新或恢复纯行尾噪声，禁止在 CI 中跳过漂移检查。
 
 药师端：
 
@@ -100,6 +113,6 @@ E2E 结果应在 PR 的“测试证据”中记录：环境、测试账号类型
 
 ## 6. 失败处理
 
-CI 失败时先定位第一个失败作业，不要重复运行掩盖确定性问题。后端测试与 JaCoCo 报告会作为 `backend-test-reports` artifact 保留 14 天。仅当失败被确认是 GitHub Runner 或依赖仓库的瞬时故障时才重跑，并在 PR 中记录原因。
+CI 失败时先定位第一个失败作业，不要重复运行掩盖确定性问题。后端测试与 JaCoCo 报告会作为 `backend-test-reports` artifact 保留 14 天；Android debug APK 会作为 `patient-android-debug-apk` artifact 保留 14 天。仅当失败被确认是 GitHub Runner 或依赖仓库的瞬时故障时才重跑，并在 PR 中记录原因。
 
 覆盖率阈值是项目基线而不是目标上限。新增业务代码应优先保持或提高覆盖率；需要下调阈值时必须单独 PR，说明原因和恢复计划。

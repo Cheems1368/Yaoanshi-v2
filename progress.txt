@@ -18,14 +18,15 @@ Project
 - Yaoshian MVP P0
 
 Branch / Context
-- Branch: codex/mobile-demo (origin: https://github.com/Cheems1368/Yaoanshi-v2.git)
-- Active workstream: T1-T5 release-candidate validation and GitHub PR delivery
-- Active surfaces: backend-v2, frontend/huanzhe, frontend/pharmacist, frontend/yisheng/web-admin
+- Branch: codex/android-jdk21 (origin: https://github.com/Cheems1368/Yaoanshi-v2.git)
+- Active workstream: Android JDK 21 standardization and enforced APK quality gate
+- Active surfaces: frontend/huanzhe Android, GitHub Actions, testing governance, Standard document
 
 Current State
-- 2026-08-14 update: T1-T5 business work is committed, protected by local branch `codex/backup-mobile-demo-20260814`, rebased onto the latest `origin/main`, and published as GitHub PR #32.
+- 2026-08-14 update: PR #32 was squash-merged as `35b1e8a`; the post-merge `main` CI run #38 passed. The old `codex/mobile-demo` branches were deleted while local protection reference `codex/backup-mobile-demo-20260814` was retained.
+- Android toolchain follow-up is published as draft PR #37. Eclipse Temurin `21.0.12+8` is installed under `JAVA21_HOME`; default `JAVA_HOME` remains Microsoft OpenJDK 17.0.15 for backend work.
 - GitHub `main` branch protection and CI governance are officially enabled. The governance-enablement baseline was 92 backend tests with 64.33% JaCoCo line coverage; the enforced floor is 60%.
-- Current release candidate: 143 backend tests pass with 61.82% JaCoCo line coverage; patient ESLint, 3 Vitest tests, type check/production build, pharmacist build, and doctor build pass locally. All nine required E2E scenarios pass, with the medication-family scenario additionally covering the reviewed transfer workflow; configured and unconfigured voice-transcription paths are evidenced locally.
+- T1–T5 delivered baseline: 143 backend tests pass with 61.82% JaCoCo line coverage; patient ESLint, 3 Vitest tests, type check/production build, pharmacist build, and doctor build pass. All nine required E2E scenarios passed, including medication transfer and configured/unconfigured voice-transcription paths.
 - 2026-08-01 update: Phase T5 complete. Pharmacist mobile work-order actions, Docker MIME/XFYUN runtime, live transcription, three-role mobile flow, and viewport acceptance all passed.
 - 2026-05-12 update: Phase T0/T1 complete for post-P0 trial/demo closed loop: Standard document sync plus patient text/image help-order loop.
 - Current implementation includes backend-v2 multi-image help-order attachments, patient image upload/reply UI, and pharmacist `/mobile/workorders`.
@@ -35,16 +36,32 @@ Current State
 - Last session (2026-03-27): Phase A–F completed (see below)
 
 In Progress
-- PR #32 review remediation, final required-gate rerun, and mergeability confirmation.
+- PR #37 adds the `Patient Android APK` job and makes it a dependency of `CI / Required Quality Gate`.
+- Technical-stack, testing, implementation-sequence, and progress documentation are being synchronized with the Android-only JDK 21 policy.
 - Product scope is frozen for this Goal; no next product phase has been started.
 
 Next
-- Push the reviewed fixes, confirm the final `CI / Required Quality Gate` is green, keep the branch current with `main`, and resolve every review conversation.
-- Stop at mergeable and do not merge PR #32.
+- Complete local patient quality checks, push the governance documentation, and verify PR #37 produces a downloadable APK artifact.
+- Resolve all PR #37 conversations, squash-merge only after the aggregate gate is green, then verify the post-merge `main` CI.
 
 Last Updated
 - 2026-08-14 Asia/Shanghai
-- Reason: addressing four actionable PR #32 review comments before final mergeability confirmation.
+- Reason: PR #32 merged; standardizing Android JDK 21 and adding APK compilation to the protected quality gate.
+
+Android JDK 21 and APK Gate (2026-08-14)
+- Changed:
+  - Squash-merged PR #32 and verified `main` run #38.
+  - Installed Eclipse Temurin `21.0.12+8`, set user-level `JAVA21_HOME`, and preserved default Java 17 plus the existing Oracle 21.0.8 installation.
+  - Added PR #37 with a `Patient Android APK` job, clean Capacitor-sync check, debug APK build, and 14-day artifact retention.
+- Validated:
+  - `npm ci` and `npm run android:build` passed with Temurin 21.0.12+8.
+  - Local APK size is 7,604,214 bytes; SHA-256 is `8C7CDA78AD1ACFFA5A557E48EAAA45DE9E185998CF892785AC477AB8F8C76E47`.
+  - `cap sync` produced no content changes; Windows-only line-ending status noise was restored before editing.
+- Open risks:
+  - PR #37 GitHub Actions and artifact download verification remain pending.
+  - Release signing and store publishing remain out of scope; no keystore or signing secret is stored in the repository.
+- Next:
+  - Complete PR #37 local/GitHub gates, resolve review conversations, squash-merge, and verify `main`.
 
 Completed This Sprint
 
