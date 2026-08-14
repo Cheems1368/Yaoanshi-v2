@@ -19,10 +19,13 @@ Project
 
 Branch / Context
 - Branch: codex/mobile-demo (origin: https://github.com/Cheems1368/Yaoanshi-v2.git)
-- Active workstream: Post-P0+ optimization sprint (trial/demo readiness, ~1 month)
+- Active workstream: T1-T5 release-candidate validation and GitHub PR delivery
 - Active surfaces: backend-v2, frontend/huanzhe, frontend/pharmacist, frontend/yisheng/web-admin
 
 Current State
+- 2026-08-14 update: T1-T5 business work is committed, protected by local branch `codex/backup-mobile-demo-20260814`, and rebased onto the latest `origin/main`; the PR has not yet been created.
+- GitHub `main` branch protection and CI governance are officially enabled. The governance-enablement baseline was 92 backend tests with 64.33% JaCoCo line coverage; the enforced floor is 60%.
+- Current release candidate: 139 backend tests pass with 61.29% JaCoCo line coverage; patient ESLint, 3 Vitest tests, type check/production build, pharmacist build, and doctor build pass locally.
 - 2026-08-01 update: Phase T5 complete. Pharmacist mobile work-order actions, Docker MIME/XFYUN runtime, live transcription, three-role mobile flow, and viewport acceptance all passed.
 - 2026-05-12 update: Phase T0/T1 complete for post-P0 trial/demo closed loop: Standard document sync plus patient text/image help-order loop.
 - Current implementation includes backend-v2 multi-image help-order attachments, patient image upload/reply UI, and pharmacist `/mobile/workorders`.
@@ -32,19 +35,17 @@ Current State
 - Last session (2026-03-27): Phase A–F completed (see below)
 
 In Progress
-- None. Post-P0 trial/demo phases T0-T5 are complete; no next phase has been started.
-- Phase 4: Integration testing — runtime integration complete
+- Release-candidate E2E evidence, first push, GitHub PR creation, required-check monitoring, and review-conversation resolution.
+- Product scope is frozen for this Goal; no next product phase has been started.
 
 Next
-- Do not start another product phase without an explicit scope decision.
-- Run browser/mobile-width manual walkthrough for the image help-order loop against a live local stack.
-- Plan Phase T2: doctor mobile Web queue/detail, patient minimum context, and structured doctor decision events.
-- End-to-end demo walkthrough (browser-level, manual UI testing)
-- Use `yaoanshi-neat` for future explicit closeout tidy or context recovery requests
+- Run the required local E2E matrix and collect sanitized browser/mobile evidence.
+- Reconfirm the branch is based on the latest `origin/main`, push `codex/mobile-demo`, and open a PR targeting `main`.
+- Keep the PR current until `CI / Required Quality Gate` is green and every review conversation is resolved; stop at mergeable and do not merge.
 
 Last Updated
-- 2026-08-01 Asia/Shanghai
-- Reason: completed T5 pharmacist mobile parity and Docker live acceptance without starting another phase.
+- 2026-08-14 Asia/Shanghai
+- Reason: synchronized the T1-T5 release candidate with the protected `main` testing baseline and started PR qualification.
 
 Completed This Sprint
 
@@ -82,16 +83,15 @@ Completed Phases (durable record)
 Phase 0–7 — see git history from 2026-03-19 sessions
 
 Infrastructure Notes
-- Flyway current latest in working tree: V10 (`V10__help_order_event_attachments.sql`); next new migration must be V11.
-- Flyway current latest: V8 (V8__ai_consent.sql); next new migration must be V9
-- Never modify already-applied migrations V1–V8
+- Flyway current latest: V12 (`V12__help_order_voice_transcription.sql`); next new migration must be V13.
+- Never modify already-applied migrations V1–V12.
 - WebSocket /ws/admin-notifications and /ws/app-notifications both use one-time socket tickets
 - AI provider: SiliconFlow /v1/chat/completions, model zai-org/GLM-4.5-Air
 - AI config: medicine.ai.base-url / medicine.ai.api-key / medicine.ai.model / medicine.ai.timeout-ms
 - Local dev secrets: backend-v2/.env.local (gitignored), startup via run-local-with-env.ps1
 - Local mixed stack: Docker MySQL 13306, Redis 16379, legacy server 48080
-- S3 stub: S3CompatibleObjectStorageStub still active (Phase B pending)
-- OCR stub: MANUAL_REVIEW_REQUIRED still active (Phase C pending)
+- Object storage: the real S3-compatible implementation is active outside tests; `S3CompatibleObjectStorageStub` is test-profile only.
+- OCR: `DeepSeekOcrService` is active when configured and degrades to manual review when credentials or the provider are unavailable.
 
 Phase B — MinIO S3 Integration (2026-03-27, commit e6178c9)
 - docker-compose.yml: MinIO service (9000/9001) + backend-v2 storage env vars + depends_on
@@ -644,3 +644,35 @@ Trial Demo Phase T5 Completion and Docker Reverification (2026-08-01)
 Last Updated
 - 2026-08-01 Asia/Shanghai
 - Reason: T5 passed code, Docker, real-browser voice, three-role workflow, and mobile viewport acceptance.
+
+T1-T5 Release Candidate and Test Governance Sync (2026-08-14)
+- Workstream:
+  - Preserve the completed T1-T5 work, inherit protected-main testing governance, and qualify `codex/mobile-demo` for a mergeable PR without adding product scope.
+- Changed:
+  - Committed the complete T5 voice help-order workflow and created local protection branch `codex/backup-mobile-demo-20260814` before history synchronization.
+  - Rebased `codex/mobile-demo` onto the latest `origin/main`, accepting `main` as authoritative for CI, PR templates, Dependabot, and `TESTING.md` while retaining JaCoCo plus the candidate's business dependencies and scripts.
+  - Fixed seven patient-app ESLint violations without broad formatting or behavior changes.
+  - Expanded `TESTING.md` with `e2e:helporder-mobile` and its image, voice, pharmacist-mobile, doctor-decision, and patient-result evidence requirements.
+  - The historical notes above that refer to “uncommitted T1-T5” are superseded by this entry; the work is now committed on the candidate branch.
+- Validated:
+  - Protected `main` governance is active: PR-only merge, required `CI / Required Quality Gate`, up-to-date branch, resolved conversations, linear history, administrator enforcement, and no force-push/deletion. Required approvals remain 0 while there is one collaborator.
+  - Governance-enablement `main` baseline: 92 backend tests, 64.33% JaCoCo line coverage, 60% enforced floor.
+  - Candidate clean backend gate: 139 tests passed with 61.29% JaCoCo line coverage.
+  - Candidate patient gate: ESLint passed, Vitest passed 3/3, type check and production build passed.
+  - Candidate pharmacist and doctor production builds passed; `git diff --check` passed before documentation updates.
+- Open risks:
+  - The required E2E matrix and refreshed real-browser voice evidence still need to be collected for this release candidate.
+  - The feature branch has not yet been pushed and no PR exists; GitHub required checks and review-conversation state therefore remain pending.
+  - Real OCR and XFYUN flows depend on approved environment-provided credentials; no secret values are stored in the repository or this record.
+- Next:
+  - Complete the E2E matrix, recheck the latest `origin/main`, push the feature branch, open the PR, and iterate until the required gate is green and all conversations are resolved. Stop before merge.
+- Delivery references:
+  - Final protected-main CI: https://github.com/Cheems1368/Yaoanshi-v2/actions/runs/30434842136
+  - Test governance PR #2: https://github.com/Cheems1368/Yaoanshi-v2/pull/2
+  - Actions and dependency governance PR #26: https://github.com/Cheems1368/Yaoanshi-v2/pull/26
+  - Test standard: https://github.com/Cheems1368/Yaoanshi-v2/blob/main/TESTING.md
+  - CI workflow: https://github.com/Cheems1368/Yaoanshi-v2/blob/main/.github/workflows/build.yml
+
+Last Updated
+- 2026-08-14 Asia/Shanghai
+- Reason: preserved and rebased T1-T5, inherited the protected-main quality gate, recorded fresh candidate metrics, and began PR qualification.

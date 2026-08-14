@@ -12,7 +12,7 @@ Rules:
 4. This document covers `P0` and `P0+` MVP phases, plus the Post-P0 trial readiness sprint.
 5. `P2` and later capabilities must stay in backlog and must not enter the primary build sequence.
 
-## 1.5 Execution Status Summary (as of 2026-03-27)
+## 1.5 Execution Status Summary (as of 2026-08-14)
 
 | Phase | Description | Status |
 |-------|-------------|--------|
@@ -26,7 +26,7 @@ Rules:
 | Phase 7 | Drug Catalog and Pinyin Initials Search (P0+) | ✅ Complete |
 | Phase 8 | Post-P0 Trial Readiness Sprint (A–H) | ✅ Complete |
 
-**Current active work:** Phase T5 complete. No next phase has been started.
+**Current active work:** Phase T5 implementation is complete on `codex/mobile-demo`; the release candidate is being validated and has not yet been delivered through a mergeable GitHub PR. No next product phase has been started.
 
 **Flyway current latest:** V12 (`V12__help_order_voice_transcription.sql`). Next new migration must be V13.
 
