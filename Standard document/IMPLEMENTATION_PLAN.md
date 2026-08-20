@@ -12,7 +12,7 @@ Rules:
 4. This document covers `P0` and `P0+` MVP phases, plus the Post-P0 trial readiness sprint.
 5. `P2` and later capabilities must stay in backlog and must not enter the primary build sequence.
 
-## 1.5 Execution Status Summary (as of 2026-08-18)
+## 1.5 Execution Status Summary (as of 2026-08-20)
 
 | Phase | Description | Status |
 |-------|-------------|--------|
@@ -27,15 +27,15 @@ Rules:
 | Phase 8 | Post-P0 Trial Readiness Sprint (A–H) | ✅ Complete |
 | Phase T0–T5 | Trial/demo closed loops through voice help orders | ✅ Delivered through PR #32 (`35b1e8a`) |
 | Phase T6 | Android JDK 21 and enforced APK build gate | ✅ Delivered through PR #37 (`98115b9`) |
-| Phase T7 | SEC-002 refresh-token HttpOnly Cookie closure | Implementation and local gates complete; physical-device and protected CI acceptance pending |
+| Phase T7 | SEC-002 refresh-token HttpOnly Cookie closure | Implementation, local gates, and physical-device acceptance complete; protected CI pending |
 
-**Current active work:** T7 is implemented on `codex/sec-002-refresh-cookie`. SEC-002 remains open until the Android process-restart check and protected `CI / Required Quality Gate` pass. Android release signing and store publishing remain separate release-engineering work.
+**Current active work:** T7 is implemented and physically accepted on `codex/sec-002-refresh-cookie`. SEC-002 remains open until the protected `CI / Required Quality Gate` passes with zero unresolved review conversations. Android release signing and store publishing remain separate release-engineering work.
 
 **Flyway current latest:** V12 (`V12__help_order_voice_transcription.sql`). Next new migration must be V13.
 
 **Known open items:**
 - `MEDICINE_OCR_API_KEY` must be set in `.env.local` for live OCR (graceful fallback if omitted)
-- SEC-002 closure acceptance pending: official clients have migrated to HttpOnly refresh Cookies, but physical-device persistence and protected CI still require evidence
+- SEC-002 closure acceptance pending: official clients have migrated to HttpOnly refresh Cookies and physical-device persistence/upload acceptance passes; protected PR/CI evidence remains required
 - Ops cleanup: `ops/sql/sec-003-clear-legacy-patient-id-card-masked.sql` needs to be run
 
 ## 1.6 Post-P0 Trial Demo Closed-Loop Sequence
@@ -1069,7 +1069,7 @@ The following items are intentionally excluded from the primary execution sequen
 3. More disease-path expansion (DDI rules for hypertension, diabetes, etc.)
 4. Non-MVP capability expansion
 5. Any work that reopens legacy backend refactor
-6. SEC-002 closure evidence: T7 implementation is complete locally; retain as an open acceptance item until physical-device restart/upload checks and protected CI pass
+6. SEC-002 closure evidence: T7 implementation, physical-device restart/upload checks, and all local gates pass; retain as an open acceptance item until protected CI passes
 7. Ops cleanup: `ops/sql/sec-003-clear-legacy-patient-id-card-masked.sql` (historical `id_card_masked` rows)
 8. S3 presigned URL upload end-to-end browser test (Phase B, pending manual verification)
 

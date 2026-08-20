@@ -27,7 +27,7 @@ Current State
 - PR #37 (https://github.com/Cheems1368/Yaoanshi-v2/pull/37) was squash-merged as `98115b9`; the post-merge `main` CI run #46 (https://github.com/Cheems1368/Yaoanshi-v2/actions/runs/31795827722) passed all six checks and produced the 14-day Android APK artifact. Eclipse Temurin `21.0.12+8` is installed under `JAVA21_HOME`; default `JAVA_HOME` remains Microsoft OpenJDK 17.0.15 for backend work.
 - GitHub `main` branch protection and CI governance are officially enabled. The governance-enablement baseline was 92 backend tests with 64.33% JaCoCo line coverage; the enforced floor is 60%.
 - T1–T5 delivered baseline: 143 backend tests pass with 61.82% JaCoCo line coverage; patient ESLint, 3 Vitest tests, type check/production build, pharmacist build, and doctor build pass. All nine required E2E scenarios passed, including medication transfer and configured/unconfigured voice-transcription paths.
-- 2026-08-18 update: T7 implementation and local gates pass: 153 backend tests, all three frontend gates, Android debug APK build, static refresh-token scan, HTTP contract/replay probes, and all nine E2E scenarios. Physical-device process-restart and protected CI evidence remain pending, so SEC-002 is not yet marked closed.
+- 2026-08-20 update: T7 Android physical-device acceptance passes on Xiaomi `2407FRK8EC` (Android 14/API 34): two process-stop/restart Cookie restorations, protected JSON reads, prescription image upload, image help order, microphone voice order, MinIO uploads, file registration, and persisted record replay. All local gates pass; protected PR/CI evidence remains pending, so SEC-002 is not yet marked closed.
 - 2026-08-01 update: Phase T5 complete. Pharmacist mobile work-order actions, Docker MIME/XFYUN runtime, live transcription, three-role mobile flow, and viewport acceptance all passed.
 - 2026-05-12 update: Phase T0/T1 complete for post-P0 trial/demo closed loop: Standard document sync plus patient text/image help-order loop.
 - Current implementation includes backend-v2 multi-image help-order attachments, patient image upload/reply UI, and pharmacist `/mobile/workorders`.
@@ -37,15 +37,15 @@ Current State
 - Last session (2026-03-27): Phase A–F completed (see below)
 
 In Progress
-- T7 code and local validation are complete; physical-device session persistence and protected CI acceptance remain.
+- T7 code, local validation, and physical-device acceptance are complete; protected PR/CI acceptance remains.
 
 Next
-- Run patient Android on a physical device, log in, kill the process, restart, and verify Cookie session recovery plus image/voice/presigned uploads.
-- Push the T7 branch through the protected PR workflow and require `CI / Required Quality Gate` before marking SEC-002 closed.
+- Commit the physical-device fix/evidence, synchronize `origin/main`, and push `codex/sec-002-refresh-cookie` through the protected PR workflow.
+- Require `CI / Required Quality Gate` green and zero unresolved review conversations before marking SEC-002 closed; do not merge in this goal.
 
 Last Updated
-- 2026-08-14 Asia/Shanghai
-- Reason: PR #37 merged; Android JDK 21 and APK compilation are active on protected `main`.
+- 2026-08-20 Asia/Shanghai
+- Reason: T7 Android physical-device and full local gates passed; protected PR/CI qualification is the only remaining closure gate.
 
 Android JDK 21 and APK Gate (2026-08-14)
 - Changed:
@@ -91,7 +91,7 @@ Phase F — CI/CD GitHub Actions (2026-03-27, commit f285037)
 
 Blockers (active)
 - MEDICINE_OCR_API_KEY must be set in .env.local to enable live OCR (graceful fallback if omitted)
-- SEC-002 implementation is complete locally; physical-device persistence and protected CI closure gates remain
+- SEC-002 implementation, local gates, and physical-device persistence/upload gates pass; protected PR/CI closure remains
 - Historical patient.id_card_masked rows need ops cleanup: ops/sql/sec-003-clear-legacy-patient-id-card-masked.sql
 
 Completed Phases (durable record)
@@ -790,3 +790,28 @@ Goal T7 SEC-002 Refresh Token Cookie Closure (2026-08-18)
 Last Updated
 - 2026-08-18 Asia/Shanghai
 - Reason: implemented T7, passed all available local gates, and recorded the remaining physical-device and protected-CI closure requirements.
+
+T7 Android Physical-Device Acceptance (2026-08-20)
+- Workstream:
+  - Validate the T7 HttpOnly refresh Cookie and upload paths on the connected patient Android app without changing the frozen session API contract.
+- Device:
+  - Xiaomi `2407FRK8EC`, serial `S4AALFDUIZAUDUEY`, Android 14/API 34, application ID `com.yaoanshi.patient`.
+- Changed:
+  - Removed the `CapacitorHttp` XHR/fetch patch while retaining `CapacitorCookies`. On the physical WebView the HTTP patch caused relative Axios requests to fail before dispatch with `XMLHttpRequest.setRequestHeader` reporting that the object was not opened.
+  - Added a unit regression that requires native Cookie support and forbids enabling the conflicting `CapacitorHttp` patch.
+- Validated:
+  - Login and patient binding succeeded; protected profile, active-plan, and today-task JSON reads returned 200.
+  - Two independent `am force-stop` / `MainActivity` restarts returned directly to the authenticated home route. Each startup called `/app-api/auth/session/refresh` successfully before protected reads.
+  - Prescription flow completed presign, MinIO PUT, and prescription registration. Image help order completed presign, MinIO PUT, file registration, order creation, and detail image rendering.
+  - Android runtime microphone permission was granted through the device dialog. Voice flow uploaded both WebM playback and 16 kHz WAV transcript-source objects, registered both assets, created the order, and loaded the original audio for playback.
+  - After the second restart, the prescription record, image order, rendered image, voice order, and audio attachment remained visible.
+  - Final local gates passed: backend 153/153 with the 60% JaCoCo gate, patient lint and Vitest 4/4, patient/pharmacist/doctor production builds, Android debug build, all nine E2E scenarios, refresh-token storage/URL scan, token-log scan, branch secret-pattern scan, and `git diff --check`.
+- Open risks:
+  - The configured XFYUN upstream returned `Output closed`; the UI degraded to `转文字失败，可听原音`. This is non-blocking for T7 because both original audio objects are persisted and playable, but provider health remains an external risk.
+  - The feature branch has not yet been pushed and the protected `CI / Required Quality Gate` has not run for this physical-device fix/evidence commit.
+- Next:
+  - Commit the physical-device fix and evidence, recheck `origin/main`, open the SEC-002 PR, resolve all review conversations, and wait for the final required gate to turn green. Stop before merge.
+
+Last Updated
+- 2026-08-20 Asia/Shanghai
+- Reason: completed T7 Android physical-device acceptance and repeated the full local quality/security gate matrix.

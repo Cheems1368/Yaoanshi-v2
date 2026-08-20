@@ -56,9 +56,9 @@ False positive notes:
 
 - If an upstream gateway already strips query strings from all logs, leak surface is reduced, but the code still accepts the token in the URL and still allows all origins.
 
-### SEC-002: Browser-accessible refresh-token storage — IMPLEMENTED, CLOSURE GATES PENDING (2026-08-18)
+### SEC-002: Browser-accessible refresh-token storage — IMPLEMENTED, PROTECTED CI PENDING (2026-08-20)
 
-**Status: IMPLEMENTED; not yet marked closed.** Patient, pharmacist, and doctor official clients now keep access tokens in memory and use backend-managed HttpOnly refresh Cookies. Session responses contain no refresh token, professional refresh query parameters were removed, and refresh/logout require `X-Auth-Refresh: 1`. Local backend, frontend, Android-build, static-scan, HTTP-contract, and nine-scenario E2E gates pass. Physical-device process-restart evidence and protected CI remain required before closure.
+**Status: IMPLEMENTED; not yet marked closed.** Patient, pharmacist, and doctor official clients now keep access tokens in memory and use backend-managed HttpOnly refresh Cookies. Session responses contain no refresh token, professional refresh query parameters were removed, and refresh/logout require `X-Auth-Refresh: 1`. Local backend, frontend, Android-build, static-scan, HTTP-contract, nine-scenario E2E, and Android physical-device gates pass. Protected PR/CI remains required before closure.
 
 ~~Impact:~~
 ~~Any XSS in the browser runtime can immediately exfiltrate both access and refresh tokens, enabling session replay and long-lived account takeover.~~
@@ -86,6 +86,9 @@ Fix:
 - Implemented persistent patient and browser-session professional Cookies with production/local SameSite and Secure policies.
 - Implemented database conditional rotation/revocation for patient sessions and Redis compare-and-set/compare-and-delete for professional sessions.
 - Migrated all three official clients to Cookie session restoration while retaining Bearer access-token authorization and legacy endpoint compatibility.
+- Verified two physical Android process-stop/restart cycles on Xiaomi `2407FRK8EC` (Android 14/API 34), including successful Cookie refresh followed by protected JSON reads.
+- Verified prescription image, help-order image, WebM voice playback, WAV transcript-source, presigned MinIO PUT, file registration, and post-restart record visibility without recording tokens, Cookies, phone numbers, or credentials as evidence.
+- Removed the conflicting `CapacitorHttp` XHR patch after a physical-device reproduction showed relative requests failing before dispatch; retained `CapacitorCookies` and added a regression test for this configuration.
 
 Mitigation:
 
