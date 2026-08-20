@@ -58,7 +58,7 @@ False positive notes:
 
 ### SEC-002: Browser-accessible refresh-token storage — FIXED ON PR #39 (2026-08-20)
 
-**Status: FIXED on PR #39; awaiting authorized merge.** Patient, pharmacist, and doctor official clients now keep access tokens in memory and use backend-managed HttpOnly refresh Cookies. Session responses contain no refresh token, professional refresh query parameters were removed, and refresh/logout require `X-Auth-Refresh: 1`. Local backend, frontend, Android-build, static-scan, HTTP-contract, nine-scenario E2E, Android physical-device, and protected `CI / Required Quality Gate` gates pass. PR #39 is clean/mergeable with zero review conversations; merge is intentionally not performed by this goal.
+**Status: FIXED on PR #39; awaiting authorized merge.** Patient, pharmacist, and doctor official clients now keep access tokens in memory and use backend-managed HttpOnly refresh Cookies. Session responses contain no refresh token, professional refresh query parameters were removed, and refresh/logout require `X-Auth-Refresh: 1`. The production Nginx credential limiter covers both legacy and session professional login paths, with a CI regression check preventing either path from falling through to the general API rate. Local backend, frontend, Android-build, static-scan, HTTP-contract, nine-scenario E2E, Android physical-device, and protected `CI / Required Quality Gate` gates pass; merge is intentionally not performed by this goal.
 
 ~~Impact:~~
 ~~Any XSS in the browser runtime can immediately exfiltrate both access and refresh tokens, enabling session replay and long-lived account takeover.~~

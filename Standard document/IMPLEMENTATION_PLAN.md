@@ -29,7 +29,7 @@ Rules:
 | Phase T6 | Android JDK 21 and enforced APK build gate | ✅ Delivered through PR #37 (`98115b9`) |
 | Phase T7 | SEC-002 refresh-token HttpOnly Cookie closure | Physical-device and protected PR gates passed on PR #39; awaiting authorized merge |
 
-**Current active work:** T7 is implemented, physically accepted, and protected-CI qualified on PR #39. The PR is clean/mergeable with zero review conversations and is awaiting the final documentation-only CI rerun plus explicit merge authorization. Android release signing and store publishing remain separate release-engineering work.
+**Current active work:** T7 is implemented, physically accepted, and protected-CI qualified on PR #39. Production session-login rate limiting is covered by the dedicated login zone and a CI regression check. The PR is awaiting explicit merge authorization. Android release signing and store publishing remain separate release-engineering work.
 
 **Flyway current latest:** V12 (`V12__help_order_voice_transcription.sql`). Next new migration must be V13.
 
