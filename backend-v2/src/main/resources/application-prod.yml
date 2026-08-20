@@ -15,6 +15,11 @@ springdoc:
     enabled: false
 
 medicine:
+  auth:
+    cookies:
+      secure: true
+      app-same-site: None
+      admin-same-site: Strict
   datasource:
     url: ${MEDICINE_DB_URL}
     username: ${MEDICINE_DB_USERNAME}

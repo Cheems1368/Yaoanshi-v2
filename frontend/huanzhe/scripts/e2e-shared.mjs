@@ -200,36 +200,51 @@ export async function createPrescriptionUpload(baseUrl, session, filename = 'smo
 }
 
 export async function primePatientPage(page, baseUrl, session, { bound = true, hasActivePlan = false } = {}) {
-  await page.goto(baseUrl, { waitUntil: 'domcontentloaded' })
-  await page.evaluate(
-    ({ refreshToken, deviceId, mobile, bound, hasActivePlan }) => {
-      sessionStorage.setItem('patient_refresh_token', refreshToken)
+  const frontendUrl = new URL(baseUrl)
+  await page.context().addCookies([{
+    name: 'yaoanshi_app_refresh',
+    value: session.refreshToken,
+    domain: frontendUrl.hostname,
+    path: '/app-api/auth/session',
+    httpOnly: true,
+    secure: frontendUrl.protocol === 'https:',
+    sameSite: frontendUrl.protocol === 'https:' ? 'None' : 'Lax',
+    expires: Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60
+  }])
+  await page.addInitScript(
+    ({ deviceId, mobile, bound, hasActivePlan }) => {
+      const primeMarker = '__e2e_patient_cookie_session_primed'
+      if (sessionStorage.getItem(primeMarker)) {
+        return
+      }
       localStorage.setItem('patient_device_id', deviceId)
       sessionStorage.setItem('patient_mobile', mobile)
       localStorage.setItem('patient_binding_status', bound ? 'BOUND' : 'PENDING')
       localStorage.setItem('patient_has_active_plan', hasActivePlan ? 'true' : 'false')
+      sessionStorage.setItem(primeMarker, '1')
     },
     {
-      refreshToken: session.refreshToken,
       deviceId: session.deviceId,
       mobile: session.mobile,
       bound,
       hasActivePlan
     }
   )
+  await page.goto(`${baseUrl}/tabs/home`, { waitUntil: 'networkidle' })
 }
 
 export async function primeProfessionalPage(page, baseUrl, session) {
-  await page.goto(baseUrl, { waitUntil: 'domcontentloaded' })
-  await page.evaluate(
-    ({ refreshToken }) => {
-      if (refreshToken) {
-        sessionStorage.setItem('refreshToken', refreshToken)
-      }
-    },
-    session
-  )
-  await page.reload({ waitUntil: 'networkidle' })
+  const frontendUrl = new URL(baseUrl)
+  await page.context().addCookies([{
+    name: 'yaoanshi_admin_refresh',
+    value: session.refreshToken,
+    domain: frontendUrl.hostname,
+    path: '/admin-api/system/auth/session',
+    httpOnly: true,
+    secure: frontendUrl.protocol === 'https:',
+    sameSite: frontendUrl.protocol === 'https:' ? 'Strict' : 'Lax'
+  }])
+  await page.goto(`${baseUrl}/mobile/workorders`, { waitUntil: 'networkidle' })
 }
 
 export async function expectCommonResultFailure(promiseFactory, expectedMessage) {

@@ -11,7 +11,7 @@ Scope:
 
 This audit found 5 actionable findings:
 
-- 3 High (all FIXED as of 2026-03-09)
+- 3 High (all FIXED; SEC-002 qualified on PR #39 as of 2026-08-20)
 - 1 Medium FIXED as of 2026-03-09
 - 1 Medium open
 
@@ -56,9 +56,9 @@ False positive notes:
 
 - If an upstream gateway already strips query strings from all logs, leak surface is reduced, but the code still accepts the token in the URL and still allows all origins.
 
-### SEC-002: All three frontends persist access or refresh tokens in `localStorage` — FIXED (2026-03-08)
+### SEC-002: Browser-accessible refresh-token storage — FIXED ON PR #39 (2026-08-20)
 
-**Status: FIXED** — All three frontends now store accessToken in memory only and refreshToken in sessionStorage. localStorage no longer contains any token material.
+**Status: FIXED on PR #39; awaiting authorized merge.** Patient, pharmacist, and doctor official clients now keep access tokens in memory and use backend-managed HttpOnly refresh Cookies. Session responses contain no refresh token, professional refresh query parameters were removed, and refresh/logout require `X-Auth-Refresh: 1`. The production Nginx credential limiter covers both legacy and session professional login paths, with a CI regression check preventing either path from falling through to the general API rate. Local backend, frontend, Android-build, static-scan, HTTP-contract, nine-scenario E2E, Android physical-device, and protected `CI / Required Quality Gate` gates pass; merge is intentionally not performed by this goal.
 
 ~~Impact:~~
 ~~Any XSS in the browser runtime can immediately exfiltrate both access and refresh tokens, enabling session replay and long-lived account takeover.~~
@@ -82,8 +82,13 @@ localStorage.setItem('refreshToken', refreshToken)
 
 Fix:
 
-- Prefer backend-managed `HttpOnly` cookies for refresh/session material.
-- If bearer auth must remain, keep refresh tokens out of browser storage and keep access tokens memory-only with short TTL.
+- Implemented additive patient and professional session endpoints returning `SessionTokenDTO` without refresh-token material.
+- Implemented persistent patient and browser-session professional Cookies with production/local SameSite and Secure policies.
+- Implemented database conditional rotation/revocation for patient sessions and Redis compare-and-set/compare-and-delete for professional sessions.
+- Migrated all three official clients to Cookie session restoration while retaining Bearer access-token authorization and legacy endpoint compatibility.
+- Verified two physical Android process-stop/restart cycles on Xiaomi `2407FRK8EC` (Android 14/API 34), including successful Cookie refresh followed by protected JSON reads.
+- Verified prescription image, help-order image, WebM voice playback, WAV transcript-source, presigned MinIO PUT, file registration, and post-restart record visibility without recording tokens, Cookies, phone numbers, or credentials as evidence.
+- Removed the conflicting `CapacitorHttp` XHR patch after a physical-device reproduction showed relative requests failing before dispatch; retained `CapacitorCookies` and added a regression test for this configuration.
 
 Mitigation:
 

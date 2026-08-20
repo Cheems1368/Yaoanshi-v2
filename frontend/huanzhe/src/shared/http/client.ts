@@ -17,6 +17,7 @@ class HttpService {
     this.instance = axios.create({
       baseURL: import.meta.env.DEV ? '' : apiBaseUrl,
       timeout: 10000,
+      withCredentials: true,
       headers: {
         'Content-Type': 'application/json'
       }
@@ -27,7 +28,7 @@ class HttpService {
       let token = patientSession.getAccessToken()
       config.headers = config.headers ?? {}
 
-      if (!token && patientSession.getRefreshToken() && !this.shouldSkipRefresh(requestUrl)) {
+      if (!token && patientSession.getAuthStatus() !== 'anonymous' && !this.shouldSkipRefresh(requestUrl)) {
         token = await this.refreshAccessToken()
       }
 
@@ -89,10 +90,21 @@ class HttpService {
     patientSession.clearGateState()
   }
 
+  async restoreSession() {
+    if (patientSession.getAccessToken()) {
+      return true
+    }
+    if (patientSession.getAuthStatus() === 'anonymous') {
+      return false
+    }
+    return Boolean(await this.refreshAccessToken())
+  }
+
   private shouldSkipRefresh(requestUrl: string) {
     return requestUrl.includes('/app-api/auth/login')
       || requestUrl.includes('/app-api/auth/send-otp')
       || requestUrl.includes('/app-api/auth/refresh-token')
+      || requestUrl.includes('/app-api/auth/session/')
   }
 
   private async retryWithRefresh(
@@ -124,27 +136,19 @@ class HttpService {
   }
 
   private async refreshAccessToken(): Promise<string | null> {
-    const refreshToken = patientSession.getRefreshToken()
-    const deviceId = patientSession.getDeviceId()
-
-    if (!refreshToken || !deviceId) {
-      return null
-    }
-
     if (!this.refreshPromise) {
       const baseURL = this.instance.defaults.baseURL ?? ''
       this.refreshPromise = axios
-        .post<ApiResponse<{ accessToken: string; refreshToken: string; expiresIn: number; refreshExpiresIn: number; deviceId: string }>>(
-          `${baseURL}/app-api/auth/refresh-token`,
-          {
-            refreshToken,
-            deviceId
-          },
+        .post<ApiResponse<{ accessToken: string; expiresIn: number; refreshExpiresIn: number; deviceId: string }>>(
+          `${baseURL}/app-api/auth/session/refresh`,
+          {},
           {
             timeout: 10000,
+            withCredentials: true,
             headers: {
               'Content-Type': 'application/json',
-              'tenant-id': '1'
+              'tenant-id': '1',
+              'X-Auth-Refresh': '1'
             }
           }
         )
@@ -155,11 +159,10 @@ class HttpService {
           }
 
           patientSession.setAccessToken(payload.data.accessToken)
-          patientSession.setRefreshToken(payload.data.refreshToken)
           return payload.data.accessToken
         })
         .catch(() => {
-          this.clearToken()
+          patientSession.markAnonymous()
           return null
         })
         .finally(() => {

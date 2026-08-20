@@ -45,7 +45,9 @@ try {
 
   const storageStateAfterLogin = await page.evaluate(() => ({
     accessToken: Boolean(localStorage.getItem('patient_access_token')),
-    refreshToken: Boolean(sessionStorage.getItem('patient_refresh_token')),
+    refreshTokenInStorage: [...Object.keys(localStorage), ...Object.keys(sessionStorage)]
+      .some((key) => key.toLowerCase().includes('refresh')),
+    refreshCookieVisibleToJavaScript: document.cookie.includes('yaoanshi_app_refresh='),
     bindingStatus: localStorage.getItem('patient_binding_status'),
     activePlanStatus: localStorage.getItem('patient_has_active_plan'),
     mobile: sessionStorage.getItem('patient_mobile'),
@@ -59,7 +61,9 @@ try {
 
   const storageStateAfterLogout = await page.evaluate(() => ({
     accessToken: localStorage.getItem('patient_access_token'),
-    refreshToken: sessionStorage.getItem('patient_refresh_token'),
+    refreshTokenInStorage: [...Object.keys(localStorage), ...Object.keys(sessionStorage)]
+      .some((key) => key.toLowerCase().includes('refresh')),
+    refreshCookieVisibleToJavaScript: document.cookie.includes('yaoanshi_app_refresh='),
     bindingStatus: localStorage.getItem('patient_binding_status'),
     activePlanStatus: localStorage.getItem('patient_has_active_plan'),
     mobile: sessionStorage.getItem('patient_mobile'),

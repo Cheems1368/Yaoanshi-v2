@@ -93,6 +93,7 @@ const router = createRouter({
 
 router.beforeEach(async (to, _from, next) => {
   const userStore = useUserStore()
+  await userStore.restoreSession()
   document.title = `${to.meta.title || '药师工作台'} - 药按时`
 
   if (userStore.isLoggedIn && !userStore.userInfo.id) {

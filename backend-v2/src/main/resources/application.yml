@@ -26,6 +26,11 @@ mybatis:
     map-underscore-to-camel-case: true
 
 medicine:
+  auth:
+    cookies:
+      secure: false
+      app-same-site: Lax
+      admin-same-site: Lax
   datasource:
     url: ${MEDICINE_DB_URL:jdbc:mysql://127.0.0.1:13306/medicine?useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true}
     username: ${MEDICINE_DB_USERNAME:root}

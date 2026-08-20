@@ -86,6 +86,8 @@ These two domains do not share login tables or token tables.
 - Concurrent login policy: one account may log in on multiple devices at the same time
 - Device session policy: each device owns an independent refresh token
 - Refresh token storage: Redis + database
+- Official-client transport: `yaoanshi_app_refresh` HttpOnly Cookie scoped to `/app-api/auth/session`, persistent for the refresh TTL
+- Production Cookie policy: `Secure; SameSite=None`; local profile: non-Secure `SameSite=Lax`
 - OTP and send rate-limit storage: Redis only
 
 ### 3.3 Professional auth model
@@ -95,10 +97,14 @@ These two domains do not share login tables or token tables.
 - `backend-v2` only stores business profile extensions in:
   - `pharmacist_profile`
   - `doctor_profile`
+- Official-client transport: `yaoanshi_admin_refresh` HttpOnly browser-session Cookie scoped to `/admin-api/system/auth/session`
+- Production Cookie policy: `Secure; SameSite=Strict`; local profile: non-Secure `SameSite=Lax`
 
 ### 3.4 Required auth DTOs
 
 #### `TokenPair`
+
+Compatibility DTO for the existing auth endpoints. Official patient, pharmacist, and doctor clients must not call endpoints returning this DTO.
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
@@ -107,6 +113,17 @@ These two domains do not share login tables or token tables.
 | `expiresIn` | `number` | Yes | Access token TTL in seconds |
 | `refreshExpiresIn` | `number` | Yes | Refresh token TTL in seconds |
 | `deviceId` | `string` | Yes | Logical device identifier |
+
+#### `SessionTokenDTO`
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `accessToken` | `string` | Yes | JWT access token; official clients keep it in memory only |
+| `expiresIn` | `number` | Yes | Access token TTL in seconds |
+| `refreshExpiresIn` | `number` | Yes | Server-side refresh-session TTL in seconds |
+| `deviceId` | `string` | App only | Logical device identifier; professional sessions return `null` |
+
+`SessionTokenDTO` never contains `refreshToken`.
 
 #### App auth requests
 
@@ -126,6 +143,11 @@ These two domains do not share login tables or token tables.
 4. Refresh token rotation must invalidate the replaced refresh token.
 5. Logout from one device only invalidates that device session.
 6. Admin can revoke all sessions of one app account.
+7. Session refresh and logout require the non-simple request header `X-Auth-Refresh: 1`.
+8. Session login and refresh responses use `Cache-Control: no-store`.
+9. App refresh rotation uses a database old-hash conditional update before Redis synchronization; professional refresh rotation uses Redis compare-and-set.
+10. Cookie logout conditionally revokes only the currently matching refresh state, then clears the Cookie with `Max-Age=0`.
+11. Refresh Cookies never authenticate business APIs; business authorization remains Bearer access-token based.
 
 ## 4. Database schema
 
@@ -1017,6 +1039,9 @@ Note: `drug_catalog` is a standalone lookup table with no foreign-key relationsh
 | `POST` | `/app-api/auth/login` | No | `AppLoginRequest` | `TokenPair` | verify Redis OTP, upsert `app_account`, create session row, write Redis session |
 | `POST` | `/app-api/auth/refresh-token` | No | `RefreshTokenRequest` | `TokenPair` | rotate refresh token in Redis + DB |
 | `POST` | `/app-api/auth/logout` | Yes | `deviceId` | `Boolean` | revoke current device session |
+| `POST` | `/app-api/auth/session/login` | No | `AppLoginRequest` | `SessionTokenDTO` | issue tokens, persist session, set patient refresh Cookie |
+| `POST` | `/app-api/auth/session/refresh` | Refresh Cookie + guard header | none | `SessionTokenDTO` | atomically rotate session and replace patient refresh Cookie |
+| `POST` | `/app-api/auth/session/logout` | Refresh Cookie + guard header | none | `Boolean` | conditionally revoke device session and clear patient refresh Cookie |
 | `GET` | `/app-api/auth/me` | Yes | none | current account profile | read account and binding summary |
 
 #### Patient
@@ -1181,8 +1206,17 @@ Search priority:
 
 #### Professional auth bridge
 
-- Professional login remains owned by legacy `/system/auth/*`.
+- Legacy `/system/auth/*` remains compatible and is not modified by backend-v2.
+- Official pharmacist and doctor clients use the backend-v2 session endpoints below.
 - `backend-v2` accepts professional JWT and resolves pharmacist or doctor profile through `system_users` mapping.
+
+| Method | Path | Auth | Request | Response `data` | Side effects |
+|---|---|---|---|---|---|
+| `POST` | `/admin-api/system/auth/session/login` | No | `AdminLoginRequest` | `SessionTokenDTO` | issue professional tokens, write Redis refresh state, set session Cookie |
+| `POST` | `/admin-api/system/auth/session/refresh` | Refresh Cookie + guard header | none | `SessionTokenDTO` | Redis compare-and-set rotation and Cookie replacement |
+| `POST` | `/admin-api/system/auth/session/logout` | Refresh Cookie + guard header | none | `Boolean` | Redis compare-and-delete and Cookie clear |
+
+Existing `/admin-api/system/auth/login`, `/refresh-token`, and `/logout` contracts remain compatibility endpoints for this phase.
 
 #### Patient and profile management
 

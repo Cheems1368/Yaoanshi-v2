@@ -39,8 +39,11 @@ try {
 
   await page.waitForURL(/\/tabs\/home$/, { timeout: 15000 })
 
+  const beforeRefreshCookie = (await context.cookies()).find((cookie) => cookie.name === 'yaoanshi_app_refresh')
   const beforeRefresh = await page.evaluate(() => ({
-    refreshToken: sessionStorage.getItem('patient_refresh_token'),
+    refreshTokenInStorage: [...Object.keys(localStorage), ...Object.keys(sessionStorage)]
+      .some((key) => key.toLowerCase().includes('refresh')),
+    refreshCookieVisibleToJavaScript: document.cookie.includes('yaoanshi_app_refresh='),
     deviceId: localStorage.getItem('patient_device_id')
   }))
 
@@ -69,8 +72,11 @@ try {
     }
   })
 
+  const afterRefreshCookie = (await context.cookies()).find((cookie) => cookie.name === 'yaoanshi_app_refresh')
   const afterRefresh = await page.evaluate(() => ({
-    refreshToken: sessionStorage.getItem('patient_refresh_token'),
+    refreshTokenInStorage: [...Object.keys(localStorage), ...Object.keys(sessionStorage)]
+      .some((key) => key.toLowerCase().includes('refresh')),
+    refreshCookieVisibleToJavaScript: document.cookie.includes('yaoanshi_app_refresh='),
     deviceId: localStorage.getItem('patient_device_id')
   }))
 
@@ -81,13 +87,17 @@ try {
       mobile,
       hospitalPatientId,
       refreshProbe,
-      refreshTokenRotated: Boolean(beforeRefresh.refreshToken && afterRefresh.refreshToken && beforeRefresh.refreshToken !== afterRefresh.refreshToken),
+      refreshTokenRotated: Boolean(beforeRefreshCookie && afterRefreshCookie && beforeRefreshCookie.value !== afterRefreshCookie.value),
       beforeRefresh: {
-        refreshTokenPresent: Boolean(beforeRefresh.refreshToken),
+        refreshCookiePresent: Boolean(beforeRefreshCookie),
+        refreshTokenInStorage: beforeRefresh.refreshTokenInStorage,
+        refreshCookieVisibleToJavaScript: beforeRefresh.refreshCookieVisibleToJavaScript,
         deviceId: beforeRefresh.deviceId
       },
       afterRefresh: {
-        refreshTokenPresent: Boolean(afterRefresh.refreshToken),
+        refreshCookiePresent: Boolean(afterRefreshCookie),
+        refreshTokenInStorage: afterRefresh.refreshTokenInStorage,
+        refreshCookieVisibleToJavaScript: afterRefresh.refreshCookieVisibleToJavaScript,
         deviceId: afterRefresh.deviceId
       }
     })

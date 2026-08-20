@@ -3,17 +3,22 @@ import request from '@/utils/request'
 // 登录
 export function login(data) {
   return request({
-    url: '/admin-api/system/auth/login',
+    url: '/admin-api/system/auth/session/login',
     method: 'post',
-    data
+    data,
+    skipAuthHeader: true,
+    skipAuthRefresh: true
   })
 }
 
 // 登出
 export function logout() {
   return request({
-    url: '/admin-api/system/auth/logout',
-    method: 'post'
+    url: '/admin-api/system/auth/session/logout',
+    method: 'post',
+    headers: { 'X-Auth-Refresh': '1' },
+    skipAuthHeader: true,
+    skipAuthRefresh: true
   })
 }
 
@@ -28,16 +33,9 @@ export function getUserInfo() {
 // 刷新token
 export function refreshToken() {
   return request({
-    url: '/admin-api/system/auth/refresh-token',
-    method: 'post'
-  })
-}
-
-export function refreshTokenByValue(refreshToken) {
-  return request({
-    url: '/admin-api/system/auth/refresh-token',
+    url: '/admin-api/system/auth/session/refresh',
     method: 'post',
-    params: { refreshToken },
+    headers: { 'X-Auth-Refresh': '1' },
     skipAuthHeader: true,
     skipAuthRefresh: true
   })

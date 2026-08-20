@@ -61,8 +61,14 @@ public class SecurityConfig {
                             "/app-api/auth/send-otp",
                             "/app-api/auth/login",
                             "/app-api/auth/refresh-token",
+                            "/app-api/auth/session/login",
+                            "/app-api/auth/session/refresh",
+                            "/app-api/auth/session/logout",
                             "/admin-api/system/auth/login",
-                            "/admin-api/system/auth/refresh-token"
+                            "/admin-api/system/auth/refresh-token",
+                            "/admin-api/system/auth/session/login",
+                            "/admin-api/system/auth/session/refresh",
+                            "/admin-api/system/auth/session/logout"
                     ).permitAll();
                     if (environment.acceptsProfiles(Profiles.of("local"))) {
                         auth.requestMatchers(

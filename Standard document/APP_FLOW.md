@@ -25,6 +25,11 @@ There are three product surfaces in MVP:
 
 - Patient and family account must log in before entering the main medication flow.
 - Pharmacist and doctor must log in before entering any work dashboard.
+- Each client keeps the access token in runtime memory only and restores it through its HttpOnly refresh Cookie when a protected route is first entered after reload.
+- Access-token expiry triggers one locked Cookie refresh and one request retry. Refresh failure clears runtime auth state and redirects to login.
+- Refresh Cookies are transport-only and never replace Bearer authorization on business APIs.
+- Patient sessions persist for 30 days unless revoked or expired. Pharmacist and doctor sessions end when the browser session ends.
+- Manual logout revokes the server session, clears the refresh Cookie, clears runtime access state, and returns to login.
 
 ### 3.2 Entry gate rule
 
@@ -44,7 +49,7 @@ The following do not block the main flow in MVP:
 For all user surfaces:
 
 - If the network fails, show a clear message and allow retry.
-- If the token expires, redirect to login.
+- If access-token renewal fails, redirect to login.
 - If the user has no permission, show a permission message and stop the action.
 - If data is empty, show an empty state and the next recommended action.
 
