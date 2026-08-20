@@ -17,7 +17,8 @@ const extractMessage = (payload, fallback = DEFAULT_ERROR_MESSAGE) => {
 
 const service = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || '',
-  timeout: 15000
+  timeout: 15000,
+  withCredentials: true
 })
 
 service.interceptors.request.use(

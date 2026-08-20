@@ -18,15 +18,16 @@ Project
 - Yaoshian MVP P0
 
 Branch / Context
-- Delivery state: `main` through PR #37 (`98115b9`)
-- Active workstream: Android JDK 21 and enforced APK quality gate complete
-- Active surfaces: frontend/huanzhe Android, GitHub Actions, testing governance, Standard document
+- Delivery state: `main` through PR #37 (`98115b9`); T7 implementation is on `codex/sec-002-refresh-cookie`
+- Active workstream: T7 / SEC-002 refresh-token HttpOnly Cookie closure
+- Active surfaces: backend-v2 auth, patient Android/Web, pharmacist Web, doctor Web, E2E, Standard document
 
 Current State
 - 2026-08-14 update: PR #32 was squash-merged as `35b1e8a`; the post-merge `main` CI run #38 passed. The old `codex/mobile-demo` branches were deleted while local protection reference `codex/backup-mobile-demo-20260814` was retained.
 - PR #37 (https://github.com/Cheems1368/Yaoanshi-v2/pull/37) was squash-merged as `98115b9`; the post-merge `main` CI run #46 (https://github.com/Cheems1368/Yaoanshi-v2/actions/runs/31795827722) passed all six checks and produced the 14-day Android APK artifact. Eclipse Temurin `21.0.12+8` is installed under `JAVA21_HOME`; default `JAVA_HOME` remains Microsoft OpenJDK 17.0.15 for backend work.
 - GitHub `main` branch protection and CI governance are officially enabled. The governance-enablement baseline was 92 backend tests with 64.33% JaCoCo line coverage; the enforced floor is 60%.
 - T1–T5 delivered baseline: 143 backend tests pass with 61.82% JaCoCo line coverage; patient ESLint, 3 Vitest tests, type check/production build, pharmacist build, and doctor build pass. All nine required E2E scenarios passed, including medication transfer and configured/unconfigured voice-transcription paths.
+- 2026-08-18 update: T7 implementation and local gates pass: 153 backend tests, all three frontend gates, Android debug APK build, static refresh-token scan, HTTP contract/replay probes, and all nine E2E scenarios. Physical-device process-restart and protected CI evidence remain pending, so SEC-002 is not yet marked closed.
 - 2026-08-01 update: Phase T5 complete. Pharmacist mobile work-order actions, Docker MIME/XFYUN runtime, live transcription, three-role mobile flow, and viewport acceptance all passed.
 - 2026-05-12 update: Phase T0/T1 complete for post-P0 trial/demo closed loop: Standard document sync plus patient text/image help-order loop.
 - Current implementation includes backend-v2 multi-image help-order attachments, patient image upload/reply UI, and pharmacist `/mobile/workorders`.
@@ -36,11 +37,11 @@ Current State
 - Last session (2026-03-27): Phase A–F completed (see below)
 
 In Progress
-- No implementation work is in progress; no next product phase has been started.
+- T7 code and local validation are complete; physical-device session persistence and protected CI acceptance remain.
 
 Next
-- Treat Android release signing, keystore provisioning, and store publishing as a separate release-engineering workstream when required.
-- Continue to require `CI / Required Quality Gate`, including `Patient Android APK`, for future PRs.
+- Run patient Android on a physical device, log in, kill the process, restart, and verify Cookie session recovery plus image/voice/presigned uploads.
+- Push the T7 branch through the protected PR workflow and require `CI / Required Quality Gate` before marking SEC-002 closed.
 
 Last Updated
 - 2026-08-14 Asia/Shanghai
@@ -90,7 +91,7 @@ Phase F — CI/CD GitHub Actions (2026-03-27, commit f285037)
 
 Blockers (active)
 - MEDICINE_OCR_API_KEY must be set in .env.local to enable live OCR (graceful fallback if omitted)
-- SEC-002 partially open: refresh tokens remain sessionStorage-managed (future follow-up)
+- SEC-002 implementation is complete locally; physical-device persistence and protected CI closure gates remain
 - Historical patient.id_card_masked rows need ops cleanup: ops/sql/sec-003-clear-legacy-patient-id-card-masked.sql
 
 Completed Phases (durable record)
@@ -762,3 +763,30 @@ PR #32 Review Remediation (2026-08-14)
 Last Updated
 - 2026-08-14 Asia/Shanghai
 - Reason: implemented and locally exercised all four PR #32 review fixes.
+
+Goal T7 SEC-002 Refresh Token Cookie Closure (2026-08-18)
+- Workstream:
+  - Move all official clients from browser-readable refresh-token storage to backend-managed HttpOnly Cookies while preserving Bearer business authorization and compatibility endpoints.
+- Changed:
+  - Added patient and professional session login/refresh/logout endpoints returning `SessionTokenDTO` without `refreshToken`.
+  - Added profile-aware Cookie policies, `Cache-Control: no-store`, `X-Auth-Refresh: 1` guards, Cookie rotation, and Cookie clearing.
+  - Added database compare-and-set rotation/revocation for patient device sessions and Redis compare-and-set/compare-and-delete for professional sessions.
+  - Migrated patient, pharmacist, and doctor clients to memory-only access tokens and asynchronous Cookie session recovery; removed refresh-token Web Storage and professional query-parameter paths.
+  - Enabled Capacitor Cookies and HTTP patches and migrated E2E priming/assertions to HttpOnly Cookies.
+  - Updated Standard documents, `TESTING.md`, and the security report. No legacy-backend file or Flyway migration changed; the next migration remains V13.
+- Validated:
+  - Targeted auth tests passed; full backend `clean verify` passed 153/153 and the 60% JaCoCo gate.
+  - Patient lint, Vitest 3/3, production build, Android debug build, pharmacist build, and doctor build passed.
+  - Production-source static refresh-token scan returned zero matches.
+  - HTTP probes confirmed four-field session responses, persistent patient Cookie, professional session Cookie, HttpOnly, rotation, guard rejection, old-Cookie replay rejection, and logout replay rejection.
+  - All nine required E2E scenarios passed. `auth-expiry` was repeated against a temporary 2-second access-token TTL and confirmed silent Cookie renewal. The temporary container was deleted and the normal backend restored.
+- Open risks:
+  - No Android device was available through `adb`, so physical-device kill/restart Cookie persistence and real-device image/voice/presigned-upload regression remain unverified.
+  - The branch has not been pushed; protected `CI / Required Quality Gate` has not run for T7.
+  - SEC-002 must remain open until both gates above pass.
+- Next:
+  - Run the physical-device acceptance, then push `codex/sec-002-refresh-cookie` through the protected PR workflow and close SEC-002 only after the required gate is green.
+
+Last Updated
+- 2026-08-18 Asia/Shanghai
+- Reason: implemented T7, passed all available local gates, and recorded the remaining physical-device and protected-CI closure requirements.

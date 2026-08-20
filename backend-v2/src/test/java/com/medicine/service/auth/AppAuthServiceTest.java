@@ -137,14 +137,45 @@ class AppAuthServiceTest {
         when(jwtTokenService.generateRefreshToken(anyString(), anyString(), anyString(), any())).thenReturn("new-refresh-token");
         when(jwtTokenService.parse("new-access-token")).thenReturn(jwtClaims("13800138000", "patient-web", "new-access-jti", Instant.now().plusSeconds(7200)));
         when(jwtTokenService.parse("new-refresh-token")).thenReturn(jwtClaims("13800138000", "patient-web", "new-refresh-jti", Instant.now().plusSeconds(2592000)));
+        when(appAccountDeviceSessionMapper.rotateSession(any(AppAccountDeviceSession.class), eq(hashToken("refresh-token")))).thenReturn(1);
 
         TokenPair tokenPair = appAuthService.refreshToken(refreshTokenRequest());
 
         assertThat(tokenPair.getRefreshToken()).isEqualTo("new-refresh-token");
         assertThat(tokenPair.getRefreshExpiresIn()).isEqualTo(2592000L);
         assertThat(tokenPair.getDeviceId()).isEqualTo("patient-web");
-        verify(appAccountDeviceSessionMapper).updateSession(any(AppAccountDeviceSession.class));
+        verify(appAccountDeviceSessionMapper).rotateSession(any(AppAccountDeviceSession.class), eq(hashToken("refresh-token")));
         verify(valueOperations).set(eq("app:session:refresh:1001:patient-web"), anyString(), anyLong(), any());
+    }
+
+    @Test
+    void shouldRejectConcurrentRefreshWhenDatabaseCompareAndSetLoses() {
+        AppAccount appAccount = new AppAccount();
+        appAccount.setId(1001L);
+        appAccount.setMobile("13800138000");
+
+        AppAccountDeviceSession session = new AppAccountDeviceSession();
+        session.setId(2001L);
+        session.setAppAccountId(1001L);
+        session.setDeviceId("patient-web");
+        session.setRefreshTokenHash(hashToken("refresh-token"));
+        session.setRefreshTokenExpiresAt(LocalDateTime.now(ZoneOffset.UTC).plusDays(10));
+
+        when(jwtTokenService.parse("refresh-token")).thenReturn(jwtClaims("13800138000", "patient-web", "refresh-jti", Instant.now().plusSeconds(2592000)));
+        when(appAccountMapper.selectActiveByMobile(1L, "13800138000")).thenReturn(appAccount);
+        when(appAccountDeviceSessionMapper.selectByAccountIdAndDeviceId(1L, 1001L, "patient-web")).thenReturn(session);
+        when(valueOperations.get("app:session:refresh:1001:patient-web")).thenReturn(hashToken("refresh-token"));
+        when(jwtTokenService.generateAccessToken(anyString(), anyString(), anyString(), any())).thenReturn("new-access-token");
+        when(jwtTokenService.generateRefreshToken(anyString(), anyString(), anyString(), any())).thenReturn("new-refresh-token");
+        when(jwtTokenService.parse("new-access-token")).thenReturn(jwtClaims("13800138000", "patient-web", "new-access-jti", Instant.now().plusSeconds(7200)));
+        when(jwtTokenService.parse("new-refresh-token")).thenReturn(jwtClaims("13800138000", "patient-web", "new-refresh-jti", Instant.now().plusSeconds(2592000)));
+        when(appAccountDeviceSessionMapper.rotateSession(any(AppAccountDeviceSession.class), eq(hashToken("refresh-token")))).thenReturn(0);
+
+        assertThatThrownBy(() -> appAuthService.refreshToken(refreshTokenRequest()))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("APP_AUTH_REFRESH_INVALID");
+
+        verify(valueOperations, never()).set(eq("app:session:refresh:1001:patient-web"), anyString(), anyLong(), any());
     }
 
     @Test
@@ -191,6 +222,55 @@ class AppAuthServiceTest {
         assertThat(result).isTrue();
         verify(appAccountDeviceSessionMapper).updateSession(any(AppAccountDeviceSession.class));
         verify(stringRedisTemplate).delete("app:session:refresh:1001:patient-web");
+    }
+
+    @Test
+    void shouldConditionallyRevokeCookieSessionBeforeDeletingRedisState() {
+        AppAccount appAccount = new AppAccount();
+        appAccount.setId(1001L);
+        appAccount.setMobile("13800138000");
+
+        AppAccountDeviceSession session = new AppAccountDeviceSession();
+        session.setId(2001L);
+        session.setAppAccountId(1001L);
+        session.setDeviceId("patient-web");
+        session.setRefreshTokenHash(hashToken("refresh-token"));
+
+        when(jwtTokenService.parse("refresh-token")).thenReturn(jwtClaims("13800138000", "patient-web", "refresh-jti", Instant.now().plusSeconds(2592000)));
+        when(appAccountMapper.selectActiveByMobile(1L, "13800138000")).thenReturn(appAccount);
+        when(appAccountDeviceSessionMapper.selectByAccountIdAndDeviceId(1L, 1001L, "patient-web")).thenReturn(session);
+        when(valueOperations.get("app:session:refresh:1001:patient-web")).thenReturn(hashToken("refresh-token"));
+        when(appAccountDeviceSessionMapper.revokeSession(session, hashToken("refresh-token"))).thenReturn(1);
+
+        assertThat(appAuthService.logoutSession("refresh-token")).isTrue();
+
+        verify(appAccountDeviceSessionMapper).revokeSession(session, hashToken("refresh-token"));
+        verify(stringRedisTemplate).delete("app:session:refresh:1001:patient-web");
+    }
+
+    @Test
+    void shouldNotDeleteRedisStateWhenCookieLogoutLosesDatabaseRace() {
+        AppAccount appAccount = new AppAccount();
+        appAccount.setId(1001L);
+        appAccount.setMobile("13800138000");
+
+        AppAccountDeviceSession session = new AppAccountDeviceSession();
+        session.setId(2001L);
+        session.setAppAccountId(1001L);
+        session.setDeviceId("patient-web");
+        session.setRefreshTokenHash(hashToken("refresh-token"));
+
+        when(jwtTokenService.parse("refresh-token")).thenReturn(jwtClaims("13800138000", "patient-web", "refresh-jti", Instant.now().plusSeconds(2592000)));
+        when(appAccountMapper.selectActiveByMobile(1L, "13800138000")).thenReturn(appAccount);
+        when(appAccountDeviceSessionMapper.selectByAccountIdAndDeviceId(1L, 1001L, "patient-web")).thenReturn(session);
+        when(valueOperations.get("app:session:refresh:1001:patient-web")).thenReturn(hashToken("refresh-token"));
+        when(appAccountDeviceSessionMapper.revokeSession(session, hashToken("refresh-token"))).thenReturn(0);
+
+        assertThatThrownBy(() -> appAuthService.logoutSession("refresh-token"))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("APP_AUTH_REFRESH_INVALID");
+
+        verify(stringRedisTemplate, never()).delete("app:session:refresh:1001:patient-web");
     }
 
     private OtpSendRequest otpSendRequest() {

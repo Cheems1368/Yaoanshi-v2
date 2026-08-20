@@ -14,6 +14,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.nio.charset.StandardCharsets;
@@ -26,6 +27,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
@@ -147,12 +149,30 @@ class AdminAuthServiceTest {
         when(jwtTokenService.generateProfessionalAccessToken(anyString(), anyLong(), anyLong(), anyString(), any(), eq("pharmacist"))).thenReturn("new-access");
         when(jwtTokenService.generateProfessionalRefreshToken(anyString(), anyLong(), anyLong(), anyString(), any(), eq("pharmacist"))).thenReturn("new-refresh");
         when(jwtTokenService.parse("new-refresh")).thenReturn(professionalClaims(Instant.now().plusSeconds(2592000)));
+        when(stringRedisTemplate.execute(any(DefaultRedisScript.class), anyList(), anyString(), anyString(), anyString())).thenReturn(1L);
 
         TokenPair tokenPair = adminAuthService.refreshToken("refresh-token");
 
         assertThat(tokenPair.getAccessToken()).isEqualTo("new-access");
         assertThat(tokenPair.getRefreshToken()).isEqualTo("new-refresh");
-        verify(valueOperations).set(eq("admin:session:refresh:1:1001"), anyString(), anyLong(), any());
+        verify(stringRedisTemplate).execute(any(DefaultRedisScript.class), anyList(),
+                eq(hashToken("refresh-token")), eq(hashToken("new-refresh")), anyString());
+    }
+
+    @Test
+    void shouldRejectConcurrentRefreshWhenRedisCompareAndSetLoses() {
+        when(jwtTokenService.parse("refresh-token")).thenReturn(professionalClaims(Instant.now().plusSeconds(1200)));
+        when(valueOperations.get("admin:session:refresh:1:1001")).thenReturn(hashToken("refresh-token"));
+        when(professionalIdentityRepository.selectActiveSystemUser(1L, 1001L)).thenReturn(systemUser());
+        when(professionalIdentityRepository.selectRoleCodesByUserId(1L, 1001L)).thenReturn(List.of("pharmacist"));
+        when(jwtTokenService.generateProfessionalAccessToken(anyString(), anyLong(), anyLong(), anyString(), any(), eq("pharmacist"))).thenReturn("new-access");
+        when(jwtTokenService.generateProfessionalRefreshToken(anyString(), anyLong(), anyLong(), anyString(), any(), eq("pharmacist"))).thenReturn("new-refresh");
+        when(jwtTokenService.parse("new-refresh")).thenReturn(professionalClaims(Instant.now().plusSeconds(2592000)));
+        when(stringRedisTemplate.execute(any(DefaultRedisScript.class), anyList(), anyString(), anyString(), anyString())).thenReturn(0L);
+
+        assertThatThrownBy(() -> adminAuthService.refreshToken("refresh-token"))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("ADMIN_AUTH_INVALID");
     }
 
     @Test
@@ -164,6 +184,7 @@ class AdminAuthServiceTest {
         when(jwtTokenService.generateProfessionalAccessToken(anyString(), anyLong(), anyLong(), anyString(), any(), eq("doctor"))).thenReturn("new-doctor-access");
         when(jwtTokenService.generateProfessionalRefreshToken(anyString(), anyLong(), anyLong(), anyString(), any(), eq("doctor"))).thenReturn("new-doctor-refresh");
         when(jwtTokenService.parse("new-doctor-refresh")).thenReturn(professionalClaims(Instant.now().plusSeconds(2592000), "doctor"));
+        when(stringRedisTemplate.execute(any(DefaultRedisScript.class), anyList(), anyString(), anyString(), anyString())).thenReturn(1L);
 
         TokenPair tokenPair = adminAuthService.refreshToken("refresh-token");
 
@@ -213,6 +234,27 @@ class AdminAuthServiceTest {
 
         assertThat(result).isTrue();
         verify(stringRedisTemplate).delete("admin:session:refresh:1:1001");
+    }
+
+    @Test
+    void shouldAtomicallyRevokeCookieSession() {
+        when(jwtTokenService.parse("refresh-token")).thenReturn(professionalClaims(Instant.now().plusSeconds(1200)));
+        when(stringRedisTemplate.execute(any(DefaultRedisScript.class), anyList(), anyString())).thenReturn(1L);
+
+        assertThat(adminAuthService.logoutSession("refresh-token")).isTrue();
+
+        verify(stringRedisTemplate).execute(any(DefaultRedisScript.class),
+                eq(List.of("admin:session:refresh:1:1001")), eq(hashToken("refresh-token")));
+    }
+
+    @Test
+    void shouldRejectCookieLogoutWhenRedisCompareAndDeleteLoses() {
+        when(jwtTokenService.parse("refresh-token")).thenReturn(professionalClaims(Instant.now().plusSeconds(1200)));
+        when(stringRedisTemplate.execute(any(DefaultRedisScript.class), anyList(), anyString())).thenReturn(0L);
+
+        assertThatThrownBy(() -> adminAuthService.logoutSession("refresh-token"))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("ADMIN_AUTH_INVALID");
     }
 
     private SystemUser systemUser() {

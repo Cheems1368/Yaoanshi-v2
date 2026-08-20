@@ -1,8 +1,7 @@
 import { httpService } from '@/shared/http/client'
 
-export interface TokenPair {
+export interface SessionTokenDTO {
   accessToken: string
-  refreshToken: string
   expiresIn: number
   refreshExpiresIn: number
   deviceId: string
@@ -327,15 +326,14 @@ export const appAuthService = {
   },
 
   login(payload: { mobile: string; otpCode: string; deviceId: string; deviceName?: string; platform?: string }) {
-    return httpService.post<TokenPair>('/app-api/auth/login', payload)
+    return httpService.post<SessionTokenDTO>('/app-api/auth/session/login', payload)
   },
 
-  refreshToken(refreshToken: string, deviceId: string) {
-    return httpService.post<TokenPair>('/app-api/auth/refresh-token', { refreshToken, deviceId })
-  },
-
-  logout(deviceId: string) {
-    return httpService.post<boolean>('/app-api/auth/logout', { deviceId })
+  logout() {
+    return httpService.post<boolean>('/app-api/auth/session/logout', {}, {
+      headers: { 'X-Auth-Refresh': '1' },
+      withCredentials: true
+    })
   },
 
   getCurrentAccount() {

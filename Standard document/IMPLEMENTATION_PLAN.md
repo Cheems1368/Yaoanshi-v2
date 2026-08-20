@@ -12,7 +12,7 @@ Rules:
 4. This document covers `P0` and `P0+` MVP phases, plus the Post-P0 trial readiness sprint.
 5. `P2` and later capabilities must stay in backlog and must not enter the primary build sequence.
 
-## 1.5 Execution Status Summary (as of 2026-08-14)
+## 1.5 Execution Status Summary (as of 2026-08-18)
 
 | Phase | Description | Status |
 |-------|-------------|--------|
@@ -27,14 +27,15 @@ Rules:
 | Phase 8 | Post-P0 Trial Readiness Sprint (A–H) | ✅ Complete |
 | Phase T0–T5 | Trial/demo closed loops through voice help orders | ✅ Delivered through PR #32 (`35b1e8a`) |
 | Phase T6 | Android JDK 21 and enforced APK build gate | ✅ Delivered through PR #37 (`98115b9`) |
+| Phase T7 | SEC-002 refresh-token HttpOnly Cookie closure | Implementation and local gates complete; physical-device and protected CI acceptance pending |
 
-**Current active work:** T1–T6 are merged into `main`; no new product phase is in progress. Android release signing and store publishing remain separate release-engineering work.
+**Current active work:** T7 is implemented on `codex/sec-002-refresh-cookie`. SEC-002 remains open until the Android process-restart check and protected `CI / Required Quality Gate` pass. Android release signing and store publishing remain separate release-engineering work.
 
 **Flyway current latest:** V12 (`V12__help_order_voice_transcription.sql`). Next new migration must be V13.
 
 **Known open items:**
 - `MEDICINE_OCR_API_KEY` must be set in `.env.local` for live OCR (graceful fallback if omitted)
-- SEC-002 partially open: refresh tokens remain sessionStorage-managed (future follow-up)
+- SEC-002 closure acceptance pending: official clients have migrated to HttpOnly refresh Cookies, but physical-device persistence and protected CI still require evidence
 - Ops cleanup: `ops/sql/sec-003-clear-legacy-patient-id-card-masked.sql` needs to be run
 
 ## 1.6 Post-P0 Trial Demo Closed-Loop Sequence
@@ -50,12 +51,22 @@ The post-P0 trial/demo work is phase-based, not tied to fixed calendar weeks. Ea
 | Phase T4 | OCR hardening, CSV rule import, reviewed education recommendation | ✅ backend targeted tests, pharmacist build, patient build |
 | Phase T5 | Help-order voice message + XFYUN transcription | ✅ backend targeted tests, patient/pharmacist/doctor builds, Docker live voice walkthrough |
 | Phase T6 | Android JDK 21 toolchain and APK gate | Temurin 21.0.12+8, clean Capacitor sync, local `assembleDebug`, CI APK artifact, aggregate quality gate |
+| Phase T7 | SEC-002 refresh-token Cookie closure across patient, pharmacist, and doctor clients | backend auth tests and full verify, three frontend gates, Android build, nine E2E scenarios, physical-device restart, static token scan, protected CI |
 
 Rules:
 
 1. T1 must land before T2-T5 implementation work.
 2. New database migrations continue from the latest existing Flyway version; after `V12__help_order_voice_transcription.sql`, the next migration is `V13`.
 3. Temporary execution plans stay in conversation; durable sequence changes belong here.
+4. T7 is additive: legacy auth endpoints remain compatible, no legacy-backend change is allowed, and the next Flyway migration remains V13.
+
+### Phase T7 acceptance boundary
+
+1. Official clients use the additive `/session/login`, `/session/refresh`, and `/session/logout` endpoints and never receive or persist refresh-token material.
+2. Access tokens remain memory-only; route guards may improve navigation but backend Bearer authorization remains authoritative.
+3. Patient refresh Cookies persist for the refresh TTL. Pharmacist and doctor refresh Cookies are browser-session Cookies.
+4. Refresh rotation and Cookie logout reject replaced tokens atomically; refresh and logout require `X-Auth-Refresh: 1`.
+5. SEC-002 may be marked closed only after backend, frontend, Android, nine-scenario E2E, physical-device restart, static scan, and protected CI gates pass.
 
 ## 2. Implementation Rules
 
@@ -1058,7 +1069,7 @@ The following items are intentionally excluded from the primary execution sequen
 3. More disease-path expansion (DDI rules for hypertension, diabetes, etc.)
 4. Non-MVP capability expansion
 5. Any work that reopens legacy backend refactor
-6. SEC-002: Refresh token rotation hardening (currently sessionStorage-managed; deferred)
+6. SEC-002 closure evidence: T7 implementation is complete locally; retain as an open acceptance item until physical-device restart/upload checks and protected CI pass
 7. Ops cleanup: `ops/sql/sec-003-clear-legacy-patient-id-card-masked.sql` (historical `id_card_masked` rows)
 8. S3 presigned URL upload end-to-end browser test (Phase B, pending manual verification)
 

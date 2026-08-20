@@ -56,9 +56,9 @@ False positive notes:
 
 - If an upstream gateway already strips query strings from all logs, leak surface is reduced, but the code still accepts the token in the URL and still allows all origins.
 
-### SEC-002: All three frontends persist access or refresh tokens in `localStorage` — FIXED (2026-03-08)
+### SEC-002: Browser-accessible refresh-token storage — IMPLEMENTED, CLOSURE GATES PENDING (2026-08-18)
 
-**Status: FIXED** — All three frontends now store accessToken in memory only and refreshToken in sessionStorage. localStorage no longer contains any token material.
+**Status: IMPLEMENTED; not yet marked closed.** Patient, pharmacist, and doctor official clients now keep access tokens in memory and use backend-managed HttpOnly refresh Cookies. Session responses contain no refresh token, professional refresh query parameters were removed, and refresh/logout require `X-Auth-Refresh: 1`. Local backend, frontend, Android-build, static-scan, HTTP-contract, and nine-scenario E2E gates pass. Physical-device process-restart evidence and protected CI remain required before closure.
 
 ~~Impact:~~
 ~~Any XSS in the browser runtime can immediately exfiltrate both access and refresh tokens, enabling session replay and long-lived account takeover.~~
@@ -82,8 +82,10 @@ localStorage.setItem('refreshToken', refreshToken)
 
 Fix:
 
-- Prefer backend-managed `HttpOnly` cookies for refresh/session material.
-- If bearer auth must remain, keep refresh tokens out of browser storage and keep access tokens memory-only with short TTL.
+- Implemented additive patient and professional session endpoints returning `SessionTokenDTO` without refresh-token material.
+- Implemented persistent patient and browser-session professional Cookies with production/local SameSite and Secure policies.
+- Implemented database conditional rotation/revocation for patient sessions and Redis compare-and-set/compare-and-delete for professional sessions.
+- Migrated all three official clients to Cookie session restoration while retaining Bearer access-token authorization and legacy endpoint compatibility.
 
 Mitigation:
 

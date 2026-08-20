@@ -100,6 +100,25 @@ npm run e2e:admin-notifications
 
 E2E 结果应在 PR 的“测试证据”中记录：环境、测试账号类型、命令、测试数、覆盖率、场景结果和脱敏截图。真实 OCR、语音、短信或 AI 服务只能通过环境变量或批准的密钥工具注入，禁止写入仓库或日志。
 
+### T7 / SEC-002 认证验收
+
+除九场景矩阵外，refresh Cookie 变更必须证明：
+
+1. session 登录/刷新响应仅包含 `accessToken`、`expiresIn`、`refreshExpiresIn`、`deviceId`，不包含 `refreshToken`。
+2. `sessionStorage`、`localStorage`、请求 URL 和日志不出现 refresh token；Cookie 对页面 JavaScript 不可见。
+3. 页面重载和真实 access-token 过期都能静默恢复，轮换后的旧 Cookie 返回既有无效令牌错误。
+4. 缺少 `X-Auth-Refresh: 1` 的 refresh/logout 被拒绝；退出后 Cookie 被清理且不能续期。
+5. 患者 Cookie 为 30 天持久 Cookie；专业端 Cookie 为浏览器会话 Cookie。
+6. Android debug 构建通过，并在真机执行杀进程重启、JSON、图片、语音和预签名上传回归。
+
+生产源码静态扫描至少覆盖：
+
+```powershell
+rg -n -i "sessionStorage[^\r\n]*refresh|localStorage[^\r\n]*refresh|refreshTokenByValue|[?&]refreshToken=|params\s*:\s*\{[^\r\n]*refreshToken" frontend/huanzhe/src frontend/pharmacist/src frontend/yisheng/web-admin/src
+```
+
+零命中时 `rg` 返回退出码 1，属于通过结果。
+
 ## 5. 发布前检查
 
 发布候选版本必须满足：

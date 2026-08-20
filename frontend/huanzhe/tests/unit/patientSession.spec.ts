@@ -5,18 +5,17 @@ describe('patientSession', () => {
   beforeEach(() => {
     localStorage.clear()
     sessionStorage.clear()
-    patientSession.clearAccessToken()
+    patientSession.resetAuthStatus()
   })
 
   test('clears all authentication state', () => {
     patientSession.setAccessToken('access-token')
-    patientSession.setRefreshToken('refresh-token')
     patientSession.setMobile('13800000000')
 
     patientSession.clearAuthState()
 
     expect(patientSession.getAccessToken()).toBeNull()
-    expect(patientSession.getRefreshToken()).toBeNull()
+    expect(patientSession.getAuthStatus()).toBe('anonymous')
     expect(patientSession.getMobile()).toBeNull()
   })
 

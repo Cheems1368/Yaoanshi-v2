@@ -119,7 +119,7 @@ public class AppAuthService {
         updateOtpVerifyStatus(parsedOtp.requestId(), "SUCCESS", null);
 
         AppAccount appAccount = upsertPatientAccount(mobile);
-        return issueTokenPair(appAccount, deviceId, deviceName, platform);
+        return issueLoginTokenPair(appAccount, deviceId, deviceName, platform);
     }
 
     public TokenPair refreshToken(RefreshTokenRequest request) {
@@ -152,7 +152,49 @@ public class AppAuthService {
             throw new BusinessException(ErrorCode.APP_AUTH_REFRESH_INVALID.getCode(), ErrorCode.APP_AUTH_REFRESH_INVALID.getMessage());
         }
 
-        return issueTokenPair(appAccount, deviceId, session.getDeviceName(), session.getPlatform());
+        return rotateTokenPair(appAccount, session, refreshTokenHash);
+    }
+
+    public TokenPair refreshSession(String refreshToken) {
+        JwtClaims claims = jwtTokenService.parse(normalize(refreshToken));
+        if (claims == null || !APP_DOMAIN.equals(claims.getDomain()) || !StringUtils.hasText(claims.getDeviceId())) {
+            throw new BusinessException(ErrorCode.APP_AUTH_REFRESH_INVALID.getCode(), ErrorCode.APP_AUTH_REFRESH_INVALID.getMessage());
+        }
+        RefreshTokenRequest request = new RefreshTokenRequest();
+        request.setRefreshToken(refreshToken);
+        request.setDeviceId(claims.getDeviceId());
+        return refreshToken(request);
+    }
+
+    public boolean logoutSession(String refreshToken) {
+        String tokenValue = normalize(refreshToken);
+        JwtClaims claims = jwtTokenService.parse(tokenValue);
+        if (claims == null || !APP_DOMAIN.equals(claims.getDomain()) || !StringUtils.hasText(claims.getDeviceId())) {
+            throw new BusinessException(ErrorCode.APP_AUTH_REFRESH_INVALID.getCode(), ErrorCode.APP_AUTH_REFRESH_INVALID.getMessage());
+        }
+        AppAccount appAccount = appAccountMapper.selectActiveByMobile(DEFAULT_TENANT_ID, claims.getSubject());
+        if (appAccount == null) {
+            throw new BusinessException(ErrorCode.APP_AUTH_REFRESH_INVALID.getCode(), ErrorCode.APP_AUTH_REFRESH_INVALID.getMessage());
+        }
+        AppAccountDeviceSession session = appAccountDeviceSessionMapper.selectByAccountIdAndDeviceId(
+                DEFAULT_TENANT_ID, appAccount.getId(), claims.getDeviceId());
+        String tokenHash = hashToken(tokenValue);
+        String redisHash = stringRedisTemplate.opsForValue().get(refreshSessionKey(appAccount.getId(), claims.getDeviceId()));
+        if (session == null || session.getRevokedAt() != null || !tokenHash.equals(session.getRefreshTokenHash())
+                || !tokenHash.equals(redisHash)) {
+            throw new BusinessException(ErrorCode.APP_AUTH_REFRESH_INVALID.getCode(), ErrorCode.APP_AUTH_REFRESH_INVALID.getMessage());
+        }
+        LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
+        session.setRevokedAt(now);
+        session.setRevokedReason("logout");
+        session.setLastSeenAt(now);
+        session.setUpdater("app-auth");
+        session.setUpdateTime(now);
+        if (appAccountDeviceSessionMapper.revokeSession(session, tokenHash) != 1) {
+            throw new BusinessException(ErrorCode.APP_AUTH_REFRESH_INVALID.getCode(), ErrorCode.APP_AUTH_REFRESH_INVALID.getMessage());
+        }
+        stringRedisTemplate.delete(refreshSessionKey(appAccount.getId(), claims.getDeviceId()));
+        return true;
     }
 
     public boolean logout(String subject, String deviceId) {
@@ -222,12 +264,65 @@ public class AppAuthService {
         return appAccount;
     }
 
-    private TokenPair issueTokenPair(AppAccount appAccount, String deviceId, String deviceName, String platform) {
+    private TokenPair issueLoginTokenPair(AppAccount appAccount, String deviceId, String deviceName, String platform) {
+        TokenPair tokenPair = createTokenPair(appAccount, deviceId);
+        persistLoginSession(appAccount, tokenPair, deviceId, deviceName, platform);
+        return tokenPair;
+    }
+
+    private TokenPair rotateTokenPair(
+            AppAccount appAccount,
+            AppAccountDeviceSession session,
+            String expectedRefreshTokenHash
+    ) {
+        TokenPair tokenPair = createTokenPair(appAccount, session.getDeviceId());
+        JwtClaims accessClaims = jwtTokenService.parse(tokenPair.getAccessToken());
+        JwtClaims refreshClaims = jwtTokenService.parse(tokenPair.getRefreshToken());
+        if (accessClaims == null || refreshClaims == null) {
+            throw new IllegalStateException("Failed to parse freshly issued tokens");
+        }
+
+        LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
+        session.setAccessTokenJti(accessClaims.getJti());
+        session.setRefreshTokenHash(hashToken(tokenPair.getRefreshToken()));
+        session.setRefreshTokenExpiresAt(LocalDateTime.ofInstant(refreshClaims.getExpiresAt(), ZoneOffset.UTC));
+        session.setLastSeenAt(now);
+        session.setUpdater("app-auth");
+        session.setUpdateTime(now);
+
+        if (appAccountDeviceSessionMapper.rotateSession(session, expectedRefreshTokenHash) != 1) {
+            throw new BusinessException(ErrorCode.APP_AUTH_REFRESH_INVALID.getCode(), ErrorCode.APP_AUTH_REFRESH_INVALID.getMessage());
+        }
+
+        writeRefreshState(appAccount.getId(), session.getDeviceId(), session.getRefreshTokenHash(), refreshClaims.getExpiresAt());
+        return tokenPair;
+    }
+
+    private TokenPair createTokenPair(AppAccount appAccount, String deviceId) {
         List<String> roles = "FAMILY".equalsIgnoreCase(appAccount.getAccountType())
                 ? List.of("ROLE_FAMILY")
                 : List.of("ROLE_PATIENT");
         String accessToken = jwtTokenService.generateAccessToken(appAccount.getMobile(), APP_DOMAIN, deviceId, roles);
         String refreshToken = jwtTokenService.generateRefreshToken(appAccount.getMobile(), APP_DOMAIN, deviceId, roles);
+
+        TokenPair tokenPair = new TokenPair();
+        tokenPair.setAccessToken(accessToken);
+        tokenPair.setRefreshToken(refreshToken);
+        tokenPair.setExpiresIn(jwtProperties.getAccessTokenSeconds());
+        tokenPair.setRefreshExpiresIn(jwtProperties.getRefreshTokenSeconds());
+        tokenPair.setDeviceId(deviceId);
+        return tokenPair;
+    }
+
+    private void persistLoginSession(
+            AppAccount appAccount,
+            TokenPair tokenPair,
+            String deviceId,
+            String deviceName,
+            String platform
+    ) {
+        String accessToken = tokenPair.getAccessToken();
+        String refreshToken = tokenPair.getRefreshToken();
 
         JwtClaims accessClaims = jwtTokenService.parse(accessToken);
         JwtClaims refreshClaims = jwtTokenService.parse(refreshToken);
@@ -264,21 +359,17 @@ public class AppAuthService {
             appAccountDeviceSessionMapper.updateSession(session);
         }
 
-        Duration refreshTtl = Duration.between(Instant.now(), refreshClaims.getExpiresAt());
+        writeRefreshState(appAccount.getId(), deviceId, session.getRefreshTokenHash(), refreshClaims.getExpiresAt());
+    }
+
+    private void writeRefreshState(Long appAccountId, String deviceId, String refreshTokenHash, Instant expiresAt) {
+        Duration refreshTtl = Duration.between(Instant.now(), expiresAt);
         stringRedisTemplate.opsForValue().set(
-                refreshSessionKey(appAccount.getId(), deviceId),
-                session.getRefreshTokenHash(),
+                refreshSessionKey(appAccountId, deviceId),
+                refreshTokenHash,
                 Math.max(refreshTtl.getSeconds(), 1),
                 TimeUnit.SECONDS
         );
-
-        TokenPair tokenPair = new TokenPair();
-        tokenPair.setAccessToken(accessToken);
-        tokenPair.setRefreshToken(refreshToken);
-        tokenPair.setExpiresIn(jwtProperties.getAccessTokenSeconds());
-        tokenPair.setRefreshExpiresIn(jwtProperties.getRefreshTokenSeconds());
-        tokenPair.setDeviceId(deviceId);
-        return tokenPair;
     }
 
     private void updateOtpVerifyStatus(String requestId, String verifyStatus, String errorCode) {

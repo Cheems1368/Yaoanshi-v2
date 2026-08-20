@@ -54,4 +54,43 @@ public interface AppAccountDeviceSessionMapper {
             WHERE id = #{id}
             """)
     int updateSession(AppAccountDeviceSession session);
+
+    @Update("""
+            UPDATE app_account_device_session
+            SET device_name = #{session.deviceName},
+                platform = #{session.platform},
+                access_token_jti = #{session.accessTokenJti},
+                refresh_token_hash = #{session.refreshTokenHash},
+                refresh_token_expires_at = #{session.refreshTokenExpiresAt},
+                last_seen_at = #{session.lastSeenAt},
+                revoked_at = NULL,
+                revoked_reason = NULL,
+                updater = #{session.updater},
+                update_time = #{session.updateTime}
+            WHERE id = #{session.id}
+              AND refresh_token_hash = #{expectedRefreshTokenHash}
+              AND revoked_at IS NULL
+              AND refresh_token_expires_at > UTC_TIMESTAMP()
+            """)
+    int rotateSession(
+            @Param("session") AppAccountDeviceSession session,
+            @Param("expectedRefreshTokenHash") String expectedRefreshTokenHash
+    );
+
+    @Update("""
+            UPDATE app_account_device_session
+            SET revoked_at = #{session.revokedAt},
+                revoked_reason = #{session.revokedReason},
+                last_seen_at = #{session.lastSeenAt},
+                updater = #{session.updater},
+                update_time = #{session.updateTime}
+            WHERE id = #{session.id}
+              AND refresh_token_hash = #{expectedRefreshTokenHash}
+              AND revoked_at IS NULL
+              AND refresh_token_expires_at > UTC_TIMESTAMP()
+            """)
+    int revokeSession(
+            @Param("session") AppAccountDeviceSession session,
+            @Param("expectedRefreshTokenHash") String expectedRefreshTokenHash
+    );
 }

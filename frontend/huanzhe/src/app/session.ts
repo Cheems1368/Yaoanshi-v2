@@ -1,9 +1,9 @@
-const REFRESH_TOKEN_KEY = 'patient_refresh_token'
 const DEVICE_ID_KEY = 'patient_device_id'
 const MOBILE_KEY = 'patient_mobile'
 const BINDING_STATUS_KEY = 'patient_binding_status'
 const ACTIVE_PLAN_KEY = 'patient_has_active_plan'
 let accessTokenMemory = ''
+let authStatus: 'unknown' | 'authenticated' | 'anonymous' = 'unknown'
 
 const getSessionStorage = () => (typeof window !== 'undefined' ? window.sessionStorage : null)
 
@@ -28,30 +28,25 @@ export const patientSession = {
 
   setAccessToken(token: string) {
     accessTokenMemory = token || ''
+    authStatus = accessTokenMemory ? 'authenticated' : authStatus
   },
 
   clearAccessToken() {
     accessTokenMemory = ''
   },
 
-  getRefreshToken(): string | null {
-    return getSessionStorage()?.getItem(REFRESH_TOKEN_KEY) ?? null
+  getAuthStatus() {
+    return authStatus
   },
 
-  setRefreshToken(token: string) {
-    const storage = getSessionStorage()
-    if (!storage) {
-      return
-    }
-    if (!token) {
-      storage.removeItem(REFRESH_TOKEN_KEY)
-      return
-    }
-    storage.setItem(REFRESH_TOKEN_KEY, token)
+  markAnonymous() {
+    authStatus = 'anonymous'
+    accessTokenMemory = ''
   },
 
-  clearRefreshToken() {
-    getSessionStorage()?.removeItem(REFRESH_TOKEN_KEY)
+  resetAuthStatus() {
+    authStatus = 'unknown'
+    accessTokenMemory = ''
   },
 
   getDeviceId(): string | null {
@@ -94,8 +89,7 @@ export const patientSession = {
   },
 
   clearAuthState() {
-    this.clearAccessToken()
-    this.clearRefreshToken()
+    this.markAnonymous()
     this.clearMobile()
   },
 
@@ -114,7 +108,7 @@ export const patientSession = {
 
   getGateState(): PatientGateState {
     return {
-      loggedIn: Boolean(accessTokenMemory || this.getRefreshToken()),
+      loggedIn: authStatus === 'authenticated' && Boolean(accessTokenMemory),
       isBound: localStorage.getItem(BINDING_STATUS_KEY) === 'BOUND',
       hasActivePlan: localStorage.getItem(ACTIVE_PLAN_KEY) === 'true'
     }

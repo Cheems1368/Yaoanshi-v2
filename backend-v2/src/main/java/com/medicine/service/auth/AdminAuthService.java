@@ -8,6 +8,7 @@ import com.medicine.config.JwtProperties;
 import com.medicine.domain.identity.SystemUser;
 import com.medicine.repository.identity.ProfessionalIdentityRepository;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
@@ -25,6 +26,24 @@ import java.util.stream.Collectors;
 
 @Service
 public class AdminAuthService {
+
+    private static final DefaultRedisScript<Long> ROTATE_REFRESH_SCRIPT = new DefaultRedisScript<>("""
+            local current = redis.call('GET', KEYS[1])
+            if current ~= ARGV[1] then
+                return 0
+            end
+            redis.call('SET', KEYS[1], ARGV[2], 'EX', ARGV[3])
+            return 1
+            """, Long.class);
+
+    private static final DefaultRedisScript<Long> REVOKE_REFRESH_SCRIPT = new DefaultRedisScript<>("""
+            local current = redis.call('GET', KEYS[1])
+            if current ~= ARGV[1] then
+                return 0
+            end
+            redis.call('DEL', KEYS[1])
+            return 1
+            """, Long.class);
 
     private static final Set<String> PHARMACIST_ROLE_CODES = Set.of(
             "pharmacists",
@@ -77,7 +96,9 @@ public class AdminAuthService {
         List<String> roles = safeList(professionalIdentityRepository.selectRoleCodesByUserId(resolvedTenantId, user.getId()));
         String effectiveRole = resolveEffectiveRole(role, roles);
 
-        return issueTokenPair(user, resolvedTenantId, roles, effectiveRole);
+        TokenPair tokenPair = createTokenPair(user, resolvedTenantId, roles, effectiveRole);
+        persistLoginRefreshState(resolvedTenantId, user.getId(), tokenPair);
+        return tokenPair;
     }
 
     public TokenPair refreshToken(String refreshTokenValue) {
@@ -107,7 +128,44 @@ public class AdminAuthService {
 
         List<String> roles = safeList(professionalIdentityRepository.selectRoleCodesByUserId(claims.getTenantId(), claims.getUserId()));
         String effectiveRole = resolveEffectiveRole(claims.getEffectiveRole(), roles);
-        return issueTokenPair(user, claims.getTenantId(), roles, effectiveRole);
+        TokenPair tokenPair = createTokenPair(user, claims.getTenantId(), roles, effectiveRole);
+        JwtClaims refreshClaims = jwtTokenService.parse(tokenPair.getRefreshToken());
+        if (refreshClaims == null || refreshClaims.getExpiresAt() == null) {
+            throw new IllegalStateException("Failed to parse freshly issued admin refresh token");
+        }
+        long ttlSeconds = Math.max(Duration.between(Instant.now(), refreshClaims.getExpiresAt()).getSeconds(), 1);
+        Long rotated = stringRedisTemplate.execute(
+                ROTATE_REFRESH_SCRIPT,
+                List.of(refreshSessionKey(claims.getTenantId(), claims.getUserId())),
+                expectedHash,
+                hashToken(tokenPair.getRefreshToken()),
+                Long.toString(ttlSeconds)
+        );
+        if (!Long.valueOf(1L).equals(rotated)) {
+            throw new BusinessException(ErrorCode.ADMIN_AUTH_INVALID.getCode(), ErrorCode.ADMIN_AUTH_INVALID.getMessage());
+        }
+        return tokenPair;
+    }
+
+    public TokenPair refreshSession(String refreshToken) {
+        return refreshToken(refreshToken);
+    }
+
+    public boolean logoutSession(String refreshToken) {
+        String tokenValue = normalize(refreshToken);
+        JwtClaims claims = jwtTokenService.parse(tokenValue);
+        if (claims == null || !claims.isProfessional() || claims.getTenantId() == null || claims.getUserId() == null) {
+            throw new BusinessException(ErrorCode.ADMIN_AUTH_INVALID.getCode(), ErrorCode.ADMIN_AUTH_INVALID.getMessage());
+        }
+        Long revoked = stringRedisTemplate.execute(
+                REVOKE_REFRESH_SCRIPT,
+                List.of(refreshSessionKey(claims.getTenantId(), claims.getUserId())),
+                hashToken(tokenValue)
+        );
+        if (!Long.valueOf(1L).equals(revoked)) {
+            throw new BusinessException(ErrorCode.ADMIN_AUTH_INVALID.getCode(), ErrorCode.ADMIN_AUTH_INVALID.getMessage());
+        }
+        return true;
     }
 
     public AdminPermissionInfoDTO getPermissionInfo(Long tenantId, Long userId) {
@@ -137,7 +195,7 @@ public class AdminAuthService {
         return true;
     }
 
-    private TokenPair issueTokenPair(SystemUser user, Long tenantId, List<String> roles, String effectiveRole) {
+    private TokenPair createTokenPair(SystemUser user, Long tenantId, List<String> roles, String effectiveRole) {
         String displayName = StringUtils.hasText(user.getNickname()) ? user.getNickname() : user.getUsername();
         String accessToken = jwtTokenService.generateProfessionalAccessToken(
                 user.getUsername(),
@@ -156,19 +214,6 @@ public class AdminAuthService {
                 effectiveRole
         );
 
-        JwtClaims refreshClaims = jwtTokenService.parse(refreshToken);
-        if (refreshClaims == null || refreshClaims.getExpiresAt() == null) {
-            throw new IllegalStateException("Failed to parse freshly issued admin refresh token");
-        }
-
-        Duration refreshTtl = Duration.between(Instant.now(), refreshClaims.getExpiresAt());
-        stringRedisTemplate.opsForValue().set(
-                refreshSessionKey(tenantId, user.getId()),
-                hashToken(refreshToken),
-                Math.max(refreshTtl.getSeconds(), 1),
-                TimeUnit.SECONDS
-        );
-
         TokenPair tokenPair = new TokenPair();
         tokenPair.setAccessToken(accessToken);
         tokenPair.setRefreshToken(refreshToken);
@@ -176,6 +221,21 @@ public class AdminAuthService {
         tokenPair.setRefreshExpiresIn(jwtProperties.getRefreshTokenSeconds());
         tokenPair.setDeviceId(null);
         return tokenPair;
+    }
+
+    private void persistLoginRefreshState(Long tenantId, Long userId, TokenPair tokenPair) {
+        JwtClaims refreshClaims = jwtTokenService.parse(tokenPair.getRefreshToken());
+        if (refreshClaims == null || refreshClaims.getExpiresAt() == null) {
+            throw new IllegalStateException("Failed to parse freshly issued admin refresh token");
+        }
+
+        Duration refreshTtl = Duration.between(Instant.now(), refreshClaims.getExpiresAt());
+        stringRedisTemplate.opsForValue().set(
+                refreshSessionKey(tenantId, userId),
+                hashToken(tokenPair.getRefreshToken()),
+                Math.max(refreshTtl.getSeconds(), 1),
+                TimeUnit.SECONDS
+        );
     }
 
     private String resolveEffectiveRole(String role, List<String> roles) {

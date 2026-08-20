@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from '@ionic/vue-router'
 import type { RouteRecordRaw } from 'vue-router'
 import TabsPage from '@/modules/app/pages/TabsPage.vue'
 import { patientSession } from '@/app/session'
+import { httpService } from '@/shared/http/client'
 
 const routes: Array<RouteRecordRaw> = [
   {
@@ -123,7 +124,8 @@ const resolveAuthenticatedHome = () => {
   return '/tabs/home'
 }
 
-router.beforeEach((to, _from, next) => {
+router.beforeEach(async (to, _from, next) => {
+  await httpService.restoreSession()
   const gateState = patientSession.getGateState()
   const isPublicRoute = Boolean(to.meta?.public)
   const requiresAuth = Boolean(to.meta?.requiresAuth)

@@ -624,10 +624,7 @@ const handleLogout = async () => {
   logoutLoading.value = true
 
   try {
-    const deviceId = patientSession.getDeviceId()
-    if (deviceId) {
-      await appAuthService.logout(deviceId)
-    }
+    await appAuthService.logout()
   } catch {
     // ignore logout network failure and close local session
   } finally {

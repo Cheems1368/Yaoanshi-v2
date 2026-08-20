@@ -97,6 +97,13 @@ try {
       body: JSON.stringify({ code: 500, msg: 'E2E simulated DDI service unavailable' })
     })
   )
+  const degradedNetwork = []
+  const captureDegradedResponse = (response) => {
+    if (response.url().includes('/app-api/')) {
+      degradedNetwork.push({ status: response.status(), path: new URL(response.url()).pathname })
+    }
+  }
+  patientPage.on('response', captureDegradedResponse)
   await patientPage.locator('input[type="file"]:not([capture])').setInputFiles({
     name: `prescription-degraded-${runId}.png`,
     mimeType: 'image/png',
@@ -108,7 +115,14 @@ try {
   const degradedUploadPromise = patientPage.waitForResponse((response) => response.url().includes('/app-api/prescriptions/uploads'))
   await patientPage.getByRole('button', { name: '提交登记' }).click()
   await degradedScreeningPromise
-  const degradedUploadResponse = await degradedUploadPromise
+  let degradedUploadResponse
+  try {
+    degradedUploadResponse = await degradedUploadPromise
+  } catch (error) {
+    throw new Error(`Degraded prescription upload did not complete: ${JSON.stringify(degradedNetwork)}`, { cause: error })
+  } finally {
+    patientPage.off('response', captureDegradedResponse)
+  }
   const degradedUploadPayload = await degradedUploadResponse.json()
   const degradedPrescriptionId = degradedUploadPayload.data.id
   await patientPage.unroute('**/app-api/ddi/screen')

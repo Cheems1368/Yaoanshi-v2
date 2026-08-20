@@ -184,7 +184,6 @@ const handleLogin = async () => {
     })
 
     patientSession.setAccessToken(response.data.accessToken)
-    patientSession.setRefreshToken(response.data.refreshToken)
     patientSession.setDeviceId(response.data.deviceId || deviceId)
     patientSession.setMobile(mobile)
 

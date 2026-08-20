@@ -1,10 +1,8 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
 import { ElMessage } from 'element-plus'
-import { login, logout, getUserInfo, refreshTokenByValue } from '@/api/auth'
+import { login, logout, getUserInfo, refreshToken } from '@/api/auth'
 import { API_SUCCESS_CODES } from '@/utils/constants'
-
-const REFRESH_TOKEN_STORAGE_KEY = 'refreshToken'
 
 const EMPTY_USER = {
   id: null,
@@ -20,8 +18,6 @@ const ROLE_DISPLAY_LABELS = {
   pharmacist: '药师',
   patient: '患者'
 }
-
-const readRefreshToken = () => window.sessionStorage.getItem(REFRESH_TOKEN_STORAGE_KEY) || ''
 
 const derivePrimaryRole = (info = {}) => {
   const rawRoles = []
@@ -78,12 +74,12 @@ const normalizeUserInfo = (info = {}) => {
 
 export const useUserStore = defineStore('user', () => {
   const token = ref('')
-  const refreshTokenValue = ref(readRefreshToken())
+  const sessionStatus = ref('unknown')
   const userInfo = ref({ ...EMPTY_USER })
   const userRole = ref('')
   let refreshPromise = null
 
-  const isLoggedIn = computed(() => Boolean(token.value || refreshTokenValue.value))
+  const isLoggedIn = computed(() => sessionStatus.value === 'authenticated' && Boolean(token.value))
   const isDoctor = computed(() => false)
   const isPharmacist = computed(() => userRole.value === 'pharmacist')
 
@@ -94,45 +90,35 @@ export const useUserStore = defineStore('user', () => {
 
   const setToken = (newToken) => {
     token.value = newToken || ''
-  }
-
-  const setRefreshToken = (newRefreshToken) => {
-    refreshTokenValue.value = newRefreshToken || ''
-
-    if (refreshTokenValue.value) {
-      window.sessionStorage.setItem(REFRESH_TOKEN_STORAGE_KEY, refreshTokenValue.value)
-      return
+    if (token.value) {
+      sessionStatus.value = 'authenticated'
     }
-
-    window.sessionStorage.removeItem(REFRESH_TOKEN_STORAGE_KEY)
   }
 
   const clearAuthState = () => {
     setToken('')
-    setRefreshToken('')
+    sessionStatus.value = 'anonymous'
     resetUserState()
   }
 
   const refreshAccessToken = async () => {
-    if (!refreshTokenValue.value) {
+    if (sessionStatus.value === 'anonymous') {
       return null
     }
 
     if (!refreshPromise) {
-      refreshPromise = refreshTokenByValue(refreshTokenValue.value)
+      refreshPromise = refreshToken()
         .then((response) => {
           if (!API_SUCCESS_CODES.includes(response.code)) {
             throw new Error(response.msg || response.message || 'Token 刷新失败')
           }
 
           const nextAccessToken = response.data?.accessToken || ''
-          const nextRefreshToken = response.data?.refreshToken || ''
           if (!nextAccessToken) {
             throw new Error('登录响应缺少访问令牌')
           }
 
           setToken(nextAccessToken)
-          setRefreshToken(nextRefreshToken)
           return nextAccessToken
         })
         .catch(() => {
@@ -162,13 +148,12 @@ export const useUserStore = defineStore('user', () => {
         return false
       }
 
-      const { accessToken, refreshToken } = response.data || {}
+      const { accessToken } = response.data || {}
       if (!accessToken) {
         throw new Error('登录响应缺少访问令牌')
       }
 
       setToken(accessToken)
-      setRefreshToken(refreshToken || '')
 
       await initUserInfo()
       ElMessage.success('登录成功')
@@ -184,9 +169,7 @@ export const useUserStore = defineStore('user', () => {
     const { silent = false } = options
 
     try {
-      if (token.value) {
-        await logout()
-      }
+      await logout()
     } catch (error) {
       console.error('退出请求失败:', error)
     } finally {
@@ -231,21 +214,28 @@ export const useUserStore = defineStore('user', () => {
     }
   }
 
+  const restoreSession = async () => {
+    if (token.value) {
+      return true
+    }
+    return Boolean(await refreshAccessToken())
+  }
+
   const updateUserInfo = (newInfo) => {
     setUserInfo({ ...userInfo.value, ...newInfo })
   }
 
   return {
     token,
-    refreshTokenValue,
+    sessionStatus,
     userInfo,
     userRole,
     isLoggedIn,
     isDoctor,
     isPharmacist,
     setToken,
-    setRefreshToken,
     refreshAccessToken,
+    restoreSession,
     setUserInfo,
     loginAction,
     logoutAction,
