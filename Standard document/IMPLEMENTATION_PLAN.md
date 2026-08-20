@@ -27,15 +27,15 @@ Rules:
 | Phase 8 | Post-P0 Trial Readiness Sprint (A–H) | ✅ Complete |
 | Phase T0–T5 | Trial/demo closed loops through voice help orders | ✅ Delivered through PR #32 (`35b1e8a`) |
 | Phase T6 | Android JDK 21 and enforced APK build gate | ✅ Delivered through PR #37 (`98115b9`) |
-| Phase T7 | SEC-002 refresh-token HttpOnly Cookie closure | Implementation, local gates, and physical-device acceptance complete; protected CI pending |
+| Phase T7 | SEC-002 refresh-token HttpOnly Cookie closure | Physical-device and protected PR gates passed on PR #39; awaiting authorized merge |
 
-**Current active work:** T7 is implemented and physically accepted on `codex/sec-002-refresh-cookie`. SEC-002 remains open until the protected `CI / Required Quality Gate` passes with zero unresolved review conversations. Android release signing and store publishing remain separate release-engineering work.
+**Current active work:** T7 is implemented, physically accepted, and protected-CI qualified on PR #39. The PR is clean/mergeable with zero review conversations and is awaiting the final documentation-only CI rerun plus explicit merge authorization. Android release signing and store publishing remain separate release-engineering work.
 
 **Flyway current latest:** V12 (`V12__help_order_voice_transcription.sql`). Next new migration must be V13.
 
 **Known open items:**
 - `MEDICINE_OCR_API_KEY` must be set in `.env.local` for live OCR (graceful fallback if omitted)
-- SEC-002 closure acceptance pending: official clients have migrated to HttpOnly refresh Cookies and physical-device persistence/upload acceptance passes; protected PR/CI evidence remains required
+- SEC-002 candidate closure is qualified on PR #39: official clients use HttpOnly refresh Cookies, physical-device acceptance passes, and the first protected required gate is green; merge remains explicitly out of scope
 - Ops cleanup: `ops/sql/sec-003-clear-legacy-patient-id-card-masked.sql` needs to be run
 
 ## 1.6 Post-P0 Trial Demo Closed-Loop Sequence
@@ -1069,7 +1069,7 @@ The following items are intentionally excluded from the primary execution sequen
 3. More disease-path expansion (DDI rules for hypertension, diabetes, etc.)
 4. Non-MVP capability expansion
 5. Any work that reopens legacy backend refactor
-6. SEC-002 closure evidence: T7 implementation, physical-device restart/upload checks, and all local gates pass; retain as an open acceptance item until protected CI passes
+6. SEC-002 closure evidence: T7 implementation, physical-device restart/upload checks, all local gates, and PR #39's protected required gate pass; retain PR #39 for explicit merge authorization
 7. Ops cleanup: `ops/sql/sec-003-clear-legacy-patient-id-card-masked.sql` (historical `id_card_masked` rows)
 8. S3 presigned URL upload end-to-end browser test (Phase B, pending manual verification)
 

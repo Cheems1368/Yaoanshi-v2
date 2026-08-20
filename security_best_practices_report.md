@@ -11,7 +11,7 @@ Scope:
 
 This audit found 5 actionable findings:
 
-- 3 High (all FIXED as of 2026-03-09)
+- 3 High (all FIXED; SEC-002 qualified on PR #39 as of 2026-08-20)
 - 1 Medium FIXED as of 2026-03-09
 - 1 Medium open
 
@@ -56,9 +56,9 @@ False positive notes:
 
 - If an upstream gateway already strips query strings from all logs, leak surface is reduced, but the code still accepts the token in the URL and still allows all origins.
 
-### SEC-002: Browser-accessible refresh-token storage — IMPLEMENTED, PROTECTED CI PENDING (2026-08-20)
+### SEC-002: Browser-accessible refresh-token storage — FIXED ON PR #39 (2026-08-20)
 
-**Status: IMPLEMENTED; not yet marked closed.** Patient, pharmacist, and doctor official clients now keep access tokens in memory and use backend-managed HttpOnly refresh Cookies. Session responses contain no refresh token, professional refresh query parameters were removed, and refresh/logout require `X-Auth-Refresh: 1`. Local backend, frontend, Android-build, static-scan, HTTP-contract, nine-scenario E2E, and Android physical-device gates pass. Protected PR/CI remains required before closure.
+**Status: FIXED on PR #39; awaiting authorized merge.** Patient, pharmacist, and doctor official clients now keep access tokens in memory and use backend-managed HttpOnly refresh Cookies. Session responses contain no refresh token, professional refresh query parameters were removed, and refresh/logout require `X-Auth-Refresh: 1`. Local backend, frontend, Android-build, static-scan, HTTP-contract, nine-scenario E2E, Android physical-device, and protected `CI / Required Quality Gate` gates pass. PR #39 is clean/mergeable with zero review conversations; merge is intentionally not performed by this goal.
 
 ~~Impact:~~
 ~~Any XSS in the browser runtime can immediately exfiltrate both access and refresh tokens, enabling session replay and long-lived account takeover.~~

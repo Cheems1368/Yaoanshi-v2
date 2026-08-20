@@ -27,7 +27,7 @@ Current State
 - PR #37 (https://github.com/Cheems1368/Yaoanshi-v2/pull/37) was squash-merged as `98115b9`; the post-merge `main` CI run #46 (https://github.com/Cheems1368/Yaoanshi-v2/actions/runs/31795827722) passed all six checks and produced the 14-day Android APK artifact. Eclipse Temurin `21.0.12+8` is installed under `JAVA21_HOME`; default `JAVA_HOME` remains Microsoft OpenJDK 17.0.15 for backend work.
 - GitHub `main` branch protection and CI governance are officially enabled. The governance-enablement baseline was 92 backend tests with 64.33% JaCoCo line coverage; the enforced floor is 60%.
 - T1–T5 delivered baseline: 143 backend tests pass with 61.82% JaCoCo line coverage; patient ESLint, 3 Vitest tests, type check/production build, pharmacist build, and doctor build pass. All nine required E2E scenarios passed, including medication transfer and configured/unconfigured voice-transcription paths.
-- 2026-08-20 update: T7 Android physical-device acceptance passes on Xiaomi `2407FRK8EC` (Android 14/API 34): two process-stop/restart Cookie restorations, protected JSON reads, prescription image upload, image help order, microphone voice order, MinIO uploads, file registration, and persisted record replay. All local gates pass; protected PR/CI evidence remains pending, so SEC-002 is not yet marked closed.
+- 2026-08-20 update: T7 Android physical-device acceptance passes on Xiaomi `2407FRK8EC` (Android 14/API 34), and PR #39 first protected CI run #32323797498 passed all six checks including `CI / Required Quality Gate`. The PR is clean/mergeable with zero review conversations. Physical-device and protected PR gates have passed; waiting for authorized merge after the documentation-only final CI rerun.
 - 2026-08-01 update: Phase T5 complete. Pharmacist mobile work-order actions, Docker MIME/XFYUN runtime, live transcription, three-role mobile flow, and viewport acceptance all passed.
 - 2026-05-12 update: Phase T0/T1 complete for post-P0 trial/demo closed loop: Standard document sync plus patient text/image help-order loop.
 - Current implementation includes backend-v2 multi-image help-order attachments, patient image upload/reply UI, and pharmacist `/mobile/workorders`.
@@ -37,15 +37,15 @@ Current State
 - Last session (2026-03-27): Phase A–F completed (see below)
 
 In Progress
-- T7 code, local validation, and physical-device acceptance are complete; protected PR/CI acceptance remains.
+- T7 code, local validation, physical-device acceptance, and the first protected PR gate are complete; the final documentation-only CI rerun is pending before handoff for authorized merge.
 
 Next
-- Commit the physical-device fix/evidence, synchronize `origin/main`, and push `codex/sec-002-refresh-cookie` through the protected PR workflow.
-- Require `CI / Required Quality Gate` green and zero unresolved review conversations before marking SEC-002 closed; do not merge in this goal.
+- Push the final PR qualification documentation update and require the resulting `CI / Required Quality Gate` rerun to remain green.
+- Hand off PR #39 as current, clean, zero-conversation, and merge-ready; do not merge without explicit authorization.
 
 Last Updated
 - 2026-08-20 Asia/Shanghai
-- Reason: T7 Android physical-device and full local gates passed; protected PR/CI qualification is the only remaining closure gate.
+- Reason: T7 physical-device and first protected PR gates passed; recording final merge-ready evidence before the last documentation-only CI rerun.
 
 Android JDK 21 and APK Gate (2026-08-14)
 - Changed:
@@ -91,7 +91,7 @@ Phase F — CI/CD GitHub Actions (2026-03-27, commit f285037)
 
 Blockers (active)
 - MEDICINE_OCR_API_KEY must be set in .env.local to enable live OCR (graceful fallback if omitted)
-- SEC-002 implementation, local gates, and physical-device persistence/upload gates pass; protected PR/CI closure remains
+- PR #39 has passed physical-device and protected quality gates; the final documentation-only CI rerun must remain green before authorized merge
 - Historical patient.id_card_masked rows need ops cleanup: ops/sql/sec-003-clear-legacy-patient-id-card-masked.sql
 
 Completed Phases (durable record)
@@ -815,3 +815,23 @@ T7 Android Physical-Device Acceptance (2026-08-20)
 Last Updated
 - 2026-08-20 Asia/Shanghai
 - Reason: completed T7 Android physical-device acceptance and repeated the full local quality/security gate matrix.
+
+T7 Protected PR Qualification (2026-08-20)
+- Workstream:
+  - Publish the physically accepted SEC-002 candidate through the protected GitHub workflow and stop before merge.
+- Delivered:
+  - Pushed `codex/sec-002-refresh-cookie` and opened PR #39: https://github.com/Cheems1368/Yaoanshi-v2/pull/39
+  - First protected CI run #32323797498 passed backend tests/coverage, patient quality, patient Android APK, pharmacist build, doctor build, and `CI / Required Quality Gate`: https://github.com/Cheems1368/Yaoanshi-v2/actions/runs/32323797498
+- Validated:
+  - PR head `b57e5e9` was current with `origin/main`, mergeable, and reported `mergeStateStatus=CLEAN`.
+  - GitHub reported zero submitted reviews, zero review threads, and therefore zero unresolved conversations.
+  - The PR description records the frozen contract, risk/rollback, 153 backend tests, four patient unit tests, three builds, Android build, nine E2E scenarios, static security scans, and sanitized physical-device evidence.
+- Open risks:
+  - This final evidence-only commit triggers one more protected CI run. No further code or document change is required if that run remains green.
+  - Merge is intentionally outside this goal and requires explicit authorization.
+- Next:
+  - Push this evidence update, wait for the final required quality gate, reconfirm current/clean/zero-conversation state, and hand off without merging.
+
+Last Updated
+- 2026-08-20 Asia/Shanghai
+- Reason: physical-device and protected PR gates passed; PR #39 is awaiting the final documentation-only CI rerun and authorized merge.
