@@ -18,8 +18,8 @@ Project
 - Yaoshian MVP P0
 
 Branch / Context
-- Delivery state: `main` through PR #39 (`4c90292`); T8 implementation is on `codex/sec-005-ai-data-boundary`
-- Active workstream: T8 / SEC-005 AI data-boundary closure
+- Delivery state: `main` through PR #39 (`4c90292`); T8 candidate is protected-qualified in PR #40 on `codex/sec-005-ai-data-boundary` and awaits separate merge authorization
+- Active workstream: T8 / SEC-005 AI data-boundary protected PR handoff
 - Active surfaces: backend-v2 AI consent/redaction/upstream/audit, patient AI assistant Web/Android, V13, Standard document, security evidence
 
 Current State
@@ -29,6 +29,7 @@ Current State
 - T1–T5 delivered baseline: 143 backend tests pass with 61.82% JaCoCo line coverage; patient ESLint, 3 Vitest tests, type check/production build, pharmacist build, and doctor build pass. All nine required E2E scenarios passed, including medication transfer and configured/unconfigured voice-transcription paths.
 - 2026-08-22 update: PR #39 was squash-merged to `main` as `4c90292`; the post-merge `main` CI passed. The retained T7 remote branch is not part of T8 cleanup.
 - 2026-08-22 update: T8 adds versioned AI disclosure/consent, high-confidence redaction, exact upstream allowlisting, metadata-only fail-closed audit, V13, and a patient-side fail-closed disclosure flow. SEC-005 remains open until all local gates plus protected PR CI and review-conversation checks pass.
+- 2026-08-22 update: PR #40 passed all six protected CI checks at head `689f800`, including `CI / Required Quality Gate`; GitHub reported `CLEAN`, `MERGEABLE`, and zero reviews, review threads, or comments. SEC-005 candidate closure gates are satisfied; delivery to `main` remains outside this goal.
 - 2026-08-01 update: Phase T5 complete. Pharmacist mobile work-order actions, Docker MIME/XFYUN runtime, live transcription, three-role mobile flow, and viewport acceptance all passed.
 - 2026-05-12 update: Phase T0/T1 complete for post-P0 trial/demo closed loop: Standard document sync plus patient text/image help-order loop.
 - Current implementation includes backend-v2 multi-image help-order attachments, patient image upload/reply UI, and pharmacist `/mobile/workorders`.
@@ -38,14 +39,14 @@ Current State
 - Last session (2026-03-27): Phase A–F completed (see below)
 
 In Progress
-- T8 implementation and all available local gates are complete at `bf0bbe8`; the remote branch is published. PR creation/protected qualification is pending GitHub CLI authentication.
+- Record the PR #40 qualification evidence and wait for the evidence-only commit's final protected CI rerun.
 
 Next
-- Authenticate GitHub CLI or create the PR from the published-branch URL, then wait for the required gate and resolve all review conversations before closing SEC-005.
+- Confirm the final PR #40 required gate remains green, the branch remains current and mergeable, and review conversations remain at zero; then hand off for separate merge authorization without merging in this goal.
 
 Last Updated
 - 2026-08-22 Asia/Shanghai
-- Reason: T7 is merged; T8 SEC-005 passes local gates and is pushed, but remains open pending PR creation and protected qualification.
+- Reason: T8 PR #40 passed the first protected CI run with zero review conversations; final evidence rerun and merge handoff remain.
 
 Android JDK 21 and APK Gate (2026-08-14)
 - Changed:
@@ -91,8 +92,6 @@ Phase F — CI/CD GitHub Actions (2026-03-27, commit f285037)
 
 Blockers (active)
 - MEDICINE_OCR_API_KEY must be set in .env.local to enable live OCR (graceful fallback if omitted)
-- GitHub CLI is not authenticated; T8 branch push succeeded, but PR creation and protected CI have not started
-- SEC-005 closure requires the T8 protected required gate and zero unresolved review conversations
 - Historical patient.id_card_masked rows need ops cleanup: ops/sql/sec-003-clear-legacy-patient-id-card-masked.sql
 
 Completed Phases (durable record)
@@ -874,3 +873,25 @@ T8 Branch Publication (2026-08-22)
 Last Updated
 - 2026-08-22 Asia/Shanghai
 - Reason: published the T8 branch; PR creation is blocked only by missing GitHub CLI authentication.
+
+T8 Protected PR Qualification (2026-08-22)
+- Workstream:
+  - Publish the locally qualified SEC-005 candidate through the protected GitHub workflow and stop before merge.
+- Delivered:
+  - Authenticated GitHub CLI as `Cheems1368` without storing credentials in the repository.
+  - Opened PR #40: https://github.com/Cheems1368/Yaoanshi-v2/pull/40
+  - Protected CI run #32568105884 passed backend tests/coverage, patient quality, patient Android APK, pharmacist build, doctor build, and `CI / Required Quality Gate`: https://github.com/Cheems1368/Yaoanshi-v2/actions/runs/32568105884
+- Validated:
+  - Before PR creation, the branch was zero commits behind `origin/main`, the worktree was clean, and changed-file, forbidden-path, secret-pattern, and `git diff --check` checks passed.
+  - PR head `689f800` was current with `origin/main`, `MERGEABLE`, and reported `mergeStateStatus=CLEAN`.
+  - GitHub reported zero submitted reviews, zero review threads, zero unresolved conversations, and zero ordinary PR comments.
+  - The PR description records V13 and third-party-provider risk, rollback, compatibility boundaries, 170 backend tests with 62.66% JaCoCo line coverage, six patient unit tests, Web/Android gates, migration/cleanup evidence, and sanitized static-scan results.
+- Open risks:
+  - This evidence-only commit triggers one final protected CI run; qualification remains valid only if that run stays green and no review conversation is opened.
+  - Merge is intentionally outside this goal and requires separate authorization.
+- Next:
+  - Wait for the final required gate, reconfirm current/mergeable/zero-conversation state, update the PR evidence checkbox, and hand off PR #40 without merging.
+
+Last Updated
+- 2026-08-22 Asia/Shanghai
+- Reason: PR #40 passed its first protected gate with zero review conversations and awaits the final evidence rerun.

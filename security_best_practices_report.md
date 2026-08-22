@@ -13,7 +13,7 @@ This audit found 5 actionable findings:
 
 - 3 High (all FIXED; SEC-002 delivered through PR #39 as of 2026-08-22)
 - 1 Medium FIXED as of 2026-03-09
-- 1 Medium with remediation implemented on T8; protected-CI closure pending
+- 1 Medium protected-qualified on the T8 candidate in PR #40; delivery to `main` pending
 
 The highest-risk themes are browser-accessible token storage, WebSocket authentication through query strings with wildcard origins, and patient medical data persisted in `localStorage`. I did not find obvious use of `eval`, `new Function`, or unsafe `postMessage` handlers in the scanned code paths.
 
@@ -178,9 +178,9 @@ False positive notes:
 
 - This is a secure-defaults problem. If every environment overrides these values and Swagger is gated at an upstream layer, runtime risk is lower.
 
-### SEC-005: AI proxy forwards raw user prompts to an external upstream without visible consent, minimization, or audit controls — REMEDIATION IMPLEMENTED ON T8
+### SEC-005: AI proxy forwards raw user prompts to an external upstream without visible consent, minimization, or audit controls — FIXED ON T8 CANDIDATE
 
-**Status: LOCALLY QUALIFIED on `codex/sec-005-ai-data-boundary`; closure remains pending until the protected required gate is green and review conversations are resolved.** Targeted and full backend tests, the 60% JaCoCo gate, patient lint/unit/build/Android gates, Flyway fresh/V12-upgrade checks, metadata schema assertions, and bounded-cleanup validation pass.
+**Status: PROTECTED-QUALIFIED in PR #40 on `codex/sec-005-ai-data-boundary`; delivery to `main` awaits separate merge authorization.** Local targeted and full backend tests, the 60% JaCoCo gate, patient lint/unit/build/Android gates, Flyway fresh/V12-upgrade checks, metadata schema assertions, and bounded-cleanup validation pass. Protected CI run #32568105884 passed all six checks, and GitHub reported zero reviews, review threads, unresolved conversations, or comments at qualification time.
 
 Original impact:
 Patient-entered medical text could cross the first-party boundary to a third-party AI endpoint with no code-visible redaction, versioned consent, durable disclosure trail, or metadata audit.
@@ -205,5 +205,6 @@ audit status: PENDING -> SUCCESS | FAILED; expires_at = create_time + 180 days
 
 Closure requirements:
 
-- Targeted and full backend gates, patient lint/unit/build/Android gates, fresh/existing migration checks, and static no-content audit checks pass.
-- Protected `CI / Required Quality Gate` is green with zero unresolved review conversations.
+- Targeted and full backend gates, patient lint/unit/build/Android gates, fresh/existing migration checks, and static no-content audit checks pass. ✅
+- Protected `CI / Required Quality Gate` is green with zero unresolved review conversations. ✅ PR #40 / run #32568105884
+- Merge to `main` is a separate delivery authorization and is not part of SEC-005 candidate qualification.

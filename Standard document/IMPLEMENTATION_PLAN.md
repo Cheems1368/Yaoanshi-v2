@@ -28,15 +28,15 @@ Rules:
 | Phase T0–T5 | Trial/demo closed loops through voice help orders | ✅ Delivered through PR #32 (`35b1e8a`) |
 | Phase T6 | Android JDK 21 and enforced APK build gate | ✅ Delivered through PR #37 (`98115b9`) |
 | Phase T7 | SEC-002 refresh-token HttpOnly Cookie closure | ✅ Delivered through PR #39 (`4c90292`) |
-| Phase T8 | SEC-005 AI data-boundary closure | Local gates pass and branch is published; PR creation/protected qualification pending GitHub CLI authentication |
+| Phase T8 | SEC-005 AI data-boundary closure | ✅ Protected-qualified in PR #40; delivery to `main` awaits separate merge authorization |
 
-**Current active work:** T8 closes SEC-005 with versioned provider disclosure, high-confidence text redaction, exact upstream-host allowlisting, fail-closed metadata-only audit, and patient-side policy loading. SEC-005 remains open until the T8 protected required gate is green and all review conversations are resolved. Android release signing and store publishing remain separate release-engineering work.
+**Current active work:** T8 closes SEC-005 with versioned provider disclosure, high-confidence text redaction, exact upstream-host allowlisting, fail-closed metadata-only audit, and patient-side policy loading. PR #40 passed all protected checks with zero review conversations; the candidate awaits a final evidence-only CI rerun and separate merge authorization. Android release signing and store publishing remain separate release-engineering work.
 
 **Flyway current latest:** V13 (`V13__ai_data_boundary.sql`). Next new migration must be V14.
 
 **Known open items:**
 - `MEDICINE_OCR_API_KEY` must be set in `.env.local` for live OCR (graceful fallback if omitted)
-- SEC-005 T8 candidate passes local backend, patient Web/Android, migration, and data-boundary gates; protected PR gate and conversation check remain before closure
+- SEC-005 T8 candidate passes local backend, patient Web/Android, migration, data-boundary, protected PR, and zero-conversation gates; delivery to `main` remains pending
 - Ops cleanup: `ops/sql/sec-003-clear-legacy-patient-id-card-masked.sql` needs to be run
 
 ## 1.6 Post-P0 Trial Demo Closed-Loop Sequence
