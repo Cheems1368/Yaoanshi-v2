@@ -101,7 +101,7 @@ class AdminPatientServiceTest {
         target.setServiceStatus("ACTIVE");
         HelpOrder pharmacistOrder = helpOrder(6001L, "PHARMACIST_IN_PROGRESS", "PHARMACIST", 9001L);
         HelpOrder doctorOrder = helpOrder(6002L, "WAITING_DOCTOR", "DOCTOR", 8001L);
-        when(patientMapper.selectByIdAndTenant(1L, 3001L)).thenReturn(patient);
+        when(patientMapper.lockByIdAndTenant(1L, 3001L)).thenReturn(patient);
         when(pharmacistProfileMapper.selectById(1L, 9002L)).thenReturn(target);
         when(helpOrderMapper.selectNonTerminalByPatientId(1L, 3001L)).thenReturn(List.of(pharmacistOrder, doctorOrder));
         when(patientFamilyBindingMapper.selectActiveByPatientId(1L, 3001L)).thenReturn(List.of());
@@ -113,6 +113,8 @@ class AdminPatientServiceTest {
         AdminPatientDetailDTO result = adminPatientService.reassignPatient(claims, 3001L, request);
 
         assertThat(result.getResponsiblePharmacistId()).isEqualTo(9002L);
+        verify(patientMapper).lockByIdAndTenant(1L, 3001L);
+        verify(patientMapper, never()).selectByIdAndTenant(1L, 3001L);
         verify(patientMapper).updateResponsiblePharmacist(patient);
         verify(helpOrderMapper).reassignNonTerminalByPatientId(1L, 3001L, 9001L, 9002L,
                 "admin-reassign-100", patient.getUpdateTime());

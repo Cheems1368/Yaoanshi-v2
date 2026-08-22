@@ -965,6 +965,13 @@ T9 PR A Latest-Head Review Remediation (2026-08-22)
 - External gate unchanged:
   - Licensed pharmacist or physician approval of all ten `medication-literacy-v1` stems, options, and answers remains mandatory before PR #41 can merge.
 
+T9 PR A Reassignment Concurrency Remediation (2026-08-22)
+- Changed:
+  - Responsibility reassignment now locks and rereads the patient row before deriving the previous pharmacist, serializing concurrent admin changes and keeping in-flight order handlers plus `REASSIGNED` audit events consistent.
+- Validated locally:
+  - The affected regression suites passed; full backend `clean verify` passed 198/198 tests with 64.87% JaCoCo line coverage, and `git diff --check` reported no whitespace errors.
+  - Protected CI and final latest-head review must still pass before this fix is qualified.
+
 Last Updated
 - 2026-08-22 Asia/Shanghai
 - Reason: T8 is formally delivered and T9 PR A is implemented locally; medical approval and protected PR qualification remain open.

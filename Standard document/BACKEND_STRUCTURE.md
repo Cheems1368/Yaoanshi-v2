@@ -1305,6 +1305,8 @@ Existing `/admin-api/system/auth/login`, `/refresh-token`, and `/logout` contrac
 | `PUT` | `/admin-api/patients/{id}` | pharmacist | patient update DTO | updated detail | update patient medical fields, maybe trigger ABCD2 recalculation |
 | `PUT` | `/admin-api/patients/{id}/responsible-pharmacist` | admin / super_admin / tenant_admin | `{ pharmacistId, reason }` | updated detail | atomically update patient and non-terminal orders; append `REASSIGNED` events |
 | `POST` | `/admin-api/patients/{id}/knowledge-assessments/remind` | responsible pharmacist or admin | none | Boolean | persist/send current-phase reminder when due |
+
+Responsibility reassignment locks and rereads the patient row before deriving the old pharmacist. Concurrent admin requests therefore serialize on the patient and update in-flight orders and `REASSIGNED` audit events from the actual preceding assignment.
 | `GET` | `/admin-api/pharmacists/options` | admin / super_admin / tenant_admin | none | ACTIVE pharmacist options | none |
 
 #### Prescription and OCR

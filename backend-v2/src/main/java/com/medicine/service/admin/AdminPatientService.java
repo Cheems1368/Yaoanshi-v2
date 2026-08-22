@@ -112,7 +112,10 @@ public class AdminPatientService {
     public AdminPatientDetailDTO reassignPatient(JwtClaims claims, Long patientId, PatientReassignRequest request) {
         requireAdmin(claims);
         if (request == null || request.getPharmacistId() == null) throw new BusinessException(400, "BAD_REQUEST");
-        Patient patient = requirePatient(claims.getTenantId(), patientId);
+        Patient patient = patientMapper.lockByIdAndTenant(claims.getTenantId(), patientId);
+        if (patient == null) {
+            throw new BusinessException(ErrorCode.PATIENT_NOT_FOUND.getCode(), ErrorCode.PATIENT_NOT_FOUND.getMessage());
+        }
         PharmacistProfile target = pharmacistProfileMapper.selectById(claims.getTenantId(), request.getPharmacistId());
         if (target == null || !"ACTIVE".equals(target.getServiceStatus())) throw new BusinessException(400, "PHARMACIST_NOT_ACTIVE");
         Long oldPharmacistId = patient.getBoundByPharmacistId();
