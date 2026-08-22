@@ -528,13 +528,25 @@ export const drugCatalogService = {
   }
 }
 
+export interface AiDisclosureDTO {
+  policyVersion: string
+  providerCode: string
+  providerDisplayName: string
+  statement: string
+  consentGranted: boolean
+}
+
 export const aiConsentService = {
+  getDisclosure() {
+    return httpService.get<AiDisclosureDTO>('/app-api/ai/disclosure')
+  },
+
   getConsentStatus() {
     return httpService.get<boolean>('/app-api/ai/consent')
   },
 
-  grantConsent() {
-    return httpService.post<boolean>('/app-api/ai/consent', {})
+  grantConsent(policyVersion: string) {
+    return httpService.post<boolean>('/app-api/ai/consent', { policyVersion })
   }
 }
 

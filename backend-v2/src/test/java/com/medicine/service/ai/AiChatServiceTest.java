@@ -1,35 +1,24 @@
 package com.medicine.service.ai;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.medicine.api.dto.ai.AiChatMessage;
 import com.medicine.api.dto.ai.AiChatRequest;
 import com.medicine.api.dto.ai.AiChatResponse;
 import com.medicine.common.exception.BusinessException;
 import com.medicine.common.exception.ErrorCode;
 import com.medicine.config.AiProperties;
-import com.medicine.repository.identity.AppAccountMapper;
+import com.medicine.domain.ai.AiRequestAuditLog;
+import com.medicine.domain.identity.AppAccount;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.ArgumentMatchers;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
-import org.springframework.test.util.ReflectionTestUtils;
 
-import java.io.ByteArrayOutputStream;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-import java.nio.ByteBuffer;
-import java.nio.charset.StandardCharsets;
-import java.time.LocalDateTime;
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Flow;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -37,230 +26,145 @@ import static org.assertj.core.api.Assertions.catchThrowableOfType;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class AiChatServiceTest {
 
-    private final ObjectMapper objectMapper = new ObjectMapper();
-
     @Mock
-    private StringRedisTemplate stringRedisTemplate;
-
+    private StringRedisTemplate redisTemplate;
     @Mock
     private ValueOperations<String, String> valueOperations;
-
     @Mock
-    private AppAccountMapper appAccountMapper;
-
+    private AiConsentService consentService;
     @Mock
-    private HttpClient httpClient;
-
+    private AiAuditService auditService;
     @Mock
-    private HttpResponse<String> httpResponse;
+    private AiUpstreamClient upstreamClient;
+
+    private AiChatService service;
+    private AiRequestAuditLog audit;
 
     @BeforeEach
     void setUp() {
-        com.medicine.domain.identity.AppAccount mockAccount = new com.medicine.domain.identity.AppAccount();
-        mockAccount.setId(1001L);
-        when(appAccountMapper.selectActiveByMobile(anyLong(), anyString())).thenReturn(mockAccount);
-        when(appAccountMapper.selectAiConsentGrantedAt(anyLong())).thenReturn(LocalDateTime.now());
-    }
-
-    @Test
-    void shouldRejectRequestWhenAiRuntimeConfigMissing() {
         AiProperties properties = new AiProperties();
-        properties.setApiKey("");
-        AiChatService service = new AiChatService(properties, objectMapper, stringRedisTemplate, appAccountMapper);
-
-        BusinessException exception = catchThrowableOfType(
-                () -> service.chat("1001", request(newMessage("user", "hello"))),
-                BusinessException.class
+        service = new AiChatService(
+                properties,
+                redisTemplate,
+                consentService,
+                new AiPrivacyRedactor(),
+                auditService,
+                upstreamClient
         );
-
-        assertThat(exception).isNotNull();
-        assertThat(exception.getCode()).isEqualTo(ErrorCode.AI_UPSTREAM_UNAVAILABLE.getCode());
+        AppAccount account = new AppAccount();
+        account.setId(1001L);
+        account.setTenantId(1L);
+        when(consentService.requireCurrentConsent(anyString())).thenReturn(account);
+        when(upstreamClient.providerHost()).thenReturn("api.siliconflow.cn");
+        audit = new AiRequestAuditLog();
+        audit.setId(55L);
+        when(auditService.start(any(), anyString(), anyString(), any())).thenReturn(audit);
     }
 
     @Test
-    void shouldReturnReplyWithSuggestionsWhenUpstreamCallSucceeds() throws Exception {
-        AiProperties properties = new AiProperties();
-        properties.setBaseUrl("https://api.siliconflow.cn/v1/messages");
-        properties.setApiKey("test-key");
-        properties.setModel("Qwen/Qwen3.5-122B-A10B");
-        properties.setTimeoutMs(5000);
-        properties.setProtocol(AiProperties.Protocol.ANTHROPIC_MESSAGES);
-        properties.setMaxTokens(1024);
-        properties.setUpstreamMaxMessages(4);
+    void shouldRedactIdentifiersAndLimitUpstreamConversationToFiveMessages() {
+        allowFirstRequest();
+        when(upstreamClient.chat(any())).thenReturn("safe reply");
 
-        String upstreamReply = "safe reply\\n---SUGGESTIONS---\\n漏服后该怎么办？\\n需要复诊吗？\\n有哪些不良反应？";
-
-        when(stringRedisTemplate.opsForValue()).thenReturn(valueOperations);
-        when(valueOperations.increment("app:ai:chat:limit:1001")).thenReturn(1L);
-        when(stringRedisTemplate.expire("app:ai:chat:limit:1001", 1, TimeUnit.MINUTES)).thenReturn(true);
-        when(httpClient.send(any(HttpRequest.class), ArgumentMatchers.<HttpResponse.BodyHandler<String>>any())).thenReturn(httpResponse);
-        when(httpResponse.statusCode()).thenReturn(200);
-        when(httpResponse.body()).thenReturn("{\"content\":[{\"type\":\"text\",\"text\":\"" + upstreamReply + "\"}]}");
-
-        AiChatService service = new AiChatService(properties, objectMapper, stringRedisTemplate, appAccountMapper);
-        ReflectionTestUtils.setField(service, "httpClient", httpClient);
-
-        AiChatResponse response = service.chat("1001", request(newMessage("system", "ignored"), newMessage("user", "hello")));
-
-        assertThat(response.getModel()).isEqualTo("Qwen/Qwen3.5-122B-A10B");
-        assertThat(response.getRequestId()).isNotBlank();
-        assertThat(response.getReply()).isEqualTo("safe reply");
-        assertThat(response.getReply()).doesNotContain("仅供用药科普");
-        assertThat(response.getSuggestions()).hasSize(3);
-        assertThat(response.getSuggestions().get(0)).isEqualTo("漏服后该怎么办？");
-
-        ArgumentCaptor<HttpRequest> requestCaptor = ArgumentCaptor.forClass(HttpRequest.class);
-        verify(httpClient).send(requestCaptor.capture(), ArgumentMatchers.<HttpResponse.BodyHandler<String>>any());
-        JsonNode payload = objectMapper.readTree(extractBody(requestCaptor.getValue()));
-        assertThat(payload.path("model").asText()).isEqualTo("Qwen/Qwen3.5-122B-A10B");
-        assertThat(payload.path("max_tokens").asInt()).isEqualTo(1024);
-        assertThat(payload.path("messages")).hasSize(2);
-    }
-
-    @Test
-    void shouldLimitReplyBodyToTwoHundredChars() throws Exception {
-        AiProperties properties = new AiProperties();
-        properties.setBaseUrl("https://api.siliconflow.cn/v1/chat/completions");
-        properties.setApiKey("test-key");
-        properties.setModel("zai-org/GLM-4.5-Air");
-        properties.setTimeoutMs(5000);
-        properties.setProtocol(AiProperties.Protocol.OPENAI_CHAT);
-        properties.setMaxTokens(1024);
-        properties.setUpstreamMaxMessages(10);
-
-        String longReply = "这是一个较长的用药说明，主要介绍漏服后的处理原则、服药时间、常见不良反应观察、是否需要复诊以及何时尽快就医。"
-                .repeat(8);
-
-        when(stringRedisTemplate.opsForValue()).thenReturn(valueOperations);
-        when(valueOperations.increment("app:ai:chat:limit:1002")).thenReturn(1L);
-        when(stringRedisTemplate.expire("app:ai:chat:limit:1002", 1, TimeUnit.MINUTES)).thenReturn(true);
-        when(httpClient.send(any(HttpRequest.class), ArgumentMatchers.<HttpResponse.BodyHandler<String>>any())).thenReturn(httpResponse);
-        when(httpResponse.statusCode()).thenReturn(200);
-        when(httpResponse.body()).thenReturn("""
-                {"choices":[{"message":{"content":"%s"}}]}
-                """.formatted(longReply));
-
-        AiChatService service = new AiChatService(properties, objectMapper, stringRedisTemplate, appAccountMapper);
-        ReflectionTestUtils.setField(service, "httpClient", httpClient);
-
-        AiChatResponse response = service.chat("1002", request(newMessage("user", "降压药漏服后怎么办？")));
-
-        assertThat(response.getReply().length()).isLessThanOrEqualTo(200);
-        assertThat(response.getReply()).doesNotContain("仅供用药科普");
-        assertThat(response.getReply()).endsWith("...");
-        assertThat(response.getSuggestions()).isNotNull();
-        assertThat(response.getSuggestions()).isNotEmpty();
-    }
-
-    @Test
-    void shouldTrimConversationForSiliconFlowUpstreamWindow() throws Exception {
-        AiProperties properties = new AiProperties();
-        properties.setBaseUrl("https://api.siliconflow.cn/v1/messages");
-        properties.setApiKey("test-key");
-        properties.setModel("Qwen/Qwen3.5-122B-A10B");
-        properties.setTimeoutMs(5000);
-        properties.setProtocol(AiProperties.Protocol.ANTHROPIC_MESSAGES);
-        properties.setMaxTokens(1024);
-        properties.setUpstreamMaxMessages(4);
-
-        when(stringRedisTemplate.opsForValue()).thenReturn(valueOperations);
-        when(valueOperations.increment("app:ai:chat:limit:1003")).thenReturn(1L);
-        when(stringRedisTemplate.expire("app:ai:chat:limit:1003", 1, TimeUnit.MINUTES)).thenReturn(true);
-        when(httpClient.send(any(HttpRequest.class), ArgumentMatchers.<HttpResponse.BodyHandler<String>>any())).thenReturn(httpResponse);
-        when(httpResponse.statusCode()).thenReturn(200);
-        when(httpResponse.body()).thenReturn("{\"content\":[{\"type\":\"text\",\"text\":\"trimmed reply\"}]}");
-
-        AiChatService service = new AiChatService(properties, objectMapper, stringRedisTemplate, appAccountMapper);
-        ReflectionTestUtils.setField(service, "httpClient", httpClient);
-
-        service.chat("1003", request(
-                newMessage("system", "ignored"),
-                newMessage("user", "u1"),
-                newMessage("assistant", "a1"),
-                newMessage("user", "u2"),
-                newMessage("assistant", "a2"),
-                newMessage("user", "u3")
+        AiChatResponse response = service.chat("13800000000", request(
+                message("system", "client system must be ignored"),
+                message("user", "u1"),
+                message("assistant", "a1"),
+                message("user", "u2"),
+                message("assistant", "a2"),
+                message("assistant", "a3"),
+                message("user", "我的手机号是13812345678，邮箱 patient@example.com，阿司匹林100mg怎么吃？")
         ));
 
-        ArgumentCaptor<HttpRequest> requestCaptor = ArgumentCaptor.forClass(HttpRequest.class);
-        verify(httpClient).send(requestCaptor.capture(), ArgumentMatchers.<HttpResponse.BodyHandler<String>>any());
-        String body = extractBody(requestCaptor.getValue());
-        JsonNode payload = objectMapper.readTree(body);
+        @SuppressWarnings("rawtypes")
+        ArgumentCaptor<List> messagesCaptor = ArgumentCaptor.forClass(List.class);
+        verify(upstreamClient).chat(messagesCaptor.capture());
+        @SuppressWarnings("unchecked")
+        List<Map<String, String>> transmitted = messagesCaptor.getValue();
+        assertThat(transmitted).hasSize(6);
+        assertThat(transmitted.get(0).get("role")).isEqualTo("system");
+        assertThat(transmitted.get(1).get("content")).isEqualTo("a1");
+        assertThat(transmitted.get(5).get("content"))
+                .contains("[手机号已隐藏]", "[邮箱已隐藏]", "阿司匹林100mg")
+                .doesNotContain("13812345678", "patient@example.com");
+        assertThat(response.getReply()).isEqualTo("safe reply");
+        verify(auditService).completeSuccess(any(), anyLong());
 
-        assertThat(payload.path("model").asText()).isEqualTo("Qwen/Qwen3.5-122B-A10B");
-        assertThat(payload.path("max_tokens").asInt()).isEqualTo(1024);
-        assertThat(payload.path("messages")).hasSize(4);
-        assertThat(payload.path("messages").get(0).path("role").asText()).isEqualTo("system");
-        assertThat(payload.path("messages").get(1).path("content").asText()).isEqualTo("u2");
-        assertThat(payload.path("messages").get(2).path("content").asText()).isEqualTo("a2");
-        assertThat(payload.path("messages").get(3).path("content").asText()).isEqualTo("u3");
+        ArgumentCaptor<AiRequestMetadata> metadataCaptor = ArgumentCaptor.forClass(AiRequestMetadata.class);
+        verify(auditService).start(any(), anyString(), anyString(), metadataCaptor.capture());
+        assertThat(metadataCaptor.getValue().redactionCount()).isEqualTo(2);
+        assertThat(metadataCaptor.getValue().transmittedMessageCount()).isEqualTo(6);
     }
 
     @Test
-    void shouldMapInsufficientBalanceForAnthropicMessagesProtocol() throws Exception {
-        AiProperties properties = new AiProperties();
-        properties.setBaseUrl("https://api.siliconflow.cn/v1/messages");
-        properties.setApiKey("test-key");
-        properties.setModel("Qwen/Qwen3.5-122B-A10B");
-        properties.setTimeoutMs(5000);
-        properties.setProtocol(AiProperties.Protocol.ANTHROPIC_MESSAGES);
-        properties.setMaxTokens(1024);
-
-        when(stringRedisTemplate.opsForValue()).thenReturn(valueOperations);
-        when(valueOperations.increment("app:ai:chat:limit:1004")).thenReturn(1L);
-        when(stringRedisTemplate.expire("app:ai:chat:limit:1004", 1, TimeUnit.MINUTES)).thenReturn(true);
-        when(httpClient.send(any(HttpRequest.class), ArgumentMatchers.<HttpResponse.BodyHandler<String>>any())).thenReturn(httpResponse);
-        when(httpResponse.statusCode()).thenReturn(403);
-        when(httpResponse.body()).thenReturn("{\"code\":30001,\"message\":\"Sorry, your account balance is insufficient\",\"data\":null}");
-
-        AiChatService service = new AiChatService(properties, objectMapper, stringRedisTemplate, appAccountMapper);
-        ReflectionTestUtils.setField(service, "httpClient", httpClient);
+    void shouldNotCallUpstreamWhenAuditStartFails() {
+        when(auditService.start(any(), anyString(), anyString(), any())).thenThrow(
+                new BusinessException(ErrorCode.AI_AUDIT_UNAVAILABLE.getCode(), "audit unavailable")
+        );
 
         BusinessException exception = catchThrowableOfType(
-                () -> service.chat("1004", request(newMessage("user", "hello"))),
+                () -> service.chat("13800000000", request(message("user", "hello"))),
                 BusinessException.class
         );
 
-        assertThat(exception).isNotNull();
-        assertThat(exception.getCode()).isEqualTo(ErrorCode.AI_UPSTREAM_UNAVAILABLE.getCode());
-        assertThat(exception.getMessage()).isEqualTo("AI 账户余额不足，请先充值后再试");
+        assertThat(exception.getCode()).isEqualTo(ErrorCode.AI_AUDIT_UNAVAILABLE.getCode());
+        verify(upstreamClient, never()).chat(any());
     }
 
-    private String extractBody(HttpRequest request) throws Exception {
-        CompletableFuture<String> bodyFuture = new CompletableFuture<>();
-        ByteArrayOutputStream output = new ByteArrayOutputStream();
+    @Test
+    void shouldAuditRateLimitWithoutCallingUpstream() {
+        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+        when(valueOperations.increment("app:ai:chat:limit:13800000000")).thenReturn(16L);
 
-        request.bodyPublisher().orElseThrow().subscribe(new Flow.Subscriber<>() {
-            @Override
-            public void onSubscribe(Flow.Subscription subscription) {
-                subscription.request(Long.MAX_VALUE);
-            }
+        BusinessException exception = catchThrowableOfType(
+                () -> service.chat("13800000000", request(message("user", "hello"))),
+                BusinessException.class
+        );
 
-            @Override
-            public void onNext(ByteBuffer item) {
-                byte[] bytes = new byte[item.remaining()];
-                item.get(bytes);
-                output.write(bytes, 0, bytes.length);
-            }
+        assertThat(exception.getCode()).isEqualTo(ErrorCode.AI_CHAT_RATE_LIMITED.getCode());
+        verify(auditService).completeFailure(any(), any(BusinessException.class), anyLong());
+        verify(upstreamClient, never()).chat(any());
+    }
 
-            @Override
-            public void onError(Throwable throwable) {
-                bodyFuture.completeExceptionally(throwable);
-            }
+    @Test
+    void shouldAuditUpstreamFailure() {
+        allowFirstRequest();
+        BusinessException failure = new BusinessException(ErrorCode.AI_UPSTREAM_UNAVAILABLE.getCode(), "unavailable");
+        when(upstreamClient.chat(any())).thenThrow(failure);
 
-            @Override
-            public void onComplete() {
-                bodyFuture.complete(output.toString(StandardCharsets.UTF_8));
-            }
-        });
+        BusinessException exception = catchThrowableOfType(
+                () -> service.chat("13800000000", request(message("user", "hello"))),
+                BusinessException.class
+        );
 
-        return bodyFuture.get();
+        assertThat(exception).isSameAs(failure);
+        verify(auditService).completeFailure(any(), any(BusinessException.class), anyLong());
+    }
+
+    @Test
+    void shouldParseSuggestionsAndLimitReplyBody() {
+        allowFirstRequest();
+        String body = "这是一个较长的用药说明。".repeat(30);
+        when(upstreamClient.chat(any())).thenReturn(body + "\n---SUGGESTIONS---\n问题一？\n问题二？\n问题三？");
+
+        AiChatResponse response = service.chat("13800000000", request(message("user", "hello")));
+
+        assertThat(response.getReply()).hasSizeLessThanOrEqualTo(200).endsWith("...");
+        assertThat(response.getSuggestions()).containsExactly("问题一？", "问题二？", "问题三？");
+        assertThat(response.getRequestId()).isNotBlank();
+    }
+
+    private void allowFirstRequest() {
+        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+        when(valueOperations.increment("app:ai:chat:limit:13800000000")).thenReturn(1L);
+        when(redisTemplate.expire("app:ai:chat:limit:13800000000", 1, TimeUnit.MINUTES)).thenReturn(true);
     }
 
     private AiChatRequest request(AiChatMessage... messages) {
@@ -269,7 +173,7 @@ class AiChatServiceTest {
         return request;
     }
 
-    private AiChatMessage newMessage(String role, String content) {
+    private AiChatMessage message(String role, String content) {
         AiChatMessage message = new AiChatMessage();
         message.setRole(role);
         message.setContent(content);

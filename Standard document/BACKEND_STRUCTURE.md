@@ -991,12 +991,61 @@ Business rules:
 2. Drug names entered outside the catalog (free-text) remain valid; the catalog is autocomplete-only and does not enforce name constraints.
 3. Pinyin prefix match takes priority over fuzzy Chinese name match in search result ranking.
 
+### 4.11 AI data-boundary domain
+
+#### Table: `ai_consent_record`
+
+Purpose:
+
+- preserve versioned proof that an account accepted the exact provider disclosure currently in force
+- prevent the legacy `app_account.ai_consent_granted_at` timestamp from being treated as consent for a newer policy
+
+Key columns and constraints:
+
+| Column | Type | Nullable | Index / Constraint | Business rule |
+|---|---|---|---|---|
+| `account_id` | `BIGINT` | No | `UK_ai_consent_policy`, `IDX_ai_consent_account` | consenting application account |
+| `policy_version` | `VARCHAR(64)` | No | `UK_ai_consent_policy` | server-controlled policy version |
+| `provider_code` | `VARCHAR(64)` | No | `UK_ai_consent_policy` | provider snapshot, default `SILICONFLOW` |
+| `provider_display_name` | `VARCHAR(128)` | No |  | display-name snapshot shown to the user |
+| `statement_hash` | `CHAR(64)` | No | `UK_ai_consent_policy` | SHA-256 of the complete disclosure statement |
+| `granted_at` | `DATETIME` | No | `IDX_ai_consent_account` | explicit grant time |
+| audit columns | standard |  |  |  |
+
+Only a row matching the current policy version, provider code, and statement hash is valid consent. V13 does not migrate old timestamps into this table.
+
+#### Table: `ai_request_audit_log`
+
+Purpose:
+
+- fail-closed metadata audit for every attempted third-party AI call
+- support 180-day retention without storing question, response, request payload, or body hash
+
+Key columns and constraints:
+
+| Column | Type | Nullable | Index / Constraint | Business rule |
+|---|---|---|---|---|
+| `request_id` | `VARCHAR(64)` | No | `UK_ai_audit_request` | non-content correlation id |
+| `account_id` | `BIGINT` | No | `IDX_ai_audit_account` | caller account |
+| `provider_code`, `provider_host`, `model` | metadata | No |  | selected upstream snapshot |
+| message/character counts | `INT` | No |  | original and transmitted aggregate counts only |
+| `redaction_count` | `INT` | No |  | number of high-confidence replacements |
+| `status` | `VARCHAR(20)` | No |  | `PENDING`, `SUCCESS`, or `FAILED` |
+| `error_code` | `VARCHAR(64)` | Yes |  | normalized non-content failure code |
+| `latency_ms` | `BIGINT` | Yes |  | elapsed call time |
+| `expires_at` | `DATETIME` | No | `IDX_ai_audit_expiry` | `create_time + 180 days` by default |
+| audit columns | standard |  |  |  |
+
+The service inserts `PENDING` before any upstream access. Insert failure blocks the call; outcome-update failure leaves the record `PENDING` and may log identifiers only. The bounded preview/delete runbook is `ops/sql/sec-005-purge-expired-ai-audit-log.sql`; no scheduler is introduced in T8.
+
 ## 5. Entity relationships
 
 ```mermaid
 erDiagram
     app_account ||--o| patient : binds
     app_account ||--o{ app_account_device_session : owns
+    app_account ||--o{ ai_consent_record : grants
+    app_account ||--o{ ai_request_audit_log : invokes
     patient ||--o{ patient_family_binding : has
     app_account ||--o{ patient_family_binding : acts_as_family
     patient ||--o{ prescription : uploads_for
@@ -1193,7 +1242,17 @@ Search priority:
 
 | Method | Path | Auth | Request | Response `data` | Side effects |
 |---|---|---|---|---|---|
-| `POST` | `/app-api/ai/chat` | Yes | `{ messages, model? }` | `{ reply, model, disclaimer }` | proxy to upstream AI provider, no persistent side effects |
+| `GET` | `/app-api/ai/disclosure` | Yes | none | `AiDisclosureDTO { policyVersion, providerCode, providerDisplayName, statement, consentGranted }` | read current policy and exact-match consent |
+| `GET` | `/app-api/ai/consent` | Yes | none | `Boolean` | returns true only for current policy/provider/statement hash |
+| `POST` | `/app-api/ai/consent` | Yes | `AiConsentGrantRequest { policyVersion }` | `Boolean` | insert versioned consent; update legacy timestamp for compatibility |
+| `POST` | `/app-api/ai/chat` | Yes | `AiChatRequest { messages }` | `AiChatResponse { reply, model, requestId, suggestions }` | redact and send at most five recent non-system messages; write metadata-only audit |
+
+AI rules:
+
+1. Missing or stale consent version returns `AI_CONSENT_POLICY_MISMATCH (40034)`; chat without exact current consent returns `AI_CONSENT_REQUIRED (40031)`.
+2. Client-supplied system messages are ignored. The server supplies its own system prompt and forwards at most the five most recent user/assistant messages.
+3. Mainland mobile numbers, 15/18-digit identity numbers, email addresses, and explicitly labelled names or clinical identifiers are replaced before transfer; ordinary names/addresses are not guessed.
+4. The configured upstream host must exactly match `MEDICINE_AI_ALLOWED_HOSTS`. HTTPS is mandatory except for an explicitly allowlisted loopback host, and redirects are never followed.
 
 #### Assessments
 
@@ -1364,6 +1423,9 @@ The document must use stable business codes. Minimum required set:
 | `DDI_CONFIRM_REQUIRED` | high-risk interaction requires pharmacist confirmation |
 | `FILE_UPLOAD_INVALID_TYPE` | unsupported file type |
 | `FILE_UPLOAD_TOO_LARGE` | file too large |
+| `AI_CONSENT_REQUIRED` | current versioned AI consent is missing |
+| `AI_CONSENT_POLICY_MISMATCH` | submitted AI policy version is missing or stale |
+| `AI_AUDIT_UNAVAILABLE` | PENDING audit could not be inserted, so upstream access is blocked |
 
 ## 7. Storage rules
 
@@ -1402,6 +1464,7 @@ Minimum retention:
 | notification logs | at least 12 months |
 | assessments | at least 12 months |
 | device sessions | at least 12 months after revoke |
+| AI request audit metadata | 180 days; delete only after previewing bounded expiry batches |
 
 ### 7.4 Masking
 
@@ -1410,6 +1473,8 @@ Professional Web surfaces must mask sensitive patient fields by default:
 - mobile
 - national id fragments
 - full address if introduced later
+
+Before third-party AI transfer, both user and prior assistant text use high-confidence redaction for mainland mobile numbers, 15/18-digit identity numbers, emails, and explicitly labelled names or patient/visit/record identifiers. The application must not automatically append account mobile, identity data, patient id, or health-profile data.
 
 ### 7.5 Audit requirement
 
@@ -1421,6 +1486,9 @@ The following actions must always leave durable audit:
 4. work order submit / escalate / reject / close
 5. DDI confirm override
 6. ABCD2 recalculation
+7. third-party AI invocation metadata, beginning with a fail-closed `PENDING` row before network access
+
+AI audit must never include prompt text, response text, request payload, or content hashes. Service logs for audit-finalization failures are limited to non-content request/audit identifiers.
 
 ## 8. Edge cases and required behavior
 

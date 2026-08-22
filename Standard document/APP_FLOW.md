@@ -468,18 +468,27 @@ Purpose:
 
 - Provide AI-powered medication knowledge Q&A for patients
 - Answer questions about medication timing, missed doses, adverse effects, and general medication literacy
+- Explain the third-party data boundary before any medical text leaves the application
 
 Trigger:
 
 - User taps "AI 用药助手" quick entry on Home page
+- Every screen entry requests the current disclosure from `GET /app-api/ai/disclosure`; local consent caches are not authoritative
 
 Success:
 
+- Before first use or whenever the policy/provider/statement changes, show the full server-provided provider name and disclosure statement
+- Grant consent by posting the displayed `policyVersion`; only an exact current version unlocks sending
+- Keep a visible "数据使用说明" entry so the disclosure can be reopened at any time
 - AI responds with concise medication guidance including safety disclaimer
+- The screen reminds the user not to enter identity information and explains that only redacted recent messages are sent; account mobile, identity number, patient id, and health profile are not appended
+- The disclosure states that call audit retains metadata for 180 days and does not save question or response text
 
 Error:
 
-- Show AI service failure with one-click retry
+- Until disclosure loads successfully, keep send disabled and show a retry-later message
+- Missing or stale consent reopens the current disclosure instead of sending the question
+- AI service failure preserves the local conversation and allows retry; it must not expose upstream error bodies
 
 #### Self-Reported Medication Screen
 

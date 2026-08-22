@@ -12,7 +12,7 @@ Rules:
 4. This document covers `P0` and `P0+` MVP phases, plus the Post-P0 trial readiness sprint.
 5. `P2` and later capabilities must stay in backlog and must not enter the primary build sequence.
 
-## 1.5 Execution Status Summary (as of 2026-08-20)
+## 1.5 Execution Status Summary (as of 2026-08-22)
 
 | Phase | Description | Status |
 |-------|-------------|--------|
@@ -27,15 +27,16 @@ Rules:
 | Phase 8 | Post-P0 Trial Readiness Sprint (A–H) | ✅ Complete |
 | Phase T0–T5 | Trial/demo closed loops through voice help orders | ✅ Delivered through PR #32 (`35b1e8a`) |
 | Phase T6 | Android JDK 21 and enforced APK build gate | ✅ Delivered through PR #37 (`98115b9`) |
-| Phase T7 | SEC-002 refresh-token HttpOnly Cookie closure | Physical-device and protected PR gates passed on PR #39; awaiting authorized merge |
+| Phase T7 | SEC-002 refresh-token HttpOnly Cookie closure | ✅ Delivered through PR #39 (`4c90292`) |
+| Phase T8 | SEC-005 AI data-boundary closure | Local implementation and all available gates pass on `codex/sec-005-ai-data-boundary`; protected PR qualification pending |
 
-**Current active work:** T7 is implemented, physically accepted, and protected-CI qualified on PR #39. Production session-login rate limiting is covered by the dedicated login zone and a CI regression check. The PR is awaiting explicit merge authorization. Android release signing and store publishing remain separate release-engineering work.
+**Current active work:** T8 closes SEC-005 with versioned provider disclosure, high-confidence text redaction, exact upstream-host allowlisting, fail-closed metadata-only audit, and patient-side policy loading. SEC-005 remains open until the T8 protected required gate is green and all review conversations are resolved. Android release signing and store publishing remain separate release-engineering work.
 
-**Flyway current latest:** V12 (`V12__help_order_voice_transcription.sql`). Next new migration must be V13.
+**Flyway current latest:** V13 (`V13__ai_data_boundary.sql`). Next new migration must be V14.
 
 **Known open items:**
 - `MEDICINE_OCR_API_KEY` must be set in `.env.local` for live OCR (graceful fallback if omitted)
-- SEC-002 candidate closure is qualified on PR #39: official clients use HttpOnly refresh Cookies, physical-device acceptance passes, and the first protected required gate is green; merge remains explicitly out of scope
+- SEC-005 T8 candidate passes local backend, patient Web/Android, migration, and data-boundary gates; protected PR gate and conversation check remain before closure
 - Ops cleanup: `ops/sql/sec-003-clear-legacy-patient-id-card-masked.sql` needs to be run
 
 ## 1.6 Post-P0 Trial Demo Closed-Loop Sequence
@@ -52,13 +53,14 @@ The post-P0 trial/demo work is phase-based, not tied to fixed calendar weeks. Ea
 | Phase T5 | Help-order voice message + XFYUN transcription | ✅ backend targeted tests, patient/pharmacist/doctor builds, Docker live voice walkthrough |
 | Phase T6 | Android JDK 21 toolchain and APK gate | Temurin 21.0.12+8, clean Capacitor sync, local `assembleDebug`, CI APK artifact, aggregate quality gate |
 | Phase T7 | SEC-002 refresh-token Cookie closure across patient, pharmacist, and doctor clients | backend auth tests and full verify, three frontend gates, Android build, nine E2E scenarios, physical-device restart, static token scan, protected CI |
+| Phase T8 | SEC-005 AI data-boundary closure | V13 migration, versioned consent/disclosure, redaction and upstream allowlist tests, metadata-only audit failure paths, patient Web/Android gates, protected CI |
 
 Rules:
 
 1. T1 must land before T2-T5 implementation work.
-2. New database migrations continue from the latest existing Flyway version; after `V12__help_order_voice_transcription.sql`, the next migration is `V13`.
+2. New database migrations continue from the latest existing Flyway version; after `V13__ai_data_boundary.sql`, the next migration is `V14`.
 3. Temporary execution plans stay in conversation; durable sequence changes belong here.
-4. T7 is additive: legacy auth endpoints remain compatible, no legacy-backend change is allowed, and the next Flyway migration remains V13.
+4. T8 is additive: the legacy AI timestamp and chat DTO remain compatible, no legacy-backend change is allowed, and only the AI feature is denied to clients without current versioned consent.
 
 ### Phase T7 acceptance boundary
 
@@ -67,6 +69,16 @@ Rules:
 3. Patient refresh Cookies persist for the refresh TTL. Pharmacist and doctor refresh Cookies are browser-session Cookies.
 4. Refresh rotation and Cookie logout reject replaced tokens atomically; refresh and logout require `X-Auth-Refresh: 1`.
 5. SEC-002 may be marked closed only after backend, frontend, Android, nine-scenario E2E, physical-device restart, static scan, and protected CI gates pass.
+
+### Phase T8 acceptance boundary
+
+1. Only consent rows matching the current policy version, provider code, and statement SHA-256 unlock AI; the legacy timestamp alone never grants T8 consent.
+2. The patient screen loads disclosure on every entry, remains fail-closed while disclosure is unknown, posts the current version, and can reopen the data-use statement at any time.
+3. At most five recent non-system messages are sent after high-confidence redaction; no account identity or health-profile fields are automatically appended.
+4. The upstream host exactly matches the allowlist, uses HTTPS except for an explicitly allowlisted loopback host, and never follows redirects.
+5. A metadata-only `PENDING` audit is inserted before network access. Insert failure blocks the provider call; completion-update failure leaves `PENDING` without logging content.
+6. V13 is additive, audit expiry is 180 days, and the cleanup SQL provides preview plus bounded deletion without adding a scheduler.
+7. SEC-005 may be marked closed only after targeted and full backend gates, patient lint/unit/build/Android gates, migration checks, protected CI, and zero unresolved review conversations pass.
 
 ## 2. Implementation Rules
 
@@ -1069,7 +1081,6 @@ The following items are intentionally excluded from the primary execution sequen
 3. More disease-path expansion (DDI rules for hypertension, diabetes, etc.)
 4. Non-MVP capability expansion
 5. Any work that reopens legacy backend refactor
-6. SEC-002 closure evidence: T7 implementation, physical-device restart/upload checks, all local gates, and PR #39's protected required gate pass; retain PR #39 for explicit merge authorization
-7. Ops cleanup: `ops/sql/sec-003-clear-legacy-patient-id-card-masked.sql` (historical `id_card_masked` rows)
-8. S3 presigned URL upload end-to-end browser test (Phase B, pending manual verification)
+6. Ops cleanup: `ops/sql/sec-003-clear-legacy-patient-id-card-masked.sql` (historical `id_card_masked` rows)
+7. S3 presigned URL upload end-to-end browser test (Phase B, pending manual verification)
 

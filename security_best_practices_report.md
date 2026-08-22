@@ -11,9 +11,9 @@ Scope:
 
 This audit found 5 actionable findings:
 
-- 3 High (all FIXED; SEC-002 qualified on PR #39 as of 2026-08-20)
+- 3 High (all FIXED; SEC-002 delivered through PR #39 as of 2026-08-22)
 - 1 Medium FIXED as of 2026-03-09
-- 1 Medium open
+- 1 Medium with remediation implemented on T8; protected-CI closure pending
 
 The highest-risk themes are browser-accessible token storage, WebSocket authentication through query strings with wildcard origins, and patient medical data persisted in `localStorage`. I did not find obvious use of `eval`, `new Function`, or unsafe `postMessage` handlers in the scanned code paths.
 
@@ -56,9 +56,9 @@ False positive notes:
 
 - If an upstream gateway already strips query strings from all logs, leak surface is reduced, but the code still accepts the token in the URL and still allows all origins.
 
-### SEC-002: Browser-accessible refresh-token storage — FIXED ON PR #39 (2026-08-20)
+### SEC-002: Browser-accessible refresh-token storage — FIXED (2026-08-22)
 
-**Status: FIXED on PR #39; awaiting authorized merge.** Patient, pharmacist, and doctor official clients now keep access tokens in memory and use backend-managed HttpOnly refresh Cookies. Session responses contain no refresh token, professional refresh query parameters were removed, and refresh/logout require `X-Auth-Refresh: 1`. The production Nginx credential limiter covers both legacy and session professional login paths, with a CI regression check preventing either path from falling through to the general API rate. Local backend, frontend, Android-build, static-scan, HTTP-contract, nine-scenario E2E, Android physical-device, and protected `CI / Required Quality Gate` gates pass; merge is intentionally not performed by this goal.
+**Status: FIXED.** PR #39 was squash-merged to `main` as `4c90292`. Patient, pharmacist, and doctor official clients keep access tokens in memory and use backend-managed HttpOnly refresh Cookies. Session responses contain no refresh token, professional refresh query parameters were removed, and refresh/logout require `X-Auth-Refresh: 1`. The production Nginx credential limiter covers both legacy and session professional login paths, with a CI regression check preventing either path from falling through to the general API rate. Local backend, frontend, Android-build, static-scan, HTTP-contract, nine-scenario E2E, Android physical-device, protected PR gate, and post-merge `main` CI passed.
 
 ~~Impact:~~
 ~~Any XSS in the browser runtime can immediately exfiltrate both access and refresh tokens, enabling session replay and long-lived account takeover.~~
@@ -178,35 +178,32 @@ False positive notes:
 
 - This is a secure-defaults problem. If every environment overrides these values and Swagger is gated at an upstream layer, runtime risk is lower.
 
-### SEC-005: AI proxy forwards raw user prompts to an external upstream without visible consent, minimization, or audit controls
+### SEC-005: AI proxy forwards raw user prompts to an external upstream without visible consent, minimization, or audit controls — REMEDIATION IMPLEMENTED ON T8
 
-Impact:
-Patient-entered medical text can cross the first-party boundary to a third-party AI endpoint with no code-visible redaction, explicit consent gate, or durable disclosure trail.
+**Status: LOCALLY QUALIFIED on `codex/sec-005-ai-data-boundary`; closure remains pending until the protected required gate is green and review conversations are resolved.** Targeted and full backend tests, the 60% JaCoCo gate, patient lint/unit/build/Android gates, Flyway fresh/V12-upgrade checks, metadata schema assertions, and bounded-cleanup validation pass.
 
-Location:
+Original impact:
+Patient-entered medical text could cross the first-party boundary to a third-party AI endpoint with no code-visible redaction, versioned consent, durable disclosure trail, or metadata audit.
 
-- `backend-v2/src/main/resources/application.yml:28-32`
-- `backend-v2/src/main/java/com/medicine/service/ai/AiChatService.java:140-176`
+Remediation:
+
+- `V13__ai_data_boundary.sql` adds exact-policy consent records and metadata-only request audits without prompt, reply, payload, or body hash.
+- `AiConsentPolicy` and `AiConsentService` require the current policy/provider/statement hash; the legacy timestamp alone is insufficient.
+- `AiPrivacyRedactor` removes high-confidence identity patterns from user and assistant text, and `AiChatService` sends at most five recent non-system messages.
+- `HttpAiUpstreamClient` requires an exact host allowlist, HTTPS except for explicitly allowlisted loopback hosts, and never follows redirects.
+- `AiAuditService` inserts `PENDING` before network access and blocks the provider call if insertion fails; audit finalization logs identifiers only.
+- The patient screen fetches disclosure on every entry, remains fail-closed while it is unavailable, submits the displayed policy version, and exposes a persistent data-use entry.
 
 Evidence:
 
 ```text
-base-url: ${MEDICINE_AI_BASE_URL:https://api.openai.com/v1/chat/completions}
-payload.put("messages", messages);
-.header("Authorization", "Bearer " + aiProperties.getApiKey())
+GET  /app-api/ai/disclosure -> AiDisclosureDTO
+POST /app-api/ai/consent    <- AiConsentGrantRequest { policyVersion }
+MEDICINE_AI_ALLOWED_HOSTS=api.siliconflow.cn
+audit status: PENDING -> SUCCESS | FAILED; expires_at = create_time + 180 days
 ```
 
-Fix:
+Closure requirements:
 
-- Add explicit user-facing consent and provider disclosure for medical-text submission.
-- Minimize/redact identifiable data before forwarding.
-- Add durable audit metadata for provider, request class, and decision path.
-- Restrict upstream base URLs to an allowlist.
-
-Mitigation:
-
-- Enforce server-side content length and PHI filters before upstream dispatch.
-
-False positive notes:
-
-- If the configured base URL points to a self-hosted internal model and consent is handled outside this repository, severity is lower. I did not find that evidence in the scanned code.
+- Targeted and full backend gates, patient lint/unit/build/Android gates, fresh/existing migration checks, and static no-content audit checks pass.
+- Protected `CI / Required Quality Gate` is green with zero unresolved review conversations.
