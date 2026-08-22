@@ -263,9 +263,11 @@ Columns:
 
 Constraints:
 
-1. Unique active binding: `tenant_id + patient_id + family_account_id + deleted`
+1. One family account can have only one active patient binding per tenant; V14 enforces this with `tenant_id + active_family_account_id`.
 2. Maximum two active family bindings per patient is enforced by service rule.
 3. Unbound rows remain queryable for history but lose permission immediately.
+
+Before V14, the read-only preflight at `backend-v2/src/main/resources/db/preflight/V14__mvp_release_closure_preflight.sql` must run and block the release if one family account has multiple active patient bindings. The operator must review those relationships before continuing. As a fail-safe if the preflight is bypassed, V14 retains the earliest authorization as `ACTIVE` and converts later duplicates to `UNBOUND` with an explicit migration reason; no binding row is deleted.
 
 #### Table: `otp_login_log`
 
@@ -557,6 +559,7 @@ Columns:
 | `id` | `BIGINT` | No |  | PK | record id |
 | `dose_task_id` | `BIGINT` | No |  | `IDX_checkin_task` | target task |
 | `patient_id` | `BIGINT` | No |  | `IDX_checkin_patient` | owner patient |
+| `client_request_id` | `VARCHAR(64)` | Yes |  | `UK_checkin_client_request` | patient-scoped idempotency key supplied by the native offline queue |
 | `operator_type` | `VARCHAR(20)` | No |  |  | `PATIENT`, `FAMILY`, `SYSTEM` |
 | `operator_id` | `BIGINT` | No |  |  | app account id or system id |
 | `result` | `VARCHAR(20)` | No |  | `IDX_checkin_result` | `ON_TIME`, `DELAYED`, `MISSED`, `SKIPPED` |
@@ -573,6 +576,7 @@ Rules:
 1. No hard delete.
 2. Within 24 hours, the latest valid submission becomes `is_effective = 1`.
 3. Previous submissions for the same dose task remain preserved with `is_effective = 0`.
+4. A duplicate `client_request_id` returns the existing record. After a concurrent insert conflict, the service uses a locking current read so MySQL repeatable-read snapshots cannot hide the winning row.
 
 #### Table: `medication_plan_event`
 

@@ -87,6 +87,24 @@ public interface MedicationCheckinRecordMapper {
             @Param("clientRequestId") String clientRequestId
     );
 
+    @Select("""
+            SELECT id, dose_task_id, patient_id, client_request_id, operator_type, operator_id, result, actual_taken_at, note, skip_reason,
+                   is_correction, supersedes_record_id, is_effective,
+                   creator, create_time, updater, update_time, deleted, tenant_id
+            FROM medication_checkin_record
+            WHERE tenant_id = #{tenantId}
+              AND patient_id = #{patientId}
+              AND client_request_id = #{clientRequestId}
+              AND deleted = 0
+            LIMIT 1
+            FOR UPDATE
+            """)
+    MedicationCheckinRecord selectByClientRequestIdForUpdate(
+            @Param("tenantId") Long tenantId,
+            @Param("patientId") Long patientId,
+            @Param("clientRequestId") String clientRequestId
+    );
+
     @Update("""
             UPDATE medication_checkin_record
             SET is_effective = b'0', updater = #{updater}, update_time = #{updateTime}

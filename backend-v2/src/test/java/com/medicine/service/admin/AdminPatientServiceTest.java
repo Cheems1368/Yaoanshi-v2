@@ -43,6 +43,7 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -140,6 +141,22 @@ class AdminPatientServiceTest {
                 .isInstanceOf(BusinessException.class)
                 .hasMessage("KNOWLEDGE_ASSESSMENT_NOT_DUE");
         verify(notificationDispatchService, never()).createAndDispatch(any(), any(), any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void shouldAllowDoctorWorkspaceAdminToSendKnowledgeReminder() {
+        JwtClaims claims = professionalClaims();
+        claims.setRoles(List.of("admin"));
+        claims.setEffectiveRole("doctor");
+        when(patientMapper.selectByIdAndTenant(1L, 3001L)).thenReturn(patient(3001L, 9001L));
+        when(medicationPlanMapper.selectFirstActivatedAt(1L, 3001L)).thenReturn(LocalDate.now().atStartOfDay());
+
+        assertThat(adminPatientService.remindKnowledgeAssessment(claims, 3001L)).isTrue();
+
+        verify(professionalIdentityService, never()).getOrCreatePharmacistProfile(any());
+        verify(notificationDispatchService).createAndDispatch(
+                eq(1L), eq("assessment-reminder"), eq("PATIENT"), eq(3001L),
+                eq("KNOWLEDGE_ASSESSMENT_REMINDER"), eq(3001L), any(), any());
     }
 
     @Test

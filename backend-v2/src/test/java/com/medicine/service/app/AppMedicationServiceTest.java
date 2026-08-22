@@ -22,6 +22,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -33,6 +34,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.never;
@@ -83,6 +85,30 @@ class AppMedicationServiceTest {
         assertThat(result.getId()).isEqualTo(701L);
         assertThat(result.getClientRequestId()).isEqualTo("offline-001");
         verify(medicationCheckinRecordMapper, never()).insert(any());
+        verify(medicationDoseTaskMapper, never()).updateStatus(any());
+    }
+
+    @Test
+    void shouldReturnWinningCheckinAfterConcurrentClientRequestConflict() {
+        when(appPatientService.requireAccessContext("13800138000")).thenReturn(accessContext());
+        when(medicationDoseTaskMapper.selectById(1L, 601L))
+                .thenReturn(doseTask(601L, LocalDateTime.now(ZoneOffset.UTC).plusHours(1)));
+        MedicationCheckinRecord winner = checkinRecord(702L, 601L, true);
+        winner.setClientRequestId("offline-race-001");
+        when(medicationCheckinRecordMapper.selectByClientRequestId(1L, 201L, "offline-race-001")).thenReturn(null);
+        doThrow(new DataIntegrityViolationException("duplicate client request"))
+                .when(medicationCheckinRecordMapper).insert(any());
+        when(medicationCheckinRecordMapper.selectByClientRequestIdForUpdate(1L, 201L, "offline-race-001"))
+                .thenReturn(winner);
+        CheckinSubmitRequest request = new CheckinSubmitRequest();
+        request.setDoseTaskId(601L);
+        request.setClientRequestId("offline-race-001");
+        request.setResult("TAKEN");
+
+        CheckinRecordDTO result = appMedicationService.submitCheckin("13800138000", request);
+
+        assertThat(result.getId()).isEqualTo(702L);
+        verify(medicationCheckinRecordMapper).selectByClientRequestIdForUpdate(1L, 201L, "offline-race-001");
         verify(medicationDoseTaskMapper, never()).updateStatus(any());
     }
 

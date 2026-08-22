@@ -157,7 +157,7 @@ public class AppMedicationService {
         try {
             medicationCheckinRecordMapper.insert(record);
         } catch (DataIntegrityViolationException ex) {
-            MedicationCheckinRecord existing = clientRequestId == null ? null : medicationCheckinRecordMapper.selectByClientRequestId(
+            MedicationCheckinRecord existing = clientRequestId == null ? null : medicationCheckinRecordMapper.selectByClientRequestIdForUpdate(
                     DEFAULT_TENANT_ID, context.patient().getId(), clientRequestId
             );
             if (existing == null) {

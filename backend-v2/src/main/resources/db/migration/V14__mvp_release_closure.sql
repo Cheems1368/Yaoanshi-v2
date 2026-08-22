@@ -1,23 +1,34 @@
 -- MVP v0.1.0 reliability closure. This migration is additive only.
 
-DELIMITER $$
-CREATE PROCEDURE assert_no_duplicate_active_family_bindings()
-BEGIN
-    IF EXISTS (
-        SELECT 1
-        FROM patient_family_binding
-        WHERE status = 'ACTIVE' AND deleted = b'0'
-        GROUP BY tenant_id, family_account_id
-        HAVING COUNT(*) > 1
-    ) THEN
-        SIGNAL SQLSTATE '45000'
-            SET MESSAGE_TEXT = 'V14 blocked: family account has multiple active patient bindings; resolve duplicates first';
-    END IF;
-END$$
-DELIMITER ;
+CREATE TEMPORARY TABLE v14_family_binding_keep AS
+SELECT tenant_id, family_account_id, id AS keep_id
+FROM (
+    SELECT id,
+           tenant_id,
+           family_account_id,
+           ROW_NUMBER() OVER (
+               PARTITION BY tenant_id, family_account_id
+               ORDER BY authorized_at ASC, id ASC
+           ) AS binding_rank
+    FROM patient_family_binding
+    WHERE status = 'ACTIVE' AND deleted = b'0'
+) ranked_bindings
+WHERE binding_rank = 1;
 
-CALL assert_no_duplicate_active_family_bindings();
-DROP PROCEDURE assert_no_duplicate_active_family_bindings;
+UPDATE patient_family_binding duplicate_binding
+INNER JOIN v14_family_binding_keep canonical
+    ON canonical.tenant_id = duplicate_binding.tenant_id
+    AND canonical.family_account_id = duplicate_binding.family_account_id
+SET duplicate_binding.status = 'UNBOUND',
+    duplicate_binding.unbound_at = COALESCE(duplicate_binding.unbound_at, UTC_TIMESTAMP()),
+    duplicate_binding.unbound_reason = COALESCE(duplicate_binding.unbound_reason, 'V14 single-patient family binding normalization'),
+    duplicate_binding.updater = 'v14-family-binding-normalize',
+    duplicate_binding.update_time = UTC_TIMESTAMP()
+WHERE duplicate_binding.id <> canonical.keep_id
+  AND duplicate_binding.status = 'ACTIVE'
+  AND duplicate_binding.deleted = b'0';
+
+DROP TEMPORARY TABLE v14_family_binding_keep;
 
 ALTER TABLE medication_checkin_record
     ADD COLUMN client_request_id VARCHAR(64) NULL AFTER patient_id,

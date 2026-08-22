@@ -129,10 +129,12 @@ public class AdminPatientService {
     }
 
     public boolean remindKnowledgeAssessment(JwtClaims claims, Long patientId) {
-        PharmacistProfile pharmacist = professionalIdentityService.getOrCreatePharmacistProfile(claims);
         Patient patient = requirePatient(claims.getTenantId(), patientId);
-        if (!isAdmin(claims) && !pharmacist.getId().equals(patient.getBoundByPharmacistId())) {
-            throw new BusinessException(ErrorCode.PATIENT_MANAGEMENT_PERMISSION_DENIED.getCode(), ErrorCode.PATIENT_MANAGEMENT_PERMISSION_DENIED.getMessage());
+        if (!isAdmin(claims)) {
+            PharmacistProfile pharmacist = professionalIdentityService.getOrCreatePharmacistProfile(claims);
+            if (!pharmacist.getId().equals(patient.getBoundByPharmacistId())) {
+                throw new BusinessException(ErrorCode.PATIENT_MANAGEMENT_PERMISSION_DENIED.getCode(), ErrorCode.PATIENT_MANAGEMENT_PERMISSION_DENIED.getMessage());
+            }
         }
         LocalDateTime firstActivatedAt = medicationPlanMapper.selectFirstActivatedAt(claims.getTenantId(), patientId);
         if (firstActivatedAt == null) throw new BusinessException(409, "KNOWLEDGE_ASSESSMENT_NOT_DUE");
