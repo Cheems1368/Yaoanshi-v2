@@ -18,9 +18,9 @@ Project
 - Yaoshian MVP P0
 
 Branch / Context
-- Delivery state: `main` through PR #39 (`4c90292`); T8 candidate is protected-qualified in PR #40 on `codex/sec-005-ai-data-boundary` and awaits separate merge authorization
-- Active workstream: T8 / SEC-005 AI data-boundary protected PR handoff
-- Active surfaces: backend-v2 AI consent/redaction/upstream/audit, patient AI assistant Web/Android, V13, Standard document, security evidence
+- Delivery state: `main` through PR #40 (`fc3b646`); post-merge `main` CI run `32570783413` passed
+- Active workstream: T9 PR A / MVP v0.1.0 backend contract and reliability closure
+- Active surfaces: backend-v2 V14, app assessment/medication/family/notification/file contracts, admin reassignment and patient metrics, reliability workers
 
 Current State
 - 2026-08-14 update: PR #32 was squash-merged as `35b1e8a`; the post-merge `main` CI run #38 passed. The old `codex/mobile-demo` branches were deleted while local protection reference `codex/backup-mobile-demo-20260814` was retained.
@@ -40,10 +40,10 @@ Current State
 - Last session (2026-03-27): Phase A–F completed (see below)
 
 In Progress
-- No T8 implementation or qualification work remains; PR #40 awaits separate merge authorization.
+- T9 PR A implementation and disposable MySQL migration validation are in progress on `codex/mvp-v0.1.0-backend`.
 
 Next
-- Hand off PR #40 for separate merge authorization; do not merge in this goal.
+- Finish PR A documentation/migration evidence, publish the protected PR, resolve review conversations, and squash merge after required checks pass.
 
 Last Updated
 - 2026-08-22 Asia/Shanghai
@@ -918,3 +918,26 @@ T8 PR #40 Review Remediation (2026-08-22)
 Last Updated
 - 2026-08-22 Asia/Shanghai
 - Reason: all T8 review findings are fixed, locally and remotely qualified, and resolved on PR #40.
+
+Goal T9 PR A Backend Closure (2026-08-22)
+- Workstream:
+  - Merge the qualified T8 delivery, then establish the backend-v2 contracts and reliability primitives required for MVP v0.1.0.
+- Delivered:
+  - Squash-merged PR #40 as `fc3b646`; the post-merge `main` required-quality run #32570783413 passed all six checks, formally closing T8/SEC-005/V13.
+  - Added V14 for check-in idempotency, active family-account uniqueness, assessment phase uniqueness, bounded notification retry, and presigned-file cleanup state.
+  - Added server-scored DAY_1/WEEK_4 knowledge assessment, satisfaction status, family display fields and exclusivity, seven-day dose-task query, idempotent check-in, patient notification logs, administrator reassignment, pharmacist options, summary metrics, notification retry, and orphan-object cleanup.
+  - Presign now creates a `PRESIGNED` file asset and returns `fileAssetId`; registration and prescription upload prefer that ID while retaining the documented object-key compatibility path.
+- Validated:
+  - Backend full `clean verify` passed 191/191 tests with 64.45% JaCoCo line coverage after final CAS, future-plan, metadata-consistency, and null-request boundary tests.
+  - Patient lint, 6/6 unit tests, Web production build, and Android debug build passed; pharmacist and doctor production builds also passed.
+  - Disposable MySQL 8 validation passed empty V1→V14 and existing V13→V14; duplicate active family bindings stopped V14 with the explicit preflight error and left schema history at V13.
+  - The disposable MySQL container and test-only schemas were removed; no production database was contacted.
+- Open gates:
+  - The 10-question `medication-literacy-v1` wording, choices, and answers remain a draft until a licensed pharmacist or physician records approval. This is a PR A merge and v0.1.0 release blocker.
+  - Final backend verification, protected PR checks, branch currency, and zero unresolved conversations remain required before squash merge.
+- Next:
+  - Complete final review/tests, publish PR A, obtain medical approval, and merge only after every protected gate is satisfied.
+
+Last Updated
+- 2026-08-22 Asia/Shanghai
+- Reason: T8 is formally delivered and T9 PR A is implemented locally; medical approval and protected PR qualification remain open.

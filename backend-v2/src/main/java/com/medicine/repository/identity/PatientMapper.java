@@ -192,6 +192,12 @@ public interface PatientMapper {
     int updateForPharmacist(Patient patient);
 
     @Update("""
+            UPDATE patient SET bound_by_pharmacist_id = #{boundByPharmacistId}, updater = #{updater}, update_time = #{updateTime}
+            WHERE tenant_id = #{tenantId} AND id = #{id} AND deleted = 0
+            """)
+    int updateResponsiblePharmacist(Patient patient);
+
+    @Update("""
             UPDATE patient
             SET name = #{name},
                 gender = #{gender},

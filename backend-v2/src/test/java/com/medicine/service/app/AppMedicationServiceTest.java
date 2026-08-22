@@ -3,6 +3,7 @@ package com.medicine.service.app;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.medicine.api.dto.medication.CheckinCorrectRequest;
 import com.medicine.api.dto.medication.CheckinRecordDTO;
+import com.medicine.api.dto.medication.CheckinSubmitRequest;
 import com.medicine.common.exception.BusinessException;
 import com.medicine.domain.identity.AppAccount;
 import com.medicine.domain.identity.Patient;
@@ -34,6 +35,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.never;
 
 @ExtendWith(MockitoExtension.class)
 class AppMedicationServiceTest {
@@ -64,6 +66,42 @@ class AppMedicationServiceTest {
 
     @InjectMocks
     private AppMedicationService appMedicationService;
+
+    @Test
+    void shouldReturnExistingCheckinForRepeatedClientRequestId() {
+        when(appPatientService.requireAccessContext("13800138000")).thenReturn(accessContext());
+        MedicationCheckinRecord existing = checkinRecord(701L, 601L, true);
+        existing.setClientRequestId("offline-001");
+        when(medicationCheckinRecordMapper.selectByClientRequestId(1L, 201L, "offline-001")).thenReturn(existing);
+        CheckinSubmitRequest request = new CheckinSubmitRequest();
+        request.setDoseTaskId(601L);
+        request.setClientRequestId("offline-001");
+        request.setResult("TAKEN");
+
+        CheckinRecordDTO result = appMedicationService.submitCheckin("13800138000", request);
+
+        assertThat(result.getId()).isEqualTo(701L);
+        assertThat(result.getClientRequestId()).isEqualTo("offline-001");
+        verify(medicationCheckinRecordMapper, never()).insert(any());
+        verify(medicationDoseTaskMapper, never()).updateStatus(any());
+    }
+
+    @Test
+    void shouldRejectMissingCheckinRequest() {
+        assertThatThrownBy(() -> appMedicationService.submitCheckin("13800138000", null))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("BAD_REQUEST");
+        verify(appPatientService, never()).requireAccessContext(any());
+    }
+
+    @Test
+    void shouldRejectDoseTaskRangeLongerThanSevenDays() {
+        when(appPatientService.requireAccessContext("13800138000")).thenReturn(accessContext());
+
+        assertThatThrownBy(() -> appMedicationService.getDoseTasks("13800138000", "2026-08-01", "2026-08-08"))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("DOSE_TASK_DATE_RANGE_INVALID");
+    }
 
     @Test
     void shouldRejectCorrectionWhenEditWindowExpired() {

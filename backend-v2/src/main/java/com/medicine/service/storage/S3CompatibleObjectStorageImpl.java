@@ -110,6 +110,11 @@ public class S3CompatibleObjectStorageImpl implements S3CompatibleObjectStorage 
         return s3Client.getObject(getRequest, ResponseTransformer.toBytes()).asByteArray();
     }
 
+    @Override
+    public void deleteObject(String objectKey) {
+        s3Client.deleteObject(DeleteObjectRequest.builder().bucket(props.getBucket()).key(objectKey).build());
+    }
+
     private String resolvePublicEndpoint() {
         return StringUtils.hasText(props.getPublicEndpoint()) ? props.getPublicEndpoint() : props.getEndpoint();
     }

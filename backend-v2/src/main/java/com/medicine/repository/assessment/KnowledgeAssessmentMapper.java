@@ -41,4 +41,17 @@ public interface KnowledgeAssessmentMapper {
             ORDER BY submitted_at DESC, id DESC
             """)
     List<KnowledgeAssessment> selectByPatientId(@Param("tenantId") Long tenantId, @Param("patientId") Long patientId);
+
+    @Select("""
+            SELECT id, patient_id, phase, question_set_version, score, max_score, submitted_by_type, submitted_by_id, submitted_at,
+                   creator, create_time, updater, update_time, deleted, tenant_id
+            FROM knowledge_assessment
+            WHERE tenant_id = #{tenantId} AND patient_id = #{patientId} AND phase = #{phase}
+              AND question_set_version = #{questionSetVersion} AND deleted = 0
+            LIMIT 1
+            """)
+    KnowledgeAssessment selectByPatientPhaseAndVersion(
+            @Param("tenantId") Long tenantId, @Param("patientId") Long patientId,
+            @Param("phase") String phase, @Param("questionSetVersion") String questionSetVersion
+    );
 }

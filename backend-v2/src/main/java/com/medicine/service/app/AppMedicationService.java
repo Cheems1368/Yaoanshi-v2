@@ -22,6 +22,8 @@ import com.medicine.repository.medication.MedicationPlanItemMapper;
 import com.medicine.repository.medication.MedicationPlanMapper;
 import com.medicine.service.auth.AppPatientService;
 import org.springframework.stereotype.Service;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.time.LocalDate;
@@ -88,6 +90,21 @@ public class AppMedicationService {
                 .toList();
     }
 
+    public List<DoseTaskDTO> getDoseTasks(String subject, String dateFrom, String dateTo) {
+        AppPatientService.AccessContext context = appPatientService.requireAccessContext(subject);
+        LocalDate from = parseRequiredDate(dateFrom);
+        LocalDate to = parseRequiredDate(dateTo);
+        if (to.isBefore(from) || ChronoUnit.DAYS.between(from, to) > 6) {
+            throw new BusinessException(400, "DOSE_TASK_DATE_RANGE_INVALID");
+        }
+        int familyBindingCount = patientFamilyBindingMapper.countActiveByPatientId(DEFAULT_TENANT_ID, context.patient().getId());
+        LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
+        return medicationDoseTaskMapper.selectByPatientIdAndDateRange(DEFAULT_TENANT_ID, context.patient().getId(), from, to)
+                .stream()
+                .map(task -> toDoseTaskDto(task, familyBindingCount, now))
+                .toList();
+    }
+
     public PageResult<CheckinRecordDTO> getCheckins(String subject, String dateFrom, String dateTo, int pageNo, int pageSize) {
         AppPatientService.AccessContext context = appPatientService.requireAccessContext(subject);
         LocalDate from = StringUtils.hasText(dateFrom) ? LocalDate.parse(dateFrom) : LocalDate.now().minusDays(30);
@@ -105,15 +122,28 @@ public class AppMedicationService {
         return new PageResult<>(normalizedPageNo, normalizedPageSize, rows.size(), pageList);
     }
 
+    @Transactional
     public CheckinRecordDTO submitCheckin(String subject, CheckinSubmitRequest request) {
+        if (request == null || request.getDoseTaskId() == null) {
+            throw new BusinessException(400, "BAD_REQUEST");
+        }
         AppPatientService.AccessContext context = appPatientService.requireAccessContext(subject);
+        String clientRequestId = normalizeClientRequestId(request.getClientRequestId());
+        if (clientRequestId != null) {
+            MedicationCheckinRecord existing = medicationCheckinRecordMapper.selectByClientRequestId(
+                    DEFAULT_TENANT_ID, context.patient().getId(), clientRequestId
+            );
+            if (existing != null) {
+                return toCheckinDto(existing);
+            }
+        }
         MedicationDoseTask task = requireDoseTask(context.patient().getId(), request.getDoseTaskId());
         LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
-        medicationCheckinRecordMapper.markIneffectiveByDoseTaskId(DEFAULT_TENANT_ID, task.getId(), "app-checkin", now);
 
         MedicationCheckinRecord record = new MedicationCheckinRecord();
         record.setDoseTaskId(task.getId());
         record.setPatientId(context.patient().getId());
+        record.setClientRequestId(clientRequestId);
         record.setOperatorType(context.operatorType());
         record.setOperatorId(context.appAccount().getId());
         record.setResult(normalizeResult(request.getResult()));
@@ -124,7 +154,20 @@ public class AppMedicationService {
         record.setSupersedesRecordId(null);
         record.setIsEffective(true);
         applyAudit(record, "app-checkin", now);
-        medicationCheckinRecordMapper.insert(record);
+        try {
+            medicationCheckinRecordMapper.insert(record);
+        } catch (DataIntegrityViolationException ex) {
+            MedicationCheckinRecord existing = clientRequestId == null ? null : medicationCheckinRecordMapper.selectByClientRequestId(
+                    DEFAULT_TENANT_ID, context.patient().getId(), clientRequestId
+            );
+            if (existing == null) {
+                throw ex;
+            }
+            return toCheckinDto(existing);
+        }
+        medicationCheckinRecordMapper.markOthersIneffectiveByDoseTaskId(
+                DEFAULT_TENANT_ID, task.getId(), record.getId(), "app-checkin", now
+        );
 
         task.setStatus(toTaskStatus(record.getResult()));
         task.setNotificationStatus("ACKED");
@@ -286,6 +329,7 @@ public class AppMedicationService {
         dto.setId(record.getId());
         dto.setDoseTaskId(record.getDoseTaskId());
         dto.setPatientId(record.getPatientId());
+        dto.setClientRequestId(record.getClientRequestId());
         dto.setOperatorType(record.getOperatorType());
         dto.setOperatorId(record.getOperatorId());
         dto.setResult(record.getResult());
@@ -339,6 +383,28 @@ public class AppMedicationService {
 
     private String blankToNull(String value) {
         return StringUtils.hasText(value) ? value.trim() : null;
+    }
+
+    private LocalDate parseRequiredDate(String value) {
+        if (!StringUtils.hasText(value)) {
+            throw new BusinessException(400, "DOSE_TASK_DATE_RANGE_INVALID");
+        }
+        try {
+            return LocalDate.parse(value.trim());
+        } catch (RuntimeException ex) {
+            throw new BusinessException(400, "DOSE_TASK_DATE_RANGE_INVALID");
+        }
+    }
+
+    private String normalizeClientRequestId(String value) {
+        if (!StringUtils.hasText(value)) {
+            return null;
+        }
+        String normalized = value.trim();
+        if (normalized.length() > 64) {
+            throw new BusinessException(400, "BAD_REQUEST");
+        }
+        return normalized;
     }
 
     private void applyAudit(MedicationCheckinRecord record, String operator, LocalDateTime now) {

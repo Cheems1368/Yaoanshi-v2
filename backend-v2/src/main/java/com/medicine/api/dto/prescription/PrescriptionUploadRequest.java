@@ -2,6 +2,7 @@ package com.medicine.api.dto.prescription;
 
 public class PrescriptionUploadRequest {
 
+    private Long fileAssetId;
     private String objectKey;
     private String originalFilename;
     private String contentType;
@@ -47,4 +48,7 @@ public class PrescriptionUploadRequest {
     public void setSha256(String sha256) {
         this.sha256 = sha256;
     }
+
+    public Long getFileAssetId() { return fileAssetId; }
+    public void setFileAssetId(Long fileAssetId) { this.fileAssetId = fileAssetId; }
 }

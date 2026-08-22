@@ -3,6 +3,7 @@ package com.medicine.api.controller;
 import com.medicine.api.dto.identity.AdminPatientDetailDTO;
 import com.medicine.api.dto.identity.AdminPatientListItemDTO;
 import com.medicine.api.dto.identity.AdminPatientUpdateRequest;
+import com.medicine.api.dto.identity.PatientReassignRequest;
 import com.medicine.common.model.CommonResult;
 import com.medicine.common.model.PageResult;
 import com.medicine.service.admin.AdminPatientService;
@@ -11,6 +12,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -51,5 +53,17 @@ public class AdminPatientController {
     ) {
         JwtClaims claims = (JwtClaims) authentication.getDetails();
         return CommonResult.ok(adminPatientService.updatePatient(claims, id, request));
+    }
+
+    @PutMapping("/{id}/responsible-pharmacist")
+    public CommonResult<AdminPatientDetailDTO> reassign(
+            @PathVariable("id") Long id, @RequestBody PatientReassignRequest request, Authentication authentication
+    ) {
+        return CommonResult.ok(adminPatientService.reassignPatient((JwtClaims) authentication.getDetails(), id, request));
+    }
+
+    @PostMapping("/{id}/knowledge-assessments/remind")
+    public CommonResult<Boolean> remindKnowledgeAssessment(@PathVariable("id") Long id, Authentication authentication) {
+        return CommonResult.ok(adminPatientService.remindKnowledgeAssessment((JwtClaims) authentication.getDetails(), id));
     }
 }

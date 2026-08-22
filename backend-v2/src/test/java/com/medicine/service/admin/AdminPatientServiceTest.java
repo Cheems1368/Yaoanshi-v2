@@ -5,6 +5,7 @@ import com.medicine.api.dto.identity.AdminPatientDetailDTO;
 import com.medicine.api.dto.identity.AdminPatientListItemDTO;
 import com.medicine.api.dto.identity.AdminPatientUpdateRequest;
 import com.medicine.api.dto.identity.Abcd2InputDTO;
+import com.medicine.api.dto.identity.PatientReassignRequest;
 import com.medicine.common.exception.BusinessException;
 import com.medicine.common.model.PageResult;
 import com.medicine.domain.assessment.Abcd2Assessment;
@@ -12,13 +13,20 @@ import com.medicine.domain.identity.Patient;
 import com.medicine.domain.identity.PatientAdminListRow;
 import com.medicine.domain.identity.PatientFamilyBinding;
 import com.medicine.domain.identity.PharmacistProfile;
+import com.medicine.domain.helporder.HelpOrder;
+import com.medicine.domain.helporder.HelpOrderEvent;
 import com.medicine.repository.assessment.Abcd2AssessmentMapper;
+import com.medicine.repository.assessment.KnowledgeAssessmentMapper;
+import com.medicine.repository.assessment.SatisfactionSurveyMapper;
+import com.medicine.repository.helporder.HelpOrderMapper;
+import com.medicine.repository.helporder.HelpOrderEventMapper;
 import com.medicine.repository.identity.PharmacistProfileMapper;
 import com.medicine.repository.identity.PatientFamilyBindingMapper;
 import com.medicine.repository.identity.PatientMapper;
 import com.medicine.repository.medication.MedicationPlanMapper;
 import com.medicine.service.auth.JwtClaims;
 import com.medicine.service.auth.ProfessionalIdentityService;
+import com.medicine.service.notification.NotificationDispatchService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -39,6 +47,7 @@ import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.times;
 
 @ExtendWith(MockitoExtension.class)
 class AdminPatientServiceTest {
@@ -59,6 +68,21 @@ class AdminPatientServiceTest {
     private MedicationPlanMapper medicationPlanMapper;
 
     @Mock
+    private KnowledgeAssessmentMapper knowledgeAssessmentMapper;
+
+    @Mock
+    private SatisfactionSurveyMapper satisfactionSurveyMapper;
+
+    @Mock
+    private HelpOrderMapper helpOrderMapper;
+
+    @Mock
+    private HelpOrderEventMapper helpOrderEventMapper;
+
+    @Mock
+    private NotificationDispatchService notificationDispatchService;
+
+    @Mock
     private ProfessionalIdentityService professionalIdentityService;
 
     @Spy
@@ -66,6 +90,57 @@ class AdminPatientServiceTest {
 
     @InjectMocks
     private AdminPatientService adminPatientService;
+
+    @Test
+    void shouldReassignPatientAndAllNonTerminalOrdersForAdmin() {
+        JwtClaims claims = professionalClaims();
+        claims.setRoles(List.of("admin"));
+        Patient patient = patient(3001L, 9001L);
+        PharmacistProfile target = pharmacistProfile(9002L);
+        target.setServiceStatus("ACTIVE");
+        HelpOrder pharmacistOrder = helpOrder(6001L, "PHARMACIST_IN_PROGRESS", "PHARMACIST", 9001L);
+        HelpOrder doctorOrder = helpOrder(6002L, "WAITING_DOCTOR", "DOCTOR", 8001L);
+        when(patientMapper.selectByIdAndTenant(1L, 3001L)).thenReturn(patient);
+        when(pharmacistProfileMapper.selectById(1L, 9002L)).thenReturn(target);
+        when(helpOrderMapper.selectNonTerminalByPatientId(1L, 3001L)).thenReturn(List.of(pharmacistOrder, doctorOrder));
+        when(patientFamilyBindingMapper.selectActiveByPatientId(1L, 3001L)).thenReturn(List.of());
+        when(medicationPlanMapper.selectLatestByPatientId(1L, 3001L)).thenReturn(null);
+        PatientReassignRequest request = new PatientReassignRequest();
+        request.setPharmacistId(9002L);
+        request.setReason("排班调整");
+
+        AdminPatientDetailDTO result = adminPatientService.reassignPatient(claims, 3001L, request);
+
+        assertThat(result.getResponsiblePharmacistId()).isEqualTo(9002L);
+        verify(patientMapper).updateResponsiblePharmacist(patient);
+        verify(helpOrderMapper).reassignNonTerminalByPatientId(1L, 3001L, 9001L, 9002L,
+                "admin-reassign-100", patient.getUpdateTime());
+        verify(helpOrderEventMapper, times(2)).insert(any(HelpOrderEvent.class));
+    }
+
+    @Test
+    void shouldRejectReassignmentForOrdinaryPharmacist() {
+        PatientReassignRequest request = new PatientReassignRequest();
+        request.setPharmacistId(9002L);
+
+        assertThatThrownBy(() -> adminPatientService.reassignPatient(professionalClaims(), 3001L, request))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("PATIENT_MANAGEMENT_PERMISSION_DENIED");
+        verify(patientMapper, never()).updateResponsiblePharmacist(any());
+    }
+
+    @Test
+    void shouldRejectKnowledgeReminderBeforePlanStartDate() {
+        JwtClaims claims = professionalClaims();
+        when(professionalIdentityService.getOrCreatePharmacistProfile(claims)).thenReturn(pharmacistProfile(9001L));
+        when(patientMapper.selectByIdAndTenant(1L, 3001L)).thenReturn(patient(3001L, 9001L));
+        when(medicationPlanMapper.selectFirstActivatedAt(1L, 3001L)).thenReturn(LocalDate.now().plusDays(1).atStartOfDay());
+
+        assertThatThrownBy(() -> adminPatientService.remindKnowledgeAssessment(claims, 3001L))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("KNOWLEDGE_ASSESSMENT_NOT_DUE");
+        verify(notificationDispatchService, never()).createAndDispatch(any(), any(), any(), any(), any(), any(), any(), any());
+    }
 
     @Test
     void shouldReturnPatientsWithMaskedMobileAndPendingFields() {
@@ -218,5 +293,13 @@ class AdminPatientServiceTest {
         patient.setPrimaryDiseaseName("高血压");
         patient.setDrugAllergy("无");
         return patient;
+    }
+
+    private HelpOrder helpOrder(Long id, String status, String handlerType, Long handlerId) {
+        HelpOrder order = new HelpOrder();
+        order.setId(id); order.setPatientId(3001L); order.setStatus(status);
+        order.setCurrentHandlerType(handlerType); order.setCurrentHandlerId(handlerId);
+        order.setResponsiblePharmacistId(9001L);
+        return order;
     }
 }

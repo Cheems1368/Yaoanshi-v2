@@ -24,8 +24,8 @@ public class AppFileController {
     }
 
     @PostMapping("/presign")
-    public CommonResult<FilePresignResponse> presign(@RequestBody FilePresignRequest request) {
-        return CommonResult.ok(appFileService.presign(request));
+    public CommonResult<FilePresignResponse> presign(@RequestBody FilePresignRequest request, Principal principal) {
+        return CommonResult.ok(appFileService.presign(principal.getName(), request));
     }
 
     @PostMapping("/register")

@@ -2,6 +2,7 @@ package com.medicine.api.dto.file;
 
 public class FileRegisterRequest {
 
+    private Long fileAssetId;
     private String objectKey;
     private String originalFilename;
     private String contentType;
@@ -56,4 +57,7 @@ public class FileRegisterRequest {
     public void setBusinessType(String businessType) {
         this.businessType = businessType;
     }
+
+    public Long getFileAssetId() { return fileAssetId; }
+    public void setFileAssetId(Long fileAssetId) { this.fileAssetId = fileAssetId; }
 }

@@ -8,6 +8,8 @@ import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
 
+import java.time.LocalDateTime;
+
 @Mapper
 public interface MedicationPlanMapper {
 
@@ -67,6 +69,14 @@ public interface MedicationPlanMapper {
             LIMIT 1
             """)
     MedicationPlan selectLatestByPatientId(@Param("tenantId") Long tenantId, @Param("patientId") Long patientId);
+
+    @Select("""
+            SELECT MIN(effective_from)
+            FROM medication_plan
+            WHERE tenant_id = #{tenantId} AND patient_id = #{patientId}
+              AND effective_from IS NOT NULL AND confirmed_at IS NOT NULL AND deleted = 0
+            """)
+    LocalDateTime selectFirstActivatedAt(@Param("tenantId") Long tenantId, @Param("patientId") Long patientId);
 
     @Update("""
             UPDATE medication_plan

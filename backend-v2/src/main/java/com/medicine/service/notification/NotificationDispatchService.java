@@ -66,32 +66,60 @@ public class NotificationDispatchService {
         log.setScheduledAt(now);
         log.setSentAt(null);
         log.setDeliveryStatus("PENDING");
+        log.setAttemptCount(0);
+        log.setNextRetryAt(null);
+        log.setLastAttemptAt(null);
+        log.setClaimToken(null);
+        log.setClaimedAt(null);
         log.setFailureCode(null);
         log.setFailureReason(null);
         log.setPayloadJson(writeJson(payload));
         applyAudit(log, tenantId, operator, now);
         notificationLogMapper.insert(log);
-        updateDispatchResult(log, now);
+        updateDispatchResult(log, now, null);
         return log;
     }
 
-    private void updateDispatchResult(NotificationLog log, LocalDateTime now) {
+    private void updateDispatchResult(NotificationLog log, LocalDateTime now, String expectedClaimToken) {
         DispatchResult result = "WEBSOCKET".equals(log.getChannel())
                 ? dispatchRealtime(log)
                 : DispatchResult.sent();
-        // Patient WS dispatch failure degrades to SENT: the notification is persisted
-        // and the patient client will pick it up via polling fallback.
-        if (!result.success() && "PATIENT".equals(log.getTargetType())) {
+        if (!result.success() && "NO_ACTIVE_SESSION".equals(result.failureCode())) {
             result = DispatchResult.sent();
             log.setChannel("IN_APP");
         }
-        log.setDeliveryStatus(result.success() ? "SENT" : "FAILED");
+        int attemptCount = (log.getAttemptCount() == null ? 0 : log.getAttemptCount()) + 1;
+        log.setAttemptCount(attemptCount);
+        log.setLastAttemptAt(now);
+        log.setDeliveryStatus(result.success() ? "SENT" : attemptCount >= 4 ? "PERMANENT_FAILED" : "FAILED");
         log.setSentAt(result.success() ? now : null);
         log.setFailureCode(result.success() ? null : result.failureCode());
         log.setFailureReason(result.success() ? null : result.failureReason());
+        log.setNextRetryAt(result.success() || attemptCount >= 4 ? null : nextRetryAt(now, attemptCount));
+        log.setClaimToken(null);
+        log.setClaimedAt(null);
         log.setUpdater("notification-dispatch");
         log.setUpdateTime(now);
-        notificationLogMapper.updateDelivery(log);
+        if (expectedClaimToken == null) {
+            notificationLogMapper.updateDelivery(log);
+        } else {
+            notificationLogMapper.updateClaimedDelivery(log, expectedClaimToken);
+        }
+    }
+
+    public void retryClaimed(NotificationLog log, LocalDateTime now) {
+        if (log == null || !"FAILED".equals(log.getDeliveryStatus()) || log.getClaimToken() == null) {
+            return;
+        }
+        updateDispatchResult(log, now, log.getClaimToken());
+    }
+
+    private LocalDateTime nextRetryAt(LocalDateTime now, int attemptCount) {
+        return now.plusMinutes(switch (attemptCount) {
+            case 1 -> 1;
+            case 2 -> 5;
+            default -> 15;
+        });
     }
 
     private String resolveChannel(String targetType, String businessType) {

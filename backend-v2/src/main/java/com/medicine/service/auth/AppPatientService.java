@@ -13,6 +13,7 @@ import com.medicine.repository.identity.AppAccountMapper;
 import com.medicine.repository.identity.PatientFamilyBindingMapper;
 import com.medicine.repository.identity.PatientMapper;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
@@ -135,6 +136,7 @@ public class AppPatientService {
                 .toList();
     }
 
+    @Transactional
     public AppFamilyBindingDTO createFamilyBinding(String subject, CreateFamilyBindingRequest request) {
         AppAccount ownerAccount = requireAppAccount(subject);
         if (!"PATIENT".equalsIgnoreCase(ownerAccount.getAccountType())) {
@@ -172,6 +174,13 @@ public class AppPatientService {
             familyAccount.setUpdater("app-family");
             familyAccount.setUpdateTime(now);
             appAccountMapper.updateLoginInfo(familyAccount);
+        }
+
+        List<PatientFamilyBinding> familyBindings = patientFamilyBindingMapper.selectActiveByFamilyAccountId(
+                DEFAULT_TENANT_ID, familyAccount.getId()
+        );
+        if (familyBindings.stream().anyMatch(binding -> !patient.getId().equals(binding.getPatientId()))) {
+            throw new BusinessException(400, "FAMILY_ACCOUNT_ALREADY_BOUND");
         }
 
         PatientFamilyBinding existing = patientFamilyBindingMapper.selectActiveBinding(DEFAULT_TENANT_ID, patient.getId(), familyAccount.getId());
@@ -243,10 +252,22 @@ public class AppPatientService {
         AppFamilyBindingDTO dto = new AppFamilyBindingDTO();
         dto.setId(binding.getId());
         dto.setFamilyAccountId(binding.getFamilyAccountId());
+        AppAccount familyAccount = appAccountMapper.selectByIdAndTenant(DEFAULT_TENANT_ID, binding.getFamilyAccountId());
+        if (familyAccount != null) {
+            dto.setDisplayName(familyAccount.getDisplayName());
+            dto.setMobileMasked(maskMobile(familyAccount.getMobile()));
+        }
         dto.setRelationshipType(binding.getRelationshipType());
         dto.setStatus(binding.getStatus());
         dto.setAuthorizedAt(binding.getAuthorizedAt() == null ? null : binding.getAuthorizedAt().toInstant(ZoneOffset.UTC).toString());
         return dto;
+    }
+
+    private String maskMobile(String mobile) {
+        if (mobile == null || mobile.length() < 7) {
+            return mobile;
+        }
+        return mobile.substring(0, 3) + "****" + mobile.substring(mobile.length() - 4);
     }
 
     private Patient resolvePatientForAccount(AppAccount appAccount) {

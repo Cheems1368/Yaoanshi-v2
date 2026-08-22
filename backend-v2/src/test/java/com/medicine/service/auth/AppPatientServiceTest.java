@@ -3,6 +3,7 @@ package com.medicine.service.auth;
 import com.medicine.api.dto.auth.BindPatientRequest;
 import com.medicine.api.dto.identity.AppFamilyBindingDTO;
 import com.medicine.api.dto.identity.AppPatientSummaryDTO;
+import com.medicine.api.dto.identity.CreateFamilyBindingRequest;
 import com.medicine.common.exception.BusinessException;
 import com.medicine.domain.identity.AppAccount;
 import com.medicine.domain.identity.Patient;
@@ -41,6 +42,34 @@ class AppPatientServiceTest {
 
     @InjectMocks
     private AppPatientService appPatientService;
+
+    @Test
+    void shouldRejectFamilyAccountAlreadyBoundToAnotherPatient() {
+        AppAccount owner = appAccount(1001L, "13800138000");
+        owner.setAccountType("PATIENT");
+        AppAccount family = appAccount(2001L, "13900139000");
+        family.setAccountType("FAMILY");
+        Patient patient = new Patient();
+        patient.setId(3001L);
+        PatientFamilyBinding other = new PatientFamilyBinding();
+        other.setPatientId(3999L);
+        other.setFamilyAccountId(2001L);
+        other.setStatus("ACTIVE");
+        when(appAccountMapper.selectActiveByMobile(1L, "13800138000")).thenReturn(owner);
+        when(patientMapper.selectByAppAccountId(1L, 1001L)).thenReturn(patient);
+        when(patientFamilyBindingMapper.countActiveByPatientId(1L, 3001L)).thenReturn(0);
+        when(appAccountMapper.selectActiveByMobile(1L, "13900139000")).thenReturn(family);
+        when(patientFamilyBindingMapper.selectActiveByFamilyAccountId(1L, 2001L)).thenReturn(List.of(other));
+        CreateFamilyBindingRequest request = new CreateFamilyBindingRequest();
+        request.setFamilyMobile("13900139000");
+        request.setFamilyDisplayName("家属");
+        request.setRelationshipType("child");
+
+        assertThatThrownBy(() -> appPatientService.createFamilyBinding("13800138000", request))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("FAMILY_ACCOUNT_ALREADY_BOUND");
+        verify(patientFamilyBindingMapper, never()).insert(any());
+    }
 
     @Test
     void shouldInsertPatientBindingWhenNoExistingRecord() {

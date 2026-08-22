@@ -1,8 +1,10 @@
 package com.medicine.service.app;
 
 import com.medicine.api.dto.assessment.SatisfactionSurveyDTO;
+import com.medicine.api.dto.assessment.KnowledgeAssessmentSubmitRequest;
 import com.medicine.common.exception.BusinessException;
 import com.medicine.domain.assessment.SatisfactionSurvey;
+import com.medicine.domain.assessment.KnowledgeAssessment;
 import com.medicine.domain.helporder.HelpOrder;
 import com.medicine.domain.identity.AppAccount;
 import com.medicine.domain.identity.Patient;
@@ -10,12 +12,19 @@ import com.medicine.repository.assessment.KnowledgeAssessmentAnswerMapper;
 import com.medicine.repository.assessment.KnowledgeAssessmentMapper;
 import com.medicine.repository.assessment.SatisfactionSurveyMapper;
 import com.medicine.repository.helporder.HelpOrderMapper;
+import com.medicine.repository.medication.MedicationPlanMapper;
 import com.medicine.service.auth.AppPatientService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -40,10 +49,66 @@ class AppAssessmentServiceTest {
     private HelpOrderMapper helpOrderMapper;
 
     @Mock
+    private MedicationPlanMapper medicationPlanMapper;
+
+    @Mock
     private AppPatientService appPatientService;
+
+    @Spy
+    private KnowledgeQuestionBank questionBank = new KnowledgeQuestionBank();
 
     @InjectMocks
     private AppAssessmentService appAssessmentService;
+
+    @Test
+    void shouldScoreKnowledgeAnswersFromServerQuestionBank() {
+        when(appPatientService.requireAccessContext("13800138000")).thenReturn(accessContext());
+        when(medicationPlanMapper.selectFirstActivatedAt(1L, 201L)).thenReturn(LocalDateTime.now().minusDays(2));
+        when(knowledgeAssessmentMapper.selectByPatientPhaseAndVersion(1L, 201L, "DAY_1", KnowledgeQuestionBank.VERSION)).thenReturn(null);
+        when(knowledgeAssessmentMapper.selectByPatientPhaseAndVersion(1L, 201L, "WEEK_4", KnowledgeQuestionBank.VERSION)).thenReturn(null);
+        doAnswer(invocation -> {
+            KnowledgeAssessment assessment = invocation.getArgument(0);
+            assessment.setId(801L);
+            return 1;
+        }).when(knowledgeAssessmentMapper).insert(any(KnowledgeAssessment.class));
+
+        KnowledgeAssessmentSubmitRequest request = knowledgeRequest("DAY_1");
+        request.getAnswers().get(9).setSelectedOption("A");
+
+        var result = appAssessmentService.submitKnowledge("13800138000", request);
+
+        assertThat(result.getScore()).isEqualTo(9.0);
+        assertThat(result.getMaxScore()).isEqualTo(10.0);
+        assertThat(result.getAnswers().get(9).getCorrect()).isFalse();
+        verify(knowledgeAssessmentAnswerMapper, org.mockito.Mockito.times(10)).insert(any());
+    }
+
+    @Test
+    void shouldNotExposeAssessmentBeforeFirstPlanStartDate() {
+        when(appPatientService.requireAccessContext("13800138000")).thenReturn(accessContext());
+        when(medicationPlanMapper.selectFirstActivatedAt(1L, 201L))
+                .thenReturn(LocalDate.now(ZoneOffset.UTC).plusDays(1).atStartOfDay());
+
+        var result = appAssessmentService.getKnowledgeStatus("13800138000");
+
+        assertThat(result.isDue()).isFalse();
+        assertThat(result.getCurrentPhase()).isNull();
+        assertThat(result.getPlanStartDate()).isEqualTo(LocalDate.now(ZoneOffset.UTC).plusDays(1).toString());
+    }
+
+    @Test
+    void shouldRejectAlreadySubmittedCurrentPhase() {
+        when(appPatientService.requireAccessContext("13800138000")).thenReturn(accessContext());
+        when(medicationPlanMapper.selectFirstActivatedAt(1L, 201L)).thenReturn(LocalDateTime.now().minusDays(2));
+        KnowledgeAssessment existing = new KnowledgeAssessment();
+        existing.setScore(BigDecimal.TEN);
+        existing.setMaxScore(BigDecimal.TEN);
+        when(knowledgeAssessmentMapper.selectByPatientPhaseAndVersion(1L, 201L, "DAY_1", KnowledgeQuestionBank.VERSION)).thenReturn(existing);
+
+        assertThatThrownBy(() -> appAssessmentService.submitKnowledge("13800138000", knowledgeRequest("DAY_1")))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("KNOWLEDGE_ASSESSMENT_NOT_DUE");
+    }
 
     @Test
     void shouldRejectSatisfactionWhenOrderNotClosed() {
@@ -111,6 +176,19 @@ class AppAssessmentServiceTest {
         request.setHelpOrderId(801L);
         request.setRating(5);
         request.setComment("good");
+        return request;
+    }
+
+    private KnowledgeAssessmentSubmitRequest knowledgeRequest(String phase) {
+        KnowledgeAssessmentSubmitRequest request = new KnowledgeAssessmentSubmitRequest();
+        request.setPhase(phase);
+        request.setQuestionSetVersion(KnowledgeQuestionBank.VERSION);
+        request.setAnswers(questionBank.publicQuestions().stream().map(question -> {
+            KnowledgeAssessmentSubmitRequest.AnswerRequest answer = new KnowledgeAssessmentSubmitRequest.AnswerRequest();
+            answer.setQuestionCode(question.questionCode());
+            answer.setSelectedOption(questionBank.find(question.questionCode()).correctOption());
+            return answer;
+        }).toList());
         return request;
     }
 }

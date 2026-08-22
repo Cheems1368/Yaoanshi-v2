@@ -1258,8 +1258,13 @@ AI rules:
 
 | Method | Path | Auth | Request | Response `data` | Side effects |
 |---|---|---|---|---|---|
-| `POST` | `/app-api/assessments/knowledge` | Yes | `KnowledgeAssessmentDTO` | saved summary | write raw answers + result |
+| `GET` | `/app-api/assessments/knowledge/questions` | Yes | none | fixed `medication-literacy-v1` questions without answer keys | none |
+| `GET` | `/app-api/assessments/knowledge/status` | Yes | none | DAY_1/WEEK_4 due and result status | none |
+| `POST` | `/app-api/assessments/knowledge` | Yes | version, phase, selected options | server-scored summary | write validated answers + result; one submission per phase/version |
+| `GET` | `/app-api/assessments/satisfaction/status` | Yes | `helpOrderId` query | eligibility and prior survey | none |
 | `POST` | `/app-api/assessments/satisfaction` | Yes | `SatisfactionSurveyDTO` | saved survey | write satisfaction row |
+| `GET` | `/app-api/dose-tasks` | Yes | `dateFrom`, `dateTo` (inclusive, at most 7 days) | dose-task list | none |
+| `GET` | `/app-api/notifications/logs` | Yes | optional `afterId`, `limit` | current patient's persisted notifications | none |
 
 ### 6.2 Admin APIs
 
@@ -1284,6 +1289,9 @@ Existing `/admin-api/system/auth/login`, `/refresh-token`, and `/logout` contrac
 | `GET` | `/admin-api/patients` | pharmacist | patient query | paged patient list | none |
 | `GET` | `/admin-api/patients/{id}` | pharmacist | none | patient detail | none |
 | `PUT` | `/admin-api/patients/{id}` | pharmacist | patient update DTO | updated detail | update patient medical fields, maybe trigger ABCD2 recalculation |
+| `PUT` | `/admin-api/patients/{id}/responsible-pharmacist` | admin / super_admin / tenant_admin | `{ pharmacistId, reason }` | updated detail | atomically update patient and non-terminal orders; append `REASSIGNED` events |
+| `POST` | `/admin-api/patients/{id}/knowledge-assessments/remind` | responsible pharmacist or admin | none | Boolean | persist/send current-phase reminder when due |
+| `GET` | `/admin-api/pharmacists/options` | admin / super_admin / tenant_admin | none | ACTIVE pharmacist options | none |
 
 #### Prescription and OCR
 
@@ -1541,10 +1549,13 @@ AI audit must never include prompt text, response text, request payload, or cont
 
 - If DB commit succeeds but notification dispatch fails:
   - business write remains valid
-  - `notification_log` stores `FAILED`
-  - retry is allowed by async worker
+  - no active WebSocket session degrades to persisted `IN_APP/SENT`
+  - real send failure stores `FAILED` and retries after 1, 5, and 15 minutes using a CAS claim
+  - initial attempt plus three failed retries becomes `PERMANENT_FAILED`
 - If object upload succeeds but DB write fails:
-  - object is marked for cleanup by compensating job
+  - presign already created `file_asset/PRESIGNED`
+  - objects still unregistered after one hour are claimed and deleted by the compensation job
+  - delete failure remains `CLEANUP_RETRY` with bounded backoff
 
 ### 8.9 Work order permissions
 

@@ -7,6 +7,8 @@ import org.apache.ibatis.annotations.Options;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 
+import java.math.BigDecimal;
+
 @Mapper
 public interface SatisfactionSurveyMapper {
 
@@ -30,4 +32,10 @@ public interface SatisfactionSurveyMapper {
             LIMIT 1
             """)
     SatisfactionSurvey selectByHelpOrderId(@Param("tenantId") Long tenantId, @Param("helpOrderId") Long helpOrderId);
+
+    @Select("SELECT COUNT(1) FROM satisfaction_survey WHERE tenant_id = #{tenantId} AND patient_id = #{patientId} AND deleted = 0")
+    long countByPatientId(@Param("tenantId") Long tenantId, @Param("patientId") Long patientId);
+
+    @Select("SELECT AVG(rating) FROM satisfaction_survey WHERE tenant_id = #{tenantId} AND patient_id = #{patientId} AND deleted = 0")
+    BigDecimal averageByPatientId(@Param("tenantId") Long tenantId, @Param("patientId") Long patientId);
 }

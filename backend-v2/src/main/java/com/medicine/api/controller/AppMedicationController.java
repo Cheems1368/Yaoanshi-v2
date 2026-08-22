@@ -41,6 +41,15 @@ public class AppMedicationController {
         return CommonResult.ok(appMedicationService.getTodayDoseTasks(principal.getName(), date));
     }
 
+    @GetMapping("/app-api/dose-tasks")
+    public CommonResult<List<DoseTaskDTO>> getDoseTasks(
+            Principal principal,
+            @RequestParam("dateFrom") String dateFrom,
+            @RequestParam("dateTo") String dateTo
+    ) {
+        return CommonResult.ok(appMedicationService.getDoseTasks(principal.getName(), dateFrom, dateTo));
+    }
+
     @GetMapping("/app-api/checkins")
     public CommonResult<PageResult<CheckinRecordDTO>> getCheckins(
             Principal principal,

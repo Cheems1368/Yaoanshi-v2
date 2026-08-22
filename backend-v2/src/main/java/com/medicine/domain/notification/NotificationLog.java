@@ -14,6 +14,11 @@ public class NotificationLog extends BaseEntity {
     private LocalDateTime scheduledAt;
     private LocalDateTime sentAt;
     private String deliveryStatus;
+    private Integer attemptCount;
+    private LocalDateTime nextRetryAt;
+    private LocalDateTime lastAttemptAt;
+    private String claimToken;
+    private LocalDateTime claimedAt;
     private String failureCode;
     private String failureReason;
     private String payloadJson;
@@ -81,6 +86,17 @@ public class NotificationLog extends BaseEntity {
     public void setDeliveryStatus(String deliveryStatus) {
         this.deliveryStatus = deliveryStatus;
     }
+
+    public Integer getAttemptCount() { return attemptCount; }
+    public void setAttemptCount(Integer attemptCount) { this.attemptCount = attemptCount; }
+    public LocalDateTime getNextRetryAt() { return nextRetryAt; }
+    public void setNextRetryAt(LocalDateTime nextRetryAt) { this.nextRetryAt = nextRetryAt; }
+    public LocalDateTime getLastAttemptAt() { return lastAttemptAt; }
+    public void setLastAttemptAt(LocalDateTime lastAttemptAt) { this.lastAttemptAt = lastAttemptAt; }
+    public String getClaimToken() { return claimToken; }
+    public void setClaimToken(String claimToken) { this.claimToken = claimToken; }
+    public LocalDateTime getClaimedAt() { return claimedAt; }
+    public void setClaimedAt(LocalDateTime claimedAt) { this.claimedAt = claimedAt; }
 
     public String getFailureCode() {
         return failureCode;

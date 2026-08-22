@@ -3,6 +3,7 @@ package com.medicine.api.dto.medication;
 public class CheckinSubmitRequest {
 
     private Long doseTaskId;
+    private String clientRequestId;
     private String result;
     private String actualTakenAt;
     private String note;
@@ -14,6 +15,14 @@ public class CheckinSubmitRequest {
 
     public void setDoseTaskId(Long doseTaskId) {
         this.doseTaskId = doseTaskId;
+    }
+
+    public String getClientRequestId() {
+        return clientRequestId;
+    }
+
+    public void setClientRequestId(String clientRequestId) {
+        this.clientRequestId = clientRequestId;
     }
 
     public String getResult() {
