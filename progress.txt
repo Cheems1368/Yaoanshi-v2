@@ -39,14 +39,14 @@ Current State
 - Last session (2026-03-27): Phase A–F completed (see below)
 
 In Progress
-- Record the PR #40 qualification evidence and wait for the evidence-only commit's final protected CI rerun.
+- No T8 implementation or qualification work remains; PR #40 awaits separate merge authorization.
 
 Next
-- Confirm the final PR #40 required gate remains green, the branch remains current and mergeable, and review conversations remain at zero; then hand off for separate merge authorization without merging in this goal.
+- Hand off PR #40 for separate merge authorization; do not merge in this goal.
 
 Last Updated
 - 2026-08-22 Asia/Shanghai
-- Reason: T8 PR #40 passed the first protected CI run with zero review conversations; final evidence rerun and merge handoff remain.
+- Reason: T8 PR #40 passed the protected implementation and evidence runs with zero review conversations and is ready for merge handoff.
 
 Android JDK 21 and APK Gate (2026-08-14)
 - Changed:
@@ -887,11 +887,10 @@ T8 Protected PR Qualification (2026-08-22)
   - GitHub reported zero submitted reviews, zero review threads, zero unresolved conversations, and zero ordinary PR comments.
   - The PR description records V13 and third-party-provider risk, rollback, compatibility boundaries, 170 backend tests with 62.66% JaCoCo line coverage, six patient unit tests, Web/Android gates, migration/cleanup evidence, and sanitized static-scan results.
 - Open risks:
-  - This evidence-only commit triggers one final protected CI run; qualification remains valid only if that run stays green and no review conversation is opened.
   - Merge is intentionally outside this goal and requires separate authorization.
 - Next:
-  - Wait for the final required gate, reconfirm current/mergeable/zero-conversation state, update the PR evidence checkbox, and hand off PR #40 without merging.
+  - Hand off PR #40 for separate merge authorization without merging in this goal.
 
 Last Updated
 - 2026-08-22 Asia/Shanghai
-- Reason: PR #40 passed its first protected gate with zero review conversations and awaits the final evidence rerun.
+- Reason: PR #40 passed its protected implementation and evidence runs with zero review conversations and is ready for merge handoff.

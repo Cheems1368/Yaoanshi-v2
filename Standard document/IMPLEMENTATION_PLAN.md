@@ -30,7 +30,7 @@ Rules:
 | Phase T7 | SEC-002 refresh-token HttpOnly Cookie closure | ✅ Delivered through PR #39 (`4c90292`) |
 | Phase T8 | SEC-005 AI data-boundary closure | ✅ Protected-qualified in PR #40; delivery to `main` awaits separate merge authorization |
 
-**Current active work:** T8 closes SEC-005 with versioned provider disclosure, high-confidence text redaction, exact upstream-host allowlisting, fail-closed metadata-only audit, and patient-side policy loading. PR #40 passed all protected checks with zero review conversations; the candidate awaits a final evidence-only CI rerun and separate merge authorization. Android release signing and store publishing remain separate release-engineering work.
+**Current active work:** T8 closes SEC-005 with versioned provider disclosure, high-confidence text redaction, exact upstream-host allowlisting, fail-closed metadata-only audit, and patient-side policy loading. PR #40 passed its protected implementation and evidence runs with zero review conversations; the candidate awaits separate merge authorization. Android release signing and store publishing remain separate release-engineering work.
 
 **Flyway current latest:** V13 (`V13__ai_data_boundary.sql`). Next new migration must be V14.
 
