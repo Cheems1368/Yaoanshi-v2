@@ -847,7 +847,7 @@ Goal T8 SEC-005 AI Data-Boundary Local Qualification (2026-08-22)
   - Updated the patient AI screen to fetch policy on every entry, disable sending while policy is unknown, submit the displayed version, and expose a reusable data-use statement without browser consent storage or dynamic HTML.
   - Added the preview plus 1000-row bounded audit-expiry SQL and synchronized Standard documents, `TESTING.md`, and the security report.
 - Validated:
-  - Required targeted backend command passed; full backend `clean verify` passed 170/170 tests with 62.64% JaCoCo line coverage.
+  - Required targeted backend command passed; full backend `clean verify` passed 170/170 tests with 62.66% JaCoCo line coverage.
   - Patient ESLint, 6/6 Vitest tests, production build, and Android debug build passed; APK size is 7,604,214 bytes.
   - Flyway 10.20.1 on MySQL 8 passed both empty-schema V1→V13 and existing V12→V13 migrations. The audit table contains zero forbidden prompt/reply/payload/content/hash fields.
   - Cleanup runbook previewed 1002 expired rows, deleted exactly 1000, and left two expired plus one unexpired row; all disposable containers/networks and the temporary Docker engine session were removed.
