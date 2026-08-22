@@ -14,7 +14,7 @@ public class AiPrivacyRedactor {
             new Rule(Pattern.compile("(?<!\\d)(?:\\d{17}[0-9Xx]|\\d{15})(?!\\d)"), "[身份证号已隐藏]"),
             new Rule(Pattern.compile("(?<!\\d)1[3-9]\\d{9}(?!\\d)"), "[手机号已隐藏]"),
             new Rule(Pattern.compile("(患者姓名|姓名)\\s*[:：]\\s*[\\p{IsHan}A-Za-z·.]{2,32}"), "$1：[姓名已隐藏]"),
-            new Rule(Pattern.compile("(患者号|住院号|门诊号|病历号)\\s*[:：]\\s*[A-Za-z0-9._-]{2,32}"), "$1：[编号已隐藏]")
+            new Rule(Pattern.compile("(?i)(患者号|患者\\s*ID|就诊编号|就诊号|就诊\\s*ID|住院号|门诊号|病历号)\\s*[:：]\\s*[A-Za-z0-9._-]{2,32}"), "$1：[编号已隐藏]")
     );
 
     public RedactionResult redact(String input) {

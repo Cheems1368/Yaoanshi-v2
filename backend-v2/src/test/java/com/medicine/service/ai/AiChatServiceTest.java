@@ -80,7 +80,7 @@ class AiChatServiceTest {
                 message("user", "u2"),
                 message("assistant", "a2"),
                 message("assistant", "a3"),
-                message("user", "我的手机号是13812345678，邮箱 patient@example.com，阿司匹林100mg怎么吃？")
+                message("user", "手机号13812345678，邮箱 patient@example.com，就诊编号：VISIT-12345，患者ID：P-12345，阿司匹林100mg怎么吃？")
         ));
 
         @SuppressWarnings("rawtypes")
@@ -92,15 +92,34 @@ class AiChatServiceTest {
         assertThat(transmitted.get(0).get("role")).isEqualTo("system");
         assertThat(transmitted.get(1).get("content")).isEqualTo("a1");
         assertThat(transmitted.get(5).get("content"))
-                .contains("[手机号已隐藏]", "[邮箱已隐藏]", "阿司匹林100mg")
-                .doesNotContain("13812345678", "patient@example.com");
+                .contains("[手机号已隐藏]", "[邮箱已隐藏]", "就诊编号：[编号已隐藏]", "患者ID：[编号已隐藏]", "阿司匹林100mg")
+                .doesNotContain("13812345678", "patient@example.com", "VISIT-12345", "P-12345");
         assertThat(response.getReply()).isEqualTo("safe reply");
         verify(auditService).completeSuccess(any(), anyLong());
 
         ArgumentCaptor<AiRequestMetadata> metadataCaptor = ArgumentCaptor.forClass(AiRequestMetadata.class);
         verify(auditService).start(any(), anyString(), anyString(), metadataCaptor.capture());
-        assertThat(metadataCaptor.getValue().redactionCount()).isEqualTo(2);
+        assertThat(metadataCaptor.getValue().redactionCount()).isEqualTo(4);
         assertThat(metadataCaptor.getValue().transmittedMessageCount()).isEqualTo(6);
+    }
+
+    @Test
+    void shouldOnlyAuditRedactionsInTransmittedMessages() {
+        allowFirstRequest();
+        when(upstreamClient.chat(any())).thenReturn("safe reply");
+
+        service.chat("13800000000", request(
+                message("user", "病历号：TRIMMED-123"),
+                message("assistant", "a1"),
+                message("user", "u2"),
+                message("assistant", "a2"),
+                message("assistant", "a3"),
+                message("user", "u3")
+        ));
+
+        ArgumentCaptor<AiRequestMetadata> metadataCaptor = ArgumentCaptor.forClass(AiRequestMetadata.class);
+        verify(auditService).start(any(), anyString(), anyString(), metadataCaptor.capture());
+        assertThat(metadataCaptor.getValue().redactionCount()).isZero();
     }
 
     @Test

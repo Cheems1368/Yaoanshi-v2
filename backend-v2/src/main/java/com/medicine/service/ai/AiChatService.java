@@ -13,7 +13,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -125,7 +124,6 @@ public class AiChatService {
         }
 
         int originalCharCount = 0;
-        int redactionCount = 0;
         int userMessageCount = 0;
         List<Map<String, String>> conversation = new ArrayList<>();
 
@@ -150,12 +148,7 @@ public class AiChatService {
                 userMessageCount++;
             }
 
-            AiPrivacyRedactor.RedactionResult redacted = privacyRedactor.redact(content);
-            redactionCount += redacted.redactionCount();
-            Map<String, String> record = new LinkedHashMap<>();
-            record.put("role", role);
-            record.put("content", redacted.text());
-            conversation.add(record);
+            conversation.add(Map.of("role", role, "content", content));
         }
 
         if (userMessageCount == 0) {
@@ -171,7 +164,12 @@ public class AiChatService {
 
         List<Map<String, String>> normalized = new ArrayList<>(trimmedConversation.size() + 1);
         normalized.add(Map.of("role", "system", "content", SYSTEM_PROMPT));
-        normalized.addAll(trimmedConversation);
+        int redactionCount = 0;
+        for (Map<String, String> message : trimmedConversation) {
+            AiPrivacyRedactor.RedactionResult redacted = privacyRedactor.redact(message.get("content"));
+            redactionCount += redacted.redactionCount();
+            normalized.add(Map.of("role", message.get("role"), "content", redacted.text()));
+        }
 
         int transmittedCharCount = normalized.stream()
                 .mapToInt(message -> message.get("content").length())

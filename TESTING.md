@@ -130,7 +130,7 @@ mvn -q "-Dtest=AiConsentServiceTest,AiPrivacyRedactorTest,AiAuditServiceTest,Htt
 除全量 `mvn -q clean verify`、患者端 lint/Vitest/build/Android 门禁外，必须证明：
 
 1. 只有旧 `ai_consent_granted_at` 的账户仍显示 `sec-005-v2` 声明；缺失或错误版本返回 `AI_CONSENT_POLICY_MISMATCH (40034)`，正确版本授权后 disclosure 与旧 Boolean 接口均为已同意。
-2. 手机号、15/18 位身份证号、邮箱及带明确标签的姓名/患者号/住院号/门诊号/病历号只以占位符到达模拟上游；药名、剂量和服药时间不被误脱敏。
+2. 手机号、15/18 位身份证号、邮箱及带明确标签的姓名/患者号/患者 ID/就诊编号/就诊号/住院号/门诊号/病历号只以占位符到达模拟上游；药名、剂量和服药时间不被误脱敏。
 3. 客户端 system 消息被忽略；服务端最多发送最近五条非 system 历史消息和固定 system prompt。
 4. 非白名单主机、非安全协议、重定向及 `PENDING` 审计插入失败时，上游零调用。
 5. 成功、限流、认证失败和网络异常均留下无正文审计；问题、回复、请求载荷和正文哈希不进入数据库或日志。
@@ -140,7 +140,7 @@ mvn -q "-Dtest=AiConsentServiceTest,AiPrivacyRedactorTest,AiAuditServiceTest,Htt
 生产源码静态扫描至少覆盖：
 
 ```powershell
-rg -n "v-html|localStorage.*ai|question|reply|payload|content_hash" frontend/huanzhe/src/modules/patient/views/AiAssistantPage.vue backend-v2/src/main/resources/db/migration/V13__ai_data_boundary.sql backend-v2/src/main/java/com/medicine/service/ai backend-v2/src/main/java/com/medicine/infrastructure/ai
+rg -n "v-html|localStorage.*ai|question|reply|payload|content_hash" frontend/huanzhe/src/modules/patient/pages/AiAssistantPage.vue backend-v2/src/main/resources/db/migration/V13__ai_data_boundary.sql backend-v2/src/main/java/com/medicine/service/ai backend-v2/src/main/java/com/medicine/infrastructure/ai
 ```
 
 任何命中都必须逐条人工判定；测试断言或业务响应字段可以存在，审计表字段、持久化语句和审计失败日志中不得出现问答正文。

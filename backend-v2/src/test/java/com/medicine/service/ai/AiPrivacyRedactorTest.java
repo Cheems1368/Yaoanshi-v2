@@ -29,4 +29,16 @@ class AiPrivacyRedactorTest {
         assertThat(result.text()).isEqualTo(text);
         assertThat(result.redactionCount()).isZero();
     }
+
+    @Test
+    void shouldRedactEncounterAndPatientIdLabels() {
+        AiPrivacyRedactor.RedactionResult result = redactor.redact(
+                "就诊编号：VISIT-12345，就诊号：V-2026-08，患者ID：P-12345"
+        );
+
+        assertThat(result.text())
+                .contains("就诊编号：[编号已隐藏]", "就诊号：[编号已隐藏]", "患者ID：[编号已隐藏]")
+                .doesNotContain("VISIT-12345", "V-2026-08", "P-12345");
+        assertThat(result.redactionCount()).isEqualTo(3);
+    }
 }
