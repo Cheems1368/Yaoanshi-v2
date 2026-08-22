@@ -31,7 +31,37 @@ ALTER TABLE patient_family_binding
     ADD UNIQUE KEY uk_family_single_active_patient (tenant_id, active_family_account_id);
 
 ALTER TABLE knowledge_assessment
-    ADD UNIQUE KEY uk_knowledge_patient_phase_version (tenant_id, patient_id, phase, question_set_version);
+    ADD COLUMN uniqueness_guard TINYINT NULL DEFAULT 1 AFTER question_set_version;
+
+UPDATE knowledge_assessment
+SET uniqueness_guard = NULL
+WHERE deleted = b'1';
+
+CREATE TEMPORARY TABLE v14_knowledge_assessment_keep AS
+SELECT tenant_id, patient_id, phase, question_set_version, MIN(id) AS keep_id
+FROM knowledge_assessment
+WHERE deleted = b'0'
+GROUP BY tenant_id, patient_id, phase, question_set_version
+HAVING COUNT(*) > 1;
+
+UPDATE knowledge_assessment duplicate_row
+INNER JOIN v14_knowledge_assessment_keep canonical
+    ON canonical.tenant_id = duplicate_row.tenant_id
+    AND canonical.patient_id = duplicate_row.patient_id
+    AND canonical.phase = duplicate_row.phase
+    AND canonical.question_set_version = duplicate_row.question_set_version
+SET duplicate_row.uniqueness_guard = NULL,
+    duplicate_row.updater = 'v14-assessment-deduplicate',
+    duplicate_row.update_time = UTC_TIMESTAMP()
+WHERE duplicate_row.id <> canonical.keep_id
+  AND duplicate_row.deleted = b'0';
+
+DROP TEMPORARY TABLE v14_knowledge_assessment_keep;
+
+ALTER TABLE knowledge_assessment
+    ADD UNIQUE KEY uk_knowledge_patient_phase_version (
+        tenant_id, patient_id, phase, question_set_version, uniqueness_guard
+    );
 
 ALTER TABLE notification_log
     ADD COLUMN attempt_count INT NOT NULL DEFAULT 0 AFTER delivery_status,

@@ -48,6 +48,7 @@ public interface KnowledgeAssessmentMapper {
             FROM knowledge_assessment
             WHERE tenant_id = #{tenantId} AND patient_id = #{patientId} AND phase = #{phase}
               AND question_set_version = #{questionSetVersion} AND deleted = 0
+            ORDER BY submitted_at ASC, id ASC
             LIMIT 1
             """)
     KnowledgeAssessment selectByPatientPhaseAndVersion(

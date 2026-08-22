@@ -154,7 +154,7 @@ mvn -q clean verify -f D:\yaoanshi\backend-v2\pom.xml
 
 Acceptance additionally proves server-owned 10-question scoring and phase uniqueness; at-most-seven-day task retrieval; `clientRequestId` check-in idempotency; one active patient per family account and serialized two-family maximum; admin-only reassignment with non-terminal order events; replacement of the previous ACTIVE medication plan; patient notification polling; 1/5/15-minute notification retry with CAS claim; presign-first `file_asset` registration; object-key compatibility reuse; registration-versus-cleanup CAS; and retryable orphan cleanup.
 
-Run V1→V14 and V13→V14 against disposable MySQL 8. Seed a duplicate active family-account binding before V14 and verify that migration stops with the explicit V14 blocker message. Do not point these commands at production. The `medication-literacy-v1` wording, options, and answer key remain a release blocker until a licensed pharmacist or physician records approval; automated tests are not medical approval.
+Run V1→V14 and V13→V14 against disposable MySQL 8. Seed a duplicate active family-account binding before V14 and verify that migration stops with the explicit V14 blocker message. Separately seed duplicate pre-V14 knowledge assessments and verify V14 preserves every row, assigns guard `1` only to the earliest active row, assigns null guards to later duplicates, and rejects a new canonical duplicate. Do not point these commands at production. The `medication-literacy-v1` wording, options, and answer key remain a release blocker until a licensed pharmacist or physician records approval; automated tests are not medical approval.
 
 ## 5. 发布前检查
 

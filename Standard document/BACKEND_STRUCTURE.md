@@ -800,12 +800,15 @@ Columns:
 | `patient_id` | `BIGINT` | No |  | `IDX_knowledge_patient` | target patient |
 | `phase` | `VARCHAR(20)` | No |  |  | `DAY_1`, `WEEK_4`, `OTHER` |
 | `question_set_version` | `VARCHAR(32)` | No |  |  | fixed question set version |
+| `uniqueness_guard` | `TINYINT` | Yes | `1` | `UK_knowledge_patient_phase_version` | canonical submission participates in uniqueness; preserved historical duplicates use `NULL` |
 | `score` | `DECIMAL(5,2)` | No |  |  | result score |
 | `max_score` | `DECIMAL(5,2)` | No |  |  | max score |
 | `submitted_by_type` | `VARCHAR(20)` | No |  |  | `PATIENT`, `FAMILY` |
 | `submitted_by_id` | `BIGINT` | No |  |  | submitter |
 | `submitted_at` | `DATETIME` | No |  |  | submission time |
 | audit columns | standard |  |  |  |  |
+
+V14 preserves every historical assessment row and answer. If pre-V14 retries created duplicate active rows for the same patient/phase/version, the earliest row remains canonical (`uniqueness_guard = 1`) and later rows are retained with a null guard before the unique key is added. New submissions default to the canonical guard and therefore conflict with the existing first submission.
 
 #### Table: `knowledge_assessment_answer`
 
