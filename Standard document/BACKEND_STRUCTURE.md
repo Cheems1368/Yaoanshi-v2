@@ -1135,8 +1135,8 @@ Reminder stage rules:
 
 | Method | Path | Auth | Request | Response `data` | Side effects |
 |---|---|---|---|---|---|
-| `POST` | `/app-api/files/presign` | Yes | upload intent | upload token/url | none |
-| `POST` | `/app-api/files/register` | Yes | uploaded file metadata | file asset summary | register a previously uploaded object for an allowed business type |
+| `POST` | `/app-api/files/presign` | Yes | upload intent | upload token/url plus `fileAssetId` | create uploader-owned `file_asset/PRESIGNED` |
+| `POST` | `/app-api/files/register` | Yes | uploaded file metadata plus preferred `fileAssetId` or compatibility `objectKey` | file asset summary | atomically complete the matching pre-upload asset for an allowed business type |
 | `POST` | `/app-api/help-orders` | Yes | `HelpOrderDTO` create body with optional `attachmentFileAssetIds` and optional `voiceAttachment` | created order | write `help_order`, `help_order_event`, attachment links, optional voice transcript placeholder, notification |
 | `GET` | `/app-api/help-orders` | Yes | status/category query | paged list | none |
 | `GET` | `/app-api/help-orders/{id}` | Yes | none | order detail + events | none |
@@ -1144,6 +1144,13 @@ Reminder stage rules:
 | `POST` | `/app-api/help-orders/{id}/attachments/{attachmentId}/transcribe` | patient or family participant | none | `HelpOrderVoiceTranscriptDTO` | transcribe one audio attachment if not already successful |
 | `GET` | `/app-api/prescriptions` | Yes | status/page query | paged prescriptions | none |
 | `POST` | `/app-api/prescriptions/uploads` | Yes | upload metadata | prescription summary | write `prescription`, `prescription_attachment`, `prescription_ocr_record` |
+
+File registration rules:
+
+1. `fileAssetId` is preferred. The compatibility `objectKey` path must find and complete the same `PRESIGNED` row created by presign; it must not create a duplicate row for that object.
+2. Uploader, business type, original filename, normalized media type, and size must match the presign snapshot. A true pre-V14 object with no asset row remains accepted only under its allowed object-key prefix.
+3. Registration is a compare-and-set update requiring `PRESIGNED` with no cleanup claim. Registration that wins first prevents cleanup claim; cleanup that wins first causes registration conflict before any business record is created.
+4. Assets still unregistered after one hour are deleted by the bounded cleanup job. Delete failures remain `CLEANUP_RETRY` with recorded backoff state.
 
 #### Self-reported medication
 

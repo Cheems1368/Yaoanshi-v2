@@ -41,10 +41,23 @@ public interface FileAssetMapper {
             """)
     FileAsset selectByIdAndTenant(@Param("tenantId") Long tenantId, @Param("id") Long id);
 
+    @Select("""
+            SELECT id, bucket, object_key, original_filename, mime_type, size_bytes, sha256, storage_provider, storage_region,
+                   public_url, uploaded_by_type, uploaded_by_id, business_type, scan_status,
+                   cleanup_attempt_count, next_cleanup_at, cleanup_failure_reason, cleanup_claim_token, cleanup_claimed_at,
+                   creator, create_time, updater, update_time, deleted, tenant_id
+            FROM file_asset
+            WHERE tenant_id = #{tenantId} AND object_key = #{objectKey} AND deleted = 0
+            ORDER BY id ASC
+            LIMIT 1
+            """)
+    FileAsset selectByObjectKeyAndTenant(@Param("tenantId") Long tenantId, @Param("objectKey") String objectKey);
+
     @Update("""
             UPDATE file_asset SET sha256 = #{sha256}, public_url = #{publicUrl}, scan_status = #{scanStatus}, updater = #{updater}, update_time = #{updateTime},
                 next_cleanup_at = NULL, cleanup_failure_reason = NULL, cleanup_claim_token = NULL, cleanup_claimed_at = NULL
-            WHERE tenant_id = #{tenantId} AND id = #{id} AND deleted = 0
+            WHERE tenant_id = #{tenantId} AND id = #{id} AND scan_status = 'PRESIGNED'
+              AND cleanup_claim_token IS NULL AND deleted = 0
             """)
     int completeRegistration(FileAsset fileAsset);
 

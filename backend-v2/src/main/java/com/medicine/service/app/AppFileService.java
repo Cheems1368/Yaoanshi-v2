@@ -104,10 +104,11 @@ public class AppFileService {
         String contentType = normalizeContentType(request.getContentType());
         LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
 
-        FileAsset fileAsset;
-        if (request.getFileAssetId() != null) {
-            fileAsset = fileAssetMapper.selectByIdAndTenant(1L, request.getFileAssetId());
-            if (fileAsset == null || !context.appAccount().getId().equals(fileAsset.getUploadedById())
+        FileAsset fileAsset = request.getFileAssetId() == null
+                ? fileAssetMapper.selectByObjectKeyAndTenant(1L, request.getObjectKey().trim())
+                : fileAssetMapper.selectByIdAndTenant(1L, request.getFileAssetId());
+        if (fileAsset != null) {
+            if (!context.appAccount().getId().equals(fileAsset.getUploadedById())
                     || !businessType.equals(fileAsset.getBusinessType()) || !"PRESIGNED".equals(fileAsset.getScanStatus())
                     || !request.getOriginalFilename().trim().equals(fileAsset.getOriginalFilename())
                     || !contentType.equals(fileAsset.getMimeType()) || !request.getSizeBytes().equals(fileAsset.getSizeBytes())) {
@@ -117,8 +118,13 @@ public class AppFileService {
             fileAsset.setScanStatus("PENDING");
             fileAsset.setUpdater("app-file");
             fileAsset.setUpdateTime(now);
-            fileAssetMapper.completeRegistration(fileAsset);
+            if (fileAssetMapper.completeRegistration(fileAsset) != 1) {
+                throw new BusinessException(409, "FILE_ASSET_REGISTRATION_CONFLICT");
+            }
         } else {
+            if (request.getFileAssetId() != null) {
+                throw new BusinessException(400, "FILE_ASSET_INVALID");
+            }
             fileAsset = new FileAsset();
             fileAsset.setBucket(objectStorageProperties.getBucket());
             fileAsset.setObjectKey(request.getObjectKey().trim());

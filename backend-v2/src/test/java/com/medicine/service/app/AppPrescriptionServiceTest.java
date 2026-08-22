@@ -3,6 +3,7 @@ package com.medicine.service.app;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.medicine.api.dto.prescription.PrescriptionDTO;
 import com.medicine.api.dto.prescription.PrescriptionUploadRequest;
+import com.medicine.common.exception.BusinessException;
 import com.medicine.common.model.PageResult;
 import com.medicine.config.ObjectStorageProperties;
 import com.medicine.domain.file.FileAsset;
@@ -28,8 +29,11 @@ import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -86,15 +90,16 @@ class AppPrescriptionServiceTest {
 
         when(appAccountMapper.selectActiveByMobile(1L, "13800138000")).thenReturn(account);
         when(patientMapper.selectByAppAccountId(1L, 101L)).thenReturn(patient);
+        FileAsset fileAsset = new FileAsset();
+        fileAsset.setId(301L); fileAsset.setTenantId(1L); fileAsset.setObjectKey("prescriptions/mock.jpg");
+        fileAsset.setOriginalFilename("mock.jpg"); fileAsset.setMimeType("image/jpeg"); fileAsset.setSizeBytes(2048L);
+        fileAsset.setUploadedById(101L); fileAsset.setBusinessType("PRESCRIPTION"); fileAsset.setScanStatus("PRESIGNED");
+        when(fileAssetMapper.selectByObjectKeyAndTenant(1L, "prescriptions/mock.jpg")).thenReturn(fileAsset);
+        when(fileAssetMapper.completeRegistration(fileAsset)).thenReturn(1);
         when(objectStorage.createPresignedDownloadUrl("prescriptions/mock.jpg")).thenReturn("download-url");
         when(objectStorage.readObjectBytes("prescriptions/mock.jpg")).thenReturn("image-bytes".getBytes(java.nio.charset.StandardCharsets.UTF_8));
         when(ocrService.performOcr(any(byte[].class), any())).thenReturn(OcrService.OcrResult.failure(""));
 
-        doAnswer(invocation -> {
-            FileAsset fileAsset = invocation.getArgument(0);
-            fileAsset.setId(301L);
-            return 1;
-        }).when(fileAssetMapper).insert(any(FileAsset.class));
         doAnswer(invocation -> {
             Prescription prescription = invocation.getArgument(0);
             prescription.setId(401L);
@@ -125,6 +130,31 @@ class AppPrescriptionServiceTest {
         assertThat(dto.getStatus()).isEqualTo("UPLOADED");
         assertThat(dto.getAttachments()).hasSize(1);
         assertThat(dto.getOcrStatus()).isEqualTo("LOW_CONFIDENCE");
+        verify(fileAssetMapper).completeRegistration(fileAsset);
+        verify(fileAssetMapper, never()).insert(any(FileAsset.class));
+    }
+
+    @Test
+    void shouldRejectPrescriptionWhenPresignedMetadataDoesNotMatch() {
+        AppAccount account = new AppAccount();
+        account.setId(101L);
+        Patient patient = new Patient();
+        patient.setId(201L);
+        when(appAccountMapper.selectActiveByMobile(1L, "13800138000")).thenReturn(account);
+        when(patientMapper.selectByAppAccountId(1L, 101L)).thenReturn(patient);
+        FileAsset fileAsset = new FileAsset();
+        fileAsset.setId(301L); fileAsset.setTenantId(1L); fileAsset.setObjectKey("prescriptions/mock.jpg");
+        fileAsset.setOriginalFilename("mock.jpg"); fileAsset.setMimeType("image/jpeg"); fileAsset.setSizeBytes(2048L);
+        fileAsset.setUploadedById(101L); fileAsset.setBusinessType("PRESCRIPTION"); fileAsset.setScanStatus("PRESIGNED");
+        when(fileAssetMapper.selectByIdAndTenant(1L, 301L)).thenReturn(fileAsset);
+        PrescriptionUploadRequest request = new PrescriptionUploadRequest();
+        request.setFileAssetId(301L); request.setOriginalFilename("mock.jpg"); request.setContentType("image/jpeg");
+        request.setSizeBytes(2049L);
+
+        assertThatThrownBy(() -> appPrescriptionService.registerUpload("13800138000", request))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("FILE_ASSET_INVALID");
+        verify(fileAssetMapper, never()).completeRegistration(any(FileAsset.class));
     }
 
     @Test

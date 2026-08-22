@@ -16,6 +16,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -24,6 +25,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -69,6 +71,33 @@ class AppPatientServiceTest {
                 .isInstanceOf(BusinessException.class)
                 .hasMessage("FAMILY_ACCOUNT_ALREADY_BOUND");
         verify(patientFamilyBindingMapper, never()).insert(any());
+        verify(patientMapper).lockByIdAndTenant(1L, 3001L);
+    }
+
+    @Test
+    void shouldMapConcurrentFamilyUniquenessConflictToBusinessError() {
+        AppAccount owner = appAccount(1001L, "13800138000");
+        owner.setAccountType("PATIENT");
+        AppAccount family = appAccount(2001L, "13900139000");
+        family.setAccountType("FAMILY");
+        Patient patient = new Patient();
+        patient.setId(3001L);
+        when(appAccountMapper.selectActiveByMobile(1L, "13800138000")).thenReturn(owner);
+        when(patientMapper.selectByAppAccountId(1L, 1001L)).thenReturn(patient);
+        when(patientFamilyBindingMapper.countActiveByPatientId(1L, 3001L)).thenReturn(1);
+        when(appAccountMapper.selectActiveByMobile(1L, "13900139000")).thenReturn(family);
+        when(patientFamilyBindingMapper.selectActiveByFamilyAccountId(1L, 2001L)).thenReturn(List.of());
+        when(patientFamilyBindingMapper.selectActiveBinding(1L, 3001L, 2001L)).thenReturn(null);
+        doThrow(new DataIntegrityViolationException("duplicate family account"))
+                .when(patientFamilyBindingMapper).insert(any(PatientFamilyBinding.class));
+        CreateFamilyBindingRequest request = new CreateFamilyBindingRequest();
+        request.setFamilyMobile("13900139000");
+        request.setFamilyDisplayName("家属");
+        request.setRelationshipType("child");
+
+        assertThatThrownBy(() -> appPatientService.createFamilyBinding("13800138000", request))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("FAMILY_ACCOUNT_ALREADY_BOUND");
     }
 
     @Test

@@ -12,6 +12,7 @@ import com.medicine.domain.identity.PatientFamilyBinding;
 import com.medicine.repository.identity.AppAccountMapper;
 import com.medicine.repository.identity.PatientFamilyBindingMapper;
 import com.medicine.repository.identity.PatientMapper;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -143,6 +144,7 @@ public class AppPatientService {
             throw new BusinessException(400, "BAD_REQUEST");
         }
         Patient patient = requireOwnedPatient(ownerAccount);
+        patientMapper.lockByIdAndTenant(DEFAULT_TENANT_ID, patient.getId());
         if (patientFamilyBindingMapper.countActiveByPatientId(DEFAULT_TENANT_ID, patient.getId()) >= 2) {
             throw new BusinessException(400, "FAMILY_BINDING_LIMIT_REACHED");
         }
@@ -192,7 +194,11 @@ public class AppPatientService {
             existing.setStatus("ACTIVE");
             existing.setAuthorizedAt(now);
             applyAuditFields(existing, "app-family");
-            patientFamilyBindingMapper.insert(existing);
+            try {
+                patientFamilyBindingMapper.insert(existing);
+            } catch (DataIntegrityViolationException ex) {
+                throw new BusinessException(409, "FAMILY_ACCOUNT_ALREADY_BOUND");
+            }
         }
 
         return toFamilyBindingSummary(existing);

@@ -106,7 +106,7 @@ public class AppPrescriptionService {
                 || !StringUtils.hasText(request.getContentType()) || request.getSizeBytes() == null || request.getSizeBytes() <= 0) {
             throw new BusinessException(400, "BAD_REQUEST");
         }
-        String contentType = request.getContentType().trim().toLowerCase();
+        String contentType = normalizeContentType(request.getContentType());
         if (!ALLOWED_CONTENT_TYPES.contains(contentType)) {
             throw new BusinessException(ErrorCode.FILE_UPLOAD_INVALID_TYPE.getCode(), ErrorCode.FILE_UPLOAD_INVALID_TYPE.getMessage());
         }
@@ -118,11 +118,14 @@ public class AppPrescriptionService {
         Patient patient = requireBoundPatient(account);
 
         LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
-        FileAsset fileAsset;
-        if (request.getFileAssetId() != null) {
-            fileAsset = fileAssetMapper.selectByIdAndTenant(DEFAULT_TENANT_ID, request.getFileAssetId());
-            if (fileAsset == null || !account.getId().equals(fileAsset.getUploadedById())
-                    || !"PRESCRIPTION".equals(fileAsset.getBusinessType()) || !"PRESIGNED".equals(fileAsset.getScanStatus())) {
+        FileAsset fileAsset = request.getFileAssetId() == null
+                ? fileAssetMapper.selectByObjectKeyAndTenant(DEFAULT_TENANT_ID, request.getObjectKey().trim())
+                : fileAssetMapper.selectByIdAndTenant(DEFAULT_TENANT_ID, request.getFileAssetId());
+        if (fileAsset != null) {
+            if (!account.getId().equals(fileAsset.getUploadedById())
+                    || !"PRESCRIPTION".equals(fileAsset.getBusinessType()) || !"PRESIGNED".equals(fileAsset.getScanStatus())
+                    || !request.getOriginalFilename().trim().equals(fileAsset.getOriginalFilename())
+                    || !contentType.equals(fileAsset.getMimeType()) || !request.getSizeBytes().equals(fileAsset.getSizeBytes())) {
                 throw new BusinessException(400, "FILE_ASSET_INVALID");
             }
             fileAsset.setSha256(StringUtils.hasText(request.getSha256()) ? request.getSha256().trim() : null);
@@ -130,8 +133,13 @@ public class AppPrescriptionService {
             fileAsset.setScanStatus("PENDING");
             fileAsset.setUpdater("app-prescription");
             fileAsset.setUpdateTime(now);
-            fileAssetMapper.completeRegistration(fileAsset);
+            if (fileAssetMapper.completeRegistration(fileAsset) != 1) {
+                throw new BusinessException(409, "FILE_ASSET_REGISTRATION_CONFLICT");
+            }
         } else {
+            if (request.getFileAssetId() != null || !request.getObjectKey().trim().startsWith("prescriptions/")) {
+                throw new BusinessException(400, "FILE_ASSET_INVALID");
+            }
             fileAsset = new FileAsset();
             fileAsset.setBucket(objectStorageProperties.getBucket());
             fileAsset.setObjectKey(request.getObjectKey().trim());
@@ -352,6 +360,12 @@ public class AppPrescriptionService {
 
     private String normalize(String value) {
         return StringUtils.hasText(value) ? value.trim() : null;
+    }
+
+    private String normalizeContentType(String value) {
+        String normalized = value.trim().toLowerCase();
+        int parameterIndex = normalized.indexOf(';');
+        return parameterIndex < 0 ? normalized : normalized.substring(0, parameterIndex).trim();
     }
 
     private void applyAudit(BaseEntity entity, LocalDateTime now, String operator) {

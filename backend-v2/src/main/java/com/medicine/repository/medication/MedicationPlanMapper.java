@@ -96,7 +96,7 @@ public interface MedicationPlanMapper {
 
     @Update("""
             UPDATE medication_plan
-            SET status = #{status},
+            SET status = 'REPLACED',
                 updater = #{updater},
                 update_time = #{updateTime}
             WHERE tenant_id = #{tenantId}

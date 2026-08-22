@@ -148,11 +148,11 @@ rg -n "v-html|localStorage.*ai|question|reply|payload|content_hash" frontend/hua
 ### T9 PR A / V14 backend closure
 
 ```powershell
-mvn -q "-Dtest=AdminPatientServiceTest,NotificationDispatchServiceTest,NotificationRetryJobTest,OrphanFileCleanupJobTest,AppFileServiceTest,AppPrescriptionServiceTest,AppAssessmentServiceTest,AppMedicationServiceTest,AppPatientServiceTest,PrescriptionControllerTest" test -f D:\yaoanshi\backend-v2\pom.xml
+mvn -q "-Dtest=AdminMedicationPlanServiceTest,AdminPatientServiceTest,NotificationDispatchServiceTest,NotificationRetryJobTest,OrphanFileCleanupJobTest,AppFileServiceTest,AppPrescriptionServiceTest,AppAssessmentServiceTest,AppMedicationServiceTest,AppPatientServiceTest,PrescriptionControllerTest" test -f D:\yaoanshi\backend-v2\pom.xml
 mvn -q clean verify -f D:\yaoanshi\backend-v2\pom.xml
 ```
 
-Acceptance additionally proves server-owned 10-question scoring and phase uniqueness; at-most-seven-day task retrieval; `clientRequestId` check-in idempotency; one active patient per family account; admin-only reassignment with non-terminal order events; patient notification polling; 1/5/15-minute notification retry with CAS claim; presign-first `file_asset` registration; and retryable orphan cleanup.
+Acceptance additionally proves server-owned 10-question scoring and phase uniqueness; at-most-seven-day task retrieval; `clientRequestId` check-in idempotency; one active patient per family account and serialized two-family maximum; admin-only reassignment with non-terminal order events; replacement of the previous ACTIVE medication plan; patient notification polling; 1/5/15-minute notification retry with CAS claim; presign-first `file_asset` registration; object-key compatibility reuse; registration-versus-cleanup CAS; and retryable orphan cleanup.
 
 Run V1→V14 and V13→V14 against disposable MySQL 8. Seed a duplicate active family-account binding before V14 and verify that migration stops with the explicit V14 blocker message. Do not point these commands at production. The `medication-literacy-v1` wording, options, and answer key remain a release blocker until a licensed pharmacist or physician records approval; automated tests are not medical approval.
 

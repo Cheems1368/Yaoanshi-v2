@@ -17,6 +17,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.apache.ibatis.annotations.Update;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -85,6 +86,15 @@ class AdminMedicationPlanServiceTest {
 
         assertThatThrownBy(() -> adminMedicationPlanService.getPlanTasks(claims, 300L, "bad-date", "2026-03-07"))
                 .isInstanceOf(RuntimeException.class);
+    }
+
+    @Test
+    void shouldReplacePreviousActivePlansInsteadOfLeavingThemActive() throws Exception {
+        Update update = MedicationPlanMapper.class.getMethod(
+                "replaceOtherActivePlans", com.medicine.domain.medication.MedicationPlan.class
+        ).getAnnotation(Update.class);
+
+        assertThat(String.join(" ", update.value())).contains("SET status = 'REPLACED'");
     }
 
     private JwtClaims pharmacistClaims() {

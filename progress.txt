@@ -938,6 +938,18 @@ Goal T9 PR A Backend Closure (2026-08-22)
 - Next:
   - Complete final review/tests, publish PR A, obtain medical approval, and merge only after every protected gate is satisfied.
 
+T9 PR A Reliability Audit Remediation (2026-08-22)
+- Changed:
+  - Compatibility `objectKey` registration now reuses the uploader-owned `PRESIGNED` asset instead of creating a duplicate row that orphan cleanup could later delete.
+  - File and prescription registration verify the presign metadata and use a CAS update against cleanup claims, closing the register-versus-delete race.
+  - Family binding creation locks the patient row before enforcing the two-binding maximum and maps the V14 uniqueness race to a stable business conflict.
+  - Activating a medication plan now marks the previous ACTIVE plan `REPLACED`, restoring the formal single-ACTIVE invariant used by assessment timing.
+- Validated locally:
+  - Affected regression suites passed; full backend `clean verify` passed 196/196 tests with 64.60% JaCoCo line coverage.
+  - `git diff --check` passed apart from normal Windows line-ending notices; replacement protected CI remains required before this remediation is qualified.
+- External gate unchanged:
+  - Licensed pharmacist or physician approval of `medication-literacy-v1` remains mandatory before PR #41 can merge.
+
 Last Updated
 - 2026-08-22 Asia/Shanghai
 - Reason: T8 is formally delivered and T9 PR A is implemented locally; medical approval and protected PR qualification remain open.
