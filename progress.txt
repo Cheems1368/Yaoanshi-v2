@@ -38,14 +38,14 @@ Current State
 - Last session (2026-03-27): Phase A–F completed (see below)
 
 In Progress
-- T8 implementation, documentation sync, and all available local quality/security gates are complete; protected PR qualification is pending.
+- T8 implementation and all available local gates are complete at `bf0bbe8`; the remote branch is published. PR creation/protected qualification is pending GitHub CLI authentication.
 
 Next
-- Commit and publish T8 through the protected PR workflow; close SEC-005 only after the required gate is green and review conversations are resolved.
+- Authenticate GitHub CLI or create the PR from the published-branch URL, then wait for the required gate and resolve all review conversations before closing SEC-005.
 
 Last Updated
 - 2026-08-22 Asia/Shanghai
-- Reason: T7 is merged; T8 SEC-005 passes all available local gates and remains open pending protected PR qualification.
+- Reason: T7 is merged; T8 SEC-005 passes local gates and is pushed, but remains open pending PR creation and protected qualification.
 
 Android JDK 21 and APK Gate (2026-08-14)
 - Changed:
@@ -91,6 +91,7 @@ Phase F — CI/CD GitHub Actions (2026-03-27, commit f285037)
 
 Blockers (active)
 - MEDICINE_OCR_API_KEY must be set in .env.local to enable live OCR (graceful fallback if omitted)
+- GitHub CLI is not authenticated; T8 branch push succeeded, but PR creation and protected CI have not started
 - SEC-005 closure requires the T8 protected required gate and zero unresolved review conversations
 - Historical patient.id_card_masked rows need ops cleanup: ops/sql/sec-003-clear-legacy-patient-id-card-masked.sql
 
@@ -860,3 +861,16 @@ Goal T8 SEC-005 AI Data-Boundary Local Qualification (2026-08-22)
 Last Updated
 - 2026-08-22 Asia/Shanghai
 - Reason: implemented and locally qualified T8; protected PR evidence remains the only SEC-005 closure gate.
+
+T8 Branch Publication (2026-08-22)
+- Delivered:
+  - Committed the locally qualified implementation as `bf0bbe8` (`feat(ai): close SEC-005 data boundary`).
+  - Pushed `codex/sec-005-ai-data-boundary` to `origin`; `origin/main` remained `4c90292` and the worktree was clean.
+- Blocked:
+  - `gh auth status` reports no authenticated GitHub host. The repository workflow only runs on pull requests to `main` or pushes to `main`, so protected CI cannot start from the branch push alone.
+- Next:
+  - Create the PR at `https://github.com/Cheems1368/Yaoanshi-v2/pull/new/codex/sec-005-ai-data-boundary`, then wait for the protected required gate and review-conversation check. Do not mark SEC-005 closed before both pass.
+
+Last Updated
+- 2026-08-22 Asia/Shanghai
+- Reason: published the T8 branch; PR creation is blocked only by missing GitHub CLI authentication.

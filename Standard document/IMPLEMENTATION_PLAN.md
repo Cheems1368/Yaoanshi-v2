@@ -28,7 +28,7 @@ Rules:
 | Phase T0–T5 | Trial/demo closed loops through voice help orders | ✅ Delivered through PR #32 (`35b1e8a`) |
 | Phase T6 | Android JDK 21 and enforced APK build gate | ✅ Delivered through PR #37 (`98115b9`) |
 | Phase T7 | SEC-002 refresh-token HttpOnly Cookie closure | ✅ Delivered through PR #39 (`4c90292`) |
-| Phase T8 | SEC-005 AI data-boundary closure | Local implementation and all available gates pass on `codex/sec-005-ai-data-boundary`; protected PR qualification pending |
+| Phase T8 | SEC-005 AI data-boundary closure | Local gates pass and branch is published; PR creation/protected qualification pending GitHub CLI authentication |
 
 **Current active work:** T8 closes SEC-005 with versioned provider disclosure, high-confidence text redaction, exact upstream-host allowlisting, fail-closed metadata-only audit, and patient-side policy loading. SEC-005 remains open until the T8 protected required gate is green and all review conversations are resolved. Android release signing and store publishing remain separate release-engineering work.
 
