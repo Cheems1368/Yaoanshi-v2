@@ -18,16 +18,19 @@ Project
 - Yaoshian MVP P0
 
 Branch / Context
-- Delivery state: `main` through PR #37 (`98115b9`); T7 implementation is on `codex/sec-002-refresh-cookie`
-- Active workstream: T7 / SEC-002 refresh-token HttpOnly Cookie closure
-- Active surfaces: backend-v2 auth, patient Android/Web, pharmacist Web, doctor Web, E2E, Standard document
+- Delivery state: `main` through PR #39 (`4c90292`); T8 candidate is protected-qualified in PR #40 on `codex/sec-005-ai-data-boundary` and awaits separate merge authorization
+- Active workstream: T8 / SEC-005 AI data-boundary protected PR handoff
+- Active surfaces: backend-v2 AI consent/redaction/upstream/audit, patient AI assistant Web/Android, V13, Standard document, security evidence
 
 Current State
 - 2026-08-14 update: PR #32 was squash-merged as `35b1e8a`; the post-merge `main` CI run #38 passed. The old `codex/mobile-demo` branches were deleted while local protection reference `codex/backup-mobile-demo-20260814` was retained.
 - PR #37 (https://github.com/Cheems1368/Yaoanshi-v2/pull/37) was squash-merged as `98115b9`; the post-merge `main` CI run #46 (https://github.com/Cheems1368/Yaoanshi-v2/actions/runs/31795827722) passed all six checks and produced the 14-day Android APK artifact. Eclipse Temurin `21.0.12+8` is installed under `JAVA21_HOME`; default `JAVA_HOME` remains Microsoft OpenJDK 17.0.15 for backend work.
 - GitHub `main` branch protection and CI governance are officially enabled. The governance-enablement baseline was 92 backend tests with 64.33% JaCoCo line coverage; the enforced floor is 60%.
 - T1–T5 delivered baseline: 143 backend tests pass with 61.82% JaCoCo line coverage; patient ESLint, 3 Vitest tests, type check/production build, pharmacist build, and doctor build pass. All nine required E2E scenarios passed, including medication transfer and configured/unconfigured voice-transcription paths.
-- 2026-08-20 update: T7 Android physical-device acceptance passes on Xiaomi `2407FRK8EC` (Android 14/API 34). PR #39 passed protected CI, and its P1 review feedback was addressed by applying the dedicated production login limiter to `/admin-api/system/auth/session/login` plus a CI regression check. The PR is ready for authorized merge once the latest required gate and resolved-conversation checks are confirmed.
+- 2026-08-22 update: PR #39 was squash-merged to `main` as `4c90292`; the post-merge `main` CI passed. The retained T7 remote branch is not part of T8 cleanup.
+- 2026-08-22 update: T8 adds versioned AI disclosure/consent, high-confidence redaction, exact upstream allowlisting, metadata-only fail-closed audit, V13, and a patient-side fail-closed disclosure flow. SEC-005 remains open until all local gates plus protected PR CI and review-conversation checks pass.
+- 2026-08-22 update: PR #40 passed all six protected CI checks at head `689f800`, including `CI / Required Quality Gate`; GitHub reported `CLEAN`, `MERGEABLE`, and zero reviews, review threads, or comments. SEC-005 candidate closure gates are satisfied; delivery to `main` remains outside this goal.
+- 2026-08-22 update: the subsequent Codex review opened three threads; commit `4e64bf8` fixed explicit encounter/patient-ID redaction, transmitted-only redaction counts, and the T8 scan path. Local 172-test/62.65% gates and protected run #32568900388 passed, all three threads were answered and resolved, and unresolved conversations returned to zero.
 - 2026-08-01 update: Phase T5 complete. Pharmacist mobile work-order actions, Docker MIME/XFYUN runtime, live transcription, three-role mobile flow, and viewport acceptance all passed.
 - 2026-05-12 update: Phase T0/T1 complete for post-P0 trial/demo closed loop: Standard document sync plus patient text/image help-order loop.
 - Current implementation includes backend-v2 multi-image help-order attachments, patient image upload/reply UI, and pharmacist `/mobile/workorders`.
@@ -37,14 +40,14 @@ Current State
 - Last session (2026-03-27): Phase A–F completed (see below)
 
 In Progress
-- T7 code, local validation, physical-device acceptance, protected PR gates, and the production login-rate-limit review fix are complete.
+- No T8 implementation or qualification work remains; PR #40 awaits separate merge authorization.
 
 Next
-- Hand off PR #39 as current, clean, zero-conversation, and merge-ready; do not merge without explicit authorization.
+- Hand off PR #40 for separate merge authorization; do not merge in this goal.
 
 Last Updated
-- 2026-08-20 Asia/Shanghai
-- Reason: T7 physical-device and protected PR gates passed, including the production session-login rate-limit review fix; awaiting explicit merge authorization.
+- 2026-08-22 Asia/Shanghai
+- Reason: T8 PR #40 passed the protected review-remediation run and all three review conversations are resolved; it is ready for merge handoff.
 
 Android JDK 21 and APK Gate (2026-08-14)
 - Changed:
@@ -90,7 +93,6 @@ Phase F — CI/CD GitHub Actions (2026-03-27, commit f285037)
 
 Blockers (active)
 - MEDICINE_OCR_API_KEY must be set in .env.local to enable live OCR (graceful fallback if omitted)
-- PR #39 has passed physical-device and protected quality gates; merge still requires explicit authorization
 - Historical patient.id_card_masked rows need ops cleanup: ops/sql/sec-003-clear-legacy-patient-id-card-masked.sql
 
 Completed Phases (durable record)
@@ -98,11 +100,11 @@ Completed Phases (durable record)
 Phase 0–7 — see git history from 2026-03-19 sessions
 
 Infrastructure Notes
-- Flyway current latest: V12 (`V12__help_order_voice_transcription.sql`); next new migration must be V13.
-- Never modify already-applied migrations V1–V12.
+- Flyway current latest: V13 (`V13__ai_data_boundary.sql`); next new migration must be V14.
+- Never modify already-applied migrations V1–V13.
 - WebSocket /ws/admin-notifications and /ws/app-notifications both use one-time socket tickets
 - AI provider: SiliconFlow /v1/chat/completions, model zai-org/GLM-4.5-Air
-- AI config: medicine.ai.base-url / medicine.ai.api-key / medicine.ai.model / medicine.ai.timeout-ms
+- AI config: medicine.ai.base-url / medicine.ai.api-key / medicine.ai.model / medicine.ai.timeout-ms / medicine.ai.policy-version / medicine.ai.provider-* / medicine.ai.allowed-hosts / medicine.ai.audit-retention-days
 - Local dev secrets: backend-v2/.env.local (gitignored), startup via run-local-with-env.ps1
 - Local mixed stack: Docker MySQL 13306, Redis 16379, legacy server 48080
 - Object storage: the real S3-compatible implementation is active outside tests; `S3CompatibleObjectStorageStub` is test-profile only.
@@ -835,3 +837,84 @@ T7 Protected PR Qualification (2026-08-20)
 Last Updated
 - 2026-08-20 Asia/Shanghai
 - Reason: physical-device and protected PR gates passed, and the production login-rate-limit review feedback was addressed; PR #39 awaits authorized merge.
+
+Goal T8 SEC-005 AI Data-Boundary Local Qualification (2026-08-22)
+- Workstream:
+  - Close the third-party AI data boundary without changing the chat DTO or affecting non-AI patient functions.
+- Changed:
+  - Added V13 versioned consent records and metadata-only AI request audit with 180-day expiry; legacy consent timestamps remain compatibility-only.
+  - Added current disclosure DTO/API, exact policy grant request, high-confidence user/assistant redaction, five-message minimization, exact upstream host allowlist, HTTPS/redirect controls, and fail-closed `PENDING` audit orchestration.
+  - Updated the patient AI screen to fetch policy on every entry, disable sending while policy is unknown, submit the displayed version, and expose a reusable data-use statement without browser consent storage or dynamic HTML.
+  - Added the preview plus 1000-row bounded audit-expiry SQL and synchronized Standard documents, `TESTING.md`, and the security report.
+- Validated:
+  - Required targeted backend command passed; full backend `clean verify` passed 170/170 tests with 62.66% JaCoCo line coverage.
+  - Patient ESLint, 6/6 Vitest tests, production build, and Android debug build passed; APK size is 7,604,214 bytes.
+  - Flyway 10.20.1 on MySQL 8 passed both empty-schema V1→V13 and existing V12→V13 migrations. The audit table contains zero forbidden prompt/reply/payload/content/hash fields.
+  - Cleanup runbook previewed 1002 expired rows, deleted exactly 1000, and left two expired plus one unexpired row; all disposable containers/networks and the temporary Docker engine session were removed.
+  - Static scans found no AI consent browser storage, `v-html`, content-bearing AI audit field, or content-bearing AI service log; `git diff --check` passed apart from normal Windows line-ending notices.
+- Open risks:
+  - The current Codex session lacks the `js_repl` required by the enabled `playwright-interactive` skill, so no interactive visual screenshot signoff was produced. Automated patient unit/build/Android gates passed.
+  - SEC-005 remains open until the T8 protected required gate is green and all review conversations are resolved.
+- Next:
+  - Commit, push `codex/sec-005-ai-data-boundary`, open the protected PR, resolve review conversations, and wait for the final required gate before marking SEC-005 closed.
+
+Last Updated
+- 2026-08-22 Asia/Shanghai
+- Reason: implemented and locally qualified T8; protected PR evidence remains the only SEC-005 closure gate.
+
+T8 Branch Publication (2026-08-22)
+- Delivered:
+  - Committed the locally qualified implementation as `bf0bbe8` (`feat(ai): close SEC-005 data boundary`).
+  - Pushed `codex/sec-005-ai-data-boundary` to `origin`; `origin/main` remained `4c90292` and the worktree was clean.
+- Blocked:
+  - `gh auth status` reports no authenticated GitHub host. The repository workflow only runs on pull requests to `main` or pushes to `main`, so protected CI cannot start from the branch push alone.
+- Next:
+  - Create the PR at `https://github.com/Cheems1368/Yaoanshi-v2/pull/new/codex/sec-005-ai-data-boundary`, then wait for the protected required gate and review-conversation check. Do not mark SEC-005 closed before both pass.
+
+Last Updated
+- 2026-08-22 Asia/Shanghai
+- Reason: published the T8 branch; PR creation is blocked only by missing GitHub CLI authentication.
+
+T8 Protected PR Qualification (2026-08-22)
+- Workstream:
+  - Publish the locally qualified SEC-005 candidate through the protected GitHub workflow and stop before merge.
+- Delivered:
+  - Authenticated GitHub CLI as `Cheems1368` without storing credentials in the repository.
+  - Opened PR #40: https://github.com/Cheems1368/Yaoanshi-v2/pull/40
+  - Protected CI run #32568105884 passed backend tests/coverage, patient quality, patient Android APK, pharmacist build, doctor build, and `CI / Required Quality Gate`: https://github.com/Cheems1368/Yaoanshi-v2/actions/runs/32568105884
+- Validated:
+  - Before PR creation, the branch was zero commits behind `origin/main`, the worktree was clean, and changed-file, forbidden-path, secret-pattern, and `git diff --check` checks passed.
+  - PR head `689f800` was current with `origin/main`, `MERGEABLE`, and reported `mergeStateStatus=CLEAN`.
+  - GitHub reported zero submitted reviews, zero review threads, zero unresolved conversations, and zero ordinary PR comments.
+  - The PR description records V13 and third-party-provider risk, rollback, compatibility boundaries, 170 backend tests with 62.66% JaCoCo line coverage, six patient unit tests, Web/Android gates, migration/cleanup evidence, and sanitized static-scan results.
+- Open risks:
+  - Merge is intentionally outside this goal and requires separate authorization.
+- Next:
+  - Hand off PR #40 for separate merge authorization without merging in this goal.
+
+Last Updated
+- 2026-08-22 Asia/Shanghai
+- Reason: PR #40 passed its protected implementation and evidence runs with zero review conversations and is ready for merge handoff.
+
+T8 PR #40 Review Remediation (2026-08-22)
+- Workstream:
+  - Address all automated review findings without changing the frozen AI API, DTO, V13 schema, or non-AI behavior.
+- Changed:
+  - Expanded explicit identifier labels to cover encounter number/ID and patient ID variants promised by the disclosure; added redactor and upstream-payload regressions.
+  - Moved redaction and `redaction_count` aggregation after the five-message trim so audit metadata describes only content actually sent upstream.
+  - Corrected the T8 static-scan path from the nonexistent patient `views` directory to the real `pages/AiAssistantPage.vue` path.
+- Validated:
+  - The new tests failed against the prior implementation for all three expected assertions, then passed after the minimal fix.
+  - T8 targeted tests passed; full backend `clean verify` passed 172/172 with 62.65% JaCoCo line coverage.
+  - Patient lint, 6/6 Vitest tests, production build, and Android debug build passed.
+  - The corrected page path exists; patient `v-html`/AI local-storage and V13 content-bearing audit-field scans returned zero forbidden matches; `git diff --check` passed.
+  - Protected CI run #32568900388 passed all six checks at head `4e64bf8`: https://github.com/Cheems1368/Yaoanshi-v2/actions/runs/32568900388
+  - Replied to and resolved all three review threads; no review finding was dismissed as merely outdated.
+- Open risks:
+  - Merge remains intentionally outside this goal and requires separate authorization.
+- Next:
+  - Hand off PR #40 for separate merge authorization without merging in this goal.
+
+Last Updated
+- 2026-08-22 Asia/Shanghai
+- Reason: all T8 review findings are fixed, locally and remotely qualified, and resolved on PR #40.

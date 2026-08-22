@@ -43,11 +43,16 @@ medicine:
     base-url: ${MEDICINE_AI_BASE_URL:https://api.siliconflow.cn/v1/chat/completions}
     api-key: ${MEDICINE_AI_API_KEY:}
     model: ${MEDICINE_AI_MODEL:zai-org/GLM-4.5-Air}
+    provider-code: ${MEDICINE_AI_PROVIDER_CODE:SILICONFLOW}
+    provider-display-name: ${MEDICINE_AI_PROVIDER_DISPLAY_NAME:硅基流动}
+    policy-version: ${MEDICINE_AI_POLICY_VERSION:sec-005-v2}
+    allowed-hosts: ${MEDICINE_AI_ALLOWED_HOSTS:api.siliconflow.cn}
+    audit-retention-days: ${MEDICINE_AI_AUDIT_RETENTION_DAYS:180}
     protocol: ${MEDICINE_AI_PROTOCOL:OPENAI_CHAT}
     timeout-ms: ${MEDICINE_AI_TIMEOUT_MS:15000}
     enable-thinking: ${MEDICINE_AI_ENABLE_THINKING:false}
     max-tokens: ${MEDICINE_AI_MAX_TOKENS:2048}
-    upstream-max-messages: ${MEDICINE_AI_UPSTREAM_MAX_MESSAGES:10}
+    upstream-max-messages: ${MEDICINE_AI_UPSTREAM_MAX_MESSAGES:6}
   jwt:
     issuer: backend-v2
     secret: ${MEDICINE_JWT_SECRET:local-dev-jwt-secret-change-me}

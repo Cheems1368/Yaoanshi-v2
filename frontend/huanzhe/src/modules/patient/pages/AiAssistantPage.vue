@@ -24,7 +24,10 @@
     <ion-footer class="input-footer ion-no-border">
       <ion-toolbar>
         <div class="disclaimer-row">
-          仅供用药科普参考，不能替代医生面诊。如症状加重请及时就医。
+          <span>仅供用药科普参考，不能替代医生面诊。如症状加重请及时就医。</span>
+          <ion-button class="disclosure-button" size="small" fill="clear" @click="openDisclosure">
+            数据使用说明
+          </ion-button>
         </div>
         <div class="input-row" data-testid="ai-input-row">
           <div class="input-wrap">
@@ -38,7 +41,7 @@
           </div>
           <ion-button
             class="send-button"
-            :disabled="isSending || !inputText.trim()"
+            :disabled="isSending || !inputText.trim() || !canUseAi"
             @click="submitInput"
           >
             发送
@@ -68,7 +71,7 @@
 </template>
 
 <script setup lang="ts">
-import { nextTick, ref } from 'vue'
+import { computed, nextTick, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import {
   IonAlert,
@@ -87,50 +90,71 @@ import {
 import AiHomeView from '@/modules/patient/components/ai/AiHomeView.vue'
 import AiChatView, { type AiViewMessage } from '@/modules/patient/components/ai/AiChatView.vue'
 import { aiAssistantService, type AiChatMessage } from '@/modules/patient/api/aiAssistant'
-import { aiConsentService } from '@/modules/patient/api/mvp'
+import {
+  aiConsentService,
+  type AiDisclosureDTO
+} from '@/modules/patient/api/mvp'
 
 const router = useRouter()
 const viewMode = ref<'home' | 'chat'>('home')
 const showConsentDialog = ref(false)
-const consentMessage =
-  'AI 助手功能需要将您的问题发送至第三方 AI 服务（硅基流动）进行处理。您的问题内容将按照隐私协议处理，不会与您的身份信息绑定存储。'
-const AI_CONSENT_KEY = 'ai_consent_granted'
+const disclosure = ref<AiDisclosureDTO | null>(null)
+const disclosureReady = ref(false)
+const consentMessage = computed(() => disclosure.value?.statement || '数据使用说明暂不可用，请稍后重试。')
+const canUseAi = computed(() => disclosureReady.value && disclosure.value?.consentGranted === true)
 
-const consentButtons = [
-  {
-    text: '不同意',
-    role: 'cancel',
-    handler: () => {
-      router.push('/tabs/home')
-    }
-  },
-  {
-    text: '同意并继续',
-    handler: async () => {
-      try {
-        await aiConsentService.grantConsent()
-        localStorage.setItem(AI_CONSENT_KEY, 'true')
-      } catch {
-        showError('同意操作失败，请检查网络后重试')
+const consentButtons = computed(() => {
+  if (disclosure.value?.consentGranted) {
+    return [{ text: '我知道了', role: 'cancel' }]
+  }
+  return [
+    {
+      text: '不同意',
+      role: 'cancel',
+      handler: () => {
+        router.push('/tabs/home')
+      }
+    },
+    {
+      text: '同意并继续',
+      handler: async () => {
+        const policyVersion = disclosure.value?.policyVersion
+        if (!policyVersion) {
+          showError('数据使用说明暂不可用，请稍后重试')
+          return false
+        }
+        try {
+          await aiConsentService.grantConsent(policyVersion)
+          if (disclosure.value) {
+            disclosure.value.consentGranted = true
+          }
+          return true
+        } catch {
+          showError('同意操作失败，请刷新数据说明后重试')
+          return false
+        }
       }
     }
-  }
-]
+  ]
+})
 
-onIonViewWillEnter(async () => {
-  if (localStorage.getItem(AI_CONSENT_KEY) === 'true') {
-    return
-  }
+const loadDisclosure = async () => {
+  disclosureReady.value = false
   try {
-    const res = await aiConsentService.getConsentStatus()
-    if (res.data) {
-      localStorage.setItem(AI_CONSENT_KEY, 'true')
-    } else {
+    const response = await aiConsentService.getDisclosure()
+    disclosure.value = response.data
+    disclosureReady.value = true
+    if (!response.data.consentGranted) {
       showConsentDialog.value = true
     }
   } catch {
-    // 网络错误时不阻断使用
+    disclosure.value = null
+    showError('无法获取数据使用说明，AI 助手暂不可用')
   }
+}
+
+onIonViewWillEnter(async () => {
+  await loadDisclosure()
 })
 const contentRef = ref<any>(null)
 const inputText = ref('')
@@ -150,6 +174,14 @@ const messages = ref<AiViewMessage[]>([
 const showError = (message: string) => {
   toastMessage.value = message
   showToast.value = true
+}
+
+const openDisclosure = () => {
+  if (!disclosureReady.value || !disclosure.value) {
+    showError('数据使用说明暂不可用，请稍后重试')
+    return
+  }
+  showConsentDialog.value = true
 }
 
 const backToHome = () => {
@@ -183,6 +215,14 @@ const scrollToBottom = async () => {
 const submitMessage = async (text: string) => {
   const content = text.trim()
   if (!content || isSending.value) {
+    return
+  }
+  if (!disclosureReady.value) {
+    showError('数据使用说明尚未加载，AI 助手暂不可用')
+    return
+  }
+  if (!disclosure.value?.consentGranted) {
+    showConsentDialog.value = true
     return
   }
 
@@ -219,9 +259,8 @@ const submitMessage = async (text: string) => {
       content: '当前服务繁忙，请稍后重试。'
     }
     lastFailedPrompt.value = content
-    if (error?.code === 40031) {
-      localStorage.removeItem(AI_CONSENT_KEY)
-      showConsentDialog.value = true
+    if (error?.code === 40031 || error?.code === 40034) {
+      await loadDisclosure()
       return
     }
     showError(error?.message || 'AI 服务暂不可用')
@@ -282,11 +321,23 @@ const retryLastFailed = () => {
 }
 
 .disclaimer-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: var(--patient-space-1);
   text-align: center;
   font-size: var(--patient-font-caption);
   color: var(--patient-text-muted);
   padding: var(--patient-space-2) var(--patient-space-4) var(--patient-space-1);
   line-height: var(--patient-leading-normal);
+}
+
+.disclosure-button {
+  --color: var(--patient-primary);
+  min-height: 28px;
+  margin: 0;
+  font-size: var(--patient-font-caption);
 }
 
 .input-row {
