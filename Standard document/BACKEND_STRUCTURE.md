@@ -1307,6 +1307,7 @@ Existing `/admin-api/system/auth/login`, `/refresh-token`, and `/logout` contrac
 | `POST` | `/admin-api/patients/{id}/knowledge-assessments/remind` | responsible pharmacist or admin | none | Boolean | persist/send current-phase reminder when due |
 
 Responsibility reassignment locks and rereads the patient row before deriving the old pharmacist. Concurrent admin requests therefore serialize on the patient and update in-flight orders and `REASSIGNED` audit events from the actual preceding assignment.
+Patient help-order creation takes the same patient-row lock before reading `bound_by_pharmacist_id`, so a concurrent reassignment completes either before or after order creation and cannot leave a newly submitted non-terminal order assigned to a stale pharmacist.
 | `GET` | `/admin-api/pharmacists/options` | admin / super_admin / tenant_admin | none | ACTIVE pharmacist options | none |
 
 #### Prescription and OCR

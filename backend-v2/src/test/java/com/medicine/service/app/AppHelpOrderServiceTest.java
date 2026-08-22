@@ -19,6 +19,7 @@ import com.medicine.repository.helporder.HelpOrderMapper;
 import com.medicine.repository.identity.AppAccountMapper;
 import com.medicine.repository.identity.DoctorProfileMapper;
 import com.medicine.repository.identity.PharmacistProfileMapper;
+import com.medicine.repository.identity.PatientMapper;
 import com.medicine.service.auth.AppPatientService;
 import com.medicine.service.helporder.HelpOrderVoiceTranscriptionService;
 import com.medicine.service.notification.NotificationDispatchService;
@@ -69,6 +70,9 @@ class AppHelpOrderServiceTest {
     private AppPatientService appPatientService;
 
     @Mock
+    private PatientMapper patientMapper;
+
+    @Mock
     private AppAccountMapper appAccountMapper;
 
     @Mock
@@ -89,8 +93,12 @@ class AppHelpOrderServiceTest {
     @Test
     void shouldCreateHelpOrderWithoutDescriptionAndDispatchNotification() {
         AppPatientService.AccessContext context = accessContext();
+        Patient lockedPatient = new Patient();
+        lockedPatient.setId(context.patient().getId());
+        lockedPatient.setBoundByPharmacistId(302L);
         AtomicReference<HelpOrder> insertedOrder = new AtomicReference<>();
         when(appPatientService.requireAccessContext("13800138000")).thenReturn(context);
+        when(patientMapper.lockByIdAndTenant(1L, context.patient().getId())).thenReturn(lockedPatient);
         when(helpOrderMapper.insert(any(HelpOrder.class))).thenAnswer(invocation -> {
             HelpOrder order = invocation.getArgument(0);
             order.setId(900L);
@@ -112,6 +120,7 @@ class AppHelpOrderServiceTest {
         assertThat(result.getPriority()).isEqualTo("URGENT");
         assertThat(result.getStatus()).isEqualTo("SUBMITTED");
         assertThat(result.getDescription()).isEmpty();
+        assertThat(insertedOrder.get().getResponsiblePharmacistId()).isEqualTo(302L);
         ArgumentCaptor<HelpOrderEvent> eventCaptor = ArgumentCaptor.forClass(HelpOrderEvent.class);
         verify(helpOrderEventMapper).insert(eventCaptor.capture());
         assertThat(eventCaptor.getValue().getContent()).isEmpty();
@@ -119,7 +128,7 @@ class AppHelpOrderServiceTest {
                 eq(1L),
                 eq("app-help-order"),
                 eq("PHARMACIST"),
-                eq(301L),
+                eq(302L),
                 eq("HELP_ORDER_SUBMITTED"),
                 eq(900L),
                 anyMap(),
@@ -176,6 +185,7 @@ class AppHelpOrderServiceTest {
         AppPatientService.AccessContext context = accessContext();
         AtomicReference<HelpOrder> insertedOrder = new AtomicReference<>();
         when(appPatientService.requireAccessContext("13800138000")).thenReturn(context);
+        when(patientMapper.lockByIdAndTenant(1L, context.patient().getId())).thenReturn(context.patient());
         when(fileAssetMapper.selectByIdAndTenant(1L, 10L)).thenReturn(helpOrderImage(10L, 101L));
         when(fileAssetMapper.selectByIdAndTenant(1L, 11L)).thenReturn(helpOrderImage(11L, 101L));
         when(helpOrderMapper.insert(any(HelpOrder.class))).thenAnswer(invocation -> {
@@ -218,6 +228,7 @@ class AppHelpOrderServiceTest {
                 new HelpOrderVoiceTranscriptionService.VoiceFiles(helpOrderAudio(20L, "HELP_ORDER_AUDIO"), helpOrderAudio(21L, "HELP_ORDER_AUDIO_TRANSCRIPT_SOURCE"), 6);
 
         when(appPatientService.requireAccessContext("13800138000")).thenReturn(context);
+        when(patientMapper.lockByIdAndTenant(1L, context.patient().getId())).thenReturn(context.patient());
         when(voiceTranscriptionService.validateVoiceFiles(context, voiceRequest)).thenReturn(voiceFiles);
         when(helpOrderMapper.insert(any(HelpOrder.class))).thenAnswer(invocation -> {
             HelpOrder order = invocation.getArgument(0);
@@ -255,7 +266,9 @@ class AppHelpOrderServiceTest {
 
     @Test
     void shouldRejectAttachmentOwnedByAnotherAccount() {
-        when(appPatientService.requireAccessContext("13800138000")).thenReturn(accessContext());
+        AppPatientService.AccessContext context = accessContext();
+        when(appPatientService.requireAccessContext("13800138000")).thenReturn(context);
+        when(patientMapper.lockByIdAndTenant(1L, context.patient().getId())).thenReturn(context.patient());
         when(fileAssetMapper.selectByIdAndTenant(1L, 10L)).thenReturn(helpOrderImage(10L, 999L));
 
         HelpOrderDTO request = new HelpOrderDTO();

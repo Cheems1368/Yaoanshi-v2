@@ -972,6 +972,13 @@ T9 PR A Reassignment Concurrency Remediation (2026-08-22)
   - The affected regression suites passed; full backend `clean verify` passed 198/198 tests with 64.87% JaCoCo line coverage, and `git diff --check` reported no whitespace errors.
   - Protected CI and final latest-head review must still pass before this fix is qualified.
 
+T9 PR A Help-Order/Reassignment Serialization (2026-08-22)
+- Changed:
+  - Patient help-order creation now runs transactionally, locks and rereads the patient row, and derives `responsiblePharmacistId` from that current row. It therefore serializes with responsibility reassignment and cannot insert a new non-terminal order with a stale pharmacist after the reassignment snapshot.
+- Validated locally:
+  - The help-order and reassignment regression suites passed; full backend `clean verify` passed 198/198 tests with 64.87% JaCoCo line coverage, and `git diff --check` reported no whitespace errors.
+  - Protected CI and latest-head review must still pass before this fix is qualified.
+
 Last Updated
 - 2026-08-22 Asia/Shanghai
 - Reason: T8 is formally delivered and T9 PR A is implemented locally; medical approval and protected PR qualification remain open.

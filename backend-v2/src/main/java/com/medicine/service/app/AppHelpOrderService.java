@@ -22,11 +22,13 @@ import com.medicine.repository.helporder.HelpOrderMapper;
 import com.medicine.repository.identity.AppAccountMapper;
 import com.medicine.repository.identity.DoctorProfileMapper;
 import com.medicine.repository.identity.PharmacistProfileMapper;
+import com.medicine.repository.identity.PatientMapper;
 import com.medicine.service.auth.AppPatientService;
 import com.medicine.service.helporder.HelpOrderVoiceTranscriptionService;
 import com.medicine.service.notification.NotificationDispatchService;
 import com.medicine.service.storage.S3CompatibleObjectStorage;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.time.Duration;
@@ -50,6 +52,7 @@ public class AppHelpOrderService {
     private final S3CompatibleObjectStorage objectStorage;
     private final NotificationDispatchService notificationDispatchService;
     private final AppPatientService appPatientService;
+    private final PatientMapper patientMapper;
     private final AppAccountMapper appAccountMapper;
     private final PharmacistProfileMapper pharmacistProfileMapper;
     private final DoctorProfileMapper doctorProfileMapper;
@@ -64,6 +67,7 @@ public class AppHelpOrderService {
             S3CompatibleObjectStorage objectStorage,
             NotificationDispatchService notificationDispatchService,
             AppPatientService appPatientService,
+            PatientMapper patientMapper,
             AppAccountMapper appAccountMapper,
             PharmacistProfileMapper pharmacistProfileMapper,
             DoctorProfileMapper doctorProfileMapper,
@@ -77,6 +81,7 @@ public class AppHelpOrderService {
         this.objectStorage = objectStorage;
         this.notificationDispatchService = notificationDispatchService;
         this.appPatientService = appPatientService;
+        this.patientMapper = patientMapper;
         this.appAccountMapper = appAccountMapper;
         this.pharmacistProfileMapper = pharmacistProfileMapper;
         this.doctorProfileMapper = doctorProfileMapper;
@@ -84,9 +89,13 @@ public class AppHelpOrderService {
         this.voiceTranscriptionService = voiceTranscriptionService;
     }
 
+    @Transactional
     public HelpOrderDTO create(String subject, HelpOrderDTO request) {
         AppPatientService.AccessContext context = appPatientService.requireAccessContext(subject);
-        Patient patient = context.patient();
+        Patient patient = patientMapper.lockByIdAndTenant(DEFAULT_TENANT_ID, context.patient().getId());
+        if (patient == null) {
+            throw new BusinessException(ErrorCode.PATIENT_NOT_FOUND.getCode(), ErrorCode.PATIENT_NOT_FOUND.getMessage());
+        }
         LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
         List<FileAsset> attachments = validateAttachmentFiles(context, request.getAttachmentFileAssetIds());
         HelpOrderVoiceTranscriptionService.VoiceFiles voiceFiles = voiceTranscriptionService.validateVoiceFiles(context, request.getVoiceAttachment());
