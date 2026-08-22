@@ -180,7 +180,7 @@ False positive notes:
 
 ### SEC-005: AI proxy forwards raw user prompts to an external upstream without visible consent, minimization, or audit controls — FIXED ON T8 CANDIDATE
 
-**Status: PROTECTED-QUALIFIED in PR #40 on `codex/sec-005-ai-data-boundary`; delivery to `main` awaits separate merge authorization.** Local targeted and full backend tests, the 60% JaCoCo gate, patient lint/unit/build/Android gates, Flyway fresh/V12-upgrade checks, metadata schema assertions, and bounded-cleanup validation pass. Protected CI run #32568105884 passed all six checks, and GitHub reported zero reviews, review threads, unresolved conversations, or comments at qualification time.
+**Status: PROTECTED-QUALIFIED in PR #40 on `codex/sec-005-ai-data-boundary`; delivery to `main` awaits separate merge authorization.** Local targeted and full backend tests, the 60% JaCoCo gate, patient lint/unit/build/Android gates, Flyway fresh/V12-upgrade checks, metadata schema assertions, and bounded-cleanup validation pass. Protected review-remediation run #32568900388 passed all six checks. The three Codex review threads were answered and resolved, leaving zero unresolved conversations.
 
 Original impact:
 Patient-entered medical text could cross the first-party boundary to a third-party AI endpoint with no code-visible redaction, versioned consent, durable disclosure trail, or metadata audit.
@@ -189,7 +189,8 @@ Remediation:
 
 - `V13__ai_data_boundary.sql` adds exact-policy consent records and metadata-only request audits without prompt, reply, payload, or body hash.
 - `AiConsentPolicy` and `AiConsentService` require the current policy/provider/statement hash; the legacy timestamp alone is insufficient.
-- `AiPrivacyRedactor` removes high-confidence identity patterns from user and assistant text, and `AiChatService` sends at most five recent non-system messages.
+- `AiPrivacyRedactor` removes high-confidence identity patterns, including explicitly labeled encounter and patient IDs, from user and assistant text; payload tests verify the identifiers do not reach the provider.
+- `AiChatService` sends at most five recent non-system messages and computes `redaction_count` only from those transmitted messages.
 - `HttpAiUpstreamClient` requires an exact host allowlist, HTTPS except for explicitly allowlisted loopback hosts, and never follows redirects.
 - `AiAuditService` inserts `PENDING` before network access and blocks the provider call if insertion fails; audit finalization logs identifiers only.
 - The patient screen fetches disclosure on every entry, remains fail-closed while it is unavailable, submits the displayed policy version, and exposes a persistent data-use entry.
@@ -206,5 +207,5 @@ audit status: PENDING -> SUCCESS | FAILED; expires_at = create_time + 180 days
 Closure requirements:
 
 - Targeted and full backend gates, patient lint/unit/build/Android gates, fresh/existing migration checks, and static no-content audit checks pass. ✅
-- Protected `CI / Required Quality Gate` is green with zero unresolved review conversations. ✅ PR #40 / run #32568105884
+- Protected `CI / Required Quality Gate` is green with zero unresolved review conversations. ✅ PR #40 / review-remediation run #32568900388
 - Merge to `main` is a separate delivery authorization and is not part of SEC-005 candidate qualification.

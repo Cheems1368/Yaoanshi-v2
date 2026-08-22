@@ -30,6 +30,7 @@ Current State
 - 2026-08-22 update: PR #39 was squash-merged to `main` as `4c90292`; the post-merge `main` CI passed. The retained T7 remote branch is not part of T8 cleanup.
 - 2026-08-22 update: T8 adds versioned AI disclosure/consent, high-confidence redaction, exact upstream allowlisting, metadata-only fail-closed audit, V13, and a patient-side fail-closed disclosure flow. SEC-005 remains open until all local gates plus protected PR CI and review-conversation checks pass.
 - 2026-08-22 update: PR #40 passed all six protected CI checks at head `689f800`, including `CI / Required Quality Gate`; GitHub reported `CLEAN`, `MERGEABLE`, and zero reviews, review threads, or comments. SEC-005 candidate closure gates are satisfied; delivery to `main` remains outside this goal.
+- 2026-08-22 update: the subsequent Codex review opened three threads; commit `4e64bf8` fixed explicit encounter/patient-ID redaction, transmitted-only redaction counts, and the T8 scan path. Local 172-test/62.65% gates and protected run #32568900388 passed, all three threads were answered and resolved, and unresolved conversations returned to zero.
 - 2026-08-01 update: Phase T5 complete. Pharmacist mobile work-order actions, Docker MIME/XFYUN runtime, live transcription, three-role mobile flow, and viewport acceptance all passed.
 - 2026-05-12 update: Phase T0/T1 complete for post-P0 trial/demo closed loop: Standard document sync plus patient text/image help-order loop.
 - Current implementation includes backend-v2 multi-image help-order attachments, patient image upload/reply UI, and pharmacist `/mobile/workorders`.
@@ -46,7 +47,7 @@ Next
 
 Last Updated
 - 2026-08-22 Asia/Shanghai
-- Reason: T8 PR #40 passed the protected implementation and evidence runs with zero review conversations and is ready for merge handoff.
+- Reason: T8 PR #40 passed the protected review-remediation run and all three review conversations are resolved; it is ready for merge handoff.
 
 Android JDK 21 and APK Gate (2026-08-14)
 - Changed:
@@ -894,3 +895,26 @@ T8 Protected PR Qualification (2026-08-22)
 Last Updated
 - 2026-08-22 Asia/Shanghai
 - Reason: PR #40 passed its protected implementation and evidence runs with zero review conversations and is ready for merge handoff.
+
+T8 PR #40 Review Remediation (2026-08-22)
+- Workstream:
+  - Address all automated review findings without changing the frozen AI API, DTO, V13 schema, or non-AI behavior.
+- Changed:
+  - Expanded explicit identifier labels to cover encounter number/ID and patient ID variants promised by the disclosure; added redactor and upstream-payload regressions.
+  - Moved redaction and `redaction_count` aggregation after the five-message trim so audit metadata describes only content actually sent upstream.
+  - Corrected the T8 static-scan path from the nonexistent patient `views` directory to the real `pages/AiAssistantPage.vue` path.
+- Validated:
+  - The new tests failed against the prior implementation for all three expected assertions, then passed after the minimal fix.
+  - T8 targeted tests passed; full backend `clean verify` passed 172/172 with 62.65% JaCoCo line coverage.
+  - Patient lint, 6/6 Vitest tests, production build, and Android debug build passed.
+  - The corrected page path exists; patient `v-html`/AI local-storage and V13 content-bearing audit-field scans returned zero forbidden matches; `git diff --check` passed.
+  - Protected CI run #32568900388 passed all six checks at head `4e64bf8`: https://github.com/Cheems1368/Yaoanshi-v2/actions/runs/32568900388
+  - Replied to and resolved all three review threads; no review finding was dismissed as merely outdated.
+- Open risks:
+  - Merge remains intentionally outside this goal and requires separate authorization.
+- Next:
+  - Hand off PR #40 for separate merge authorization without merging in this goal.
+
+Last Updated
+- 2026-08-22 Asia/Shanghai
+- Reason: all T8 review findings are fixed, locally and remotely qualified, and resolved on PR #40.
