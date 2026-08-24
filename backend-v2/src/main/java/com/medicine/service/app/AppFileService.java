@@ -75,6 +75,28 @@ public class AppFileService {
         return response;
     }
 
+    public FilePresignResponse presign(String subject, FilePresignRequest request) {
+        FilePresignResponse response = presign(request);
+        AppPatientService.AccessContext context = appPatientService.requireAccessContext(subject);
+        LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
+        FileAsset fileAsset = new FileAsset();
+        fileAsset.setBucket(response.getBucket());
+        fileAsset.setObjectKey(response.getObjectKey());
+        fileAsset.setOriginalFilename(response.getFilename());
+        fileAsset.setMimeType(response.getContentType());
+        fileAsset.setSizeBytes(response.getSizeBytes());
+        fileAsset.setStorageProvider("S3_COMPATIBLE");
+        fileAsset.setUploadedByType(context.operatorType());
+        fileAsset.setUploadedById(context.appAccount().getId());
+        fileAsset.setBusinessType(normalizeBusinessType(request.getBusinessType()));
+        fileAsset.setScanStatus("PRESIGNED");
+        fileAsset.setCleanupAttemptCount(0);
+        applyAudit(fileAsset, "app-file-presign", now);
+        fileAssetMapper.insert(fileAsset);
+        response.setFileAssetId(fileAsset.getId());
+        return response;
+    }
+
     public FileAssetDTO register(String subject, FileRegisterRequest request) {
         validateRegisterRequest(request);
         AppPatientService.AccessContext context = appPatientService.requireAccessContext(subject);
@@ -82,22 +104,43 @@ public class AppFileService {
         String contentType = normalizeContentType(request.getContentType());
         LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
 
-        FileAsset fileAsset = new FileAsset();
-        fileAsset.setBucket(objectStorageProperties.getBucket());
-        fileAsset.setObjectKey(request.getObjectKey().trim());
-        fileAsset.setOriginalFilename(request.getOriginalFilename().trim());
-        fileAsset.setMimeType(contentType);
-        fileAsset.setSizeBytes(request.getSizeBytes());
-        fileAsset.setSha256(StringUtils.hasText(request.getSha256()) ? request.getSha256().trim() : null);
-        fileAsset.setStorageProvider("S3_COMPATIBLE");
-        fileAsset.setStorageRegion(null);
-        fileAsset.setPublicUrl(null);
-        fileAsset.setUploadedByType(context.operatorType());
-        fileAsset.setUploadedById(context.appAccount().getId());
-        fileAsset.setBusinessType(businessType);
-        fileAsset.setScanStatus("PENDING");
-        applyAudit(fileAsset, "app-file", now);
-        fileAssetMapper.insert(fileAsset);
+        FileAsset fileAsset = request.getFileAssetId() == null
+                ? fileAssetMapper.selectByObjectKeyAndTenant(1L, request.getObjectKey().trim())
+                : fileAssetMapper.selectByIdAndTenant(1L, request.getFileAssetId());
+        if (fileAsset != null) {
+            if (!context.appAccount().getId().equals(fileAsset.getUploadedById())
+                    || !businessType.equals(fileAsset.getBusinessType()) || !"PRESIGNED".equals(fileAsset.getScanStatus())
+                    || !request.getOriginalFilename().trim().equals(fileAsset.getOriginalFilename())
+                    || !contentType.equals(fileAsset.getMimeType()) || !request.getSizeBytes().equals(fileAsset.getSizeBytes())) {
+                throw new BusinessException(400, "FILE_ASSET_INVALID");
+            }
+            fileAsset.setSha256(StringUtils.hasText(request.getSha256()) ? request.getSha256().trim() : null);
+            fileAsset.setScanStatus("PENDING");
+            fileAsset.setUpdater("app-file");
+            fileAsset.setUpdateTime(now);
+            if (fileAssetMapper.completeRegistration(fileAsset) != 1) {
+                throw new BusinessException(409, "FILE_ASSET_REGISTRATION_CONFLICT");
+            }
+        } else {
+            if (request.getFileAssetId() != null) {
+                throw new BusinessException(400, "FILE_ASSET_INVALID");
+            }
+            fileAsset = new FileAsset();
+            fileAsset.setBucket(objectStorageProperties.getBucket());
+            fileAsset.setObjectKey(request.getObjectKey().trim());
+            fileAsset.setOriginalFilename(request.getOriginalFilename().trim());
+            fileAsset.setMimeType(contentType);
+            fileAsset.setSizeBytes(request.getSizeBytes());
+            fileAsset.setSha256(StringUtils.hasText(request.getSha256()) ? request.getSha256().trim() : null);
+            fileAsset.setStorageProvider("S3_COMPATIBLE");
+            fileAsset.setUploadedByType(context.operatorType());
+            fileAsset.setUploadedById(context.appAccount().getId());
+            fileAsset.setBusinessType(businessType);
+            fileAsset.setScanStatus("PENDING");
+            fileAsset.setCleanupAttemptCount(0);
+            applyAudit(fileAsset, "app-file", now);
+            fileAssetMapper.insert(fileAsset);
+        }
 
         FileAssetDTO dto = new FileAssetDTO();
         dto.setId(fileAsset.getId());
@@ -127,7 +170,7 @@ public class AppFileService {
     }
 
     private void validateRegisterRequest(FileRegisterRequest request) {
-        if (request == null || !StringUtils.hasText(request.getObjectKey()) || !StringUtils.hasText(request.getOriginalFilename())
+        if (request == null || (request.getFileAssetId() == null && !StringUtils.hasText(request.getObjectKey())) || !StringUtils.hasText(request.getOriginalFilename())
                 || !StringUtils.hasText(request.getContentType()) || request.getSizeBytes() == null || request.getSizeBytes() <= 0) {
             throw new BusinessException(400, "BAD_REQUEST");
         }
@@ -138,7 +181,7 @@ public class AppFileService {
             throw new BusinessException(ErrorCode.FILE_UPLOAD_INVALID_TYPE.getCode(), ErrorCode.FILE_UPLOAD_INVALID_TYPE.getMessage());
         }
         validateRequest(toPresignRequest(request));
-        if (!request.getObjectKey().trim().startsWith(resolveObjectPrefix(businessType) + "/")) {
+        if (request.getFileAssetId() == null && !request.getObjectKey().trim().startsWith(resolveObjectPrefix(businessType) + "/")) {
             throw new BusinessException(ErrorCode.FILE_UPLOAD_INVALID_TYPE.getCode(), ErrorCode.FILE_UPLOAD_INVALID_TYPE.getMessage());
         }
     }

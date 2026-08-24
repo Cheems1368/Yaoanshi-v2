@@ -148,6 +148,8 @@ Route: `/questionnaire`
 Purpose:
 
 - Complete knowledge assessment or other non-blocking survey task
+- DAY_1 starts on the first confirmed plan effective date; WEEK_4 becomes current on calendar day 28. A future effective date is not due.
+- The client sends only question-set version, phase, question codes, and selected options; scoring is server-owned.
 
 Trigger:
 

@@ -39,9 +39,9 @@ class PrescriptionControllerTest {
         FilePresignRequest request = new FilePresignRequest();
         FilePresignResponse response = new FilePresignResponse();
         response.setObjectKey("prescriptions/test.jpg");
-        when(appFileService.presign(request)).thenReturn(response);
+        when(appFileService.presign("13800138000", request)).thenReturn(response);
 
-        CommonResult<FilePresignResponse> result = appFileController.presign(request);
+        CommonResult<FilePresignResponse> result = appFileController.presign(request, () -> "13800138000");
 
         assertThat(result.getCode()).isEqualTo(200);
         assertThat(result.getData().getObjectKey()).isEqualTo("prescriptions/test.jpg");

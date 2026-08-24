@@ -32,6 +32,11 @@ public class S3CompatibleObjectStorageStub implements S3CompatibleObjectStorage 
         return ("stub-object:" + objectKey).getBytes(java.nio.charset.StandardCharsets.UTF_8);
     }
 
+    @Override
+    public void deleteObject(String objectKey) {
+        // The test stub has no persistent object store.
+    }
+
     private String baseObjectUrl(String objectKey) {
         String endpoint = org.springframework.util.StringUtils.hasText(properties.getPublicEndpoint())
                 ? properties.getPublicEndpoint()

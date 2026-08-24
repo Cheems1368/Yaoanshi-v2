@@ -27,6 +27,7 @@ import com.medicine.service.storage.S3CompatibleObjectStorage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
@@ -99,12 +100,13 @@ public class AppPrescriptionService {
         return new PageResult<>(normalizedPageNo, normalizedPageSize, total, list);
     }
 
+    @Transactional
     public PrescriptionDTO registerUpload(String subject, PrescriptionUploadRequest request) {
-        if (request == null || !StringUtils.hasText(request.getObjectKey()) || !StringUtils.hasText(request.getOriginalFilename())
+        if (request == null || (request.getFileAssetId() == null && !StringUtils.hasText(request.getObjectKey())) || !StringUtils.hasText(request.getOriginalFilename())
                 || !StringUtils.hasText(request.getContentType()) || request.getSizeBytes() == null || request.getSizeBytes() <= 0) {
             throw new BusinessException(400, "BAD_REQUEST");
         }
-        String contentType = request.getContentType().trim().toLowerCase();
+        String contentType = normalizeContentType(request.getContentType());
         if (!ALLOWED_CONTENT_TYPES.contains(contentType)) {
             throw new BusinessException(ErrorCode.FILE_UPLOAD_INVALID_TYPE.getCode(), ErrorCode.FILE_UPLOAD_INVALID_TYPE.getMessage());
         }
@@ -116,22 +118,45 @@ public class AppPrescriptionService {
         Patient patient = requireBoundPatient(account);
 
         LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
-        FileAsset fileAsset = new FileAsset();
-        fileAsset.setBucket(objectStorageProperties.getBucket());
-        fileAsset.setObjectKey(request.getObjectKey().trim());
-        fileAsset.setOriginalFilename(request.getOriginalFilename().trim());
-        fileAsset.setMimeType(contentType);
-        fileAsset.setSizeBytes(request.getSizeBytes());
-        fileAsset.setSha256(StringUtils.hasText(request.getSha256()) ? request.getSha256().trim() : null);
-        fileAsset.setStorageProvider("S3_COMPATIBLE");
-        fileAsset.setStorageRegion(null);
-        fileAsset.setPublicUrl(objectStorage.createPresignedDownloadUrl(fileAsset.getObjectKey()));
-        fileAsset.setUploadedByType("PATIENT");
-        fileAsset.setUploadedById(account.getId());
-        fileAsset.setBusinessType("PRESCRIPTION");
-        fileAsset.setScanStatus("PENDING");
-        applyAudit(fileAsset, now, "app-prescription");
-        fileAssetMapper.insert(fileAsset);
+        FileAsset fileAsset = request.getFileAssetId() == null
+                ? fileAssetMapper.selectByObjectKeyAndTenant(DEFAULT_TENANT_ID, request.getObjectKey().trim())
+                : fileAssetMapper.selectByIdAndTenant(DEFAULT_TENANT_ID, request.getFileAssetId());
+        if (fileAsset != null) {
+            if (!account.getId().equals(fileAsset.getUploadedById())
+                    || !"PRESCRIPTION".equals(fileAsset.getBusinessType()) || !"PRESIGNED".equals(fileAsset.getScanStatus())
+                    || !request.getOriginalFilename().trim().equals(fileAsset.getOriginalFilename())
+                    || !contentType.equals(fileAsset.getMimeType()) || !request.getSizeBytes().equals(fileAsset.getSizeBytes())) {
+                throw new BusinessException(400, "FILE_ASSET_INVALID");
+            }
+            fileAsset.setSha256(StringUtils.hasText(request.getSha256()) ? request.getSha256().trim() : null);
+            fileAsset.setPublicUrl(objectStorage.createPresignedDownloadUrl(fileAsset.getObjectKey()));
+            fileAsset.setScanStatus("PENDING");
+            fileAsset.setUpdater("app-prescription");
+            fileAsset.setUpdateTime(now);
+            if (fileAssetMapper.completeRegistration(fileAsset) != 1) {
+                throw new BusinessException(409, "FILE_ASSET_REGISTRATION_CONFLICT");
+            }
+        } else {
+            if (request.getFileAssetId() != null || !request.getObjectKey().trim().startsWith("prescriptions/")) {
+                throw new BusinessException(400, "FILE_ASSET_INVALID");
+            }
+            fileAsset = new FileAsset();
+            fileAsset.setBucket(objectStorageProperties.getBucket());
+            fileAsset.setObjectKey(request.getObjectKey().trim());
+            fileAsset.setOriginalFilename(request.getOriginalFilename().trim());
+            fileAsset.setMimeType(contentType);
+            fileAsset.setSizeBytes(request.getSizeBytes());
+            fileAsset.setSha256(StringUtils.hasText(request.getSha256()) ? request.getSha256().trim() : null);
+            fileAsset.setStorageProvider("S3_COMPATIBLE");
+            fileAsset.setPublicUrl(objectStorage.createPresignedDownloadUrl(fileAsset.getObjectKey()));
+            fileAsset.setUploadedByType("PATIENT");
+            fileAsset.setUploadedById(account.getId());
+            fileAsset.setBusinessType("PRESCRIPTION");
+            fileAsset.setScanStatus("PENDING");
+            fileAsset.setCleanupAttemptCount(0);
+            applyAudit(fileAsset, now, "app-prescription");
+            fileAssetMapper.insert(fileAsset);
+        }
 
         Prescription prescription = new Prescription();
         prescription.setPatientId(patient.getId());
@@ -335,6 +360,12 @@ public class AppPrescriptionService {
 
     private String normalize(String value) {
         return StringUtils.hasText(value) ? value.trim() : null;
+    }
+
+    private String normalizeContentType(String value) {
+        String normalized = value.trim().toLowerCase();
+        int parameterIndex = normalized.indexOf(';');
+        return parameterIndex < 0 ? normalized : normalized.substring(0, parameterIndex).trim();
     }
 
     private void applyAudit(BaseEntity entity, LocalDateTime now, String operator) {

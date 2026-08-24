@@ -41,6 +41,17 @@ public interface PatientMapper {
                    binding_status, bound_by_pharmacist_id, bound_at,
                    creator, create_time, updater, update_time, deleted, tenant_id
             FROM patient
+            WHERE tenant_id = #{tenantId} AND id = #{id} AND deleted = 0
+            FOR UPDATE
+            """)
+    Patient lockByIdAndTenant(@Param("tenantId") Long tenantId, @Param("id") Long id);
+
+    @Select("""
+            SELECT id, app_account_id, hospital_patient_id, mobile, name, gender, birth_date, age, id_card_masked,
+                   primary_disease_code, primary_disease_name, drug_allergy, food_allergy, medical_history_json,
+                   binding_status, bound_by_pharmacist_id, bound_at,
+                   creator, create_time, updater, update_time, deleted, tenant_id
+            FROM patient
             WHERE tenant_id = #{tenantId} AND app_account_id = #{appAccountId} AND deleted = 0
             LIMIT 1
             """)
@@ -190,6 +201,12 @@ public interface PatientMapper {
             WHERE tenant_id = #{tenantId} AND id = #{id} AND deleted = 0
             """)
     int updateForPharmacist(Patient patient);
+
+    @Update("""
+            UPDATE patient SET bound_by_pharmacist_id = #{boundByPharmacistId}, updater = #{updater}, update_time = #{updateTime}
+            WHERE tenant_id = #{tenantId} AND id = #{id} AND deleted = 0
+            """)
+    int updateResponsiblePharmacist(Patient patient);
 
     @Update("""
             UPDATE patient

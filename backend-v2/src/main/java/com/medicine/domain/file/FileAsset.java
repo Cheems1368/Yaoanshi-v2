@@ -17,6 +17,11 @@ public class FileAsset extends BaseEntity {
     private Long uploadedById;
     private String businessType;
     private String scanStatus;
+    private Integer cleanupAttemptCount;
+    private java.time.LocalDateTime nextCleanupAt;
+    private String cleanupFailureReason;
+    private String cleanupClaimToken;
+    private java.time.LocalDateTime cleanupClaimedAt;
 
     public String getBucket() {
         return bucket;
@@ -121,4 +126,15 @@ public class FileAsset extends BaseEntity {
     public void setScanStatus(String scanStatus) {
         this.scanStatus = scanStatus;
     }
+
+    public Integer getCleanupAttemptCount() { return cleanupAttemptCount; }
+    public void setCleanupAttemptCount(Integer cleanupAttemptCount) { this.cleanupAttemptCount = cleanupAttemptCount; }
+    public java.time.LocalDateTime getNextCleanupAt() { return nextCleanupAt; }
+    public void setNextCleanupAt(java.time.LocalDateTime nextCleanupAt) { this.nextCleanupAt = nextCleanupAt; }
+    public String getCleanupFailureReason() { return cleanupFailureReason; }
+    public void setCleanupFailureReason(String cleanupFailureReason) { this.cleanupFailureReason = cleanupFailureReason; }
+    public String getCleanupClaimToken() { return cleanupClaimToken; }
+    public void setCleanupClaimToken(String cleanupClaimToken) { this.cleanupClaimToken = cleanupClaimToken; }
+    public java.time.LocalDateTime getCleanupClaimedAt() { return cleanupClaimedAt; }
+    public void setCleanupClaimedAt(java.time.LocalDateTime cleanupClaimedAt) { this.cleanupClaimedAt = cleanupClaimedAt; }
 }

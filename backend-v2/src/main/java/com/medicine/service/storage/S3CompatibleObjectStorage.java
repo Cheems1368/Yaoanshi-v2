@@ -13,4 +13,6 @@ public interface S3CompatibleObjectStorage {
     String createPresignedDownloadUrl(String objectKey, Duration signatureDuration);
 
     byte[] readObjectBytes(String objectKey);
+
+    void deleteObject(String objectKey);
 }

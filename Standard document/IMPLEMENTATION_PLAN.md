@@ -28,15 +28,17 @@ Rules:
 | Phase T0–T5 | Trial/demo closed loops through voice help orders | ✅ Delivered through PR #32 (`35b1e8a`) |
 | Phase T6 | Android JDK 21 and enforced APK build gate | ✅ Delivered through PR #37 (`98115b9`) |
 | Phase T7 | SEC-002 refresh-token HttpOnly Cookie closure | ✅ Delivered through PR #39 (`4c90292`) |
-| Phase T8 | SEC-005 AI data-boundary closure | ✅ Protected-qualified in PR #40; delivery to `main` awaits separate merge authorization |
+| Phase T8 | SEC-005 AI data-boundary closure | ✅ Delivered through PR #40 (`fc3b646`); post-merge `main` CI run `32570783413` passed |
+| Phase T9 | MVP v0.1.0 formal delivery and gap closure | 🚧 PR A backend contract/reliability implementation in progress on `codex/mvp-v0.1.0-backend` |
 
-**Current active work:** T8 closes SEC-005 with versioned provider disclosure, high-confidence text redaction, exact upstream-host allowlisting, fail-closed metadata-only audit, and patient-side policy loading. PR #40 passed its protected implementation and evidence runs with zero review conversations; the candidate awaits separate merge authorization. Android release signing and store publishing remain separate release-engineering work.
+**Current active work:** T9 closes the remaining MVP contract, patient, professional-client, reliability, operations, and release-evidence gaps through three protected PRs. T8/SEC-005 is formally delivered. Android release signing and store publishing remain out of scope.
 
-**Flyway current latest:** V13 (`V13__ai_data_boundary.sql`). Next new migration must be V14.
+**Flyway current latest on `main`:** V13 (`V13__ai_data_boundary.sql`). T9 PR A reserves V14 as `V14__mvp_release_closure.sql`; V1–V13 remain immutable.
 
 **Known open items:**
 - `MEDICINE_OCR_API_KEY` must be set in `.env.local` for live OCR (graceful fallback if omitted)
-- SEC-005 T8 candidate passes local backend, patient Web/Android, migration, data-boundary, protected PR, and zero-conversation gates; delivery to `main` remains pending
+- T9 knowledge bank wording/options/answers require documented approval by a licensed pharmacist or physician before `v0.1.0` may be tagged
+- T9 Android physical-device and disposable MySQL/MinIO acceptance remain release gates
 - Ops cleanup: `ops/sql/sec-003-clear-legacy-patient-id-card-masked.sql` needs to be run
 
 ## 1.6 Post-P0 Trial Demo Closed-Loop Sequence

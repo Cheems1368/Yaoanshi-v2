@@ -9,23 +9,36 @@ import com.medicine.api.dto.identity.AdminPatientListItemDTO;
 import com.medicine.api.dto.identity.AdminPatientUpdateRequest;
 import com.medicine.api.dto.identity.FamilyBindingSummaryDTO;
 import com.medicine.api.dto.identity.PatientAdherenceSummaryDTO;
+import com.medicine.api.dto.identity.PatientReassignRequest;
+import com.medicine.api.dto.identity.PharmacistOptionDTO;
+import com.medicine.api.dto.assessment.KnowledgeAssessmentDTO;
 import com.medicine.common.exception.BusinessException;
 import com.medicine.common.exception.ErrorCode;
 import com.medicine.common.model.PageResult;
 import com.medicine.domain.assessment.Abcd2Assessment;
+import com.medicine.domain.assessment.KnowledgeAssessment;
+import com.medicine.domain.helporder.HelpOrder;
+import com.medicine.domain.helporder.HelpOrderEvent;
 import com.medicine.domain.identity.Patient;
 import com.medicine.domain.identity.PatientAdminListRow;
 import com.medicine.domain.identity.PatientFamilyBinding;
 import com.medicine.domain.identity.PharmacistProfile;
 import com.medicine.domain.medication.MedicationPlan;
 import com.medicine.repository.assessment.Abcd2AssessmentMapper;
+import com.medicine.repository.assessment.KnowledgeAssessmentMapper;
+import com.medicine.repository.assessment.SatisfactionSurveyMapper;
+import com.medicine.repository.helporder.HelpOrderMapper;
+import com.medicine.repository.helporder.HelpOrderEventMapper;
 import com.medicine.repository.identity.PharmacistProfileMapper;
 import com.medicine.repository.identity.PatientFamilyBindingMapper;
 import com.medicine.repository.identity.PatientMapper;
 import com.medicine.repository.medication.MedicationPlanMapper;
 import com.medicine.service.auth.JwtClaims;
 import com.medicine.service.auth.ProfessionalIdentityService;
+import com.medicine.service.app.KnowledgeQuestionBank;
+import com.medicine.service.notification.NotificationDispatchService;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.time.LocalDate;
@@ -35,6 +48,9 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.math.BigDecimal;
+import java.time.temporal.ChronoUnit;
 
 @Service
 public class AdminPatientService {
@@ -50,6 +66,11 @@ public class AdminPatientService {
     private final PharmacistProfileMapper pharmacistProfileMapper;
     private final Abcd2AssessmentMapper abcd2AssessmentMapper;
     private final MedicationPlanMapper medicationPlanMapper;
+    private final KnowledgeAssessmentMapper knowledgeAssessmentMapper;
+    private final SatisfactionSurveyMapper satisfactionSurveyMapper;
+    private final HelpOrderMapper helpOrderMapper;
+    private final HelpOrderEventMapper helpOrderEventMapper;
+    private final NotificationDispatchService notificationDispatchService;
     private final ProfessionalIdentityService professionalIdentityService;
     private final ObjectMapper objectMapper;
 
@@ -59,6 +80,11 @@ public class AdminPatientService {
             PharmacistProfileMapper pharmacistProfileMapper,
             Abcd2AssessmentMapper abcd2AssessmentMapper,
             MedicationPlanMapper medicationPlanMapper,
+            KnowledgeAssessmentMapper knowledgeAssessmentMapper,
+            SatisfactionSurveyMapper satisfactionSurveyMapper,
+            HelpOrderMapper helpOrderMapper,
+            HelpOrderEventMapper helpOrderEventMapper,
+            NotificationDispatchService notificationDispatchService,
             ProfessionalIdentityService professionalIdentityService,
             ObjectMapper objectMapper
     ) {
@@ -67,8 +93,63 @@ public class AdminPatientService {
         this.pharmacistProfileMapper = pharmacistProfileMapper;
         this.abcd2AssessmentMapper = abcd2AssessmentMapper;
         this.medicationPlanMapper = medicationPlanMapper;
+        this.knowledgeAssessmentMapper = knowledgeAssessmentMapper;
+        this.satisfactionSurveyMapper = satisfactionSurveyMapper;
+        this.helpOrderMapper = helpOrderMapper;
+        this.helpOrderEventMapper = helpOrderEventMapper;
+        this.notificationDispatchService = notificationDispatchService;
         this.professionalIdentityService = professionalIdentityService;
         this.objectMapper = objectMapper;
+    }
+
+    public List<PharmacistOptionDTO> getActivePharmacists(JwtClaims claims) {
+        requireAdmin(claims);
+        return pharmacistProfileMapper.selectActive(claims.getTenantId()).stream()
+                .map(profile -> new PharmacistOptionDTO(profile.getId(), profile.getRealName())).toList();
+    }
+
+    @Transactional
+    public AdminPatientDetailDTO reassignPatient(JwtClaims claims, Long patientId, PatientReassignRequest request) {
+        requireAdmin(claims);
+        if (request == null || request.getPharmacistId() == null) throw new BusinessException(400, "BAD_REQUEST");
+        Patient patient = patientMapper.lockByIdAndTenant(claims.getTenantId(), patientId);
+        if (patient == null) {
+            throw new BusinessException(ErrorCode.PATIENT_NOT_FOUND.getCode(), ErrorCode.PATIENT_NOT_FOUND.getMessage());
+        }
+        PharmacistProfile target = pharmacistProfileMapper.selectById(claims.getTenantId(), request.getPharmacistId());
+        if (target == null || !"ACTIVE".equals(target.getServiceStatus())) throw new BusinessException(400, "PHARMACIST_NOT_ACTIVE");
+        Long oldPharmacistId = patient.getBoundByPharmacistId();
+        if (target.getId().equals(oldPharmacistId)) return buildDetailDto(claims.getTenantId(), patient);
+        LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
+        List<HelpOrder> orders = helpOrderMapper.selectNonTerminalByPatientId(claims.getTenantId(), patientId);
+        patient.setBoundByPharmacistId(target.getId());
+        patient.setUpdater("admin-reassign-" + claims.getUserId());
+        patient.setUpdateTime(now);
+        patientMapper.updateResponsiblePharmacist(patient);
+        helpOrderMapper.reassignNonTerminalByPatientId(claims.getTenantId(), patientId, oldPharmacistId, target.getId(), patient.getUpdater(), now);
+        for (HelpOrder order : orders) appendReassignedEvent(claims, order, oldPharmacistId, target.getId(), request.getReason(), now);
+        return buildDetailDto(claims.getTenantId(), patient);
+    }
+
+    public boolean remindKnowledgeAssessment(JwtClaims claims, Long patientId) {
+        Patient patient = requirePatient(claims.getTenantId(), patientId);
+        if (!isAdmin(claims)) {
+            PharmacistProfile pharmacist = professionalIdentityService.getOrCreatePharmacistProfile(claims);
+            if (!pharmacist.getId().equals(patient.getBoundByPharmacistId())) {
+                throw new BusinessException(ErrorCode.PATIENT_MANAGEMENT_PERMISSION_DENIED.getCode(), ErrorCode.PATIENT_MANAGEMENT_PERMISSION_DENIED.getMessage());
+            }
+        }
+        LocalDateTime firstActivatedAt = medicationPlanMapper.selectFirstActivatedAt(claims.getTenantId(), patientId);
+        if (firstActivatedAt == null) throw new BusinessException(409, "KNOWLEDGE_ASSESSMENT_NOT_DUE");
+        LocalDate today = LocalDate.now(ZoneOffset.UTC);
+        if (today.isBefore(firstActivatedAt.toLocalDate())) throw new BusinessException(409, "KNOWLEDGE_ASSESSMENT_NOT_DUE");
+        String phase = ChronoUnit.DAYS.between(firstActivatedAt.toLocalDate(), today) >= 27 ? "WEEK_4" : "DAY_1";
+        if (knowledgeAssessmentMapper.selectByPatientPhaseAndVersion(claims.getTenantId(), patientId, phase, KnowledgeQuestionBank.VERSION) != null) {
+            throw new BusinessException(409, "KNOWLEDGE_ASSESSMENT_NOT_DUE");
+        }
+        notificationDispatchService.createAndDispatch(claims.getTenantId(), "assessment-reminder", "PATIENT", patientId,
+                "KNOWLEDGE_ASSESSMENT_REMINDER", patientId, Map.of("phase", phase), LocalDateTime.now(ZoneOffset.UTC));
+        return true;
     }
 
     public PageResult<AdminPatientListItemDTO> getPatients(JwtClaims claims, String keyword, int pageNo, int pageSize) {
@@ -191,6 +272,13 @@ public class AdminPatientService {
         detail.setFamilyBindings(loadFamilyBindings(tenantId, patient.getId()));
         detail.setLatestAbcd2Assessment(toAssessmentDto(abcd2AssessmentMapper.selectLatestByPatientId(tenantId, patient.getId())));
         detail.setAdherenceSummary(buildAdherenceSummary());
+        detail.setDay1KnowledgeAssessment(toKnowledgeAssessmentDto(knowledgeAssessmentMapper.selectByPatientPhaseAndVersion(
+                tenantId, patient.getId(), "DAY_1", KnowledgeQuestionBank.VERSION)));
+        detail.setWeek4KnowledgeAssessment(toKnowledgeAssessmentDto(knowledgeAssessmentMapper.selectByPatientPhaseAndVersion(
+                tenantId, patient.getId(), "WEEK_4", KnowledgeQuestionBank.VERSION)));
+        detail.setSatisfactionCount(satisfactionSurveyMapper.countByPatientId(tenantId, patient.getId()));
+        BigDecimal satisfactionAverage = satisfactionSurveyMapper.averageByPatientId(tenantId, patient.getId());
+        detail.setSatisfactionAverage(satisfactionAverage == null ? null : satisfactionAverage.doubleValue());
         MedicationPlan latestPlan = medicationPlanMapper.selectLatestByPatientId(tenantId, patient.getId());
         if (latestPlan != null) {
             detail.setLatestMedicationPlanId(latestPlan.getId());
@@ -200,6 +288,36 @@ public class AdminPatientService {
             detail.setLatestMedicationPlanConfirmedAt(formatDateTime(latestPlan.getConfirmedAt()));
         }
         return detail;
+    }
+
+    private KnowledgeAssessmentDTO toKnowledgeAssessmentDto(KnowledgeAssessment assessment) {
+        if (assessment == null) return null;
+        KnowledgeAssessmentDTO dto = new KnowledgeAssessmentDTO();
+        dto.setId(assessment.getId()); dto.setPhase(assessment.getPhase()); dto.setQuestionSetVersion(assessment.getQuestionSetVersion());
+        dto.setScore(assessment.getScore().doubleValue()); dto.setMaxScore(assessment.getMaxScore().doubleValue());
+        dto.setSubmittedAt(formatDateTime(assessment.getSubmittedAt()));
+        return dto;
+    }
+
+    private void appendReassignedEvent(JwtClaims claims, HelpOrder order, Long oldId, Long newId, String reason, LocalDateTime now) {
+        HelpOrderEvent event = new HelpOrderEvent();
+        event.setHelpOrderId(order.getId()); event.setEventType("REASSIGNED"); event.setFromStatus(order.getStatus()); event.setToStatus(order.getStatus());
+        event.setOperatorType("ADMIN"); event.setOperatorId(claims.getUserId());
+        event.setContent(StringUtils.hasText(reason) ? reason.trim() : "责任药师改派");
+        event.setMetadataJson(writeJson(Map.of("oldPharmacistId", oldId == null ? 0L : oldId, "newPharmacistId", newId)));
+        event.setCreator("admin-reassign-" + claims.getUserId()); event.setCreateTime(now); event.setUpdater(event.getCreator());
+        event.setUpdateTime(now); event.setDeleted(false); event.setTenantId(claims.getTenantId());
+        helpOrderEventMapper.insert(event);
+    }
+
+    private void requireAdmin(JwtClaims claims) {
+        if (!isAdmin(claims)) throw new BusinessException(ErrorCode.PATIENT_MANAGEMENT_PERMISSION_DENIED.getCode(), ErrorCode.PATIENT_MANAGEMENT_PERMISSION_DENIED.getMessage());
+    }
+
+    private boolean isAdmin(JwtClaims claims) {
+        Set<String> adminRoles = Set.of("admin", "super_admin", "tenant_admin");
+        return claims != null && claims.isProfessional() && claims.getRoles() != null
+                && claims.getRoles().stream().anyMatch(role -> role != null && adminRoles.contains(role.toLowerCase()));
     }
 
     private List<FamilyBindingSummaryDTO> loadFamilyBindings(Long tenantId, Long patientId) {

@@ -68,7 +68,7 @@ class NotificationDispatchServiceTest {
     }
 
     @Test
-    void shouldMarkProfessionalNotificationAsFailedWhenNoRealtimeSessionExists() {
+    void shouldDegradeProfessionalNotificationToInAppWhenNoRealtimeSessionExists() {
         doAnswer(invocation -> {
             NotificationLog log = invocation.getArgument(0);
             log.setId(9002L);
@@ -91,9 +91,10 @@ class NotificationDispatchServiceTest {
         ArgumentCaptor<NotificationLog> captor = ArgumentCaptor.forClass(NotificationLog.class);
         verify(notificationLogMapper).updateDelivery(captor.capture());
         NotificationLog updated = captor.getValue();
-        assertThat(updated.getDeliveryStatus()).isEqualTo("FAILED");
-        assertThat(updated.getFailureCode()).isEqualTo("NO_ACTIVE_SESSION");
-        assertThat(updated.getSentAt()).isNull();
+        assertThat(updated.getChannel()).isEqualTo("IN_APP");
+        assertThat(updated.getDeliveryStatus()).isEqualTo("SENT");
+        assertThat(updated.getFailureCode()).isNull();
+        assertThat(updated.getSentAt()).isNotNull();
     }
 
     @Test
@@ -122,5 +123,45 @@ class NotificationDispatchServiceTest {
         assertThat(updated.getChannel()).isEqualTo("WEBSOCKET");
         assertThat(updated.getDeliveryStatus()).isEqualTo("SENT");
         assertThat(updated.getSentAt()).isNotNull();
+    }
+
+    @Test
+    void shouldScheduleBoundedRetryForRealSendFailure() {
+        doAnswer(invocation -> { ((NotificationLog) invocation.getArgument(0)).setId(9004L); return 1; })
+                .when(notificationLogMapper).insert(any(NotificationLog.class));
+        when(realtimeService.dispatch(any(NotificationLog.class)))
+                .thenReturn(NotificationDispatchService.DispatchResult.failed("SOCKET_SEND_FAILED", "send failed"));
+        LocalDateTime now = LocalDateTime.now();
+
+        notificationDispatchService.createAndDispatch(1L, "unit-test", "PHARMACIST", 101L,
+                "HELP_ORDER_SUBMITTED", 6004L, Map.of(), now);
+
+        ArgumentCaptor<NotificationLog> captor = ArgumentCaptor.forClass(NotificationLog.class);
+        verify(notificationLogMapper).updateDelivery(captor.capture());
+        NotificationLog updated = captor.getValue();
+        assertThat(updated.getDeliveryStatus()).isEqualTo("FAILED");
+        assertThat(updated.getAttemptCount()).isEqualTo(1);
+        assertThat(updated.getNextRetryAt()).isEqualTo(now.plusMinutes(1));
+    }
+
+    @Test
+    void shouldStopRetryingAfterFourthFailedAttempt() {
+        NotificationLog log = new NotificationLog();
+        log.setId(9005L);
+        log.setChannel("WEBSOCKET");
+        log.setTargetType("PHARMACIST");
+        log.setDeliveryStatus("FAILED");
+        log.setAttemptCount(3);
+        log.setClaimToken("claim-9005");
+        when(realtimeService.dispatch(log))
+                .thenReturn(NotificationDispatchService.DispatchResult.failed("SOCKET_SEND_FAILED", "send failed"));
+        LocalDateTime now = LocalDateTime.now();
+
+        notificationDispatchService.retryClaimed(log, now);
+
+        assertThat(log.getDeliveryStatus()).isEqualTo("PERMANENT_FAILED");
+        assertThat(log.getAttemptCount()).isEqualTo(4);
+        assertThat(log.getNextRetryAt()).isNull();
+        verify(notificationLogMapper).updateClaimedDelivery(log, "claim-9005");
     }
 }

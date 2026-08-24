@@ -5,6 +5,7 @@ public class CheckinRecordDTO {
     private Long id;
     private Long doseTaskId;
     private Long patientId;
+    private String clientRequestId;
     private String operatorType;
     private Long operatorId;
     private String result;
@@ -38,6 +39,14 @@ public class CheckinRecordDTO {
 
     public void setPatientId(Long patientId) {
         this.patientId = patientId;
+    }
+
+    public String getClientRequestId() {
+        return clientRequestId;
+    }
+
+    public void setClientRequestId(String clientRequestId) {
+        this.clientRequestId = clientRequestId;
     }
 
     public String getOperatorType() {

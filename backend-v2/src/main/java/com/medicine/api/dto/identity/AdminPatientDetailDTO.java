@@ -1,5 +1,7 @@
 package com.medicine.api.dto.identity;
 
+import com.medicine.api.dto.assessment.KnowledgeAssessmentDTO;
+
 import java.util.List;
 import java.util.Map;
 
@@ -31,6 +33,10 @@ public class AdminPatientDetailDTO {
     private String latestMedicationPlanStatus;
     private Integer latestMedicationPlanVersionNo;
     private String latestMedicationPlanConfirmedAt;
+    private KnowledgeAssessmentDTO day1KnowledgeAssessment;
+    private KnowledgeAssessmentDTO week4KnowledgeAssessment;
+    private long satisfactionCount;
+    private Double satisfactionAverage;
 
     public Long getId() {
         return id;
@@ -239,4 +245,13 @@ public class AdminPatientDetailDTO {
     public void setLatestMedicationPlanConfirmedAt(String latestMedicationPlanConfirmedAt) {
         this.latestMedicationPlanConfirmedAt = latestMedicationPlanConfirmedAt;
     }
+
+    public KnowledgeAssessmentDTO getDay1KnowledgeAssessment() { return day1KnowledgeAssessment; }
+    public void setDay1KnowledgeAssessment(KnowledgeAssessmentDTO value) { this.day1KnowledgeAssessment = value; }
+    public KnowledgeAssessmentDTO getWeek4KnowledgeAssessment() { return week4KnowledgeAssessment; }
+    public void setWeek4KnowledgeAssessment(KnowledgeAssessmentDTO value) { this.week4KnowledgeAssessment = value; }
+    public long getSatisfactionCount() { return satisfactionCount; }
+    public void setSatisfactionCount(long satisfactionCount) { this.satisfactionCount = satisfactionCount; }
+    public Double getSatisfactionAverage() { return satisfactionAverage; }
+    public void setSatisfactionAverage(Double satisfactionAverage) { this.satisfactionAverage = satisfactionAverage; }
 }

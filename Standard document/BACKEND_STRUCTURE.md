@@ -263,9 +263,11 @@ Columns:
 
 Constraints:
 
-1. Unique active binding: `tenant_id + patient_id + family_account_id + deleted`
+1. One family account can have only one active patient binding per tenant; V14 enforces this with `tenant_id + active_family_account_id`.
 2. Maximum two active family bindings per patient is enforced by service rule.
 3. Unbound rows remain queryable for history but lose permission immediately.
+
+Before V14, the read-only preflight at `backend-v2/src/main/resources/db/preflight/V14__mvp_release_closure_preflight.sql` must run and block the release if one family account has multiple active patient bindings. The operator must review those relationships before continuing. As a fail-safe if the preflight is bypassed, V14 retains the earliest authorization as `ACTIVE` and converts later duplicates to `UNBOUND` with an explicit migration reason; no binding row is deleted.
 
 #### Table: `otp_login_log`
 
@@ -557,6 +559,7 @@ Columns:
 | `id` | `BIGINT` | No |  | PK | record id |
 | `dose_task_id` | `BIGINT` | No |  | `IDX_checkin_task` | target task |
 | `patient_id` | `BIGINT` | No |  | `IDX_checkin_patient` | owner patient |
+| `client_request_id` | `VARCHAR(64)` | Yes |  | `UK_checkin_client_request` | patient-scoped idempotency key supplied by the native offline queue |
 | `operator_type` | `VARCHAR(20)` | No |  |  | `PATIENT`, `FAMILY`, `SYSTEM` |
 | `operator_id` | `BIGINT` | No |  |  | app account id or system id |
 | `result` | `VARCHAR(20)` | No |  | `IDX_checkin_result` | `ON_TIME`, `DELAYED`, `MISSED`, `SKIPPED` |
@@ -573,6 +576,7 @@ Rules:
 1. No hard delete.
 2. Within 24 hours, the latest valid submission becomes `is_effective = 1`.
 3. Previous submissions for the same dose task remain preserved with `is_effective = 0`.
+4. A duplicate `client_request_id` returns the existing record. After a concurrent insert conflict, the service uses a locking current read so MySQL repeatable-read snapshots cannot hide the winning row.
 
 #### Table: `medication_plan_event`
 
@@ -800,12 +804,15 @@ Columns:
 | `patient_id` | `BIGINT` | No |  | `IDX_knowledge_patient` | target patient |
 | `phase` | `VARCHAR(20)` | No |  |  | `DAY_1`, `WEEK_4`, `OTHER` |
 | `question_set_version` | `VARCHAR(32)` | No |  |  | fixed question set version |
+| `uniqueness_guard` | `TINYINT` | Yes | `1` | `UK_knowledge_patient_phase_version` | canonical submission participates in uniqueness; preserved historical duplicates use `NULL` |
 | `score` | `DECIMAL(5,2)` | No |  |  | result score |
 | `max_score` | `DECIMAL(5,2)` | No |  |  | max score |
 | `submitted_by_type` | `VARCHAR(20)` | No |  |  | `PATIENT`, `FAMILY` |
 | `submitted_by_id` | `BIGINT` | No |  |  | submitter |
 | `submitted_at` | `DATETIME` | No |  |  | submission time |
 | audit columns | standard |  |  |  |  |
+
+V14 preserves every historical assessment row and answer. If pre-V14 retries created duplicate active rows for the same patient/phase/version, the earliest row remains canonical (`uniqueness_guard = 1`) and later rows are retained with a null guard before the unique key is added. New submissions default to the canonical guard and therefore conflict with the existing first submission.
 
 #### Table: `knowledge_assessment_answer`
 
@@ -1135,8 +1142,8 @@ Reminder stage rules:
 
 | Method | Path | Auth | Request | Response `data` | Side effects |
 |---|---|---|---|---|---|
-| `POST` | `/app-api/files/presign` | Yes | upload intent | upload token/url | none |
-| `POST` | `/app-api/files/register` | Yes | uploaded file metadata | file asset summary | register a previously uploaded object for an allowed business type |
+| `POST` | `/app-api/files/presign` | Yes | upload intent | upload token/url plus `fileAssetId` | create uploader-owned `file_asset/PRESIGNED` |
+| `POST` | `/app-api/files/register` | Yes | uploaded file metadata plus preferred `fileAssetId` or compatibility `objectKey` | file asset summary | atomically complete the matching pre-upload asset for an allowed business type |
 | `POST` | `/app-api/help-orders` | Yes | `HelpOrderDTO` create body with optional `attachmentFileAssetIds` and optional `voiceAttachment` | created order | write `help_order`, `help_order_event`, attachment links, optional voice transcript placeholder, notification |
 | `GET` | `/app-api/help-orders` | Yes | status/category query | paged list | none |
 | `GET` | `/app-api/help-orders/{id}` | Yes | none | order detail + events | none |
@@ -1144,6 +1151,13 @@ Reminder stage rules:
 | `POST` | `/app-api/help-orders/{id}/attachments/{attachmentId}/transcribe` | patient or family participant | none | `HelpOrderVoiceTranscriptDTO` | transcribe one audio attachment if not already successful |
 | `GET` | `/app-api/prescriptions` | Yes | status/page query | paged prescriptions | none |
 | `POST` | `/app-api/prescriptions/uploads` | Yes | upload metadata | prescription summary | write `prescription`, `prescription_attachment`, `prescription_ocr_record` |
+
+File registration rules:
+
+1. `fileAssetId` is preferred. The compatibility `objectKey` path must find and complete the same `PRESIGNED` row created by presign; it must not create a duplicate row for that object.
+2. Uploader, business type, original filename, normalized media type, and size must match the presign snapshot. A true pre-V14 object with no asset row remains accepted only under its allowed object-key prefix.
+3. Registration is a compare-and-set update requiring `PRESIGNED` with no cleanup claim. Registration that wins first prevents cleanup claim; cleanup that wins first causes registration conflict before any business record is created.
+4. Assets still unregistered after one hour are deleted by the bounded cleanup job. Delete failures remain `CLEANUP_RETRY` with recorded backoff state.
 
 #### Self-reported medication
 
@@ -1258,8 +1272,13 @@ AI rules:
 
 | Method | Path | Auth | Request | Response `data` | Side effects |
 |---|---|---|---|---|---|
-| `POST` | `/app-api/assessments/knowledge` | Yes | `KnowledgeAssessmentDTO` | saved summary | write raw answers + result |
+| `GET` | `/app-api/assessments/knowledge/questions` | Yes | none | fixed `medication-literacy-v1` questions without answer keys | none |
+| `GET` | `/app-api/assessments/knowledge/status` | Yes | none | DAY_1/WEEK_4 due and result status | none |
+| `POST` | `/app-api/assessments/knowledge` | Yes | version, phase, selected options | server-scored summary | write validated answers + result; one submission per phase/version |
+| `GET` | `/app-api/assessments/satisfaction/status` | Yes | `helpOrderId` query | eligibility and prior survey | none |
 | `POST` | `/app-api/assessments/satisfaction` | Yes | `SatisfactionSurveyDTO` | saved survey | write satisfaction row |
+| `GET` | `/app-api/dose-tasks` | Yes | `dateFrom`, `dateTo` (inclusive, at most 7 days) | dose-task list | none |
+| `GET` | `/app-api/notifications/logs` | Yes | optional `afterId`, `limit` | current patient's persisted notifications | none |
 
 ### 6.2 Admin APIs
 
@@ -1284,6 +1303,12 @@ Existing `/admin-api/system/auth/login`, `/refresh-token`, and `/logout` contrac
 | `GET` | `/admin-api/patients` | pharmacist | patient query | paged patient list | none |
 | `GET` | `/admin-api/patients/{id}` | pharmacist | none | patient detail | none |
 | `PUT` | `/admin-api/patients/{id}` | pharmacist | patient update DTO | updated detail | update patient medical fields, maybe trigger ABCD2 recalculation |
+| `PUT` | `/admin-api/patients/{id}/responsible-pharmacist` | admin / super_admin / tenant_admin | `{ pharmacistId, reason }` | updated detail | atomically update patient and non-terminal orders; append `REASSIGNED` events |
+| `POST` | `/admin-api/patients/{id}/knowledge-assessments/remind` | responsible pharmacist or admin | none | Boolean | persist/send current-phase reminder when due |
+
+Responsibility reassignment locks and rereads the patient row before deriving the old pharmacist. Concurrent admin requests therefore serialize on the patient and update in-flight orders and `REASSIGNED` audit events from the actual preceding assignment.
+Patient help-order creation takes the same patient-row lock before reading `bound_by_pharmacist_id`, so a concurrent reassignment completes either before or after order creation and cannot leave a newly submitted non-terminal order assigned to a stale pharmacist.
+| `GET` | `/admin-api/pharmacists/options` | admin / super_admin / tenant_admin | none | ACTIVE pharmacist options | none |
 
 #### Prescription and OCR
 
@@ -1541,10 +1566,13 @@ AI audit must never include prompt text, response text, request payload, or cont
 
 - If DB commit succeeds but notification dispatch fails:
   - business write remains valid
-  - `notification_log` stores `FAILED`
-  - retry is allowed by async worker
+  - no active WebSocket session degrades to persisted `IN_APP/SENT`
+  - real send failure stores `FAILED` and retries after 1, 5, and 15 minutes using a CAS claim
+  - initial attempt plus three failed retries becomes `PERMANENT_FAILED`
 - If object upload succeeds but DB write fails:
-  - object is marked for cleanup by compensating job
+  - presign already created `file_asset/PRESIGNED`
+  - objects still unregistered after one hour are claimed and deleted by the compensation job
+  - delete failure remains `CLEANUP_RETRY` with bounded backoff
 
 ### 8.9 Work order permissions
 

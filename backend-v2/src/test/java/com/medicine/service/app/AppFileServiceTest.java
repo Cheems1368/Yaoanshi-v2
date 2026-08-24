@@ -14,6 +14,7 @@ import com.medicine.service.storage.S3CompatibleObjectStorage;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -24,6 +25,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.never;
 
 @ExtendWith(MockitoExtension.class)
 class AppFileServiceTest {
@@ -42,6 +44,101 @@ class AppFileServiceTest {
 
     @InjectMocks
     private AppFileService appFileService;
+
+    @Test
+    void shouldPersistPresignedAssetForAuthenticatedAccount() {
+        when(objectStorage.createPresignedUploadUrl(anyString())).thenReturn("upload:url");
+        when(appPatientService.requireAccessContext("13800138000")).thenReturn(accessContext());
+        when(fileAssetMapper.insert(any(FileAsset.class))).thenAnswer(invocation -> {
+            ((FileAsset) invocation.getArgument(0)).setId(42L);
+            return 1;
+        });
+        FilePresignRequest request = new FilePresignRequest();
+        request.setFilename("bruise.png"); request.setContentType("image/png"); request.setSizeBytes(2048L);
+        request.setBusinessType("HELP_ORDER_IMAGE");
+
+        FilePresignResponse response = appFileService.presign("13800138000", request);
+
+        ArgumentCaptor<FileAsset> captor = ArgumentCaptor.forClass(FileAsset.class);
+        verify(fileAssetMapper).insert(captor.capture());
+        assertThat(response.getFileAssetId()).isEqualTo(42L);
+        assertThat(captor.getValue().getScanStatus()).isEqualTo("PRESIGNED");
+        assertThat(captor.getValue().getUploadedById()).isEqualTo(101L);
+    }
+
+    @Test
+    void shouldCompleteExistingPresignedAssetById() {
+        when(appPatientService.requireAccessContext("13800138000")).thenReturn(accessContext());
+        FileAsset asset = new FileAsset();
+        asset.setId(42L); asset.setTenantId(1L); asset.setUploadedById(101L); asset.setBusinessType("HELP_ORDER_IMAGE");
+        asset.setScanStatus("PRESIGNED"); asset.setObjectKey("help-orders/images/2026-08-22/a.png");
+        asset.setOriginalFilename("a.png"); asset.setMimeType("image/png"); asset.setSizeBytes(100L);
+        when(fileAssetMapper.selectByIdAndTenant(1L, 42L)).thenReturn(asset);
+        FileRegisterRequest request = new FileRegisterRequest();
+        request.setFileAssetId(42L); request.setOriginalFilename("a.png"); request.setContentType("image/png");
+        request.setSizeBytes(100L); request.setBusinessType("HELP_ORDER_IMAGE");
+        when(fileAssetMapper.completeRegistration(asset)).thenReturn(1);
+
+        var result = appFileService.register("13800138000", request);
+
+        assertThat(result.getId()).isEqualTo(42L);
+        verify(fileAssetMapper).completeRegistration(asset);
+    }
+
+    @Test
+    void shouldCompleteSamePresignedAssetForLegacyObjectKeyRegistration() {
+        when(appPatientService.requireAccessContext("13800138000")).thenReturn(accessContext());
+        FileAsset asset = new FileAsset();
+        asset.setId(42L); asset.setTenantId(1L); asset.setUploadedById(101L); asset.setBusinessType("HELP_ORDER_IMAGE");
+        asset.setScanStatus("PRESIGNED"); asset.setObjectKey("help-orders/images/2026-08-22/a.png");
+        asset.setOriginalFilename("a.png"); asset.setMimeType("image/png"); asset.setSizeBytes(100L);
+        when(fileAssetMapper.selectByObjectKeyAndTenant(1L, asset.getObjectKey())).thenReturn(asset);
+        FileRegisterRequest request = new FileRegisterRequest();
+        request.setObjectKey(asset.getObjectKey()); request.setOriginalFilename("a.png"); request.setContentType("image/png");
+        request.setSizeBytes(100L); request.setBusinessType("HELP_ORDER_IMAGE");
+        when(fileAssetMapper.completeRegistration(asset)).thenReturn(1);
+
+        var result = appFileService.register("13800138000", request);
+
+        assertThat(result.getId()).isEqualTo(42L);
+        verify(fileAssetMapper).completeRegistration(asset);
+        verify(fileAssetMapper, never()).insert(any(FileAsset.class));
+    }
+
+    @Test
+    void shouldRejectPresignedAssetWhenRegistrationMetadataDoesNotMatch() {
+        when(appPatientService.requireAccessContext("13800138000")).thenReturn(accessContext());
+        FileAsset asset = new FileAsset();
+        asset.setId(42L); asset.setTenantId(1L); asset.setUploadedById(101L); asset.setBusinessType("HELP_ORDER_IMAGE");
+        asset.setScanStatus("PRESIGNED"); asset.setObjectKey("help-orders/images/2026-08-22/a.png");
+        asset.setOriginalFilename("a.png"); asset.setMimeType("image/png"); asset.setSizeBytes(100L);
+        when(fileAssetMapper.selectByIdAndTenant(1L, 42L)).thenReturn(asset);
+        FileRegisterRequest request = new FileRegisterRequest();
+        request.setFileAssetId(42L); request.setOriginalFilename("a.png"); request.setContentType("image/png");
+        request.setSizeBytes(101L); request.setBusinessType("HELP_ORDER_IMAGE");
+
+        assertThatThrownBy(() -> appFileService.register("13800138000", request))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("FILE_ASSET_INVALID");
+    }
+
+    @Test
+    void shouldRejectRegistrationWhenCleanupClaimWinsRace() {
+        when(appPatientService.requireAccessContext("13800138000")).thenReturn(accessContext());
+        FileAsset asset = new FileAsset();
+        asset.setId(42L); asset.setTenantId(1L); asset.setUploadedById(101L); asset.setBusinessType("HELP_ORDER_IMAGE");
+        asset.setScanStatus("PRESIGNED"); asset.setObjectKey("help-orders/images/2026-08-22/a.png");
+        asset.setOriginalFilename("a.png"); asset.setMimeType("image/png"); asset.setSizeBytes(100L);
+        when(fileAssetMapper.selectByIdAndTenant(1L, 42L)).thenReturn(asset);
+        when(fileAssetMapper.completeRegistration(asset)).thenReturn(0);
+        FileRegisterRequest request = new FileRegisterRequest();
+        request.setFileAssetId(42L); request.setOriginalFilename("a.png"); request.setContentType("image/png");
+        request.setSizeBytes(100L); request.setBusinessType("HELP_ORDER_IMAGE");
+
+        assertThatThrownBy(() -> appFileService.register("13800138000", request))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("FILE_ASSET_REGISTRATION_CONFLICT");
+    }
 
     @Test
     void shouldCreatePresignPayloadForPrescriptionImage() {

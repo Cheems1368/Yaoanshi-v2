@@ -2,6 +2,7 @@ package com.medicine.api.dto.prescription;
 
 public class FilePresignResponse {
 
+    private Long fileAssetId;
     private String objectKey;
     private String uploadUrl;
     private String downloadUrl;
@@ -65,4 +66,7 @@ public class FilePresignResponse {
     public void setSizeBytes(Long sizeBytes) {
         this.sizeBytes = sizeBytes;
     }
+
+    public Long getFileAssetId() { return fileAssetId; }
+    public void setFileAssetId(Long fileAssetId) { this.fileAssetId = fileAssetId; }
 }

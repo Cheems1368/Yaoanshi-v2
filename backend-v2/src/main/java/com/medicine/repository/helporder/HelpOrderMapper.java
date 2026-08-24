@@ -189,4 +189,31 @@ public interface HelpOrderMapper {
             WHERE tenant_id = #{tenantId} AND id = #{id} AND deleted = 0
             """)
     int updateState(HelpOrder helpOrder);
+
+    @Select("""
+            SELECT id, order_no, patient_id, submitted_by_type, submitted_by_id, category, title, description, status, priority,
+                   requires_offline_emergency, current_handler_type, current_handler_id, responsible_pharmacist_id, assigned_doctor_id,
+                   first_responded_at, closed_at, reject_reason, service_notice,
+                   creator, create_time, updater, update_time, deleted, tenant_id
+            FROM help_order
+            WHERE tenant_id = #{tenantId} AND patient_id = #{patientId}
+              AND status NOT IN ('CLOSED', 'REJECTED') AND deleted = 0
+            ORDER BY id ASC
+            """)
+    List<HelpOrder> selectNonTerminalByPatientId(@Param("tenantId") Long tenantId, @Param("patientId") Long patientId);
+
+    @Update("""
+            UPDATE help_order
+            SET responsible_pharmacist_id = #{newPharmacistId},
+                current_handler_id = CASE
+                    WHEN current_handler_type = 'PHARMACIST' AND current_handler_id = #{oldPharmacistId} THEN #{newPharmacistId}
+                    ELSE current_handler_id END,
+                updater = #{updater}, update_time = #{updateTime}
+            WHERE tenant_id = #{tenantId} AND patient_id = #{patientId}
+              AND status NOT IN ('CLOSED', 'REJECTED') AND deleted = 0
+            """)
+    int reassignNonTerminalByPatientId(@Param("tenantId") Long tenantId, @Param("patientId") Long patientId,
+                                       @Param("oldPharmacistId") Long oldPharmacistId,
+                                       @Param("newPharmacistId") Long newPharmacistId,
+                                       @Param("updater") String updater, @Param("updateTime") java.time.LocalDateTime updateTime);
 }
