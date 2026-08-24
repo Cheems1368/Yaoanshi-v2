@@ -18,6 +18,42 @@ export function createAppNotificationClient(getToken?: () => string | null) {
   let reconnectTimer: number | null = null
   let manualClose = false
   let connecting = false
+  let pollingTimer: number | null = null
+  let lastSeenId: number | undefined
+
+  const dispatch = (payload: unknown) => {
+    window.dispatchEvent(new CustomEvent(EVENT_NAME, { detail: payload }))
+  }
+
+  const pollLogs = async () => {
+    if (manualClose) return
+    try {
+      const response = await appNotificationService.getLogs(lastSeenId, 50)
+      for (const log of response.data ?? []) {
+        lastSeenId = Math.max(lastSeenId ?? 0, log.id)
+        let payload: Record<string, unknown> = {}
+        if (log.payloadJson) {
+          try { payload = JSON.parse(log.payloadJson) } catch { payload = {} }
+        }
+        dispatch({ ...payload, id: log.id, businessType: log.businessType, businessId: log.businessId })
+      }
+    } catch {
+      // The next bounded poll retries; the main UI remains usable.
+    }
+  }
+
+  const startPolling = () => {
+    if (manualClose || pollingTimer !== null) return
+    void pollLogs()
+    pollingTimer = window.setInterval(() => void pollLogs(), 5000)
+  }
+
+  const stopPolling = () => {
+    if (pollingTimer !== null) {
+      window.clearInterval(pollingTimer)
+      pollingTimer = null
+    }
+  }
 
   const scheduleReconnect = () => {
     if (manualClose || reconnectTimer !== null) {
@@ -31,6 +67,7 @@ export function createAppNotificationClient(getToken?: () => string | null) {
 
   const disconnect = () => {
     manualClose = true
+    stopPolling()
     if (reconnectTimer !== null) {
       window.clearTimeout(reconnectTimer)
       reconnectTimer = null
@@ -65,7 +102,7 @@ export function createAppNotificationClient(getToken?: () => string | null) {
       }
       socket = new WebSocket(`${resolveWebSocketUrl()}?ticket=${encodeURIComponent(ticket)}`)
     } catch (error) {
-      console.error('Failed to create app notification socket ticket:', error)
+      startPolling()
       scheduleReconnect()
       return
     } finally {
@@ -75,11 +112,12 @@ export function createAppNotificationClient(getToken?: () => string | null) {
     socket.onmessage = (event) => {
       try {
         const payload = JSON.parse(event.data)
-        window.dispatchEvent(new CustomEvent(EVENT_NAME, { detail: payload }))
-      } catch (error) {
-        console.error('Failed to parse app notification:', error)
-      }
+        if (typeof payload?.id === 'number') lastSeenId = Math.max(lastSeenId ?? 0, payload.id)
+        dispatch(payload)
+      } catch { /* malformed realtime events are ignored */ }
     }
+
+    socket.onopen = stopPolling
 
     socket.onerror = () => {
       if (socket && socket.readyState === WebSocket.OPEN) {
@@ -89,6 +127,7 @@ export function createAppNotificationClient(getToken?: () => string | null) {
 
     socket.onclose = () => {
       socket = null
+      startPolling()
       scheduleReconnect()
     }
   }

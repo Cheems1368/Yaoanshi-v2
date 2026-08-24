@@ -362,6 +362,7 @@ const registerUpload = async (file: File, options?: { screeningDegraded?: boolea
   }
 
   const result = await prescriptionService.registerUpload({
+    fileAssetId: presign.data.fileAssetId,
     objectKey: presign.data.objectKey,
     originalFilename: file.name,
     contentType,

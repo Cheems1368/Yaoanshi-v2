@@ -18,9 +18,9 @@ Project
 - Yaoshian MVP P0
 
 Branch / Context
-- Delivery state: `main` through PR #40 (`fc3b646`); post-merge `main` CI run `32570783413` passed
-- Active workstream: T9 PR A / MVP v0.1.0 backend contract and reliability closure
-- Active surfaces: backend-v2 V14, app assessment/medication/family/notification/file contracts, admin reassignment and patient metrics, reliability workers
+- Delivery state: `main` through PR #41 (`2614271`); post-merge `main` CI run `32692544044` passed all six jobs
+- Active workstream: T9 PR B / patient MVP gap closure on `codex/mvp-v0.1.0-patient`
+- Active surfaces: patient family management, knowledge assessment, satisfaction, notification polling, native reminders, and encrypted offline check-ins
 
 Current State
 - 2026-08-14 update: PR #32 was squash-merged as `35b1e8a`; the post-merge `main` CI run #38 passed. The old `codex/mobile-demo` branches were deleted while local protection reference `codex/backup-mobile-demo-20260814` was retained.
@@ -40,14 +40,14 @@ Current State
 - Last session (2026-03-27): Phase A–F completed (see below)
 
 In Progress
-- T9 PR A implementation and disposable MySQL migration validation are in progress on `codex/mvp-v0.1.0-backend`.
+- T9 PR B implementation and protected review preparation are in progress on `codex/mvp-v0.1.0-patient`.
 
 Next
-- Finish PR A documentation/migration evidence, publish the protected PR, resolve review conversations, and squash merge after required checks pass.
+- Publish PR B and clear protected checks/review conversations. Complete Android physical-device offline, force-stop, encrypted persistence, idempotent replay, and logout-clear acceptance before squash merge.
 
 Last Updated
-- 2026-08-22 Asia/Shanghai
-- Reason: T8 PR #40 passed the protected review-remediation run and all three review conversations are resolved; it is ready for merge handoff.
+- 2026-08-24 Asia/Shanghai
+- Reason: PR A is delivered and PR B code/browser/Android compilation gates pass; no ADB device is currently connected for the required physical-device acceptance.
 
 Android JDK 21 and APK Gate (2026-08-14)
 - Changed:
@@ -982,3 +982,26 @@ T9 PR A Help-Order/Reassignment Serialization (2026-08-22)
 Last Updated
 - 2026-08-22 Asia/Shanghai
 - Reason: T8 is formally delivered and T9 PR A is implemented locally; medical approval and protected PR qualification remain open.
+
+T9 PR A Delivery and PR B Patient Closure (2026-08-24)
+- Delivered:
+  - The project owner approved all ten `medication-literacy-v1` stems/options/answers as general science education, accepted the residual content risk, and waived a separate licensed-clinician sign-off. The record does not claim that the owner is a licensed clinician.
+  - Squash-merged PR #41 as `261427132b13fc2c53483b95f2d12208190e026a`; post-merge `main` run #32692544044 passed backend, patient Web, patient Android, pharmacist, doctor, and the required aggregate gate.
+- Changed on PR B:
+  - Added patient-only family-binding management, a separate `/knowledge-assessment` route with server-owned scoring, a deferrable one-time CLOSED-order satisfaction card, and `fileAssetId`-preferred upload registration.
+  - Added `/app-api/notifications/logs` cursor polling whenever the patient WebSocket is unavailable.
+  - Locked `@capacitor/local-notifications` to `7.0.7`; local reminders use generic lock-screen copy.
+  - Added a native Capacitor secure-cache plugin using Android Keystore and AES/GCM, a 48-hour task cache, encrypted pending check-ins with stable `clientRequestId`, page/online replay, and logout/unbind clearing. Web medical state is never written to Web Storage.
+- Validated:
+  - Patient lint, production build, 10/10 Vitest tests, and `git diff --check` passed.
+  - `e2e:mvp-release` passed family management, 10-question assessment submission, satisfaction, notification polling fallback, and 390x844 / 430x932 overflow checks.
+  - Capacitor sync found `@capacitor/local-notifications@7.0.7`; Android `assembleDebug` passed.
+  - `D:\ANDROIDSDK\platform-tools\adb.exe devices -l` returned no connected device.
+- Open gate:
+  - Physical Android acceptance remains mandatory before PR B merge: offline check-in, force-stop encrypted persistence, online replay producing one effective record, and logout cache deletion.
+- Next:
+  - Publish the protected PR, clear CI and review conversations, connect a physical Android device, run the four required device scenarios, and only then squash merge PR B.
+
+Last Updated
+- 2026-08-24 Asia/Shanghai
+- Reason: PR A is formally delivered; PR B automated gates pass and only physical-device acceptance remains external.

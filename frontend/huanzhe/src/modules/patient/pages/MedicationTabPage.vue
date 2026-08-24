@@ -23,6 +23,9 @@
 
       <!-- 今日提醒 -->
       <div v-show="activeSegment === 'reminder'" class="container">
+        <div v-if="offlineMode" class="offline-banner" role="status">
+          当前离线，展示 48 小时内的加密缓存；打卡将在联网后自动同步。
+        </div>
         <ion-card class="overview-card">
           <ion-card-content class="overview-grid">
             <div class="overview-item">
@@ -182,6 +185,7 @@ import {
   IonTitle,
   IonToast,
   IonToolbar,
+  onIonViewDidLeave,
   onIonViewWillEnter
 } from '@ionic/vue'
 import { computed, ref } from 'vue'
@@ -193,6 +197,12 @@ import {
   type MedicationPlanDTO
 } from '@/modules/patient/api/mvp'
 import { patientSession } from '@/app/session'
+import {
+  installCheckinReplayListener,
+  loadMedicationTasks,
+  submitOrQueueCheckin
+} from '@/modules/patient/services/offlineMedication'
+import { enableAndScheduleMedicationReminders } from '@/modules/patient/services/localMedicationReminders'
 
 const activeSegment = ref<'reminder' | 'record'>('reminder')
 
@@ -202,6 +212,8 @@ const activePlan = ref<MedicationPlanDTO | null>(null)
 const tasks = ref<DoseTaskDTO[]>([])
 const currentAccountType = ref('PATIENT')
 const submittingTaskId = ref<number | null>(null)
+const offlineMode = ref(false)
+let removeReplayListener: (() => void) | null = null
 
 const reminderCompletedCount = computed(() => tasks.value.filter((t) => t.status === 'COMPLETED').length)
 const pendingCount = computed(() =>
@@ -213,16 +225,20 @@ const loadTasks = async () => {
   try {
     const [planRes, taskRes, accountRes] = await Promise.all([
       medicationService.getActiveMedicationPlan(),
-      medicationService.getTodayDoseTasks(),
+      loadMedicationTasks(),
       appAuthService.getCurrentAccount()
     ])
     activePlan.value = planRes.data ?? null
-    tasks.value = taskRes.data ?? []
+    const today = new Date().toLocaleDateString('sv-SE')
+    tasks.value = taskRes.tasks.filter((task) => task.taskDate === today)
+    offlineMode.value = taskRes.offline
+    void enableAndScheduleMedicationReminders(taskRes.tasks).catch(() => undefined)
     currentAccountType.value = String((accountRes.data as any)?.accountType || 'PATIENT').toUpperCase()
     patientSession.setActivePlanStatus(Boolean(planRes.data))
   } catch {
     activePlan.value = null
     tasks.value = []
+    offlineMode.value = false
     patientSession.setActivePlanStatus(false)
     showMessage('提醒数据加载失败')
   } finally {
@@ -242,7 +258,12 @@ const saveResult = async (task: DoseTaskDTO, result: 'TAKEN' | 'MISSED') => {
     if (task.lastEffectiveCheckinId) {
       await medicationService.correctCheckin(task.lastEffectiveCheckinId, payload)
     } else {
-      await medicationService.submitCheckin({ doseTaskId: task.id, ...payload })
+      const outcome = await submitOrQueueCheckin(task, result)
+      if (outcome === 'queued') {
+        task.status = result === 'TAKEN' ? 'COMPLETED' : 'MISSED'
+        showMessage('当前离线，记录已加密保存，将在联网后自动同步')
+        return
+      }
     }
     showMessage(result === 'TAKEN' ? '已记录为已服药' : '已记录为漏服')
     await loadTasks()
@@ -370,7 +391,15 @@ async function handleRefresh(event: CustomEvent) {
   }
 }
 
-onIonViewWillEnter(loadAll)
+onIonViewWillEnter(async () => {
+  removeReplayListener?.()
+  removeReplayListener = installCheckinReplayListener()
+  await loadAll()
+})
+onIonViewDidLeave(() => {
+  removeReplayListener?.()
+  removeReplayListener = null
+})
 </script>
 
 <style scoped>
@@ -381,6 +410,15 @@ onIonViewWillEnter(loadAll)
 .med-segment {
   padding: 0 var(--patient-space-4);
   --background: transparent;
+}
+
+.offline-banner {
+  padding: var(--patient-space-3);
+  border-radius: var(--patient-radius-md);
+  color: var(--patient-warning-dark, #8a4b08);
+  background: rgba(245, 158, 11, 0.14);
+  font-size: var(--patient-font-helper);
+  line-height: var(--patient-leading-normal);
 }
 
 ion-segment-button {

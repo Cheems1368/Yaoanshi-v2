@@ -46,6 +46,16 @@
           </ion-card-content>
         </ion-card>
 
+        <ion-card v-if="assessmentStatus?.due" class="assessment-card" data-testid="knowledge-assessment-task">
+          <ion-card-content>
+            <div>
+              <div class="assessment-title">用药知识测评待完成</div>
+              <div class="assessment-meta">{{ assessmentStatus.currentPhase === 'WEEK_4' ? '第 4 周复测' : '首次科普测评' }} · 约 3 分钟</div>
+            </div>
+            <ion-button size="small" @click="router.push('/knowledge-assessment')">去完成</ion-button>
+          </ion-card-content>
+        </ion-card>
+
         <!-- 快捷入口（浙里办 3 列宫格） -->
         <ion-card class="quick-actions-card">
           <ion-card-header>
@@ -142,7 +152,13 @@ import {
 } from '@ionic/vue'
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { medicationService, type DoseTaskDTO, type MedicationPlanDTO } from '@/modules/patient/api/mvp'
+import {
+  assessmentService,
+  medicationService,
+  type DoseTaskDTO,
+  type KnowledgeAssessmentStatusDTO,
+  type MedicationPlanDTO
+} from '@/modules/patient/api/mvp'
 import { patientSession } from '@/app/session'
 
 const router = useRouter()
@@ -152,6 +168,7 @@ const activePlan = ref<MedicationPlanDTO | null>(null)
 const todayTasks = ref<DoseTaskDTO[]>([])
 const showToast = ref(false)
 const toastMessage = ref('')
+const assessmentStatus = ref<KnowledgeAssessmentStatusDTO | null>(null)
 
 const quickActions = [
   { id: 1, label: '处方上传', icon: 'documentTextOutline', color: 'primary', route: '/prescription' },
@@ -187,12 +204,14 @@ const showMessage = (message: string) => {
 const loadDashboard = async () => {
   loading.value = true
   try {
-    const [planResponse, tasksResponse] = await Promise.all([
+    const [planResponse, tasksResponse, assessmentResponse] = await Promise.all([
       medicationService.getActiveMedicationPlan(),
-      medicationService.getTodayDoseTasks()
+      medicationService.getTodayDoseTasks(),
+      assessmentService.getKnowledgeStatus().catch(() => ({ data: null }))
     ])
     activePlan.value = planResponse.data ?? null
     todayTasks.value = tasksResponse.data ?? []
+    assessmentStatus.value = assessmentResponse.data ?? null
     patientSession.setActivePlanStatus(Boolean(planResponse.data))
   } catch (error: any) {
     activePlan.value = null
@@ -269,9 +288,20 @@ onIonViewWillEnter(loadDashboard)
 /* ── 概览卡片 ── */
 .overview-card,
 .quick-actions-card,
+.assessment-card,
 .recent-card {
   margin: 0;
 }
+
+.assessment-card ion-card-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--patient-space-3);
+}
+
+.assessment-title { font-weight: var(--patient-font-semibold); color: var(--patient-text-primary); }
+.assessment-meta { margin-top: var(--patient-space-1); font-size: var(--patient-font-helper); color: var(--patient-text-secondary); }
 
 .overview-body {
   padding: var(--patient-space-4) var(--patient-space-3) var(--patient-space-3);

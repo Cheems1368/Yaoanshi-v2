@@ -91,6 +91,7 @@ export const patientSession = {
   clearAuthState() {
     this.markAnonymous()
     this.clearMobile()
+    if (typeof window !== 'undefined') window.dispatchEvent(new Event('patient-session-cleared'))
   },
 
   setBindingStatus(isBound: boolean) {

@@ -75,7 +75,8 @@ Current MVP route list for the patient app:
 
 - `/login` - Login Screen
 - `/realname` - Patient Binding Screen
-- `/questionnaire` - Knowledge or survey task screen, not a hard gate
+- `/questionnaire` - Health profile questionnaire, not a hard gate
+- `/knowledge-assessment` - DAY_1 / WEEK_4 medication-literacy assessment, not a hard gate
 - `/tabs/home` - Home Screen
 - `/tabs/help-order` - Help Order List / Entry Screen
 - `/help-order/:id` - Help Order Detail / Conversation Screen
@@ -141,21 +142,17 @@ Error:
 - Allow retry
 - If duplicate identity is detected, show that pharmacist confirmation is required
 
-#### Questionnaire Screen
+#### Health Profile Questionnaire Screen
 
 Route: `/questionnaire`
 
 Purpose:
 
-- Complete knowledge assessment or other non-blocking survey task
-- DAY_1 starts on the first confirmed plan effective date; WEEK_4 becomes current on calendar day 28. A future effective date is not due.
-- The client sends only question-set version, phase, question codes, and selected options; scoring is server-owned.
+- Complete the non-blocking health profile questionnaire.
 
 Trigger:
 
-- First-day task reminder
-- Week-4 task reminder
-- Pharmacist asks the patient to complete it
+- The patient chooses to complete or update the health profile.
 
 Success:
 
@@ -166,6 +163,30 @@ Error:
 
 - Show save failure and allow retry
 - Keep already entered answers when possible
+
+#### Knowledge Assessment Screen
+
+Route: `/knowledge-assessment`
+
+Purpose:
+
+- Complete the fixed `medication-literacy-v1` science-education assessment without blocking medication or help-order flows.
+- DAY_1 starts on the first ACTIVE plan effective date; WEEK_4 becomes current on calendar day 28. A future effective date is not due.
+- The client sends only question-set version, phase, question codes, and selected options; scoring is server-owned.
+
+Trigger:
+
+- A due card appears on Home.
+- The pharmacist reminds the patient to complete the current phase.
+
+Success:
+
+- Show the server-calculated score and completion timestamp.
+- A completed phase cannot be submitted twice.
+
+Error:
+
+- Keep the main medication flow usable and allow retry.
 
 #### Home Screen
 
@@ -234,6 +255,9 @@ Error:
 - Keep the entered selection
 - Allow retry
 - If offline, cache locally and auto-sync later
+- Native Android caches at most 48 hours of tasks and pending check-ins in app-private AES/GCM ciphertext backed by Android Keystore. Web does not persist medical task/check-in data in Web Storage.
+- Every queued check-in carries a stable `clientRequestId`; entry, login/online recovery, and medication-page entry attempt replay, and the server idempotency contract prevents duplicates.
+- Local lock-screen reminders use generic wording and contain no identity, medicine name, or dose.
 
 #### Medication Record Screen
 
@@ -328,6 +352,8 @@ Error:
 
 - Show detail load failure and retry
 - If realtime update is unavailable, keep the page usable with polling refresh
+- When the app WebSocket is unavailable, poll `/app-api/notifications/logs` with an `afterId` cursor and dispatch the same in-app event shape.
+- A CLOSED order offers a non-blocking 1–5 satisfaction card; the patient may defer it and return later, but may submit only once.
 
 #### Prescription Screen
 
@@ -374,6 +400,7 @@ Success:
 
 - Profile data loads
 - User can manage family account binding status and view care-related info
+- Only a patient account can add, list, confirm, or remove family bindings; the UI enforces the two-binding limit while the server remains authoritative.
 
 Error:
 

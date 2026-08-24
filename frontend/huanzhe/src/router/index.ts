@@ -70,6 +70,11 @@ const routes: Array<RouteRecordRaw> = [
     meta: { requiresAuth: true, requiresBinding: true }
   },
   {
+    path: '/knowledge-assessment',
+    component: () => import('@/modules/patient/pages/KnowledgeAssessmentPage.vue'),
+    meta: { requiresAuth: true, requiresBinding: true }
+  },
+  {
     path: '/help-order/:id',
     component: () => import('@/modules/patient/pages/HelpOrderDetailPage.vue'),
     meta: { requiresAuth: true, requiresBinding: true }

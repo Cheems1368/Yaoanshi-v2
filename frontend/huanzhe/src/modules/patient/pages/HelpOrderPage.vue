@@ -407,6 +407,7 @@ const uploadSelectedImages = async () => {
     })
     await helpOrderService.uploadToPresignedUrl(presign.data.uploadUrl, image.file, contentType)
     const registered = await helpOrderService.registerImage({
+      fileAssetId: presign.data.fileAssetId,
       objectKey: presign.data.objectKey,
       originalFilename: image.file.name || presign.data.filename,
       contentType,

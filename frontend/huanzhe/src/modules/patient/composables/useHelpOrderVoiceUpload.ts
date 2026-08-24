@@ -21,6 +21,7 @@ async function uploadOne(file: File, businessType: 'HELP_ORDER_AUDIO' | 'HELP_OR
   })
   await helpOrderService.uploadToPresignedUrl(presign.data.uploadUrl, file, contentType)
   const registered = await helpOrderService.registerAudio({
+    fileAssetId: presign.data.fileAssetId,
     objectKey: presign.data.objectKey,
     originalFilename: file.name || presign.data.filename,
     contentType,
