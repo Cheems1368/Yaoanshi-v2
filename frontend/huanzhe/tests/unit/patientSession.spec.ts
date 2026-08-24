@@ -37,4 +37,21 @@ describe('patientSession', () => {
     expect(firstDeviceId).toBeTruthy()
     expect(patientSession.ensureDeviceId()).toBe(firstDeviceId)
   })
+
+  test('signals secure-cache clearing when the authenticated subject changes or expires', () => {
+    let clears = 0
+    const listener = () => { clears += 1 }
+    const token = (subject: string) => `header.${btoa(JSON.stringify({ sub: subject }))}.signature`
+    window.addEventListener('patient-session-cleared', listener)
+    try {
+      patientSession.setAccessToken(token('patient-1'))
+      expect(patientSession.getAccountSubject()).toBe('patient-1')
+      patientSession.setAccessToken(token('patient-2'))
+      patientSession.markAnonymous()
+      expect(clears).toBe(2)
+      expect(patientSession.getAccountSubject()).toBeNull()
+    } finally {
+      window.removeEventListener('patient-session-cleared', listener)
+    }
+  })
 })

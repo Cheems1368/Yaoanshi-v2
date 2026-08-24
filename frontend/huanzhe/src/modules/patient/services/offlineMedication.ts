@@ -1,5 +1,6 @@
 import { Capacitor, registerPlugin } from '@capacitor/core'
 import { medicationService, type DoseTaskDTO } from '@/modules/patient/api/mvp'
+import { patientSession } from '@/app/session'
 
 const CACHE_TTL_MS = 48 * 60 * 60 * 1000
 
@@ -14,6 +15,7 @@ interface PendingCheckin {
 
 interface MedicalCacheState {
   version: 1
+  accountSubject: string
   expiresAt: number
   tasks: DoseTaskDTO[]
   pendingCheckins: PendingCheckin[]
@@ -30,6 +32,7 @@ const isNative = () => Capacitor.isNativePlatform()
 
 const emptyState = (): MedicalCacheState => ({
   version: 1,
+  accountSubject: patientSession.getAccountSubject() ?? '',
   expiresAt: Date.now() + CACHE_TTL_MS,
   tasks: [],
   pendingCheckins: []
@@ -41,7 +44,8 @@ async function readState(): Promise<MedicalCacheState> {
     const { value } = await SecureMedicalCache.read()
     if (!value) return emptyState()
     const parsed = JSON.parse(value) as MedicalCacheState
-    if (parsed.version !== 1 || parsed.expiresAt <= Date.now()) {
+    const accountSubject = patientSession.getAccountSubject()
+    if (!accountSubject || parsed.accountSubject !== accountSubject || parsed.version !== 1 || parsed.expiresAt <= Date.now()) {
       await SecureMedicalCache.clear()
       return emptyState()
     }
@@ -54,6 +58,9 @@ async function readState(): Promise<MedicalCacheState> {
 
 async function writeState(state: MedicalCacheState) {
   if (!isNative()) return
+  const accountSubject = patientSession.getAccountSubject()
+  if (!accountSubject) throw new Error('AUTHENTICATED_ACCOUNT_REQUIRED')
+  state.accountSubject = accountSubject
   state.expiresAt = Date.now() + CACHE_TTL_MS
   await SecureMedicalCache.write({ value: JSON.stringify(state) })
 }
@@ -125,8 +132,10 @@ export async function submitOrQueueCheckin(
   }
 }
 
-export async function replayPendingCheckins() {
-  if (!isNative() || !navigator.onLine) return 0
+let replayPromise: Promise<number> | null = null
+
+async function replayPendingCheckinsInternal() {
+  if (!isNative() || !navigator.onLine || !patientSession.getAccessToken()) return 0
   const state = await readState()
   let synced = 0
   for (const pending of [...state.pendingCheckins]) {
@@ -144,12 +153,13 @@ export async function replayPendingCheckins() {
   return synced
 }
 
-export async function clearMedicalCache() {
-  if (isNative()) await SecureMedicalCache.clear()
+export function replayPendingCheckins() {
+  if (!replayPromise) {
+    replayPromise = replayPendingCheckinsInternal().finally(() => { replayPromise = null })
+  }
+  return replayPromise
 }
 
-export function installCheckinReplayListener() {
-  const replay = () => void replayPendingCheckins()
-  window.addEventListener('online', replay)
-  return () => window.removeEventListener('online', replay)
+export async function clearMedicalCache() {
+  if (isNative()) await SecureMedicalCache.clear()
 }

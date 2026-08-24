@@ -2,7 +2,8 @@ import { createApp } from 'vue'
 import App from './App.vue'
 import router from './router';
 import { appAuthService, patientService } from '@/modules/patient/api/mvp'
-import { clearMedicalCache } from '@/modules/patient/services/offlineMedication'
+import { clearMedicalCache, replayPendingCheckins } from '@/modules/patient/services/offlineMedication'
+import { patientSession } from '@/app/session'
 
 import { IonicVue } from '@ionic/vue';
 import AppIcon from '@/shared/components/AppIcon.vue'
@@ -36,6 +37,11 @@ import './theme/variables.css';
 
 if (typeof window !== 'undefined') {
   window.addEventListener('patient-session-cleared', () => void clearMedicalCache())
+  const replayIfAuthenticated = () => {
+    if (patientSession.getAccessToken()) void replayPendingCheckins()
+  }
+  window.addEventListener('online', replayIfAuthenticated)
+  window.addEventListener('patient-session-authenticated', replayIfAuthenticated)
 }
 
 if (import.meta.env.DEV && typeof window !== 'undefined') {

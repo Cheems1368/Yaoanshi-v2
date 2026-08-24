@@ -185,7 +185,6 @@ import {
   IonTitle,
   IonToast,
   IonToolbar,
-  onIonViewDidLeave,
   onIonViewWillEnter
 } from '@ionic/vue'
 import { computed, ref } from 'vue'
@@ -198,7 +197,6 @@ import {
 } from '@/modules/patient/api/mvp'
 import { patientSession } from '@/app/session'
 import {
-  installCheckinReplayListener,
   loadMedicationTasks,
   submitOrQueueCheckin
 } from '@/modules/patient/services/offlineMedication'
@@ -213,7 +211,6 @@ const tasks = ref<DoseTaskDTO[]>([])
 const currentAccountType = ref('PATIENT')
 const submittingTaskId = ref<number | null>(null)
 const offlineMode = ref(false)
-let removeReplayListener: (() => void) | null = null
 
 const reminderCompletedCount = computed(() => tasks.value.filter((t) => t.status === 'COMPLETED').length)
 const pendingCount = computed(() =>
@@ -392,13 +389,7 @@ async function handleRefresh(event: CustomEvent) {
 }
 
 onIonViewWillEnter(async () => {
-  removeReplayListener?.()
-  removeReplayListener = installCheckinReplayListener()
   await loadAll()
-})
-onIonViewDidLeave(() => {
-  removeReplayListener?.()
-  removeReplayListener = null
 })
 </script>
 

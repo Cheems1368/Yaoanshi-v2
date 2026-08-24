@@ -26,9 +26,15 @@ export async function enableAndScheduleMedicationReminders(tasks: DoseTaskDTO[])
       title: GENERIC_REMINDER_TITLE,
       body: GENERIC_REMINDER_BODY,
       schedule: { at, allowWhileIdle: true },
-      extra: { route: '/tabs/medication' }
+      extra: { kind: 'MEDICATION_TASK', route: '/tabs/medication' }
     }))
 
+  const desiredIds = new Set(notifications.map((notification) => notification.id))
+  const pending = await LocalNotifications.getPending()
+  const obsolete = pending.notifications
+    .filter((notification) => notification.extra?.kind === 'MEDICATION_TASK' && !desiredIds.has(notification.id))
+    .map((notification) => ({ id: notification.id }))
+  if (obsolete.length) await LocalNotifications.cancel({ notifications: obsolete })
   if (notifications.length) await LocalNotifications.schedule({ notifications })
   return true
 }

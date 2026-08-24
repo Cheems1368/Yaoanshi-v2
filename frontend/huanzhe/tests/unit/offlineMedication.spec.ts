@@ -13,6 +13,10 @@ vi.mock('@/modules/patient/api/mvp', () => ({
   medicationService: { getDoseTasks: mocks.getDoseTasks, submitCheckin: mocks.submitCheckin }
 }))
 
+vi.mock('@/app/session', () => ({
+  patientSession: { getAccountSubject: () => 'patient-1', getAccessToken: () => 'access-token' }
+}))
+
 import { loadMedicationTasks, submitOrQueueCheckin } from '@/modules/patient/services/offlineMedication'
 
 const cachedTask = {
@@ -28,7 +32,7 @@ describe('native offline medication flow', () => {
   beforeEach(() => {
     Object.values(mocks).forEach((mock) => mock.mockReset())
     mocks.read.mockResolvedValue({
-      value: JSON.stringify({ version: 1, expiresAt: Date.now() + 60_000, tasks: [cachedTask], pendingCheckins: [] })
+      value: JSON.stringify({ version: 1, accountSubject: 'patient-1', expiresAt: Date.now() + 60_000, tasks: [cachedTask], pendingCheckins: [] })
     })
     mocks.write.mockResolvedValue(undefined)
     mocks.clear.mockResolvedValue(undefined)
@@ -55,5 +59,15 @@ describe('native offline medication flow', () => {
     mocks.submitCheckin.mockRejectedValue(new Error('CHECKIN_WINDOW_EXPIRED'))
     await expect(submitOrQueueCheckin(cachedTask as any, 'TAKEN')).rejects.toThrow('CHECKIN_WINDOW_EXPIRED')
     expect(mocks.write).not.toHaveBeenCalled()
+  })
+
+  test('rejects another account cache instead of exposing its tasks', async () => {
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: false })
+    mocks.read.mockResolvedValue({
+      value: JSON.stringify({ version: 1, accountSubject: 'patient-2', expiresAt: Date.now() + 60_000, tasks: [cachedTask], pendingCheckins: [] })
+    })
+    mocks.getDoseTasks.mockRejectedValue(new Error('Network error'))
+    await expect(loadMedicationTasks()).resolves.toEqual({ tasks: [], offline: true })
+    expect(mocks.clear).toHaveBeenCalled()
   })
 })
