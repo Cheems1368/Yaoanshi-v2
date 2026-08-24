@@ -22,6 +22,12 @@
             <p>本阶段已完成 · {{ formatDateTime(completedAssessment.submittedAt) }}</p>
           </ion-card-content>
         </ion-card>
+        <ion-card v-else-if="status && !status.due" class="result-card">
+          <ion-card-content>
+            <h2>当前没有待完成测评</h2>
+            <p>测评不会阻塞用药和求助主流程，到期后首页会再次提醒。</p>
+          </ion-card-content>
+        </ion-card>
         <template v-else>
           <ion-card v-for="(question, index) in questions" :key="question.questionCode" class="question-card">
             <ion-card-header>

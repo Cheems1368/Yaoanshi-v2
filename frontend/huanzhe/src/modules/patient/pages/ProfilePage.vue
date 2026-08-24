@@ -721,10 +721,15 @@ const confirmUnbind = async (binding: AppFamilyBindingDTO) => {
         text: '确认解绑',
         role: 'destructive',
         handler: () => {
-          void patientService.deleteFamilyBinding(binding.id).then(async () => {
-            await clearMedicalCache()
-            await loadFamilyBindings()
-          })
+          void patientService.deleteFamilyBinding(binding.id)
+            .then(async () => {
+              await clearMedicalCache()
+              await loadFamilyBindings()
+            })
+            .catch(async (error: any) => {
+              const toast = await toastController.create({ message: error?.message || '解绑失败', duration: 2200, color: 'danger' })
+              await toast.present()
+            })
         }
       }
     ]

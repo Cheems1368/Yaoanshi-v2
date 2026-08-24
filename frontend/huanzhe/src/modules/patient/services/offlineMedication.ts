@@ -78,7 +78,7 @@ const formatLocalDate = (date: Date) => {
   return `${year}-${month}-${day}`
 }
 
-export async function loadMedicationTasks(days = 2): Promise<{ tasks: DoseTaskDTO[]; offline: boolean }> {
+export async function loadMedicationTasks(days = 3): Promise<{ tasks: DoseTaskDTO[]; offline: boolean }> {
   const dateFrom = new Date()
   const dateTo = new Date()
   dateTo.setDate(dateTo.getDate() + Math.min(Math.max(days, 1), 7) - 1)

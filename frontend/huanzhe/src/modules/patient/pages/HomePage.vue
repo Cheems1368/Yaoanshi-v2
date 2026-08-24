@@ -88,7 +88,7 @@
             </div>
 
             <EmptyState
-              v-else-if="!activePlan"
+              v-else-if="!activePlan && todayTasks.length === 0"
               type="no-plan"
               title="暂无生效用药计划"
               description="等待药师建立计划，或发起求助"
@@ -160,6 +160,7 @@ import {
   type MedicationPlanDTO
 } from '@/modules/patient/api/mvp'
 import { patientSession } from '@/app/session'
+import { loadMedicationTasks } from '@/modules/patient/services/offlineMedication'
 
 const router = useRouter()
 
@@ -205,14 +206,15 @@ const loadDashboard = async () => {
   loading.value = true
   try {
     const [planResponse, tasksResponse, assessmentResponse] = await Promise.all([
-      medicationService.getActiveMedicationPlan(),
-      medicationService.getTodayDoseTasks(),
+      medicationService.getActiveMedicationPlan().catch(() => ({ data: null })),
+      loadMedicationTasks(),
       assessmentService.getKnowledgeStatus().catch(() => ({ data: null }))
     ])
     activePlan.value = planResponse.data ?? null
-    todayTasks.value = tasksResponse.data ?? []
+    const today = new Date().toLocaleDateString('sv-SE')
+    todayTasks.value = tasksResponse.tasks.filter((task) => task.taskDate === today)
     assessmentStatus.value = assessmentResponse.data ?? null
-    patientSession.setActivePlanStatus(Boolean(planResponse.data))
+    if (!tasksResponse.offline) patientSession.setActivePlanStatus(Boolean(planResponse.data))
   } catch (error: any) {
     activePlan.value = null
     todayTasks.value = []

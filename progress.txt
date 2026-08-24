@@ -993,7 +993,7 @@ T9 PR A Delivery and PR B Patient Closure (2026-08-24)
   - Locked `@capacitor/local-notifications` to `7.0.7`; local reminders use generic lock-screen copy.
   - Added a native Capacitor secure-cache plugin using Android Keystore and AES/GCM, a 48-hour task cache, encrypted pending check-ins with stable `clientRequestId`, page/online replay, and logout/unbind clearing. Web medical state is never written to Web Storage.
 - Validated:
-  - Patient lint, production build, 10/10 Vitest tests, and `git diff --check` passed.
+  - Patient lint, production build, 13/13 Vitest tests, and `git diff --check` passed; the offline regression suite proves cached tasks remain visible when auxiliary plan/account APIs are unreachable and that online business errors are not queued.
   - `e2e:mvp-release` passed family management, 10-question assessment submission, satisfaction, notification polling fallback, and 390x844 / 430x932 overflow checks.
   - Capacitor sync found `@capacitor/local-notifications@7.0.7`; Android `assembleDebug` passed.
   - `D:\ANDROIDSDK\platform-tools\adb.exe devices -l` returned no connected device.

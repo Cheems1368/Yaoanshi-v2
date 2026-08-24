@@ -48,7 +48,7 @@
         </div>
 
         <EmptyState
-          v-else-if="!activePlan"
+          v-else-if="!activePlan && tasks.length === 0"
           type="no-plan"
           title="暂无生效用药计划"
           description="等待药师建立计划，或发起求助"
@@ -163,9 +163,9 @@ const loadTasks = async () => {
   loading.value = true
   try {
     const [planResponse, taskResponse, accountResponse] = await Promise.all([
-      medicationService.getActiveMedicationPlan(),
+      medicationService.getActiveMedicationPlan().catch(() => ({ data: null })),
       loadMedicationTasks(),
-      appAuthService.getCurrentAccount()
+      appAuthService.getCurrentAccount().catch(() => ({ data: { accountType: 'PATIENT' } }))
     ])
     activePlan.value = planResponse.data ?? null
     const today = new Date().toLocaleDateString('sv-SE')
@@ -173,7 +173,7 @@ const loadTasks = async () => {
     offlineMode.value = taskResponse.offline
     void enableAndScheduleMedicationReminders(taskResponse.tasks).catch(() => undefined)
     currentAccountType.value = String((accountResponse.data as any)?.accountType || 'PATIENT').toUpperCase()
-    patientSession.setActivePlanStatus(Boolean(planResponse.data))
+    if (!taskResponse.offline) patientSession.setActivePlanStatus(Boolean(planResponse.data))
   } catch (error: any) {
     activePlan.value = null
     tasks.value = []
