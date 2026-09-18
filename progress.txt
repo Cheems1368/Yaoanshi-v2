@@ -1010,6 +1010,7 @@ T9 PR B Physical Android Acceptance and Review Remediation (2026-09-18)
 - Changed:
   - Home now schedules native medication reminders after loading the task cache; offline check-ins immediately cancel the corresponding reminder.
   - Pending-check-in replay is scoped to the authenticated account and rechecks identity after each network result, preventing an in-flight replay from rewriting another account's cache.
+  - All encrypted-cache read/modify/write operations are serialized so rapid offline check-ins cannot overwrite each other; mutations preserve the original absolute 48-hour expiry instead of extending it.
   - Temporary refresh failure leaves the encrypted native cache sealed while unauthenticated; explicit logout, unbind, account switch, expiry, or invalid cache version still clears it.
   - Added an exact credentialed Capacitor CORS allowlist and a debug-only `http://localhost` WebView origin for ADB reverse. Packaged builds keep the default secure origin.
   - Fixed Spring constructor selection for the HTTP AI upstream client so the application context starts with both production dependencies available.
@@ -1017,7 +1018,7 @@ T9 PR B Physical Android Acceptance and Review Remediation (2026-09-18)
   - On a physical Android 14 device, the app cached tasks as app-private AES/GCM ciphertext, queued a check-in with the backend unavailable, retained identical ciphertext across force-stop/relaunch, and replayed exactly one effective record after reconnect and same-account login.
   - Repeated page entry did not duplicate the replayed check-in. Logout removed the encrypted cache; final device application data was cleared.
   - Android notification permission was granted, AlarmManager registered the Capacitor receiver, and the system notification service recorded one enqueue and one post using generic lock-screen copy. Lack of exact-alarm permission degraded to a non-exact alarm without exposing identity, medicine, or dose.
-  - Full backend `clean verify` passed 198/198 tests. Patient lint, 20/20 Vitest tests, production build, Android debug build, pharmacist build, doctor build, `git diff --check`, and `e2e:mvp-release` all passed.
+  - Full backend `clean verify` passed 198/198 tests. Patient lint, 22/22 Vitest tests, production build, Android debug build, pharmacist build, doctor build, `git diff --check`, and `e2e:mvp-release` all passed.
   - The local acceptance-only task/check-in rows, temporary screenshots, Cookie database copies, and device application data were deleted. No production database or production service was contacted.
 - Remaining gate:
   - Push the remediation head, pass all protected checks, resolve all latest-head review conversations, and squash-merge PR #42 before starting PR C.

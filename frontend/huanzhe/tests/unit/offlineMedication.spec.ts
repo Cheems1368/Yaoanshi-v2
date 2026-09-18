@@ -108,4 +108,59 @@ describe('native offline medication flow', () => {
 
     expect(mocks.write).not.toHaveBeenCalled()
   })
+
+  test('serializes concurrent offline check-ins without losing either pending request', async () => {
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: false })
+    mocks.submitCheckin.mockRejectedValue(new Error('Network error'))
+    let storedValue = JSON.stringify({
+      version: 1,
+      accountSubject: 'patient-1',
+      expiresAt: Date.now() + 60_000,
+      tasks: [cachedTask, { ...cachedTask, id: 8 }],
+      pendingCheckins: []
+    })
+    mocks.read.mockImplementation(async () => ({ value: storedValue }))
+    let releaseFirstWrite!: () => void
+    mocks.write
+      .mockImplementationOnce(({ value }) => new Promise<void>((resolve) => {
+        releaseFirstWrite = () => {
+          storedValue = value
+          resolve()
+        }
+      }))
+      .mockImplementation(async ({ value }) => { storedValue = value })
+
+    const first = submitOrQueueCheckin(cachedTask as any, 'TAKEN')
+    await vi.waitFor(() => expect(mocks.write).toHaveBeenCalledTimes(1))
+    const second = submitOrQueueCheckin({ ...cachedTask, id: 8 } as any, 'MISSED')
+    await vi.waitFor(() => expect(mocks.submitCheckin).toHaveBeenCalledTimes(2))
+    expect(mocks.read).toHaveBeenCalledTimes(1)
+
+    releaseFirstWrite()
+    await Promise.all([first, second])
+
+    const saved = JSON.parse(storedValue)
+    expect(saved.pendingCheckins).toHaveLength(2)
+    expect(saved.pendingCheckins.map((item: any) => item.doseTaskId)).toEqual([7, 8])
+  })
+
+  test('preserves the original cache expiry when an offline check-in is queued', async () => {
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: false })
+    mocks.submitCheckin.mockRejectedValue(new Error('Network error'))
+    const originalExpiry = Date.now() + 60_000
+    mocks.read.mockResolvedValue({
+      value: JSON.stringify({
+        version: 1,
+        accountSubject: 'patient-1',
+        expiresAt: originalExpiry,
+        tasks: [cachedTask],
+        pendingCheckins: []
+      })
+    })
+
+    await submitOrQueueCheckin(cachedTask as any, 'TAKEN')
+
+    const saved = JSON.parse(mocks.write.mock.calls[0][0].value)
+    expect(saved.expiresAt).toBe(originalExpiry)
+  })
 })

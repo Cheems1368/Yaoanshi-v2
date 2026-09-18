@@ -67,17 +67,27 @@ async function writeState(state: MedicalCacheState) {
   if (!accountSubject || !state.accountSubject || state.accountSubject !== accountSubject) {
     throw new Error('AUTHENTICATED_ACCOUNT_CHANGED')
   }
-  state.expiresAt = Date.now() + CACHE_TTL_MS
   await SecureMedicalCache.write({ value: JSON.stringify(state) })
+}
+
+let stateMutationTail: Promise<void> = Promise.resolve()
+
+function mutateState<T>(mutation: (state: MedicalCacheState) => T | Promise<T>): Promise<T> {
+  const operation = stateMutationTail.then(async () => {
+    const state = await readState()
+    const result = await mutation(state)
+    await writeState(state)
+    return result
+  })
+  stateMutationTail = operation.then(() => undefined, () => undefined)
+  return operation
 }
 
 const makeRequestId = () => globalThis.crypto?.randomUUID?.()
   ?? `checkin-${Date.now()}-${Math.random().toString(16).slice(2)}`
 
 export async function cacheDoseTasks(tasks: DoseTaskDTO[]) {
-  const state = await readState()
-  state.tasks = tasks
-  await writeState(state)
+  await mutateState((state) => { state.tasks = tasks })
 }
 
 export async function getCachedDoseTasks() {
@@ -126,14 +136,14 @@ export async function submitOrQueueCheckin(
   } catch (error) {
     const message = error instanceof Error ? error.message : ''
     if (!isNative() || (navigator.onLine && message !== 'Network error')) throw error
-    const state = await readState()
-    if (!state.pendingCheckins.some((item) => item.clientRequestId === payload.clientRequestId)) {
-      state.pendingCheckins.push(payload)
-    }
-    state.tasks = state.tasks.map((item) => item.id === task.id
-      ? { ...item, status: result === 'TAKEN' ? 'COMPLETED' : 'MISSED' }
-      : item)
-    await writeState(state)
+    await mutateState((state) => {
+      if (!state.pendingCheckins.some((item) => item.clientRequestId === payload.clientRequestId)) {
+        state.pendingCheckins.push(payload)
+      }
+      state.tasks = state.tasks.map((item) => item.id === task.id
+        ? { ...item, status: result === 'TAKEN' ? 'COMPLETED' : 'MISSED' }
+        : item)
+    })
     return 'queued'
   }
 }
@@ -154,11 +164,12 @@ async function replayPendingCheckinsInternal(accountSubject: string) {
     try {
       await medicationService.submitCheckin(pending)
       if (patientSession.getAccountSubject() !== accountSubject) return synced
-      state.pendingCheckins = state.pendingCheckins.filter(
-        (item) => item.clientRequestId !== pending.clientRequestId
-      )
+      await mutateState((currentState) => {
+        currentState.pendingCheckins = currentState.pendingCheckins.filter(
+          (item) => item.clientRequestId !== pending.clientRequestId
+        )
+      })
       synced += 1
-      await writeState(state)
     } catch {
       break
     }
