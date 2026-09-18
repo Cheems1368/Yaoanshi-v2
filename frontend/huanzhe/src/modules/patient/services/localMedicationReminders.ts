@@ -7,6 +7,11 @@ export const GENERIC_REMINDER_BODY = '您有一项用药任务待处理，请打
 
 const notificationId = (taskId: number) => Math.abs(taskId % 2_000_000_000) + 1
 
+export async function cancelMedicationReminder(taskId: number) {
+  if (!Capacitor.isNativePlatform()) return
+  await LocalNotifications.cancel({ notifications: [{ id: notificationId(taskId) }] })
+}
+
 export async function enableAndScheduleMedicationReminders(tasks: DoseTaskDTO[]) {
   if (!Capacitor.isNativePlatform()) return false
   let permission = await LocalNotifications.checkPermissions()

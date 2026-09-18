@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
-  read: vi.fn(), write: vi.fn(), clear: vi.fn(), getDoseTasks: vi.fn(), submitCheckin: vi.fn()
+  read: vi.fn(), write: vi.fn(), clear: vi.fn(), getDoseTasks: vi.fn(), submitCheckin: vi.fn(),
+  accountSubject: 'patient-1'
 }))
 
 vi.mock('@capacitor/core', () => ({
@@ -14,10 +15,14 @@ vi.mock('@/modules/patient/api/mvp', () => ({
 }))
 
 vi.mock('@/app/session', () => ({
-  patientSession: { getAccountSubject: () => 'patient-1', getAccessToken: () => 'access-token' }
+  patientSession: { getAccountSubject: () => mocks.accountSubject, getAccessToken: () => 'access-token' }
 }))
 
-import { loadMedicationTasks, submitOrQueueCheckin } from '@/modules/patient/services/offlineMedication'
+import {
+  loadMedicationTasks,
+  replayPendingCheckins,
+  submitOrQueueCheckin
+} from '@/modules/patient/services/offlineMedication'
 
 const cachedTask = {
   id: 7,
@@ -30,7 +35,10 @@ const cachedTask = {
 
 describe('native offline medication flow', () => {
   beforeEach(() => {
-    Object.values(mocks).forEach((mock) => mock.mockReset())
+    Object.values(mocks).forEach((mock) => {
+      if (typeof mock === 'function' && 'mockReset' in mock) mock.mockReset()
+    })
+    mocks.accountSubject = 'patient-1'
     mocks.read.mockResolvedValue({
       value: JSON.stringify({ version: 1, accountSubject: 'patient-1', expiresAt: Date.now() + 60_000, tasks: [cachedTask], pendingCheckins: [] })
     })
@@ -69,5 +77,35 @@ describe('native offline medication flow', () => {
     mocks.getDoseTasks.mockRejectedValue(new Error('Network error'))
     await expect(loadMedicationTasks()).resolves.toEqual({ tasks: [], offline: true })
     expect(mocks.clear).toHaveBeenCalled()
+  })
+
+  test('keeps encrypted data sealed while no account is authenticated', async () => {
+    mocks.accountSubject = ''
+    await expect(loadMedicationTasks()).resolves.toEqual({ tasks: [], offline: true })
+    expect(mocks.clear).not.toHaveBeenCalled()
+    expect(mocks.write).not.toHaveBeenCalled()
+  })
+
+  test('does not rewrite an old account cache after the session changes during replay', async () => {
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: true })
+    mocks.read.mockResolvedValue({
+      value: JSON.stringify({
+        version: 1,
+        accountSubject: 'patient-1',
+        expiresAt: Date.now() + 60_000,
+        tasks: [cachedTask],
+        pendingCheckins: [{ clientRequestId: 'request-1', doseTaskId: 7, result: 'TAKEN', actualTakenAt: new Date().toISOString() }]
+      })
+    })
+    let resolveSubmit!: () => void
+    mocks.submitCheckin.mockImplementation(() => new Promise<void>((resolve) => { resolveSubmit = resolve }))
+
+    const replay = replayPendingCheckins()
+    await vi.waitFor(() => expect(mocks.submitCheckin).toHaveBeenCalledTimes(1))
+    mocks.accountSubject = 'patient-2'
+    resolveSubmit()
+    await replay
+
+    expect(mocks.write).not.toHaveBeenCalled()
   })
 })

@@ -148,6 +148,7 @@ Compatibility DTO for the existing auth endpoints. Official patient, pharmacist,
 9. App refresh rotation uses a database old-hash conditional update before Redis synchronization; professional refresh rotation uses Redis compare-and-set.
 10. Cookie logout conditionally revokes only the currently matching refresh state, then clears the Cookie with `Max-Age=0`.
 11. Refresh Cookies never authenticate business APIs; business authorization remains Bearer access-token based.
+12. Credentialed Capacitor WebView requests use an exact-origin CORS allowlist: `https://localhost` in every profile, plus `http://localhost` only in the `local` profile for ADB-reversed debug acceptance. Wildcard origins are forbidden.
 
 ## 4. Database schema
 

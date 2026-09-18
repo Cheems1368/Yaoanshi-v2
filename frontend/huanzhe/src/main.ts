@@ -36,7 +36,7 @@ import '@ionic/vue/css/display.css';
 import './theme/variables.css';
 
 if (typeof window !== 'undefined') {
-  window.addEventListener('patient-session-cleared', () => void clearMedicalCache())
+  window.addEventListener('patient-account-switched', () => void clearMedicalCache())
   const replayIfAuthenticated = () => {
     if (patientSession.getAccessToken()) void replayPendingCheckins()
   }

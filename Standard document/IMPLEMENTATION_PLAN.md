@@ -12,7 +12,7 @@ Rules:
 4. This document covers `P0` and `P0+` MVP phases, plus the Post-P0 trial readiness sprint.
 5. `P2` and later capabilities must stay in backlog and must not enter the primary build sequence.
 
-## 1.5 Execution Status Summary (as of 2026-08-24)
+## 1.5 Execution Status Summary (as of 2026-09-18)
 
 | Phase | Description | Status |
 |-------|-------------|--------|
@@ -29,7 +29,7 @@ Rules:
 | Phase T6 | Android JDK 21 and enforced APK build gate | ✅ Delivered through PR #37 (`98115b9`) |
 | Phase T7 | SEC-002 refresh-token HttpOnly Cookie closure | ✅ Delivered through PR #39 (`4c90292`) |
 | Phase T8 | SEC-005 AI data-boundary closure | ✅ Delivered through PR #40 (`fc3b646`); post-merge `main` CI run `32570783413` passed |
-| Phase T9 | MVP v0.1.0 formal delivery and gap closure | 🚧 PR A delivered through PR #41 (`2614271`); PR B patient implementation is under protected review preparation |
+| Phase T9 | MVP v0.1.0 formal delivery and gap closure | 🚧 PR A delivered through PR #41 (`2614271`); PR B patient implementation and physical Android acceptance are complete, with protected review qualification in progress |
 
 **Current active work:** T9 closes the remaining MVP contract, patient, professional-client, reliability, operations, and release-evidence gaps through three protected PRs. T8/SEC-005 is formally delivered. Android release signing and store publishing remain out of scope.
 
@@ -38,7 +38,7 @@ Rules:
 **Known open items:**
 - `MEDICINE_OCR_API_KEY` must be set in `.env.local` for live OCR (graceful fallback if omitted)
 - The project owner approved `medication-literacy-v1` on 2026-08-24 as general medication science education and explicitly accepted the risk of releasing without a separate licensed-clinician sign-off; this is an owner waiver, not a claim of clinical credentials
-- T9 Android physical-device and disposable MySQL/MinIO acceptance remain release gates
+- T9 disposable MinIO cleanup/rollback acceptance and PR C release closure remain release gates; PR B physical Android acceptance passed on 2026-09-18
 - Ops cleanup: `ops/sql/sec-003-clear-legacy-patient-id-card-masked.sql` needs to be run
 
 ## 1.6 Post-P0 Trial Demo Closed-Loop Sequence

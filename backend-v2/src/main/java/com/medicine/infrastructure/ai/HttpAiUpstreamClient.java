@@ -6,6 +6,7 @@ import com.medicine.common.exception.BusinessException;
 import com.medicine.common.exception.ErrorCode;
 import com.medicine.config.AiProperties;
 import com.medicine.service.ai.AiUpstreamClient;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
@@ -33,6 +34,7 @@ public class HttpAiUpstreamClient implements AiUpstreamClient {
     private final HttpClient httpClient;
     private final URI endpoint;
 
+    @Autowired
     public HttpAiUpstreamClient(AiProperties properties, ObjectMapper objectMapper) {
         this(properties, objectMapper, HttpClient.newBuilder()
                 .connectTimeout(Duration.ofMillis(properties.getTimeoutMs()))

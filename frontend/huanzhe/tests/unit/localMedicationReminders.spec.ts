@@ -7,7 +7,10 @@ const mocks = vi.hoisted(() => ({
 vi.mock('@capacitor/core', () => ({ Capacitor: { isNativePlatform: () => true } }))
 vi.mock('@capacitor/local-notifications', () => ({ LocalNotifications: mocks }))
 
-import { enableAndScheduleMedicationReminders } from '@/modules/patient/services/localMedicationReminders'
+import {
+  cancelMedicationReminder,
+  enableAndScheduleMedicationReminders
+} from '@/modules/patient/services/localMedicationReminders'
 
 describe('local medication reminder lifecycle', () => {
   beforeEach(() => {
@@ -28,5 +31,10 @@ describe('local medication reminder lifecycle', () => {
     } as any])
     expect(mocks.cancel).toHaveBeenCalledWith({ notifications: [{ id: 8 }] })
     expect(mocks.schedule).not.toHaveBeenCalled()
+  })
+
+  test('cancels the matching reminder immediately after an offline checkin', async () => {
+    await cancelMedicationReminder(7)
+    expect(mocks.cancel).toHaveBeenCalledWith({ notifications: [{ id: 8 }] })
   })
 })

@@ -45,7 +45,12 @@ async function readState(): Promise<MedicalCacheState> {
     if (!value) return emptyState()
     const parsed = JSON.parse(value) as MedicalCacheState
     const accountSubject = patientSession.getAccountSubject()
-    if (!accountSubject || parsed.accountSubject !== accountSubject || parsed.version !== 1 || parsed.expiresAt <= Date.now()) {
+    if (parsed.version !== 1 || parsed.expiresAt <= Date.now()) {
+      await SecureMedicalCache.clear()
+      return emptyState()
+    }
+    if (!accountSubject) return emptyState()
+    if (parsed.accountSubject !== accountSubject) {
       await SecureMedicalCache.clear()
       return emptyState()
     }
@@ -59,8 +64,9 @@ async function readState(): Promise<MedicalCacheState> {
 async function writeState(state: MedicalCacheState) {
   if (!isNative()) return
   const accountSubject = patientSession.getAccountSubject()
-  if (!accountSubject) throw new Error('AUTHENTICATED_ACCOUNT_REQUIRED')
-  state.accountSubject = accountSubject
+  if (!accountSubject || !state.accountSubject || state.accountSubject !== accountSubject) {
+    throw new Error('AUTHENTICATED_ACCOUNT_CHANGED')
+  }
   state.expiresAt = Date.now() + CACHE_TTL_MS
   await SecureMedicalCache.write({ value: JSON.stringify(state) })
 }
@@ -132,15 +138,22 @@ export async function submitOrQueueCheckin(
   }
 }
 
-let replayPromise: Promise<number> | null = null
+interface ReplayAttempt {
+  accountSubject: string
+  promise: Promise<number>
+}
 
-async function replayPendingCheckinsInternal() {
+let replayAttempt: ReplayAttempt | null = null
+
+async function replayPendingCheckinsInternal(accountSubject: string) {
   if (!isNative() || !navigator.onLine || !patientSession.getAccessToken()) return 0
   const state = await readState()
+  if (state.accountSubject !== accountSubject || patientSession.getAccountSubject() !== accountSubject) return 0
   let synced = 0
   for (const pending of [...state.pendingCheckins]) {
     try {
       await medicationService.submitCheckin(pending)
+      if (patientSession.getAccountSubject() !== accountSubject) return synced
       state.pendingCheckins = state.pendingCheckins.filter(
         (item) => item.clientRequestId !== pending.clientRequestId
       )
@@ -154,10 +167,15 @@ async function replayPendingCheckinsInternal() {
 }
 
 export function replayPendingCheckins() {
-  if (!replayPromise) {
-    replayPromise = replayPendingCheckinsInternal().finally(() => { replayPromise = null })
-  }
-  return replayPromise
+  const accountSubject = patientSession.getAccountSubject()
+  if (!accountSubject) return Promise.resolve(0)
+  if (replayAttempt?.accountSubject === accountSubject) return replayAttempt.promise
+
+  const promise = replayPendingCheckinsInternal(accountSubject).finally(() => {
+    if (replayAttempt?.promise === promise) replayAttempt = null
+  })
+  replayAttempt = { accountSubject, promise }
+  return promise
 }
 
 export async function clearMedicalCache() {

@@ -57,4 +57,13 @@ describe('MVP release patient contracts', () => {
     expect(GENERIC_REMINDER_BODY).toBe('您有一项用药任务待处理，请打开药按时查看。')
     expect(GENERIC_REMINDER_BODY).not.toMatch(/患者|姓名|药名|剂量|毫克|mg/i)
   })
+
+  test('schedules reminders from the default home route and cancels queued checkins immediately', () => {
+    const homeSource = readFileSync(resolve(process.cwd(), 'src/modules/patient/pages/HomePage.vue'), 'utf8')
+    const reminderSource = readFileSync(resolve(process.cwd(), 'src/modules/patient/pages/MedicationReminderPage.vue'), 'utf8')
+    const tabSource = readFileSync(resolve(process.cwd(), 'src/modules/patient/pages/MedicationTabPage.vue'), 'utf8')
+    expect(homeSource).toContain('enableAndScheduleMedicationReminders(tasksResponse.tasks)')
+    expect(reminderSource).toContain('cancelMedicationReminder(task.id)')
+    expect(tabSource).toContain('cancelMedicationReminder(task.id)')
+  })
 })

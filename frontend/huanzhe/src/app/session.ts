@@ -42,7 +42,7 @@ export const patientSession = {
   setAccessToken(token: string) {
     const nextSubject = readTokenSubject(token)
     if (accountSubjectMemory && nextSubject && accountSubjectMemory !== nextSubject && typeof window !== 'undefined') {
-      window.dispatchEvent(new Event('patient-session-cleared'))
+      window.dispatchEvent(new Event('patient-account-switched'))
     }
     accessTokenMemory = token || ''
     accountSubjectMemory = nextSubject
@@ -67,7 +67,6 @@ export const patientSession = {
     authStatus = 'anonymous'
     accessTokenMemory = ''
     accountSubjectMemory = ''
-    if (typeof window !== 'undefined') window.dispatchEvent(new Event('patient-session-cleared'))
   },
 
   resetAuthStatus() {

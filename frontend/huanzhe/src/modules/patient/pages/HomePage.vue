@@ -161,6 +161,7 @@ import {
 } from '@/modules/patient/api/mvp'
 import { patientSession } from '@/app/session'
 import { loadMedicationTasks } from '@/modules/patient/services/offlineMedication'
+import { enableAndScheduleMedicationReminders } from '@/modules/patient/services/localMedicationReminders'
 
 const router = useRouter()
 
@@ -213,6 +214,7 @@ const loadDashboard = async () => {
     activePlan.value = planResponse.data ?? null
     const today = new Date().toLocaleDateString('sv-SE')
     todayTasks.value = tasksResponse.tasks.filter((task) => task.taskDate === today)
+    void enableAndScheduleMedicationReminders(tasksResponse.tasks).catch(() => undefined)
     assessmentStatus.value = assessmentResponse.data ?? null
     if (!tasksResponse.offline) patientSession.setActivePlanStatus(Boolean(planResponse.data))
   } catch (error: any) {

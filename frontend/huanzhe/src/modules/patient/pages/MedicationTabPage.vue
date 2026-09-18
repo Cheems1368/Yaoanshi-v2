@@ -200,7 +200,10 @@ import {
   loadMedicationTasks,
   submitOrQueueCheckin
 } from '@/modules/patient/services/offlineMedication'
-import { enableAndScheduleMedicationReminders } from '@/modules/patient/services/localMedicationReminders'
+import {
+  cancelMedicationReminder,
+  enableAndScheduleMedicationReminders
+} from '@/modules/patient/services/localMedicationReminders'
 
 const activeSegment = ref<'reminder' | 'record'>('reminder')
 
@@ -258,6 +261,7 @@ const saveResult = async (task: DoseTaskDTO, result: 'TAKEN' | 'MISSED') => {
       const outcome = await submitOrQueueCheckin(task, result)
       if (outcome === 'queued') {
         task.status = result === 'TAKEN' ? 'COMPLETED' : 'MISSED'
+        await cancelMedicationReminder(task.id).catch(() => undefined)
         showMessage('当前离线，记录已加密保存，将在联网后自动同步')
         return
       }

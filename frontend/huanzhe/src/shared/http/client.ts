@@ -12,7 +12,7 @@ class HttpService {
   private refreshPromise: Promise<string | null> | null = null
 
   constructor() {
-    const apiBaseUrl = typeof __API_BASE_URL__ === 'string' ? __API_BASE_URL__ : 'http://127.0.0.1:8080'
+    const apiBaseUrl = typeof __API_BASE_URL__ === 'string' ? __API_BASE_URL__ : 'http://localhost:8080'
 
     this.instance = axios.create({
       baseURL: import.meta.env.DEV ? '' : apiBaseUrl,
