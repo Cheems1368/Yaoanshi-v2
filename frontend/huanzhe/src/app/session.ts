@@ -67,6 +67,7 @@ export const patientSession = {
     authStatus = 'anonymous'
     accessTokenMemory = ''
     accountSubjectMemory = ''
+    if (typeof window !== 'undefined') window.dispatchEvent(new Event('patient-session-anonymous'))
   },
 
   resetAuthStatus() {

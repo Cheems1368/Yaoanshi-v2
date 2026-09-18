@@ -54,4 +54,16 @@ describe('patientSession', () => {
       window.removeEventListener('patient-account-switched', listener)
     }
   })
+
+  test('signals reminder cleanup whenever the session becomes anonymous', () => {
+    let anonymousEvents = 0
+    const listener = () => { anonymousEvents += 1 }
+    window.addEventListener('patient-session-anonymous', listener)
+    try {
+      patientSession.markAnonymous()
+      expect(anonymousEvents).toBe(1)
+    } finally {
+      window.removeEventListener('patient-session-anonymous', listener)
+    }
+  })
 })

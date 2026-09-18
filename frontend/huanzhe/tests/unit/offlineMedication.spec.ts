@@ -163,4 +163,42 @@ describe('native offline medication flow', () => {
     const saved = JSON.parse(mocks.write.mock.calls[0][0].value)
     expect(saved.expiresAt).toBe(originalExpiry)
   })
+
+  test('does not cache a task response after the authenticated account changes', async () => {
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: true })
+    let resolveTasks!: (value: { data: any[] }) => void
+    mocks.getDoseTasks.mockImplementation(() => new Promise((resolve) => { resolveTasks = resolve }))
+
+    const loading = loadMedicationTasks()
+    await vi.waitFor(() => expect(mocks.getDoseTasks).toHaveBeenCalledTimes(1))
+    mocks.accountSubject = 'patient-2'
+    resolveTasks({ data: [cachedTask] })
+
+    await expect(loading).resolves.toEqual({ tasks: [], offline: true })
+    expect(mocks.write).not.toHaveBeenCalled()
+  })
+
+  test('drops a terminal missing-task checkin and continues replaying the queue', async () => {
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: true })
+    let storedValue = JSON.stringify({
+      version: 1,
+      accountSubject: 'patient-1',
+      expiresAt: Date.now() + 60_000,
+      tasks: [cachedTask],
+      pendingCheckins: [
+        { clientRequestId: 'missing-task', doseTaskId: 7, result: 'TAKEN', actualTakenAt: new Date().toISOString() },
+        { clientRequestId: 'valid-task', doseTaskId: 8, result: 'TAKEN', actualTakenAt: new Date().toISOString() }
+      ]
+    })
+    mocks.read.mockImplementation(async () => ({ value: storedValue }))
+    mocks.write.mockImplementation(async ({ value }) => { storedValue = value })
+    mocks.submitCheckin
+      .mockRejectedValueOnce(new Error('DOSE_TASK_NOT_FOUND'))
+      .mockResolvedValueOnce(undefined)
+
+    await expect(replayPendingCheckins()).resolves.toBe(1)
+
+    expect(mocks.submitCheckin).toHaveBeenCalledTimes(2)
+    expect(JSON.parse(storedValue).pendingCheckins).toEqual([])
+  })
 })

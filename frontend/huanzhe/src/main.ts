@@ -3,6 +3,7 @@ import App from './App.vue'
 import router from './router';
 import { appAuthService, patientService } from '@/modules/patient/api/mvp'
 import { clearMedicalCache, replayPendingCheckins } from '@/modules/patient/services/offlineMedication'
+import { cancelAllMedicationReminders } from '@/modules/patient/services/localMedicationReminders'
 import { patientSession } from '@/app/session'
 
 import { IonicVue } from '@ionic/vue';
@@ -36,7 +37,11 @@ import '@ionic/vue/css/display.css';
 import './theme/variables.css';
 
 if (typeof window !== 'undefined') {
-  window.addEventListener('patient-account-switched', () => void clearMedicalCache())
+  window.addEventListener('patient-account-switched', () => {
+    void clearMedicalCache()
+    void cancelAllMedicationReminders()
+  })
+  window.addEventListener('patient-session-anonymous', () => void cancelAllMedicationReminders())
   const replayIfAuthenticated = () => {
     if (patientSession.getAccessToken()) void replayPendingCheckins()
   }

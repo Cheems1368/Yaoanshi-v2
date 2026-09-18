@@ -3,6 +3,7 @@ package com.yaoanshi.patient;
 import android.security.keystore.KeyGenParameterSpec;
 import android.security.keystore.KeyProperties;
 import android.util.Base64;
+import android.util.AtomicFile;
 
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
@@ -11,9 +12,11 @@ import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
 
 import java.nio.charset.StandardCharsets;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
+import java.io.FileNotFoundException;
 import java.security.KeyStore;
 
 import javax.crypto.Cipher;
@@ -30,15 +33,17 @@ public class SecureMedicalCachePlugin extends Plugin {
     @PluginMethod
     public void read(PluginCall call) {
         try {
-            File path = cacheFile();
             JSObject result = new JSObject();
-            if (!path.exists()) {
+            byte[] stored;
+            try {
+                stored = readAll(new AtomicFile(cacheFile()));
+            } catch (FileNotFoundException missing) {
                 result.put("value", "");
                 call.resolve(result);
                 return;
             }
 
-            String[] parts = new String(readAll(path), StandardCharsets.UTF_8).split("\\.", 2);
+            String[] parts = new String(stored, StandardCharsets.UTF_8).split("\\.", 2);
             if (parts.length != 2) {
                 throw new IllegalStateException("Encrypted cache format is invalid");
             }
@@ -66,8 +71,16 @@ public class SecureMedicalCachePlugin extends Plugin {
             byte[] encrypted = cipher.doFinal(value.getBytes(StandardCharsets.UTF_8));
             String encoded = Base64.encodeToString(cipher.getIV(), Base64.NO_WRAP)
                     + "." + Base64.encodeToString(encrypted, Base64.NO_WRAP);
-            try (FileOutputStream output = new FileOutputStream(cacheFile(), false)) {
+            AtomicFile atomicFile = new AtomicFile(cacheFile());
+            FileOutputStream output = null;
+            try {
+                output = atomicFile.startWrite();
                 output.write(encoded.getBytes(StandardCharsets.UTF_8));
+                output.getFD().sync();
+                atomicFile.finishWrite(output);
+            } catch (Exception error) {
+                if (output != null) atomicFile.failWrite(output);
+                throw error;
             }
             call.resolve();
         } catch (Exception error) {
@@ -78,10 +91,7 @@ public class SecureMedicalCachePlugin extends Plugin {
     @PluginMethod
     public void clear(PluginCall call) {
         try {
-            File file = cacheFile();
-            if (file.exists() && !file.delete()) {
-                throw new IllegalStateException("Encrypted cache could not be deleted");
-            }
+            new AtomicFile(cacheFile()).delete();
             KeyStore keyStore = KeyStore.getInstance(KEYSTORE);
             keyStore.load(null);
             if (keyStore.containsAlias(KEY_ALIAS)) {
@@ -97,18 +107,15 @@ public class SecureMedicalCachePlugin extends Plugin {
         return new File(getContext().getFilesDir(), FILE_NAME);
     }
 
-    private byte[] readAll(File file) throws Exception {
-        byte[] bytes = new byte[(int) file.length()];
-        try (FileInputStream input = new FileInputStream(file)) {
-            int offset = 0;
-            while (offset < bytes.length) {
-                int count = input.read(bytes, offset, bytes.length - offset);
-                if (count < 0) break;
-                offset += count;
+    private byte[] readAll(AtomicFile file) throws Exception {
+        try (FileInputStream input = file.openRead(); ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+            byte[] buffer = new byte[4096];
+            int count;
+            while ((count = input.read(buffer)) >= 0) {
+                output.write(buffer, 0, count);
             }
-            if (offset != bytes.length) throw new IllegalStateException("Encrypted cache read was incomplete");
+            return output.toByteArray();
         }
-        return bytes;
     }
 
     private SecretKey getOrCreateKey() throws Exception {

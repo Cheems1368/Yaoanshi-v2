@@ -388,6 +388,7 @@ import {
 import { healthDataService, type HealthData } from '@/services/healthDataService'
 import { userDataService, type UserProfile } from '@/services/userDataService'
 import { clearMedicalCache } from '@/modules/patient/services/offlineMedication'
+import { cancelAllMedicationReminders } from '@/modules/patient/services/localMedicationReminders'
 
 const router = useRouter()
 
@@ -749,6 +750,7 @@ const handleLogout = async () => {
   } catch {
     // ignore logout network failure and close local session
   } finally {
+    await cancelAllMedicationReminders().catch(() => undefined)
     await clearMedicalCache().catch(() => undefined)
     clearLocalSession()
     logoutLoading.value = false

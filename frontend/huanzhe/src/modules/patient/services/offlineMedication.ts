@@ -86,8 +86,13 @@ function mutateState<T>(mutation: (state: MedicalCacheState) => T | Promise<T>):
 const makeRequestId = () => globalThis.crypto?.randomUUID?.()
   ?? `checkin-${Date.now()}-${Math.random().toString(16).slice(2)}`
 
-export async function cacheDoseTasks(tasks: DoseTaskDTO[]) {
-  await mutateState((state) => { state.tasks = tasks })
+export async function cacheDoseTasks(tasks: DoseTaskDTO[], expectedAccountSubject: string) {
+  await mutateState((state) => {
+    if (patientSession.getAccountSubject() !== expectedAccountSubject || state.accountSubject !== expectedAccountSubject) {
+      throw new Error('AUTHENTICATED_ACCOUNT_CHANGED')
+    }
+    state.tasks = tasks
+  })
 }
 
 export async function getCachedDoseTasks() {
@@ -102,14 +107,21 @@ const formatLocalDate = (date: Date) => {
 }
 
 export async function loadMedicationTasks(days = 3): Promise<{ tasks: DoseTaskDTO[]; offline: boolean }> {
+  const accountSubject = patientSession.getAccountSubject()
   const dateFrom = new Date()
   const dateTo = new Date()
   dateTo.setDate(dateTo.getDate() + Math.min(Math.max(days, 1), 7) - 1)
   try {
     await replayPendingCheckins()
+    if (!accountSubject || patientSession.getAccountSubject() !== accountSubject) {
+      throw new Error('AUTHENTICATED_ACCOUNT_CHANGED')
+    }
     const response = await medicationService.getDoseTasks(formatLocalDate(dateFrom), formatLocalDate(dateTo))
+    if (patientSession.getAccountSubject() !== accountSubject) {
+      throw new Error('AUTHENTICATED_ACCOUNT_CHANGED')
+    }
     const tasks = response.data ?? []
-    await cacheDoseTasks(tasks)
+    await cacheDoseTasks(tasks, accountSubject)
     return { tasks, offline: false }
   } catch (error) {
     if (!isNative()) throw error
@@ -170,7 +182,17 @@ async function replayPendingCheckinsInternal(accountSubject: string) {
         )
       })
       synced += 1
-    } catch {
+    } catch (error) {
+      const errorCode = (error as { code?: number })?.code
+      const message = error instanceof Error ? error.message : ''
+      if (errorCode === 40025 || message === 'DOSE_TASK_NOT_FOUND') {
+        await mutateState((currentState) => {
+          currentState.pendingCheckins = currentState.pendingCheckins.filter(
+            (item) => item.clientRequestId !== pending.clientRequestId
+          )
+        })
+        continue
+      }
       break
     }
   }

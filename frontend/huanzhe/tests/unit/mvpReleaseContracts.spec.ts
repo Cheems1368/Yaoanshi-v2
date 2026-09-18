@@ -50,6 +50,10 @@ describe('MVP release patient contracts', () => {
     expect(webSource).not.toMatch(/localStorage|sessionStorage|indexedDB/i)
     expect(nativeSource).toContain('AndroidKeyStore')
     expect(nativeSource).toContain('AES/GCM/NoPadding')
+    expect(nativeSource).toContain('AtomicFile')
+    expect(nativeSource).toContain('openRead')
+    expect(nativeSource).toContain('finishWrite')
+    expect(nativeSource).toContain('failWrite')
     expect(nativeSource).not.toContain('MODE_WORLD_READABLE')
   })
 
