@@ -54,6 +54,18 @@ describe('local medication reminder lifecycle', () => {
     expect(mocks.cancel).toHaveBeenCalledWith({ notifications: [{ id: 8 }] })
   })
 
+  test('cancels obsolete reminders even after display permission is revoked', async () => {
+    mocks.checkPermissions.mockResolvedValue({ display: 'denied' })
+    mocks.getPending.mockResolvedValue({
+      notifications: [{ id: 8, extra: { kind: 'MEDICATION_TASK' } }]
+    })
+
+    await enableAndScheduleMedicationReminders([])
+
+    expect(mocks.cancel).toHaveBeenCalledWith({ notifications: [{ id: 8 }] })
+    expect(mocks.schedule).not.toHaveBeenCalled()
+  })
+
   test('waits for in-flight scheduling before clearing all medication reminders', async () => {
     mocks.getPending
       .mockResolvedValueOnce({ notifications: [] })

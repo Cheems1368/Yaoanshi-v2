@@ -49,6 +49,21 @@ export async function registerMedicationReminderActionHandler(
 export async function enableAndScheduleMedicationReminders(tasks: DoseTaskDTO[]) {
   if (!Capacitor.isNativePlatform()) return false
   return enqueueReminderOperation(async () => {
+    const now = Date.now()
+    const reminderCandidates = tasks
+      .filter((task) => task.status === 'PENDING')
+      .filter((task) => Boolean(task.scheduledAt))
+      .map((task) => ({ task, at: new Date(task.scheduledAt as string) }))
+      .filter(({ at }) => !Number.isNaN(at.getTime()) && at.getTime() > now && at.getTime() <= now + 48 * 60 * 60 * 1000)
+
+    const desiredIds = new Set(reminderCandidates.map(({ task }) => notificationId(task.id)))
+    const pending = await LocalNotifications.getPending()
+    const obsolete = pending.notifications
+      .filter((notification) => notification.extra?.kind === 'MEDICATION_TASK' && !desiredIds.has(notification.id))
+      .map((notification) => ({ id: notification.id }))
+    if (obsolete.length) await LocalNotifications.cancel({ notifications: obsolete })
+    if (!reminderCandidates.length) return true
+
     let permission = await LocalNotifications.checkPermissions()
     if (permission.display === 'prompt' || permission.display === 'prompt-with-rationale') {
       permission = await LocalNotifications.requestPermissions()
@@ -66,13 +81,7 @@ export async function enableAndScheduleMedicationReminders(tasks: DoseTaskDTO[])
       exactAlarmGranted = exactSetting.exact_alarm === 'granted'
     }
 
-    const now = Date.now()
-    const notifications = tasks
-      .filter((task) => task.status === 'PENDING')
-      .filter((task) => Boolean(task.scheduledAt))
-      .map((task) => ({ task, at: new Date(task.scheduledAt as string) }))
-      .filter(({ at }) => !Number.isNaN(at.getTime()) && at.getTime() > now && at.getTime() <= now + 48 * 60 * 60 * 1000)
-      .map(({ task, at }) => ({
+    const notifications = reminderCandidates.map(({ task, at }) => ({
         id: notificationId(task.id),
         title: GENERIC_REMINDER_TITLE,
         body: GENERIC_REMINDER_BODY,
@@ -80,13 +89,7 @@ export async function enableAndScheduleMedicationReminders(tasks: DoseTaskDTO[])
         extra: { kind: 'MEDICATION_TASK', route: MEDICATION_REMINDER_ROUTE }
       }))
 
-    const desiredIds = new Set(notifications.map((notification) => notification.id))
-    const pending = await LocalNotifications.getPending()
-    const obsolete = pending.notifications
-      .filter((notification) => notification.extra?.kind === 'MEDICATION_TASK' && !desiredIds.has(notification.id))
-      .map((notification) => ({ id: notification.id }))
-    if (obsolete.length) await LocalNotifications.cancel({ notifications: obsolete })
-    if (notifications.length) await LocalNotifications.schedule({ notifications })
+    await LocalNotifications.schedule({ notifications })
     return exactAlarmGranted ? 'exact' : 'inexact'
   })
 }
