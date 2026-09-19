@@ -267,6 +267,7 @@ Constraints:
 1. One family account can have only one active patient binding per tenant; V14 enforces this with `tenant_id + active_family_account_id`.
 2. Maximum two active family bindings per patient is enforced by service rule.
 3. Unbound rows remain queryable for history but lose permission immediately.
+4. An existing `PATIENT` app account must never be converted in place to `FAMILY`; family binding creation rejects that mobile number and preserves the original patient identity.
 
 Before V14, the read-only preflight at `backend-v2/src/main/resources/db/preflight/V14__mvp_release_closure_preflight.sql` must run and block the release if one family account has multiple active patient bindings. The operator must review those relationships before continuing. As a fail-safe if the preflight is bypassed, V14 retains the earliest authorization as `ACTIVE` and converts later duplicates to `UNBOUND` with an explicit migration reason; no binding row is deleted.
 

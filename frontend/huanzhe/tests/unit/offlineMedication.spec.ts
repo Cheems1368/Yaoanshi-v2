@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, test, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
   read: vi.fn(), write: vi.fn(), clear: vi.fn(), getDoseTasks: vi.fn(), submitCheckin: vi.fn(),
-  accountSubject: 'patient-1'
+  clearGateState: vi.fn(), accountSubject: 'patient-1'
 }))
 
 vi.mock('@capacitor/core', () => ({
@@ -15,7 +15,11 @@ vi.mock('@/modules/patient/api/mvp', () => ({
 }))
 
 vi.mock('@/app/session', () => ({
-  patientSession: { getAccountSubject: () => mocks.accountSubject, getAccessToken: () => 'access-token' }
+  patientSession: {
+    getAccountSubject: () => mocks.accountSubject,
+    getAccessToken: () => 'access-token',
+    clearGateState: mocks.clearGateState
+  }
 }))
 
 import {
@@ -200,5 +204,16 @@ describe('native offline medication flow', () => {
 
     expect(mocks.submitCheckin).toHaveBeenCalledTimes(2)
     expect(JSON.parse(storedValue).pendingCheckins).toEqual([])
+  })
+
+  test('does not expose cached tasks after the patient binding is revoked online', async () => {
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: true })
+    mocks.getDoseTasks.mockRejectedValue(new Error('PATIENT_BIND_CONFLICT'))
+
+    await expect(loadMedicationTasks()).rejects.toThrow('PATIENT_BIND_CONFLICT')
+
+    expect(mocks.clear).toHaveBeenCalled()
+    expect(mocks.clearGateState).toHaveBeenCalled()
+    expect(mocks.write).not.toHaveBeenCalled()
   })
 })

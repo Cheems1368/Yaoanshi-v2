@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
-  checkPermissions: vi.fn(), requestPermissions: vi.fn(), getPending: vi.fn(), cancel: vi.fn(), schedule: vi.fn()
+  checkPermissions: vi.fn(), requestPermissions: vi.fn(), getPending: vi.fn(), cancel: vi.fn(), schedule: vi.fn(), addListener: vi.fn()
 }))
 
 vi.mock('@capacitor/core', () => ({ Capacitor: { isNativePlatform: () => true } }))
@@ -10,7 +10,8 @@ vi.mock('@capacitor/local-notifications', () => ({ LocalNotifications: mocks }))
 import {
   cancelAllMedicationReminders,
   cancelMedicationReminder,
-  enableAndScheduleMedicationReminders
+  enableAndScheduleMedicationReminders,
+  registerMedicationReminderActionHandler
 } from '@/modules/patient/services/localMedicationReminders'
 
 describe('local medication reminder lifecycle', () => {
@@ -19,6 +20,7 @@ describe('local medication reminder lifecycle', () => {
     mocks.checkPermissions.mockResolvedValue({ display: 'granted' })
     mocks.cancel.mockResolvedValue(undefined)
     mocks.schedule.mockResolvedValue(undefined)
+    mocks.addListener.mockResolvedValue({ remove: vi.fn() })
   })
 
   test('cancels a previously scheduled reminder after the task is completed', async () => {
@@ -70,5 +72,16 @@ describe('local medication reminder lifecycle', () => {
 
     expect(mocks.cancel).toHaveBeenCalledWith({ notifications: [{ id: 8 }] })
     expect(mocks.schedule.mock.invocationCallOrder[0]).toBeLessThan(mocks.cancel.mock.invocationCallOrder[0])
+  })
+
+  test('opens the formal reminder route when a medication notification is tapped', async () => {
+    const navigate = vi.fn().mockResolvedValue(undefined)
+    await registerMedicationReminderActionHandler(navigate)
+    const listener = mocks.addListener.mock.calls[0][1]
+
+    await listener({ notification: { extra: { kind: 'MEDICATION_TASK', route: '/untrusted' } } })
+
+    expect(mocks.addListener).toHaveBeenCalledWith('localNotificationActionPerformed', expect.any(Function))
+    expect(navigate).toHaveBeenCalledWith('/medication-reminder')
   })
 })

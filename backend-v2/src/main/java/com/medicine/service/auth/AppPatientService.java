@@ -167,7 +167,9 @@ public class AppPatientService {
             applyAuditFields(familyAccount, "app-family");
             appAccountMapper.insert(familyAccount);
         } else {
-            familyAccount.setAccountType("FAMILY");
+            if (!"FAMILY".equalsIgnoreCase(familyAccount.getAccountType())) {
+                throw new BusinessException(400, "PATIENT_ACCOUNT_CANNOT_BE_FAMILY");
+            }
             if (StringUtils.hasText(request.getFamilyDisplayName())) {
                 familyAccount.setDisplayName(request.getFamilyDisplayName().trim());
             }

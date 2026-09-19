@@ -3,7 +3,10 @@ import App from './App.vue'
 import router from './router';
 import { appAuthService, patientService } from '@/modules/patient/api/mvp'
 import { clearMedicalCache, replayPendingCheckins } from '@/modules/patient/services/offlineMedication'
-import { cancelAllMedicationReminders } from '@/modules/patient/services/localMedicationReminders'
+import {
+  cancelAllMedicationReminders,
+  registerMedicationReminderActionHandler
+} from '@/modules/patient/services/localMedicationReminders'
 import { patientSession } from '@/app/session'
 
 import { IonicVue } from '@ionic/vue';
@@ -47,6 +50,10 @@ if (typeof window !== 'undefined') {
   }
   window.addEventListener('online', replayIfAuthenticated)
   window.addEventListener('patient-session-authenticated', replayIfAuthenticated)
+  void registerMedicationReminderActionHandler(async (route) => {
+    await router.isReady()
+    await router.push(route)
+  })
 }
 
 if (import.meta.env.DEV && typeof window !== 'undefined') {

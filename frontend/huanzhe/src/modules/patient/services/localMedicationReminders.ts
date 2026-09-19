@@ -4,6 +4,7 @@ import type { DoseTaskDTO } from '@/modules/patient/api/mvp'
 
 export const GENERIC_REMINDER_TITLE = '用药提醒'
 export const GENERIC_REMINDER_BODY = '您有一项用药任务待处理，请打开药按时查看。'
+const MEDICATION_REMINDER_ROUTE = '/medication-reminder'
 
 const notificationId = (taskId: number) => Math.abs(taskId % 2_000_000_000) + 1
 
@@ -33,6 +34,17 @@ export async function cancelAllMedicationReminders() {
   })
 }
 
+export async function registerMedicationReminderActionHandler(
+  navigate: (route: string) => void | Promise<void>
+) {
+  if (!Capacitor.isNativePlatform()) return
+  return LocalNotifications.addListener('localNotificationActionPerformed', (action) => {
+    if (action.notification.extra?.kind === 'MEDICATION_TASK') {
+      void navigate(MEDICATION_REMINDER_ROUTE)
+    }
+  })
+}
+
 export async function enableAndScheduleMedicationReminders(tasks: DoseTaskDTO[]) {
   if (!Capacitor.isNativePlatform()) return false
   return enqueueReminderOperation(async () => {
@@ -53,7 +65,7 @@ export async function enableAndScheduleMedicationReminders(tasks: DoseTaskDTO[])
         title: GENERIC_REMINDER_TITLE,
         body: GENERIC_REMINDER_BODY,
         schedule: { at, allowWhileIdle: true },
-        extra: { kind: 'MEDICATION_TASK', route: '/tabs/medication' }
+        extra: { kind: 'MEDICATION_TASK', route: MEDICATION_REMINDER_ROUTE }
       }))
 
     const desiredIds = new Set(notifications.map((notification) => notification.id))

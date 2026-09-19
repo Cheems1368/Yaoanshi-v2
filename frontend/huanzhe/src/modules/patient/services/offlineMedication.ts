@@ -87,6 +87,7 @@ const makeRequestId = () => globalThis.crypto?.randomUUID?.()
   ?? `checkin-${Date.now()}-${Math.random().toString(16).slice(2)}`
 
 export async function cacheDoseTasks(tasks: DoseTaskDTO[], expectedAccountSubject: string) {
+  if (!isNative()) return
   await mutateState((state) => {
     if (patientSession.getAccountSubject() !== expectedAccountSubject || state.accountSubject !== expectedAccountSubject) {
       throw new Error('AUTHENTICATED_ACCOUNT_CHANGED')
@@ -113,18 +114,26 @@ export async function loadMedicationTasks(days = 3): Promise<{ tasks: DoseTaskDT
   dateTo.setDate(dateTo.getDate() + Math.min(Math.max(days, 1), 7) - 1)
   try {
     await replayPendingCheckins()
-    if (!accountSubject || patientSession.getAccountSubject() !== accountSubject) {
+    if (isNative() && (!accountSubject || patientSession.getAccountSubject() !== accountSubject)) {
       throw new Error('AUTHENTICATED_ACCOUNT_CHANGED')
     }
     const response = await medicationService.getDoseTasks(formatLocalDate(dateFrom), formatLocalDate(dateTo))
-    if (patientSession.getAccountSubject() !== accountSubject) {
+    if (isNative() && patientSession.getAccountSubject() !== accountSubject) {
       throw new Error('AUTHENTICATED_ACCOUNT_CHANGED')
     }
     const tasks = response.data ?? []
-    await cacheDoseTasks(tasks, accountSubject)
+    if (isNative()) await cacheDoseTasks(tasks, accountSubject as string)
     return { tasks, offline: false }
   } catch (error) {
     if (!isNative()) throw error
+    const message = error instanceof Error ? error.message : ''
+    if (message === 'AUTHENTICATED_ACCOUNT_CHANGED') return { tasks: [], offline: true }
+    if (message === 'PATIENT_BIND_CONFLICT' || message === 'PATIENT_NOT_FOUND') {
+      patientSession.clearGateState()
+      await clearMedicalCache()
+      throw error
+    }
+    if (message !== 'Network error') throw error
     return { tasks: await getCachedDoseTasks(), offline: true }
   }
 }
@@ -212,5 +221,8 @@ export function replayPendingCheckins() {
 }
 
 export async function clearMedicalCache() {
-  if (isNative()) await SecureMedicalCache.clear()
+  if (!isNative()) return
+  const operation = stateMutationTail.then(() => SecureMedicalCache.clear())
+  stateMutationTail = operation.then(() => undefined, () => undefined)
+  await operation
 }
