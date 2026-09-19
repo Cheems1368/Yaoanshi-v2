@@ -1019,6 +1019,7 @@ T9 PR B Physical Android Acceptance and Review Remediation (2026-09-18)
   - Offline cached tasks now distinguish new check-ins from corrections: new check-ins remain queued for automatic replay, while corrections to an existing effective record are explicitly deferred until connectivity returns.
   - Submitted satisfaction results remain visible even though the backend correctly marks them no longer eligible for another submission.
   - Revoked patient/family access now cancels previously scheduled medication reminders in addition to clearing the encrypted cache and local binding gate.
+  - Removing one family binding no longer clears the patient's own encrypted medication cache or pending offline check-ins; full cache deletion remains limited to logout, account switch, expiry, invalid cache, or actual patient-access revocation.
   - The Android encrypted cache now uses `AtomicFile` start/finish/fail writes, file-descriptor sync, and recovery-aware reads so interrupted writes retain the last complete ciphertext.
   - Temporary refresh failure leaves the encrypted native cache sealed while unauthenticated; explicit logout, unbind, account switch, expiry, or invalid cache version still clears it.
   - Added an exact credentialed Capacitor CORS allowlist and a debug-only `http://localhost` WebView origin for ADB reverse. Packaged builds keep the default secure origin.
@@ -1027,7 +1028,7 @@ T9 PR B Physical Android Acceptance and Review Remediation (2026-09-18)
   - On a physical Android 14 device, the app cached tasks as app-private AES/GCM ciphertext, queued a check-in with the backend unavailable, retained identical ciphertext across force-stop/relaunch, and replayed exactly one effective record after reconnect and same-account login.
   - Repeated page entry did not duplicate the replayed check-in. Logout removed the encrypted cache; final device application data was cleared.
   - Android notification permission was granted, AlarmManager registered the Capacitor receiver, and the system notification service recorded one enqueue and one post using generic lock-screen copy. Lack of exact-alarm permission degraded to a non-exact alarm without exposing identity, medicine, or dose.
-  - Full backend `clean verify` passed 199/199 tests. Patient lint, 30/30 Vitest tests, production build, Android debug build, pharmacist build, doctor build, `git diff --check`, and `e2e:mvp-release` all passed.
+  - Full backend `clean verify` passed 199/199 tests. Patient lint, 31/31 Vitest tests, production build, Android debug build, pharmacist build, doctor build, `git diff --check`, and `e2e:mvp-release` all passed.
   - The local acceptance-only task/check-in rows, temporary screenshots, Cookie database copies, and device application data were deleted. No production database or production service was contacted.
 - Remaining gate:
   - Push the remediation head, pass all protected checks, resolve all latest-head review conversations, and squash-merge PR #42 before starting PR C.

@@ -81,4 +81,14 @@ describe('MVP release patient contracts', () => {
     expect(tabSource).toContain("if (offlineMode.value)")
     expect(tabSource).toContain('已提交记录需联网后更正')
   })
+
+  test('preserves patient offline checkins when a family binding is removed', () => {
+    const profileSource = readFileSync(resolve(process.cwd(), 'src/modules/patient/pages/ProfilePage.vue'), 'utf8')
+    const unbindFlow = profileSource.slice(
+      profileSource.indexOf('const confirmUnbind'),
+      profileSource.indexOf('const handleLogout')
+    )
+    expect(unbindFlow).toContain('deleteFamilyBinding(binding.id)')
+    expect(unbindFlow).not.toContain('clearMedicalCache()')
+  })
 })

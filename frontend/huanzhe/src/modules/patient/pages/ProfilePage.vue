@@ -724,7 +724,6 @@ const confirmUnbind = async (binding: AppFamilyBindingDTO) => {
         handler: () => {
           void patientService.deleteFamilyBinding(binding.id)
             .then(async () => {
-              await clearMedicalCache()
               await loadFamilyBindings()
             })
             .catch(async (error: any) => {
