@@ -1042,3 +1042,4 @@ Last Updated
 - Reason: PR B physical-device acceptance and latest-head review remediation are complete; protected PR qualification remains.
 - 2026-09-19：PR #42 最新 head 审查补齐知识测评页账号隔离：加载时清空题目、状态和答案，以账号 subject + 请求 epoch 丢弃账号切换或过期响应；提交结果同样只允许写回原账号会话。患者端单测增至 35 项。
 - 2026-09-19：PR #42 后续审查将原生离线缓存升级为任务快照与逐条待同步打卡各自独立的 48 小时期限，补齐亲情号列表账号竞态隔离，并修正 MVP E2E mock JWT 的 `sub`。患者端单测增至 37 项。
+- 2026-09-19：PR #42 继续封堵账号切换期间在途打卡失败写入错误队列，以及满意度轮询旧响应覆盖已提交结果；入队与状态写回均按账号、工单和请求代数复核。患者端单测增至 39 项。

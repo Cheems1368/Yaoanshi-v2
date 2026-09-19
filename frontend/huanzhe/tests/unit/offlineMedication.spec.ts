@@ -78,6 +78,20 @@ describe('native offline medication flow', () => {
     expect(mocks.write).not.toHaveBeenCalled()
   })
 
+  test('does not queue an in-flight check-in after the authenticated account changes', async () => {
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: false })
+    let rejectSubmit!: (error: Error) => void
+    mocks.submitCheckin.mockImplementation(() => new Promise((_, reject) => { rejectSubmit = reject }))
+
+    const submission = submitOrQueueCheckin(cachedTask as any, 'TAKEN')
+    await vi.waitFor(() => expect(mocks.submitCheckin).toHaveBeenCalledTimes(1))
+    mocks.accountSubject = 'patient-2'
+    rejectSubmit(new Error('Network error'))
+
+    await expect(submission).rejects.toThrow('AUTHENTICATED_ACCOUNT_CHANGED')
+    expect(mocks.write).not.toHaveBeenCalled()
+  })
+
   test('rejects another account cache instead of exposing its tasks', async () => {
     Object.defineProperty(navigator, 'onLine', { configurable: true, value: false })
     mocks.read.mockResolvedValue({

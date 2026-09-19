@@ -171,6 +171,7 @@ export async function submitOrQueueCheckin(
   task: DoseTaskDTO,
   result: 'TAKEN' | 'MISSED'
 ): Promise<'submitted' | 'queued'> {
+  const expectedAccountSubject = patientSession.getAccountSubject()
   const payload: PendingCheckin = {
     clientRequestId: makeRequestId(),
     doseTaskId: task.id,
@@ -186,7 +187,14 @@ export async function submitOrQueueCheckin(
   } catch (error) {
     const message = error instanceof Error ? error.message : ''
     if (!isNative() || (navigator.onLine && message !== 'Network error')) throw error
+    if (!expectedAccountSubject || patientSession.getAccountSubject() !== expectedAccountSubject) {
+      throw new Error('AUTHENTICATED_ACCOUNT_CHANGED')
+    }
     await mutateState((state) => {
+      if (patientSession.getAccountSubject() !== expectedAccountSubject
+        || state.accountSubject !== expectedAccountSubject) {
+        throw new Error('AUTHENTICATED_ACCOUNT_CHANGED')
+      }
       if (!state.pendingCheckins.some((item) => item.clientRequestId === payload.clientRequestId)) {
         state.pendingCheckins.push({ ...payload, expiresAt: Date.now() + CACHE_TTL_MS })
       }

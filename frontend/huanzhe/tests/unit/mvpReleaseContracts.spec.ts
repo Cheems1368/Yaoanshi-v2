@@ -120,4 +120,13 @@ describe('MVP release patient contracts', () => {
     expect(e2eSource).toContain("sub: 'e2e-patient'")
     expect(e2eSource).not.toContain("accessToken: 'e2e-token'")
   })
+
+  test('guards satisfaction polling from stale account, order and request responses', () => {
+    const orderSource = readFileSync(resolve(process.cwd(), 'src/modules/patient/pages/HelpOrderDetailPage.vue'), 'utf8')
+    expect(orderSource).toContain('const expectedRequestEpoch = ++satisfactionRequestEpoch')
+    expect(orderSource).toContain('expectedRequestEpoch !== satisfactionRequestEpoch')
+    expect(orderSource).toContain('patientSession.getAccountSubject() !== expectedAccountSubject')
+    expect(orderSource).toContain('orderId.value !== expectedOrderId')
+    expect(orderSource).toContain('if (satisfactionSubmitting.value) return')
+  })
 })

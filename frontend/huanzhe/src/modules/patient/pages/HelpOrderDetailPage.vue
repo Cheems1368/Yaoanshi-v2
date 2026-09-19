@@ -286,6 +286,8 @@ const satisfactionSubmitting = ref(false)
 
 let pollTimer: number | null = null
 let notificationClient: ReturnType<typeof createAppNotificationClient> | null = null
+let satisfactionRequestEpoch = 0
+let satisfactionContextKey = ''
 
 const orderId = computed(() => Number(route.params.id))
 const events = computed(() => order.value?.events ?? [])
@@ -344,27 +346,55 @@ const sendReply = async () => {
 }
 
 const loadSatisfactionStatus = async () => {
+  const expectedAccountSubject = patientSession.getAccountSubject()
+  const expectedOrderId = orderId.value
+  const contextKey = `${expectedAccountSubject || ''}:${expectedOrderId}`
+  if (contextKey !== satisfactionContextKey) {
+    satisfactionContextKey = contextKey
+    satisfactionStatus.value = null
+    satisfactionSubmitting.value = false
+    satisfactionRequestEpoch += 1
+  }
+  if (satisfactionSubmitting.value) return
+  const expectedRequestEpoch = ++satisfactionRequestEpoch
+  if (!expectedAccountSubject) return
   try {
-    const response = await assessmentService.getSatisfactionStatus(orderId.value)
+    const response = await assessmentService.getSatisfactionStatus(expectedOrderId)
+    if (expectedRequestEpoch !== satisfactionRequestEpoch
+      || patientSession.getAccountSubject() !== expectedAccountSubject
+      || orderId.value !== expectedOrderId) return
     satisfactionStatus.value = response.data ?? null
   } catch {
+    if (expectedRequestEpoch !== satisfactionRequestEpoch
+      || patientSession.getAccountSubject() !== expectedAccountSubject
+      || orderId.value !== expectedOrderId) return
     satisfactionStatus.value = null
   }
 }
 
 const submitSatisfaction = async () => {
   if (!satisfactionRating.value || satisfactionSubmitting.value) return
+  const expectedAccountSubject = patientSession.getAccountSubject()
+  if (!expectedAccountSubject) return
+  const expectedOrderId = orderId.value
+  const expectedRequestEpoch = ++satisfactionRequestEpoch
   satisfactionSubmitting.value = true
   try {
     await assessmentService.submitSatisfaction({
-      helpOrderId: orderId.value,
+      helpOrderId: expectedOrderId,
       rating: satisfactionRating.value,
       comment: satisfactionComment.value.trim() || undefined
     })
-    const response = await assessmentService.getSatisfactionStatus(orderId.value)
+    const response = await assessmentService.getSatisfactionStatus(expectedOrderId)
+    if (expectedRequestEpoch !== satisfactionRequestEpoch
+      || patientSession.getAccountSubject() !== expectedAccountSubject
+      || orderId.value !== expectedOrderId) return
     satisfactionStatus.value = response.data ?? null
     showMessage('评价已提交，感谢反馈')
   } catch (error: any) {
+    if (expectedRequestEpoch !== satisfactionRequestEpoch
+      || patientSession.getAccountSubject() !== expectedAccountSubject
+      || orderId.value !== expectedOrderId) return
     showMessage(error?.message || '评价提交失败')
   } finally {
     satisfactionSubmitting.value = false
