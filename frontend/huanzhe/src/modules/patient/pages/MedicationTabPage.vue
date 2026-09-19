@@ -222,17 +222,26 @@ const pendingCount = computed(() =>
 
 const loadTasks = async () => {
   reminderLoading.value = true
+  const expectedAccountSubject = patientSession.getAccountSubject()
   try {
     const [planRes, taskRes, accountRes] = await Promise.all([
       medicationService.getActiveMedicationPlan().catch(() => ({ data: null })),
       loadMedicationTasks(),
       appAuthService.getCurrentAccount().catch(() => ({ data: { accountType: 'PATIENT' } }))
     ])
+    if (!expectedAccountSubject || patientSession.getAccountSubject() !== expectedAccountSubject) {
+      activePlan.value = null
+      tasks.value = []
+      offlineMode.value = false
+      return
+    }
     activePlan.value = planRes.data ?? null
     const today = new Date().toLocaleDateString('sv-SE')
     tasks.value = taskRes.tasks.filter((task) => task.taskDate === today)
     offlineMode.value = taskRes.offline
-    void enableAndScheduleMedicationReminders(taskRes.tasks).catch(() => undefined)
+    void enableAndScheduleMedicationReminders(taskRes.tasks)
+      .then((mode) => { if (mode === 'inexact') showMessage('未授予精确闹钟权限，用药提醒可能延迟') })
+      .catch(() => undefined)
     currentAccountType.value = String((accountRes.data as any)?.accountType || 'PATIENT').toUpperCase()
     if (!taskRes.offline) patientSession.setActivePlanStatus(Boolean(planRes.data))
   } catch {

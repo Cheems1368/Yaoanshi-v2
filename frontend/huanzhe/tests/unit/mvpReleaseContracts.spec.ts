@@ -67,8 +67,11 @@ describe('MVP release patient contracts', () => {
     const reminderSource = readFileSync(resolve(process.cwd(), 'src/modules/patient/pages/MedicationReminderPage.vue'), 'utf8')
     const tabSource = readFileSync(resolve(process.cwd(), 'src/modules/patient/pages/MedicationTabPage.vue'), 'utf8')
     expect(homeSource).toContain('enableAndScheduleMedicationReminders(tasksResponse.tasks)')
+    expect(homeSource).toContain('expectedAccountSubject')
     expect(reminderSource).toContain('cancelMedicationReminder(task.id)')
+    expect(reminderSource).toContain('expectedAccountSubject')
     expect(tabSource).toContain('cancelMedicationReminder(task.id)')
+    expect(tabSource).toContain('expectedAccountSubject')
   })
 
   test('keeps submitted satisfaction visible and makes offline correction explicit', () => {
@@ -90,5 +93,12 @@ describe('MVP release patient contracts', () => {
     )
     expect(unbindFlow).toContain('deleteFamilyBinding(binding.id)')
     expect(unbindFlow).not.toContain('clearMedicalCache()')
+  })
+
+  test('aligns satisfaction length and Android exact-alarm contracts', () => {
+    const orderSource = readFileSync(resolve(process.cwd(), 'src/modules/patient/pages/HelpOrderDetailPage.vue'), 'utf8')
+    const manifest = readFileSync(resolve(process.cwd(), 'android/app/src/main/AndroidManifest.xml'), 'utf8')
+    expect(orderSource).toContain(':maxlength="255"')
+    expect(manifest).toContain('android.permission.SCHEDULE_EXACT_ALARM')
   })
 })

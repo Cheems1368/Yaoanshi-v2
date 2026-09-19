@@ -205,16 +205,25 @@ const showMessage = (message: string) => {
 
 const loadDashboard = async () => {
   loading.value = true
+  const expectedAccountSubject = patientSession.getAccountSubject()
   try {
     const [planResponse, tasksResponse, assessmentResponse] = await Promise.all([
       medicationService.getActiveMedicationPlan().catch(() => ({ data: null })),
       loadMedicationTasks(),
       assessmentService.getKnowledgeStatus().catch(() => ({ data: null }))
     ])
+    if (!expectedAccountSubject || patientSession.getAccountSubject() !== expectedAccountSubject) {
+      activePlan.value = null
+      todayTasks.value = []
+      assessmentStatus.value = null
+      return
+    }
     activePlan.value = planResponse.data ?? null
     const today = new Date().toLocaleDateString('sv-SE')
     todayTasks.value = tasksResponse.tasks.filter((task) => task.taskDate === today)
-    void enableAndScheduleMedicationReminders(tasksResponse.tasks).catch(() => undefined)
+    void enableAndScheduleMedicationReminders(tasksResponse.tasks)
+      .then((mode) => { if (mode === 'inexact') showMessage('未授予精确闹钟权限，用药提醒可能延迟') })
+      .catch(() => undefined)
     assessmentStatus.value = assessmentResponse.data ?? null
     if (!tasksResponse.offline) patientSession.setActivePlanStatus(Boolean(planResponse.data))
   } catch (error: any) {

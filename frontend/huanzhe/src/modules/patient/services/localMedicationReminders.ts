@@ -9,6 +9,7 @@ const MEDICATION_REMINDER_ROUTE = '/medication-reminder'
 const notificationId = (taskId: number) => Math.abs(taskId % 2_000_000_000) + 1
 
 let reminderOperationTail: Promise<void> = Promise.resolve()
+let exactSettingRequested = false
 
 function enqueueReminderOperation<T>(operation: () => Promise<T>): Promise<T> {
   const current = reminderOperationTail.then(operation)
@@ -54,6 +55,17 @@ export async function enableAndScheduleMedicationReminders(tasks: DoseTaskDTO[])
     }
     if (permission.display !== 'granted') return false
 
+    let exactAlarmGranted = true
+    if (Capacitor.getPlatform() === 'android') {
+      let exactSetting = await LocalNotifications.checkExactNotificationSetting()
+      if (exactSetting.exact_alarm !== 'granted' && !exactSettingRequested) {
+        exactSettingRequested = true
+        await LocalNotifications.changeExactNotificationSetting()
+        exactSetting = await LocalNotifications.checkExactNotificationSetting()
+      }
+      exactAlarmGranted = exactSetting.exact_alarm === 'granted'
+    }
+
     const now = Date.now()
     const notifications = tasks
       .filter((task) => task.status === 'PENDING')
@@ -64,7 +76,7 @@ export async function enableAndScheduleMedicationReminders(tasks: DoseTaskDTO[])
         id: notificationId(task.id),
         title: GENERIC_REMINDER_TITLE,
         body: GENERIC_REMINDER_BODY,
-        schedule: { at, allowWhileIdle: true },
+        schedule: { at, allowWhileIdle: exactAlarmGranted },
         extra: { kind: 'MEDICATION_TASK', route: MEDICATION_REMINDER_ROUTE }
       }))
 
@@ -75,6 +87,6 @@ export async function enableAndScheduleMedicationReminders(tasks: DoseTaskDTO[])
       .map((notification) => ({ id: notification.id }))
     if (obsolete.length) await LocalNotifications.cancel({ notifications: obsolete })
     if (notifications.length) await LocalNotifications.schedule({ notifications })
-    return true
+    return exactAlarmGranted ? 'exact' : 'inexact'
   })
 }

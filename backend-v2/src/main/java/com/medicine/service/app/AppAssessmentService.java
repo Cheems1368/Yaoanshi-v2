@@ -140,6 +140,7 @@ public class AppAssessmentService {
             throw new BusinessException(ErrorCode.HELP_ORDER_SURVEY_CONFLICT.getCode(), ErrorCode.HELP_ORDER_SURVEY_CONFLICT.getMessage());
         }
         if (request.getRating() == null || request.getRating() < 1 || request.getRating() > 5) throw new BusinessException(400, "BAD_REQUEST");
+        if (request.getComment() != null && request.getComment().length() > 255) throw new BusinessException(400, "BAD_REQUEST");
         LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
         SatisfactionSurvey survey = new SatisfactionSurvey();
         survey.setHelpOrderId(order.getId());

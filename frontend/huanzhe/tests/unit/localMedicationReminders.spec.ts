@@ -1,10 +1,11 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
-  checkPermissions: vi.fn(), requestPermissions: vi.fn(), getPending: vi.fn(), cancel: vi.fn(), schedule: vi.fn(), addListener: vi.fn()
+  checkPermissions: vi.fn(), requestPermissions: vi.fn(), getPending: vi.fn(), cancel: vi.fn(), schedule: vi.fn(), addListener: vi.fn(),
+  checkExactNotificationSetting: vi.fn(), changeExactNotificationSetting: vi.fn()
 }))
 
-vi.mock('@capacitor/core', () => ({ Capacitor: { isNativePlatform: () => true } }))
+vi.mock('@capacitor/core', () => ({ Capacitor: { isNativePlatform: () => true, getPlatform: () => 'android' } }))
 vi.mock('@capacitor/local-notifications', () => ({ LocalNotifications: mocks }))
 
 import {
@@ -21,6 +22,8 @@ describe('local medication reminder lifecycle', () => {
     mocks.cancel.mockResolvedValue(undefined)
     mocks.schedule.mockResolvedValue(undefined)
     mocks.addListener.mockResolvedValue({ remove: vi.fn() })
+    mocks.checkExactNotificationSetting.mockResolvedValue({ exact_alarm: 'granted' })
+    mocks.changeExactNotificationSetting.mockResolvedValue({ exact_alarm: 'granted' })
   })
 
   test('cancels a previously scheduled reminder after the task is completed', async () => {
@@ -83,5 +86,19 @@ describe('local medication reminder lifecycle', () => {
 
     expect(mocks.addListener).toHaveBeenCalledWith('localNotificationActionPerformed', expect.any(Function))
     expect(navigate).toHaveBeenCalledWith('/medication-reminder')
+  })
+
+  test('requests exact-alarm access and explicitly degrades when it remains denied', async () => {
+    mocks.checkExactNotificationSetting.mockResolvedValue({ exact_alarm: 'denied' })
+    mocks.getPending.mockResolvedValue({ notifications: [] })
+    const result = await enableAndScheduleMedicationReminders([{
+      id: 7,
+      status: 'PENDING',
+      scheduledAt: new Date(Date.now() + 60_000).toISOString()
+    } as any])
+
+    expect(mocks.changeExactNotificationSetting).toHaveBeenCalled()
+    expect(mocks.schedule.mock.calls[0][0].notifications[0].schedule.allowWhileIdle).toBe(false)
+    expect(result).toBe('inexact')
   })
 })

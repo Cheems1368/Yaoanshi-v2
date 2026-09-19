@@ -141,7 +141,7 @@
                     @click="satisfactionRating = score"
                   >{{ score }}</button>
                 </div>
-                <ion-textarea v-model="satisfactionComment" :maxlength="500" :rows="3" placeholder="可选：说说本次服务体验" />
+                <ion-textarea v-model="satisfactionComment" :maxlength="255" :rows="3" placeholder="可选：说说本次服务体验" />
                 <div class="satisfaction-actions">
                   <ion-button fill="clear" @click="satisfactionExpanded = false">稍后再评</ion-button>
                   <ion-button :disabled="!satisfactionRating || satisfactionSubmitting" @click="submitSatisfaction">
