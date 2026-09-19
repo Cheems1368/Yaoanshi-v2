@@ -399,6 +399,7 @@ const canManageFamily = ref(false)
 const familyBindings = ref<AppFamilyBindingDTO[]>([])
 const familyLoading = ref(false)
 const familySaving = ref(false)
+let familyRequestEpoch = 0
 const familyForm = reactive({ familyMobile: '', familyDisplayName: '', relationshipType: 'OTHER' })
 const familyFormValid = computed(() => /^1\d{10}$/.test(familyForm.familyMobile) && Boolean(familyForm.familyDisplayName.trim()))
 
@@ -679,17 +680,31 @@ const relationshipText = (value: string) => ({
 }[value] || value)
 
 const loadFamilyBindings = async () => {
+  const expectedAccountSubject = patientSession.getAccountSubject()
+  const expectedRequestEpoch = ++familyRequestEpoch
+  familyBindings.value = []
+  canManageFamily.value = false
   familyLoading.value = true
+  if (!expectedAccountSubject) {
+    familyLoading.value = false
+    return
+  }
   try {
     const account = await appAuthService.getCurrentAccount()
+    if (expectedRequestEpoch !== familyRequestEpoch
+      || patientSession.getAccountSubject() !== expectedAccountSubject) return
     canManageFamily.value = String((account.data as any)?.accountType || 'PATIENT').toUpperCase() === 'PATIENT'
     if (!canManageFamily.value) return
     const response = await patientService.getFamilyBindings()
+    if (expectedRequestEpoch !== familyRequestEpoch
+      || patientSession.getAccountSubject() !== expectedAccountSubject) return
     familyBindings.value = response.data ?? []
   } catch {
+    if (expectedRequestEpoch !== familyRequestEpoch
+      || patientSession.getAccountSubject() !== expectedAccountSubject) return
     familyBindings.value = []
   } finally {
-    familyLoading.value = false
+    if (expectedRequestEpoch === familyRequestEpoch) familyLoading.value = false
   }
 }
 

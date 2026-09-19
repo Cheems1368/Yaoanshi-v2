@@ -153,7 +153,7 @@ describe('native offline medication flow', () => {
     expect(saved.pendingCheckins.map((item: any) => item.doseTaskId)).toEqual([7, 8])
   })
 
-  test('preserves the original cache expiry when an offline check-in is queued', async () => {
+  test('gives a newly queued check-in its own fresh expiry without extending cached tasks', async () => {
     Object.defineProperty(navigator, 'onLine', { configurable: true, value: false })
     mocks.submitCheckin.mockRejectedValue(new Error('Network error'))
     const originalExpiry = Date.now() + 60_000
@@ -170,7 +170,31 @@ describe('native offline medication flow', () => {
     await submitOrQueueCheckin(cachedTask as any, 'TAKEN')
 
     const saved = JSON.parse(mocks.write.mock.calls[0][0].value)
-    expect(saved.expiresAt).toBe(originalExpiry)
+    expect(saved.tasksExpiresAt).toBe(originalExpiry)
+    expect(saved.pendingCheckins[0].expiresAt).toBeGreaterThan(originalExpiry)
+  })
+
+  test('refreshes the task expiry independently from existing pending check-ins', async () => {
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: true })
+    const pendingExpiry = Date.now() + 60_000
+    mocks.read.mockResolvedValue({
+      value: JSON.stringify({
+        version: 2,
+        accountSubject: 'patient-1',
+        tasksExpiresAt: Date.now() + 30_000,
+        tasks: [cachedTask],
+        pendingCheckins: [{ clientRequestId: 'request-1', doseTaskId: 7, result: 'TAKEN', actualTakenAt: new Date().toISOString(), expiresAt: pendingExpiry }]
+      })
+    })
+    mocks.submitCheckin.mockRejectedValue(new Error('Network error'))
+    mocks.getDoseTasks.mockResolvedValue({ data: [{ ...cachedTask, id: 8 }] })
+
+    const result = await loadMedicationTasks()
+
+    expect(result).toEqual({ tasks: [{ ...cachedTask, id: 8 }], offline: false })
+    const saved = JSON.parse(mocks.write.mock.calls.at(-1)[0].value)
+    expect(saved.tasksExpiresAt).toBeGreaterThan(pendingExpiry)
+    expect(saved.pendingCheckins[0].expiresAt).toBe(pendingExpiry)
   })
 
   test('does not cache a task response after the authenticated account changes', async () => {

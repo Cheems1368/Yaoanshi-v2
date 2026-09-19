@@ -7,6 +7,8 @@ const page = await context.newPage()
 let familyBindings = []
 let notificationPolls = 0
 let satisfactionSubmitted = false
+const encodeJwtPart = (value) => Buffer.from(JSON.stringify(value)).toString('base64url')
+const accessToken = `${encodeJwtPart({ alg: 'none', typ: 'JWT' })}.${encodeJwtPart({ sub: 'e2e-patient' })}.signature`
 
 const ok = (data) => ({ status: 200, contentType: 'application/json', body: JSON.stringify({ code: 200, msg: 'success', data }) })
 
@@ -20,7 +22,7 @@ await page.route('**/app-api/**', async (route) => {
   const request = route.request()
   const url = new URL(request.url())
   const path = url.pathname
-  if (path.endsWith('/auth/session/refresh')) return route.fulfill(ok({ accessToken: 'e2e-token', expiresIn: 900, refreshExpiresIn: 3600, deviceId: 'e2e-device' }))
+  if (path.endsWith('/auth/session/refresh')) return route.fulfill(ok({ accessToken, expiresIn: 900, refreshExpiresIn: 3600, deviceId: 'e2e-device' }))
   if (path.endsWith('/auth/me')) return route.fulfill(ok({ accountType: 'PATIENT' }))
   if (path.endsWith('/patients/me/profile')) return route.fulfill(ok({ patientId: 1, hospitalPatientId: 'E2E-1', name: '测试患者', phone: '138****0000', realNameVerified: true, identityMaterialArchived: true }))
   if (path.endsWith('/patients/me/health-profile')) return route.fulfill(ok({ patientId: 1, layer1: {}, layer2: {}, layer3: {} }))

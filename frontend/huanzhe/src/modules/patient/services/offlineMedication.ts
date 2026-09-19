@@ -14,7 +14,19 @@ interface PendingCheckin {
   skipReason?: string
 }
 
+interface CachedPendingCheckin extends PendingCheckin {
+  expiresAt: number
+}
+
 interface MedicalCacheState {
+  version: 2
+  accountSubject: string
+  tasksExpiresAt: number
+  tasks: DoseTaskDTO[]
+  pendingCheckins: CachedPendingCheckin[]
+}
+
+interface LegacyMedicalCacheState {
   version: 1
   accountSubject: string
   expiresAt: number
@@ -32,9 +44,9 @@ const SecureMedicalCache = registerPlugin<SecureMedicalCachePlugin>('SecureMedic
 const isNative = () => Capacitor.isNativePlatform()
 
 const emptyState = (): MedicalCacheState => ({
-  version: 1,
+  version: 2,
   accountSubject: patientSession.getAccountSubject() ?? '',
-  expiresAt: Date.now() + CACHE_TTL_MS,
+  tasksExpiresAt: 0,
   tasks: [],
   pendingCheckins: []
 })
@@ -44,9 +56,9 @@ async function readState(): Promise<MedicalCacheState> {
   try {
     const { value } = await SecureMedicalCache.read()
     if (!value) return emptyState()
-    const parsed = JSON.parse(value) as MedicalCacheState
+    const parsed = JSON.parse(value) as MedicalCacheState | LegacyMedicalCacheState
     const accountSubject = patientSession.getAccountSubject()
-    if (parsed.version !== 1 || parsed.expiresAt <= Date.now()) {
+    if (parsed.version !== 1 && parsed.version !== 2) {
       await SecureMedicalCache.clear()
       return emptyState()
     }
@@ -55,7 +67,21 @@ async function readState(): Promise<MedicalCacheState> {
       await SecureMedicalCache.clear()
       return emptyState()
     }
-    return parsed
+    const normalized: MedicalCacheState = parsed.version === 1
+      ? {
+          version: 2,
+          accountSubject: parsed.accountSubject,
+          tasksExpiresAt: parsed.expiresAt,
+          tasks: parsed.tasks,
+          pendingCheckins: parsed.pendingCheckins.map((pending) => ({ ...pending, expiresAt: parsed.expiresAt }))
+        }
+      : parsed
+    const now = Date.now()
+    return {
+      ...normalized,
+      tasks: normalized.tasksExpiresAt > now ? normalized.tasks : [],
+      pendingCheckins: normalized.pendingCheckins.filter((pending) => pending.expiresAt > now)
+    }
   } catch {
     await SecureMedicalCache.clear().catch(() => undefined)
     return emptyState()
@@ -94,6 +120,7 @@ export async function cacheDoseTasks(tasks: DoseTaskDTO[], expectedAccountSubjec
       throw new Error('AUTHENTICATED_ACCOUNT_CHANGED')
     }
     state.tasks = tasks
+    state.tasksExpiresAt = Date.now() + CACHE_TTL_MS
   })
 }
 
@@ -161,7 +188,7 @@ export async function submitOrQueueCheckin(
     if (!isNative() || (navigator.onLine && message !== 'Network error')) throw error
     await mutateState((state) => {
       if (!state.pendingCheckins.some((item) => item.clientRequestId === payload.clientRequestId)) {
-        state.pendingCheckins.push(payload)
+        state.pendingCheckins.push({ ...payload, expiresAt: Date.now() + CACHE_TTL_MS })
       }
       state.tasks = state.tasks.map((item) => item.id === task.id
         ? { ...item, status: result === 'TAKEN' ? 'COMPLETED' : 'MISSED' }
@@ -185,7 +212,14 @@ async function replayPendingCheckinsInternal(accountSubject: string) {
   let synced = 0
   for (const pending of [...state.pendingCheckins]) {
     try {
-      await medicationService.submitCheckin(pending)
+      await medicationService.submitCheckin({
+        clientRequestId: pending.clientRequestId,
+        doseTaskId: pending.doseTaskId,
+        result: pending.result,
+        actualTakenAt: pending.actualTakenAt,
+        note: pending.note,
+        skipReason: pending.skipReason
+      })
       if (patientSession.getAccountSubject() !== accountSubject) return synced
       await mutateState((currentState) => {
         currentState.pendingCheckins = currentState.pendingCheckins.filter(

@@ -110,4 +110,14 @@ describe('MVP release patient contracts', () => {
     expect(assessmentSource).toContain('clearAssessmentState()')
     expect(assessmentSource).toContain('delete answers[questionCode]')
   })
+
+  test('isolates family bindings by account and uses a subject-bearing E2E JWT', () => {
+    const profileSource = readFileSync(resolve(process.cwd(), 'src/modules/patient/pages/ProfilePage.vue'), 'utf8')
+    const e2eSource = readFileSync(resolve(process.cwd(), 'scripts/e2e-mvp-release.mjs'), 'utf8')
+    expect(profileSource).toContain('const expectedRequestEpoch = ++familyRequestEpoch')
+    expect(profileSource).toContain('patientSession.getAccountSubject() !== expectedAccountSubject')
+    expect(profileSource).toContain('familyBindings.value = []')
+    expect(e2eSource).toContain("sub: 'e2e-patient'")
+    expect(e2eSource).not.toContain("accessToken: 'e2e-token'")
+  })
 })
