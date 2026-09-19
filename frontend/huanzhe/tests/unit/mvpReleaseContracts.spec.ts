@@ -101,4 +101,13 @@ describe('MVP release patient contracts', () => {
     expect(orderSource).toContain(':maxlength="255"')
     expect(manifest).toContain('android.permission.SCHEDULE_EXACT_ALARM')
   })
+
+  test('isolates knowledge assessment state from account-switch races', () => {
+    const assessmentSource = readFileSync(resolve(process.cwd(), 'src/modules/patient/pages/KnowledgeAssessmentPage.vue'), 'utf8')
+    expect(assessmentSource).toContain('const expectedAccountSubject = patientSession.getAccountSubject()')
+    expect(assessmentSource).toContain('patientSession.getAccountSubject() !== expectedAccountSubject')
+    expect(assessmentSource).toContain('const expectedRequestEpoch = ++requestEpoch')
+    expect(assessmentSource).toContain('clearAssessmentState()')
+    expect(assessmentSource).toContain('delete answers[questionCode]')
+  })
 })

@@ -63,6 +63,7 @@ import {
   IonToast, IonToolbar, onIonViewWillEnter
 } from '@ionic/vue'
 import { computed, reactive, ref } from 'vue'
+import { patientSession } from '@/app/session'
 import {
   assessmentService,
   type KnowledgeAssessmentDTO,
@@ -77,6 +78,7 @@ const status = ref<KnowledgeAssessmentStatusDTO | null>(null)
 const answers = reactive<Record<string, string>>({})
 const toastOpen = ref(false)
 const toastMessage = ref('')
+let requestEpoch = 0
 
 const phase = computed(() => status.value?.currentPhase || 'DAY_1')
 const phaseText = computed(() => phase.value === 'WEEK_4' ? '第 4 周复测' : '首次用药科普测评')
@@ -86,44 +88,74 @@ const completedAssessment = computed<KnowledgeAssessmentDTO | null>(() =>
 const allAnswered = computed(() => questions.value.length > 0
   && questions.value.every((question) => Boolean(answers[question.questionCode])))
 
+const clearAssessmentState = () => {
+  questions.value = []
+  status.value = null
+  Object.keys(answers).forEach((questionCode) => delete answers[questionCode])
+}
+
 const load = async () => {
+  const expectedAccountSubject = patientSession.getAccountSubject()
+  const expectedRequestEpoch = ++requestEpoch
+  clearAssessmentState()
+  submitting.value = false
   loading.value = true
+  if (!expectedAccountSubject) {
+    loading.value = false
+    return
+  }
   try {
     const [questionResponse, statusResponse] = await Promise.all([
       assessmentService.getKnowledgeQuestions(),
       assessmentService.getKnowledgeStatus()
     ])
+    if (expectedRequestEpoch !== requestEpoch
+      || patientSession.getAccountSubject() !== expectedAccountSubject) return
     questions.value = questionResponse.data ?? []
     status.value = statusResponse.data ?? null
   } catch (error: any) {
+    if (expectedRequestEpoch !== requestEpoch
+      || patientSession.getAccountSubject() !== expectedAccountSubject) return
     toastMessage.value = error?.message || '测评加载失败'
     toastOpen.value = true
   } finally {
-    loading.value = false
+    if (expectedRequestEpoch === requestEpoch) loading.value = false
   }
 }
 
 const submit = async () => {
   if (!allAnswered.value || !status.value) return
+  const expectedAccountSubject = patientSession.getAccountSubject()
+  if (!expectedAccountSubject) return
+  const expectedRequestEpoch = requestEpoch
+  const submittedPhase = phase.value
+  const submittedQuestionSetVersion = status.value.questionSetVersion
+  const submittedAnswers = questions.value.map((question) => ({
+    questionCode: question.questionCode,
+    selectedOption: answers[question.questionCode]
+  }))
   submitting.value = true
   try {
     const response = await assessmentService.submitKnowledge({
-      phase: phase.value,
-      questionSetVersion: status.value.questionSetVersion,
-      answers: questions.value.map((question) => ({
-        questionCode: question.questionCode,
-        selectedOption: answers[question.questionCode]
-      }))
+      phase: submittedPhase,
+      questionSetVersion: submittedQuestionSetVersion,
+      answers: submittedAnswers
     })
-    if (phase.value === 'WEEK_4') status.value.week4 = response.data
+    if (expectedRequestEpoch !== requestEpoch
+      || patientSession.getAccountSubject() !== expectedAccountSubject
+      || !status.value) return
+    if (submittedPhase === 'WEEK_4') status.value.week4 = response.data
     else status.value.day1 = response.data
     toastMessage.value = `提交成功，得分 ${response.data.score}/${response.data.maxScore}`
     toastOpen.value = true
   } catch (error: any) {
+    if (expectedRequestEpoch !== requestEpoch
+      || patientSession.getAccountSubject() !== expectedAccountSubject) return
     toastMessage.value = error?.message || '提交失败'
     toastOpen.value = true
   } finally {
-    submitting.value = false
+    if (expectedRequestEpoch === requestEpoch
+      && patientSession.getAccountSubject() === expectedAccountSubject) submitting.value = false
   }
 }
 

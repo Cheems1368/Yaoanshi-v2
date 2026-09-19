@@ -1040,3 +1040,4 @@ T9 PR B Physical Android Acceptance and Review Remediation (2026-09-18)
 Last Updated
 - 2026-09-19 Asia/Shanghai
 - Reason: PR B physical-device acceptance and latest-head review remediation are complete; protected PR qualification remains.
+- 2026-09-19：PR #42 最新 head 审查补齐知识测评页账号隔离：加载时清空题目、状态和答案，以账号 subject + 请求 epoch 丢弃账号切换或过期响应；提交结果同样只允许写回原账号会话。患者端单测增至 35 项。
