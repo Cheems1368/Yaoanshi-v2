@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, test, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
   read: vi.fn(), write: vi.fn(), clear: vi.fn(), getDoseTasks: vi.fn(), submitCheckin: vi.fn(),
-  clearGateState: vi.fn(), accountSubject: 'patient-1'
+  clearGateState: vi.fn(), cancelAllReminders: vi.fn(), accountSubject: 'patient-1'
 }))
 
 vi.mock('@capacitor/core', () => ({
@@ -20,6 +20,10 @@ vi.mock('@/app/session', () => ({
     getAccessToken: () => 'access-token',
     clearGateState: mocks.clearGateState
   }
+}))
+
+vi.mock('@/modules/patient/services/localMedicationReminders', () => ({
+  cancelAllMedicationReminders: mocks.cancelAllReminders
 }))
 
 import {
@@ -48,6 +52,7 @@ describe('native offline medication flow', () => {
     })
     mocks.write.mockResolvedValue(undefined)
     mocks.clear.mockResolvedValue(undefined)
+    mocks.cancelAllReminders.mockResolvedValue(undefined)
   })
 
   test('keeps encrypted cached tasks when the API is unreachable', async () => {
@@ -214,6 +219,7 @@ describe('native offline medication flow', () => {
 
     expect(mocks.clear).toHaveBeenCalled()
     expect(mocks.clearGateState).toHaveBeenCalled()
+    expect(mocks.cancelAllReminders).toHaveBeenCalled()
     expect(mocks.write).not.toHaveBeenCalled()
   })
 })

@@ -1,6 +1,7 @@
 import { Capacitor, registerPlugin } from '@capacitor/core'
 import { medicationService, type DoseTaskDTO } from '@/modules/patient/api/mvp'
 import { patientSession } from '@/app/session'
+import { cancelAllMedicationReminders } from '@/modules/patient/services/localMedicationReminders'
 
 const CACHE_TTL_MS = 48 * 60 * 60 * 1000
 
@@ -131,6 +132,7 @@ export async function loadMedicationTasks(days = 3): Promise<{ tasks: DoseTaskDT
     if (message === 'PATIENT_BIND_CONFLICT' || message === 'PATIENT_NOT_FOUND') {
       patientSession.clearGateState()
       await clearMedicalCache()
+      await cancelAllMedicationReminders()
       throw error
     }
     if (message !== 'Network error') throw error

@@ -15,7 +15,7 @@
       </ion-refresher>
       <div class="container">
         <div v-if="offlineMode" class="offline-banner" role="status">
-          当前离线，展示 48 小时内的加密缓存；打卡将在联网后自动同步。
+          当前离线，展示 48 小时内的加密缓存；新打卡将在联网后自动同步，已提交记录需联网更正。
         </div>
         <ion-card class="overview-card">
           <ion-card-content class="overview-grid">
@@ -195,6 +195,10 @@ const saveResult = async (task: DoseTaskDTO, result: 'TAKEN' | 'MISSED') => {
     }
 
     if (task.lastEffectiveCheckinId) {
+      if (offlineMode.value) {
+        showMessage('当前离线，已提交记录需联网后更正')
+        return
+      }
       await medicationService.correctCheckin(task.lastEffectiveCheckinId, payload)
     } else {
       const outcome = await submitOrQueueCheckin(task, result)

@@ -70,4 +70,15 @@ describe('MVP release patient contracts', () => {
     expect(reminderSource).toContain('cancelMedicationReminder(task.id)')
     expect(tabSource).toContain('cancelMedicationReminder(task.id)')
   })
+
+  test('keeps submitted satisfaction visible and makes offline correction explicit', () => {
+    const orderSource = readFileSync(resolve(process.cwd(), 'src/modules/patient/pages/HelpOrderDetailPage.vue'), 'utf8')
+    const reminderSource = readFileSync(resolve(process.cwd(), 'src/modules/patient/pages/MedicationReminderPage.vue'), 'utf8')
+    const tabSource = readFileSync(resolve(process.cwd(), 'src/modules/patient/pages/MedicationTabPage.vue'), 'utf8')
+    expect(orderSource).toContain('satisfactionStatus?.eligible || satisfactionStatus?.submitted')
+    expect(reminderSource).toContain("if (offlineMode.value)")
+    expect(reminderSource).toContain('已提交记录需联网后更正')
+    expect(tabSource).toContain("if (offlineMode.value)")
+    expect(tabSource).toContain('已提交记录需联网后更正')
+  })
 })

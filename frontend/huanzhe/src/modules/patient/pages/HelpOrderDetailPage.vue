@@ -120,7 +120,7 @@
             </ion-card-content>
           </ion-card>
 
-          <ion-card v-if="order.status === 'CLOSED' && satisfactionStatus?.eligible" class="satisfaction-card" data-testid="satisfaction-card">
+          <ion-card v-if="order.status === 'CLOSED' && (satisfactionStatus?.eligible || satisfactionStatus?.submitted)" class="satisfaction-card" data-testid="satisfaction-card">
             <ion-card-header>
               <ion-card-title>服务满意度</ion-card-title>
               <ion-card-subtitle v-if="satisfactionStatus.submitted">
