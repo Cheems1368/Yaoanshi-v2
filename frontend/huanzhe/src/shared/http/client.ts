@@ -163,14 +163,19 @@ class HttpService {
         .then((response) => {
           const payload = response.data
           if (payload.code !== 200 && payload.code !== 0) {
-            throw new Error(payload.msg || 'Refresh token invalid')
+            if (payload.code === 40004) {
+              patientSession.markAnonymous()
+            } else {
+              this.refreshUnavailable = true
+            }
+            return null
           }
 
           patientSession.setAccessToken(payload.data.accessToken)
           return payload.data.accessToken
         })
         .catch((error) => {
-          if (error?.request && !error?.response) {
+          if (error?.response?.status !== 401 && error?.response?.data?.code !== 40004) {
             this.refreshUnavailable = true
             return null
           }

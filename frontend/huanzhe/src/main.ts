@@ -8,6 +8,7 @@ import {
   registerMedicationReminderActionHandler
 } from '@/modules/patient/services/localMedicationReminders'
 import { patientSession } from '@/app/session'
+import { httpService } from '@/shared/http/client'
 
 import { IonicVue } from '@ionic/vue';
 import AppIcon from '@/shared/components/AppIcon.vue'
@@ -51,7 +52,12 @@ if (typeof window !== 'undefined') {
   const replayIfAuthenticated = () => {
     if (patientSession.getAccessToken()) void replayPendingCheckins()
   }
-  window.addEventListener('online', replayIfAuthenticated)
+  const restoreAndReplay = async () => {
+    if (await httpService.restoreSession() && patientSession.getAccessToken()) {
+      await replayPendingCheckins()
+    }
+  }
+  window.addEventListener('online', () => void restoreAndReplay())
   window.addEventListener('patient-session-authenticated', replayIfAuthenticated)
   void registerMedicationReminderActionHandler(async (route) => {
     await router.isReady()

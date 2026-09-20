@@ -107,6 +107,16 @@ describe('MVP release patient contracts', () => {
     expect(anonymousHandler).toContain('cancelAllMedicationReminders()')
   })
 
+  test('preserves offline state for temporary refresh failures and restores before online replay', () => {
+    const clientSource = readFileSync(resolve(process.cwd(), 'src/shared/http/client.ts'), 'utf8')
+    const mainSource = readFileSync(resolve(process.cwd(), 'src/main.ts'), 'utf8')
+    expect(clientSource).toContain('payload.code === 40004')
+    expect(clientSource).toContain("error?.response?.status !== 401")
+    expect(clientSource).toContain('this.refreshUnavailable = true')
+    expect(mainSource).toContain('await httpService.restoreSession()')
+    expect(mainSource).toContain("window.addEventListener('online', () => void restoreAndReplay())")
+  })
+
   test('aligns satisfaction length and Android exact-alarm contracts', () => {
     const orderSource = readFileSync(resolve(process.cwd(), 'src/modules/patient/pages/HelpOrderDetailPage.vue'), 'utf8')
     const manifest = readFileSync(resolve(process.cwd(), 'android/app/src/main/AndroidManifest.xml'), 'utf8')
