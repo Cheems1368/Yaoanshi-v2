@@ -1,10 +1,13 @@
+import { isNativeMedicalCache, secureMedicalCache } from '@/app/secureMedicalCache'
+
 const DEVICE_ID_KEY = 'patient_device_id'
 const MOBILE_KEY = 'patient_mobile'
 const BINDING_STATUS_KEY = 'patient_binding_status'
 const ACTIVE_PLAN_KEY = 'patient_has_active_plan'
 let accessTokenMemory = ''
 let accountSubjectMemory = ''
-let authStatus: 'unknown' | 'authenticated' | 'anonymous' = 'unknown'
+let accountTypeMemory = ''
+let authStatus: 'unknown' | 'authenticated' | 'offline' | 'anonymous' = 'unknown'
 
 const getSessionStorage = () => (typeof window !== 'undefined' ? window.sessionStorage : null)
 
@@ -41,13 +44,23 @@ export const patientSession = {
 
   setAccessToken(token: string) {
     const nextSubject = readTokenSubject(token)
-    if (accountSubjectMemory && nextSubject && accountSubjectMemory !== nextSubject && typeof window !== 'undefined') {
-      window.dispatchEvent(new Event('patient-account-switched'))
+    if (accountSubjectMemory && nextSubject && accountSubjectMemory !== nextSubject) {
+      accountTypeMemory = ''
+      if (typeof window !== 'undefined') window.dispatchEvent(new Event('patient-account-switched'))
     }
     accessTokenMemory = token || ''
     accountSubjectMemory = nextSubject
     authStatus = accessTokenMemory ? 'authenticated' : authStatus
     if (accessTokenMemory && typeof window !== 'undefined') window.dispatchEvent(new Event('patient-session-authenticated'))
+  },
+
+  setAccountType(accountType: string) {
+    const normalized = accountType.toUpperCase()
+    accountTypeMemory = normalized === 'PATIENT' || normalized === 'FAMILY' ? normalized : ''
+  },
+
+  getAccountType() {
+    return accountTypeMemory || null
   },
 
   getAccountSubject() {
@@ -57,6 +70,7 @@ export const patientSession = {
   clearAccessToken() {
     accessTokenMemory = ''
     accountSubjectMemory = ''
+    accountTypeMemory = ''
   },
 
   getAuthStatus() {
@@ -67,6 +81,7 @@ export const patientSession = {
     authStatus = 'anonymous'
     accessTokenMemory = ''
     accountSubjectMemory = ''
+    accountTypeMemory = ''
     if (typeof window !== 'undefined') window.dispatchEvent(new Event('patient-session-anonymous'))
   },
 
@@ -74,6 +89,40 @@ export const patientSession = {
     authStatus = 'unknown'
     accessTokenMemory = ''
     accountSubjectMemory = ''
+    accountTypeMemory = ''
+  },
+
+  async restoreOfflineContext() {
+    if (!isNativeMedicalCache() || authStatus === 'anonymous') return false
+    try {
+      const { value } = await secureMedicalCache.read()
+      if (!value) return false
+      const parsed = JSON.parse(value) as {
+        version?: number
+        accountSubject?: string
+        accountType?: string
+        expiresAt?: number
+        tasksExpiresAt?: number
+        tasks?: unknown[]
+        pendingCheckins?: Array<{ expiresAt?: number }>
+      }
+      if ((parsed.version !== 1 && parsed.version !== 2) || !parsed.accountSubject) return false
+      const now = Date.now()
+      const tasksExpiry = parsed.version === 1 ? parsed.expiresAt : parsed.tasksExpiresAt
+      const hasValidTasks = Array.isArray(parsed.tasks) && parsed.tasks.length > 0
+        && typeof tasksExpiry === 'number' && tasksExpiry > now
+      const hasValidPending = Array.isArray(parsed.pendingCheckins) && parsed.pendingCheckins.some((pending) => {
+        const expiry = parsed.version === 1 ? parsed.expiresAt : pending.expiresAt
+        return typeof expiry === 'number' && expiry > now
+      })
+      if (!hasValidTasks && !hasValidPending) return false
+      accountSubjectMemory = parsed.accountSubject
+      this.setAccountType(parsed.accountType ?? '')
+      authStatus = 'offline'
+      return true
+    } catch {
+      return false
+    }
   },
 
   getDeviceId(): string | null {
@@ -135,8 +184,9 @@ export const patientSession = {
 
   getGateState(): PatientGateState {
     return {
-      loggedIn: authStatus === 'authenticated' && Boolean(accessTokenMemory),
-      isBound: localStorage.getItem(BINDING_STATUS_KEY) === 'BOUND',
+      loggedIn: (authStatus === 'authenticated' && Boolean(accessTokenMemory))
+        || (authStatus === 'offline' && Boolean(accountSubjectMemory)),
+      isBound: authStatus === 'offline' || localStorage.getItem(BINDING_STATUS_KEY) === 'BOUND',
       hasActivePlan: localStorage.getItem(ACTIVE_PLAN_KEY) === 'true'
     }
   }

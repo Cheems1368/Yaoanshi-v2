@@ -10,6 +10,7 @@ export interface ApiResponse<T = unknown> {
 class HttpService {
   private readonly instance: AxiosInstance
   private refreshPromise: Promise<string | null> | null = null
+  private refreshUnavailable = false
 
   constructor() {
     const apiBaseUrl = typeof __API_BASE_URL__ === 'string' ? __API_BASE_URL__ : 'http://localhost:8080'
@@ -28,7 +29,9 @@ class HttpService {
       let token = patientSession.getAccessToken()
       config.headers = config.headers ?? {}
 
-      if (!token && patientSession.getAuthStatus() !== 'anonymous' && !this.shouldSkipRefresh(requestUrl)) {
+      const offlineSession = patientSession.getAuthStatus() === 'offline'
+        && typeof navigator !== 'undefined' && !navigator.onLine
+      if (!token && !offlineSession && patientSession.getAuthStatus() !== 'anonymous' && !this.shouldSkipRefresh(requestUrl)) {
         token = await this.refreshAccessToken()
       }
 
@@ -97,7 +100,11 @@ class HttpService {
     if (patientSession.getAuthStatus() === 'anonymous') {
       return false
     }
-    return Boolean(await this.refreshAccessToken())
+    if (patientSession.getAuthStatus() === 'offline' && typeof navigator !== 'undefined' && !navigator.onLine) {
+      return true
+    }
+    if (await this.refreshAccessToken()) return true
+    return this.refreshUnavailable ? patientSession.restoreOfflineContext() : false
   }
 
   private shouldSkipRefresh(requestUrl: string) {
@@ -137,6 +144,7 @@ class HttpService {
 
   private async refreshAccessToken(): Promise<string | null> {
     if (!this.refreshPromise) {
+      this.refreshUnavailable = false
       const baseURL = this.instance.defaults.baseURL ?? ''
       this.refreshPromise = axios
         .post<ApiResponse<{ accessToken: string; expiresIn: number; refreshExpiresIn: number; deviceId: string }>>(
@@ -161,7 +169,11 @@ class HttpService {
           patientSession.setAccessToken(payload.data.accessToken)
           return payload.data.accessToken
         })
-        .catch(() => {
+        .catch((error) => {
+          if (error?.request && !error?.response) {
+            this.refreshUnavailable = true
+            return null
+          }
           patientSession.markAnonymous()
           return null
         })

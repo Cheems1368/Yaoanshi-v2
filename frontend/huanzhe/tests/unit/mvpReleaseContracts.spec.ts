@@ -66,12 +66,14 @@ describe('MVP release patient contracts', () => {
     const homeSource = readFileSync(resolve(process.cwd(), 'src/modules/patient/pages/HomePage.vue'), 'utf8')
     const reminderSource = readFileSync(resolve(process.cwd(), 'src/modules/patient/pages/MedicationReminderPage.vue'), 'utf8')
     const tabSource = readFileSync(resolve(process.cwd(), 'src/modules/patient/pages/MedicationTabPage.vue'), 'utf8')
-    expect(homeSource).toContain('enableAndScheduleMedicationReminders(tasksResponse.tasks, accountType || undefined)')
+    expect(homeSource).toContain('accountType || patientSession.getAccountType() || undefined')
     expect(homeSource).toContain('expectedAccountSubject')
     expect(reminderSource).toContain('cancelMedicationReminder(task.id)')
     expect(reminderSource).toContain('expectedAccountSubject')
     expect(tabSource).toContain('cancelMedicationReminder(task.id)')
     expect(tabSource).toContain('expectedAccountSubject')
+    expect(reminderSource).toContain("currentAccountType.value = patientSession.getAccountType() ?? 'UNKNOWN'")
+    expect(reminderSource).toContain('请尽快处理')
   })
 
   test('keeps submitted satisfaction visible and makes offline correction explicit', () => {

@@ -2,12 +2,12 @@ import { beforeEach, describe, expect, test, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
   read: vi.fn(), write: vi.fn(), clear: vi.fn(), getDoseTasks: vi.fn(), submitCheckin: vi.fn(),
-  clearGateState: vi.fn(), cancelAllReminders: vi.fn(), accountSubject: 'patient-1'
+  clearGateState: vi.fn(), cancelAllReminders: vi.fn(), accountSubject: 'patient-1', accountType: 'PATIENT'
 }))
 
-vi.mock('@capacitor/core', () => ({
-  Capacitor: { isNativePlatform: () => true },
-  registerPlugin: () => ({ read: mocks.read, write: mocks.write, clear: mocks.clear })
+vi.mock('@/app/secureMedicalCache', () => ({
+  isNativeMedicalCache: () => true,
+  secureMedicalCache: { read: mocks.read, write: mocks.write, clear: mocks.clear }
 }))
 
 vi.mock('@/modules/patient/api/mvp', () => ({
@@ -17,6 +17,7 @@ vi.mock('@/modules/patient/api/mvp', () => ({
 vi.mock('@/app/session', () => ({
   patientSession: {
     getAccountSubject: () => mocks.accountSubject,
+    getAccountType: () => mocks.accountType,
     getAccessToken: () => 'access-token',
     clearGateState: mocks.clearGateState
   }
@@ -27,6 +28,7 @@ vi.mock('@/modules/patient/services/localMedicationReminders', () => ({
 }))
 
 import {
+  cacheOfflineAccountType,
   loadMedicationTasks,
   replayPendingCheckins,
   submitOrQueueCheckin
@@ -47,6 +49,7 @@ describe('native offline medication flow', () => {
       if (typeof mock === 'function' && 'mockReset' in mock) mock.mockReset()
     })
     mocks.accountSubject = 'patient-1'
+    mocks.accountType = 'PATIENT'
     mocks.read.mockResolvedValue({
       value: JSON.stringify({ version: 1, accountSubject: 'patient-1', expiresAt: Date.now() + 60_000, tasks: [cachedTask], pendingCheckins: [] })
     })
@@ -60,6 +63,14 @@ describe('native offline medication flow', () => {
     mocks.getDoseTasks.mockRejectedValue(new Error('Network error'))
     const result = await loadMedicationTasks()
     expect(result).toEqual({ tasks: [cachedTask], offline: true })
+  })
+
+  test('persists the verified account type inside the encrypted native cache', async () => {
+    await cacheOfflineAccountType('FAMILY', 'patient-1')
+
+    const saved = JSON.parse(mocks.write.mock.calls[0][0].value)
+    expect(saved.accountSubject).toBe('patient-1')
+    expect(saved.accountType).toBe('FAMILY')
   })
 
   test('queues a stable idempotent request only for an offline network failure', async () => {

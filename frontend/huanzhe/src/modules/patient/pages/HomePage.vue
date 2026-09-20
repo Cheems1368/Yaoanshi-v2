@@ -161,7 +161,7 @@ import {
   type MedicationPlanDTO
 } from '@/modules/patient/api/mvp'
 import { patientSession } from '@/app/session'
-import { loadMedicationTasks } from '@/modules/patient/services/offlineMedication'
+import { cacheOfflineAccountType, loadMedicationTasks } from '@/modules/patient/services/offlineMedication'
 import { enableAndScheduleMedicationReminders } from '@/modules/patient/services/localMedicationReminders'
 
 const router = useRouter()
@@ -224,7 +224,11 @@ const loadDashboard = async () => {
     const today = new Date().toLocaleDateString('sv-SE')
     todayTasks.value = tasksResponse.tasks.filter((task) => task.taskDate === today)
     const accountType = String((accountResponse.data as any)?.accountType || '').toUpperCase()
-    void enableAndScheduleMedicationReminders(tasksResponse.tasks, accountType || undefined)
+    if (accountType) {
+      patientSession.setAccountType(accountType)
+      void cacheOfflineAccountType(accountType, expectedAccountSubject).catch(() => undefined)
+    }
+    void enableAndScheduleMedicationReminders(tasksResponse.tasks, accountType || patientSession.getAccountType() || undefined)
       .then((mode) => { if (mode === 'inexact') showMessage('未授予精确闹钟权限，用药提醒可能延迟') })
       .catch(() => undefined)
     assessmentStatus.value = assessmentResponse.data ?? null

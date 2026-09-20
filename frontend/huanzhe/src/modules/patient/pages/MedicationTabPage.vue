@@ -197,6 +197,7 @@ import {
 } from '@/modules/patient/api/mvp'
 import { patientSession } from '@/app/session'
 import {
+  cacheOfflineAccountType,
   loadMedicationTasks,
   submitOrQueueCheckin
 } from '@/modules/patient/services/offlineMedication'
@@ -211,7 +212,7 @@ const activeSegment = ref<'reminder' | 'record'>('reminder')
 const reminderLoading = ref(false)
 const activePlan = ref<MedicationPlanDTO | null>(null)
 const tasks = ref<DoseTaskDTO[]>([])
-const currentAccountType = ref('PATIENT')
+const currentAccountType = ref('UNKNOWN')
 const submittingTaskId = ref<number | null>(null)
 const offlineMode = ref(false)
 
@@ -223,6 +224,7 @@ const pendingCount = computed(() =>
 const loadTasks = async () => {
   reminderLoading.value = true
   const expectedAccountSubject = patientSession.getAccountSubject()
+  currentAccountType.value = patientSession.getAccountType() ?? 'UNKNOWN'
   try {
     const [planRes, taskRes, accountRes] = await Promise.all([
       medicationService.getActiveMedicationPlan().catch(() => ({ data: null })),
@@ -240,8 +242,12 @@ const loadTasks = async () => {
     tasks.value = taskRes.tasks.filter((task) => task.taskDate === today)
     offlineMode.value = taskRes.offline
     const accountType = String((accountRes.data as any)?.accountType || '').toUpperCase()
-    if (accountType) currentAccountType.value = accountType
-    void enableAndScheduleMedicationReminders(taskRes.tasks, accountType || undefined)
+    if (accountType) {
+      currentAccountType.value = accountType
+      patientSession.setAccountType(accountType)
+      void cacheOfflineAccountType(accountType, expectedAccountSubject).catch(() => undefined)
+    }
+    void enableAndScheduleMedicationReminders(taskRes.tasks, accountType || patientSession.getAccountType() || undefined)
       .then((mode) => { if (mode === 'inexact') showMessage('未授予精确闹钟权限，用药提醒可能延迟') })
       .catch(() => undefined)
     if (!taskRes.offline) patientSession.setActivePlanStatus(Boolean(planRes.data))
@@ -317,9 +323,13 @@ const formatOverdue = (minutes?: number | null) => {
 
 const reminderNotice = (task: DoseTaskDTO) => {
   if (task.reminderStage === 'FAMILY_REMINDER_DUE') {
-    return currentAccountType.value === 'FAMILY'
-      ? `已超过 ${formatOverdue(task.overdueMinutes)}，需要你协助记录`
-      : `已超过 ${formatOverdue(task.overdueMinutes)}，已提醒家属协助`
+    if (currentAccountType.value === 'FAMILY') {
+      return `已超过 ${formatOverdue(task.overdueMinutes)}，需要你协助记录`
+    }
+    if (currentAccountType.value === 'PATIENT') {
+      return `已超过 ${formatOverdue(task.overdueMinutes)}，已提醒家属协助`
+    }
+    return `已超过 ${formatOverdue(task.overdueMinutes)}，请尽快处理`
   }
   if (task.reminderStage === 'OVERDUE') {
     return `已超过 ${formatOverdue(task.overdueMinutes)}，请尽快记录`

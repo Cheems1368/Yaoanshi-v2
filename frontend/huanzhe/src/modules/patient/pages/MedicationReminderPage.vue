@@ -134,6 +134,7 @@ import { computed, ref } from 'vue'
 import { appAuthService, medicationService, type DoseTaskDTO, type MedicationPlanDTO } from '@/modules/patient/api/mvp'
 import { patientSession } from '@/app/session'
 import {
+  cacheOfflineAccountType,
   loadMedicationTasks,
   submitOrQueueCheckin
 } from '@/modules/patient/services/offlineMedication'
@@ -145,7 +146,7 @@ import {
 const loading = ref(false)
 const activePlan = ref<MedicationPlanDTO | null>(null)
 const tasks = ref<DoseTaskDTO[]>([])
-const currentAccountType = ref('PATIENT')
+const currentAccountType = ref('UNKNOWN')
 const submittingTaskId = ref<number | null>(null)
 const showToast = ref(false)
 const toastMessage = ref('')
@@ -162,6 +163,7 @@ const showMessage = (message: string) => {
 const loadTasks = async () => {
   loading.value = true
   const expectedAccountSubject = patientSession.getAccountSubject()
+  currentAccountType.value = patientSession.getAccountType() ?? 'UNKNOWN'
   try {
     const [planResponse, taskResponse, accountResponse] = await Promise.all([
       medicationService.getActiveMedicationPlan().catch(() => ({ data: null })),
@@ -179,8 +181,12 @@ const loadTasks = async () => {
     tasks.value = taskResponse.tasks.filter((task) => task.taskDate === today)
     offlineMode.value = taskResponse.offline
     const accountType = String((accountResponse.data as any)?.accountType || '').toUpperCase()
-    if (accountType) currentAccountType.value = accountType
-    void enableAndScheduleMedicationReminders(taskResponse.tasks, accountType || undefined)
+    if (accountType) {
+      currentAccountType.value = accountType
+      patientSession.setAccountType(accountType)
+      void cacheOfflineAccountType(accountType, expectedAccountSubject).catch(() => undefined)
+    }
+    void enableAndScheduleMedicationReminders(taskResponse.tasks, accountType || patientSession.getAccountType() || undefined)
       .then((mode) => { if (mode === 'inexact') showMessage('未授予精确闹钟权限，用药提醒可能延迟') })
       .catch(() => undefined)
     if (!taskResponse.offline) patientSession.setActivePlanStatus(Boolean(planResponse.data))
@@ -259,9 +265,13 @@ const formatOverdue = (minutes?: number | null) => {
 
 const reminderNotice = (task: DoseTaskDTO) => {
   if (task.reminderStage === 'FAMILY_REMINDER_DUE') {
-    return currentAccountType.value === 'FAMILY'
-      ? `已超过 ${formatOverdue(task.overdueMinutes)}，需要你协助记录`
-      : `已超过 ${formatOverdue(task.overdueMinutes)}，已提醒家属协助`
+    if (currentAccountType.value === 'FAMILY') {
+      return `已超过 ${formatOverdue(task.overdueMinutes)}，需要你协助记录`
+    }
+    if (currentAccountType.value === 'PATIENT') {
+      return `已超过 ${formatOverdue(task.overdueMinutes)}，已提醒家属协助`
+    }
+    return `已超过 ${formatOverdue(task.overdueMinutes)}，请尽快处理`
   }
   if (task.reminderStage === 'OVERDUE') {
     return `已超过 ${formatOverdue(task.overdueMinutes)}，请尽快记录`
