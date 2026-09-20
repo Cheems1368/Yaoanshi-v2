@@ -128,6 +128,7 @@ describe('MVP release patient contracts', () => {
     expect(orderSource).toContain('patientSession.getAccountSubject() !== expectedAccountSubject')
     expect(orderSource).toContain('orderId.value !== expectedOrderId')
     expect(orderSource).toContain('if (satisfactionSubmitting.value) return')
+    expect(orderSource).toContain('expectedRequestEpoch === satisfactionRequestEpoch')
   })
 
   test('commits satisfaction from the POST response and clears drafts across contexts', () => {

@@ -85,10 +85,14 @@ async function readState(): Promise<MedicalCacheState> {
     const expiredDataRemoved = pruned.tasks.length !== normalized.tasks.length
       || pruned.pendingCheckins.length !== normalized.pendingCheckins.length
     if (expiredDataRemoved && patientSession.getAccountSubject() === accountSubject) {
-      if (pruned.tasks.length === 0 && pruned.pendingCheckins.length === 0) {
-        await SecureMedicalCache.clear()
-      } else {
-        await SecureMedicalCache.write({ value: JSON.stringify(pruned) })
+      try {
+        if (pruned.tasks.length === 0 && pruned.pendingCheckins.length === 0) {
+          await SecureMedicalCache.clear()
+        } else {
+          await SecureMedicalCache.write({ value: JSON.stringify(pruned) })
+        }
+      } catch {
+        // AtomicFile preserves the previous ciphertext; do not delete still-valid entries on cleanup I/O failure.
       }
     }
     return pruned

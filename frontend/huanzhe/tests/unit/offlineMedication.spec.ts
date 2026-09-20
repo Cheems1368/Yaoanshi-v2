@@ -254,6 +254,26 @@ describe('native offline medication flow', () => {
     expect(saved.pendingCheckins).toHaveLength(1)
   })
 
+  test('keeps the atomic cache when expiry-pruning persistence fails', async () => {
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: false })
+    mocks.read.mockResolvedValue({
+      value: JSON.stringify({
+        version: 2,
+        accountSubject: 'patient-1',
+        tasksExpiresAt: Date.now() - 1,
+        tasks: [cachedTask],
+        pendingCheckins: [{ clientRequestId: 'request-1', doseTaskId: 7, result: 'TAKEN', actualTakenAt: new Date().toISOString(), expiresAt: Date.now() + 60_000 }]
+      })
+    })
+    mocks.write.mockRejectedValue(new Error('SECURE_CACHE_WRITE_FAILED'))
+    mocks.getDoseTasks.mockRejectedValue(new Error('Network error'))
+
+    await expect(loadMedicationTasks()).resolves.toEqual({ tasks: [], offline: true })
+
+    expect(mocks.write).toHaveBeenCalled()
+    expect(mocks.clear).not.toHaveBeenCalled()
+  })
+
   test('deletes the native cache and key when all medical entries have expired', async () => {
     Object.defineProperty(navigator, 'onLine', { configurable: true, value: false })
     mocks.read.mockResolvedValue({

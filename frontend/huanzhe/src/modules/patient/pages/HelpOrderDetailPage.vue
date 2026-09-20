@@ -404,7 +404,9 @@ const submitSatisfaction = async () => {
       || orderId.value !== expectedOrderId) return
     showMessage(error?.message || '评价提交失败')
   } finally {
-    satisfactionSubmitting.value = false
+    if (expectedRequestEpoch === satisfactionRequestEpoch
+      && patientSession.getAccountSubject() === expectedAccountSubject
+      && orderId.value === expectedOrderId) satisfactionSubmitting.value = false
   }
 }
 
