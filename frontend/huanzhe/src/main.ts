@@ -63,7 +63,11 @@ if (typeof window !== 'undefined') {
   const restoreAndReplay = async () => {
     if (await httpService.restoreSession() && patientSession.getAccessToken()) {
       try {
-        await patientService.getCurrentPatient()
+        const currentPatient = await patientService.getCurrentPatient()
+        if (!currentPatient.data) {
+          await clearRevokedMedicalContext()
+          return
+        }
       } catch (error) {
         const message = error instanceof Error ? error.message : ''
         if (message === 'PATIENT_BIND_CONFLICT' || message === 'PATIENT_NOT_FOUND') {

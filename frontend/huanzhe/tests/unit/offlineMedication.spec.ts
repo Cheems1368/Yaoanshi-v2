@@ -2,7 +2,8 @@ import { beforeEach, describe, expect, test, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
   read: vi.fn(), write: vi.fn(), clear: vi.fn(), getDoseTasks: vi.fn(), submitCheckin: vi.fn(),
-  clearGateState: vi.fn(), cancelAllReminders: vi.fn(), accountSubject: 'patient-1', accountType: 'PATIENT'
+  clearGateState: vi.fn(), cancelAllReminders: vi.fn(), accountSubject: 'patient-1', accountType: 'PATIENT',
+  authStatus: 'authenticated'
 }))
 
 vi.mock('@/app/secureMedicalCache', () => ({
@@ -18,6 +19,7 @@ vi.mock('@/app/session', () => ({
   patientSession: {
     getAccountSubject: () => mocks.accountSubject,
     getAccountType: () => mocks.accountType,
+    getAuthStatus: () => mocks.authStatus,
     getAccessToken: () => 'access-token',
     clearGateState: mocks.clearGateState
   }
@@ -50,6 +52,7 @@ describe('native offline medication flow', () => {
     })
     mocks.accountSubject = 'patient-1'
     mocks.accountType = 'PATIENT'
+    mocks.authStatus = 'authenticated'
     mocks.read.mockResolvedValue({
       value: JSON.stringify({ version: 1, accountSubject: 'patient-1', expiresAt: Date.now() + 60_000, tasks: [cachedTask], pendingCheckins: [] })
     })
@@ -63,6 +66,25 @@ describe('native offline medication flow', () => {
     mocks.getDoseTasks.mockRejectedValue(new Error('Network error'))
     const result = await loadMedicationTasks()
     expect(result).toEqual({ tasks: [cachedTask], offline: true })
+  })
+
+  test.each(['Server error', 'Session temporarily unavailable'])(
+    'uses encrypted cached tasks for %s after restoring an offline session',
+    async (message) => {
+      Object.defineProperty(navigator, 'onLine', { configurable: true, value: true })
+      mocks.authStatus = 'offline'
+      mocks.getDoseTasks.mockRejectedValue(new Error(message))
+
+      await expect(loadMedicationTasks()).resolves.toEqual({ tasks: [cachedTask], offline: true })
+    }
+  )
+
+  test('does not hide business failures behind the restored offline cache', async () => {
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: true })
+    mocks.authStatus = 'offline'
+    mocks.getDoseTasks.mockRejectedValue(new Error('No permission'))
+
+    await expect(loadMedicationTasks()).rejects.toThrow('No permission')
   })
 
   test('persists the verified account type inside the encrypted native cache', async () => {

@@ -135,6 +135,7 @@ describe('MVP release patient contracts', () => {
     const mainSource = readFileSync(resolve(process.cwd(), 'src/main.ts'), 'utf8')
     const profileSource = readFileSync(resolve(process.cwd(), 'src/modules/patient/pages/ProfilePage.vue'), 'utf8')
     expect(mainSource).toContain('await patientService.getCurrentPatient()')
+    expect(mainSource).toContain('if (!currentPatient.data)')
     expect(mainSource).toContain("message === 'PATIENT_BIND_CONFLICT' || message === 'PATIENT_NOT_FOUND'")
     expect(mainSource).toContain('await clearRevokedMedicalContext()')
     expect(profileSource).toContain('onIonViewWillEnter(async () => {')

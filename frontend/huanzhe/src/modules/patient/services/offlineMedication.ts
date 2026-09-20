@@ -37,6 +37,10 @@ interface LegacyMedicalCacheState {
 
 const isNative = isNativeMedicalCache
 
+const canUseOfflineCache = (message: string) => message === 'Network error'
+  || (patientSession.getAuthStatus() === 'offline'
+    && (message === 'Server error' || message === 'Session temporarily unavailable'))
+
 const emptyState = (): MedicalCacheState => ({
   version: 2,
   accountSubject: patientSession.getAccountSubject() ?? '',
@@ -200,7 +204,7 @@ export async function loadMedicationTasks(days = 3): Promise<{ tasks: DoseTaskDT
       await cancelAllMedicationReminders()
       throw error
     }
-    if (message !== 'Network error') throw error
+    if (!canUseOfflineCache(message)) throw error
     return { tasks: await getCachedDoseTasks(), offline: true }
   }
 }
