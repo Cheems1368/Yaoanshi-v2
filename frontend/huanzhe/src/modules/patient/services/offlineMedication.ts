@@ -77,11 +77,21 @@ async function readState(): Promise<MedicalCacheState> {
         }
       : parsed
     const now = Date.now()
-    return {
+    const pruned: MedicalCacheState = {
       ...normalized,
       tasks: normalized.tasksExpiresAt > now ? normalized.tasks : [],
       pendingCheckins: normalized.pendingCheckins.filter((pending) => pending.expiresAt > now)
     }
+    const expiredDataRemoved = pruned.tasks.length !== normalized.tasks.length
+      || pruned.pendingCheckins.length !== normalized.pendingCheckins.length
+    if (expiredDataRemoved && patientSession.getAccountSubject() === accountSubject) {
+      if (pruned.tasks.length === 0 && pruned.pendingCheckins.length === 0) {
+        await SecureMedicalCache.clear()
+      } else {
+        await SecureMedicalCache.write({ value: JSON.stringify(pruned) })
+      }
+    }
+    return pruned
   } catch {
     await SecureMedicalCache.clear().catch(() => undefined)
     return emptyState()
@@ -93,6 +103,10 @@ async function writeState(state: MedicalCacheState) {
   const accountSubject = patientSession.getAccountSubject()
   if (!accountSubject || !state.accountSubject || state.accountSubject !== accountSubject) {
     throw new Error('AUTHENTICATED_ACCOUNT_CHANGED')
+  }
+  if (state.tasks.length === 0 && state.pendingCheckins.length === 0) {
+    await SecureMedicalCache.clear()
+    return
   }
   await SecureMedicalCache.write({ value: JSON.stringify(state) })
 }
@@ -129,14 +143,15 @@ export async function cacheDoseTasks(tasks: DoseTaskDTO[], expectedAccountSubjec
     if (patientSession.getAccountSubject() !== expectedAccountSubject || state.accountSubject !== expectedAccountSubject) {
       throw new Error('AUTHENTICATED_ACCOUNT_CHANGED')
     }
-    state.tasks = applyPendingCheckins(tasks, state.pendingCheckins)
+    state.tasks = tasks
     state.tasksExpiresAt = Date.now() + CACHE_TTL_MS
-    return state.tasks
+    return applyPendingCheckins(state.tasks, state.pendingCheckins)
   })
 }
 
 export async function getCachedDoseTasks() {
-  return (await readState()).tasks
+  const state = await readState()
+  return applyPendingCheckins(state.tasks, state.pendingCheckins)
 }
 
 const formatLocalDate = (date: Date) => {
@@ -209,9 +224,6 @@ export async function submitOrQueueCheckin(
       if (!state.pendingCheckins.some((item) => item.clientRequestId === payload.clientRequestId)) {
         state.pendingCheckins.push({ ...payload, expiresAt: Date.now() + CACHE_TTL_MS })
       }
-      state.tasks = state.tasks.map((item) => item.id === task.id
-        ? { ...item, status: result === 'TAKEN' ? 'COMPLETED' : 'MISSED' }
-        : item)
     })
     return 'queued'
   }

@@ -69,6 +69,7 @@ describe('native offline medication flow', () => {
     const saved = JSON.parse(mocks.write.mock.calls[0][0].value)
     expect(saved.pendingCheckins).toHaveLength(1)
     expect(saved.pendingCheckins[0].clientRequestId).toBeTruthy()
+    expect(saved.tasks[0].status).toBe('PENDING')
   })
 
   test('does not queue online business failures', async () => {
@@ -229,8 +230,47 @@ describe('native offline medication flow', () => {
 
     expect(result.tasks[0].status).toBe('COMPLETED')
     const saved = JSON.parse(mocks.write.mock.calls.at(-1)[0].value)
-    expect(saved.tasks[0].status).toBe('COMPLETED')
+    expect(saved.tasks[0].status).toBe('PENDING')
     expect(saved.pendingCheckins).toHaveLength(1)
+  })
+
+  test('persists partial expiry pruning without extending remaining medical data', async () => {
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: false })
+    mocks.read.mockResolvedValue({
+      value: JSON.stringify({
+        version: 2,
+        accountSubject: 'patient-1',
+        tasksExpiresAt: Date.now() - 1,
+        tasks: [cachedTask],
+        pendingCheckins: [{ clientRequestId: 'request-1', doseTaskId: 7, result: 'TAKEN', actualTakenAt: new Date().toISOString(), expiresAt: Date.now() + 60_000 }]
+      })
+    })
+    mocks.getDoseTasks.mockRejectedValue(new Error('Network error'))
+
+    await expect(loadMedicationTasks()).resolves.toEqual({ tasks: [], offline: true })
+
+    const saved = JSON.parse(mocks.write.mock.calls[0][0].value)
+    expect(saved.tasks).toEqual([])
+    expect(saved.pendingCheckins).toHaveLength(1)
+  })
+
+  test('deletes the native cache and key when all medical entries have expired', async () => {
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: false })
+    mocks.read.mockResolvedValue({
+      value: JSON.stringify({
+        version: 2,
+        accountSubject: 'patient-1',
+        tasksExpiresAt: Date.now() - 1,
+        tasks: [cachedTask],
+        pendingCheckins: [{ clientRequestId: 'request-1', doseTaskId: 7, result: 'TAKEN', actualTakenAt: new Date().toISOString(), expiresAt: Date.now() - 1 }]
+      })
+    })
+    mocks.getDoseTasks.mockRejectedValue(new Error('Network error'))
+
+    await expect(loadMedicationTasks()).resolves.toEqual({ tasks: [], offline: true })
+
+    expect(mocks.clear).toHaveBeenCalled()
+    expect(mocks.write).not.toHaveBeenCalled()
   })
 
   test('does not cache a task response after the authenticated account changes', async () => {
