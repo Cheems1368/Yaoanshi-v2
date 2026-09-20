@@ -101,7 +101,7 @@ describe('MVP release patient contracts', () => {
     const mainSource = readFileSync(resolve(process.cwd(), 'src/main.ts'), 'utf8')
     const anonymousHandler = mainSource.slice(
       mainSource.indexOf("window.addEventListener('patient-session-anonymous'"),
-      mainSource.indexOf('const replayIfAuthenticated')
+      mainSource.indexOf('const clearRevokedMedicalContext')
     )
     expect(anonymousHandler).toContain('clearMedicalCache()')
     expect(anonymousHandler).toContain('cancelAllMedicationReminders()')
@@ -129,6 +129,16 @@ describe('MVP release patient contracts', () => {
       expect(source).toContain('expectedRequestEpoch')
       expect(source).toContain('patientSession.getAccountSubject() !== expectedAccountSubject')
     }
+  })
+
+  test('revalidates restored family access and resets cached family UI state', () => {
+    const mainSource = readFileSync(resolve(process.cwd(), 'src/main.ts'), 'utf8')
+    const profileSource = readFileSync(resolve(process.cwd(), 'src/modules/patient/pages/ProfilePage.vue'), 'utf8')
+    expect(mainSource).toContain('await patientService.getCurrentPatient()')
+    expect(mainSource).toContain("message === 'PATIENT_BIND_CONFLICT' || message === 'PATIENT_NOT_FOUND'")
+    expect(mainSource).toContain('await clearRevokedMedicalContext()')
+    expect(profileSource).toContain('onIonViewWillEnter(async () => {')
+    expect(profileSource).toContain('resetFamilyState()')
   })
 
   test('aligns satisfaction length and Android exact-alarm contracts', () => {

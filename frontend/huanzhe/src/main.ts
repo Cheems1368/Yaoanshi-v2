@@ -49,16 +49,32 @@ if (typeof window !== 'undefined') {
     void clearMedicalCache()
     void cancelAllMedicationReminders()
   })
-  const replayIfAuthenticated = () => {
-    if (patientSession.getAccessToken()) void replayPendingCheckins()
+  const clearRevokedMedicalContext = async () => {
+    await appAuthService.logout().catch(() => undefined)
+    await Promise.all([
+      clearMedicalCache().catch(() => undefined),
+      cancelAllMedicationReminders().catch(() => undefined)
+    ])
+    patientSession.clearAuthState()
+    patientSession.clearGateState()
+    await router.replace('/login')
+    window.location.reload()
   }
   const restoreAndReplay = async () => {
     if (await httpService.restoreSession() && patientSession.getAccessToken()) {
+      try {
+        await patientService.getCurrentPatient()
+      } catch (error) {
+        const message = error instanceof Error ? error.message : ''
+        if (message === 'PATIENT_BIND_CONFLICT' || message === 'PATIENT_NOT_FOUND') {
+          await clearRevokedMedicalContext()
+        }
+        return
+      }
       await replayPendingCheckins()
     }
   }
   window.addEventListener('online', () => void restoreAndReplay())
-  window.addEventListener('patient-session-authenticated', replayIfAuthenticated)
   void registerMedicationReminderActionHandler(async (route) => {
     await router.isReady()
     await router.push(route)

@@ -563,7 +563,10 @@ const connectRealtime = () => {
   if (notificationClient) {
     return
   }
-  notificationClient = createAppNotificationClient(() => patientSession.getAccessToken())
+  notificationClient = createAppNotificationClient(
+    () => patientSession.getAccessToken(),
+    () => patientSession.getAccountSubject()
+  )
   void notificationClient.connect()
 }
 

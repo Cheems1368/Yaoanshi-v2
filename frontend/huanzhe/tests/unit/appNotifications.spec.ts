@@ -43,4 +43,28 @@ describe('patient notification fallback', () => {
     client.disconnect()
     window.removeEventListener(APP_NOTIFICATION_EVENT, listener)
   })
+
+  test('reuses the latest cursor when the same account opens a new client', async () => {
+    mocks.createSocketTicket.mockRejectedValue(new Error('unavailable'))
+    mocks.getLogs
+      .mockResolvedValueOnce({ data: [{ id: 100, businessType: 'HELP_ORDER', businessId: 1 }] })
+      .mockResolvedValueOnce({ data: [{ id: 101, businessType: 'HELP_ORDER', businessId: 2 }] })
+    const received: number[] = []
+    const listener = (event: Event) => received.push((event as CustomEvent).detail.id)
+    window.addEventListener(APP_NOTIFICATION_EVENT, listener)
+
+    const firstClient = createAppNotificationClient(() => 'token', () => 'account-cursor-test')
+    await firstClient.connect()
+    await vi.waitFor(() => expect(received).toEqual([100]))
+    firstClient.disconnect()
+
+    const secondClient = createAppNotificationClient(() => 'token', () => 'account-cursor-test')
+    await secondClient.connect()
+    await vi.waitFor(() => expect(mocks.getLogs).toHaveBeenCalledTimes(2))
+
+    expect(mocks.getLogs).toHaveBeenNthCalledWith(1, undefined, 50)
+    expect(mocks.getLogs).toHaveBeenNthCalledWith(2, 100, 50)
+    secondClient.disconnect()
+    window.removeEventListener(APP_NOTIFICATION_EVENT, listener)
+  })
 })

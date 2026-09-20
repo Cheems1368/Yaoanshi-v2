@@ -1,6 +1,7 @@
 import { appNotificationService } from '@/modules/patient/api/mvp'
 
 const EVENT_NAME = 'app-notification'
+const latestCursorByAccount = new Map<string, number>()
 
 function resolveWebSocketUrl() {
   const configuredBase = typeof __API_BASE_URL__ === 'string' && __API_BASE_URL__
@@ -13,13 +14,17 @@ function resolveWebSocketUrl() {
   return `${wsBase}/ws/app-notifications`
 }
 
-export function createAppNotificationClient(getToken?: () => string | null) {
+export function createAppNotificationClient(
+  getToken?: () => string | null,
+  getAccountSubject?: () => string | null
+) {
+  const accountSubject = getAccountSubject?.() ?? null
   let socket: WebSocket | null = null
   let reconnectTimer: number | null = null
   let manualClose = false
   let connecting = false
   let pollingTimer: number | null = null
-  let lastSeenId: number | undefined
+  let lastSeenId = accountSubject ? latestCursorByAccount.get(accountSubject) : undefined
   let pollingAttempt: Promise<boolean> | null = null
   let backfillComplete = false
   const dispatchedIds = new Set<number>()
@@ -33,6 +38,11 @@ export function createAppNotificationClient(getToken?: () => string | null) {
     if (dispatchedIds.size > 200) dispatchedIds.delete(dispatchedIds.values().next().value as number)
   }
 
+  const advanceCursor = (id: number) => {
+    lastSeenId = Math.max(lastSeenId ?? 0, id)
+    if (accountSubject) latestCursorByAccount.set(accountSubject, lastSeenId)
+  }
+
   const pollLogs = () => {
     if (manualClose) return Promise.resolve(false)
     if (pollingAttempt) return pollingAttempt
@@ -43,7 +53,7 @@ export function createAppNotificationClient(getToken?: () => string | null) {
           if (manualClose) return false
           const logs = response.data ?? []
           for (const log of logs) {
-            lastSeenId = Math.max(lastSeenId ?? 0, log.id)
+            advanceCursor(log.id)
             let payload: Record<string, unknown> = {}
             if (log.payloadJson) {
               try { payload = JSON.parse(log.payloadJson) } catch { payload = {} }
@@ -144,7 +154,7 @@ export function createAppNotificationClient(getToken?: () => string | null) {
           if (dispatchedIds.has(payload.id)) return
           rememberDispatchedId(payload.id)
           if (backfillComplete && pollingAttempt === null) {
-            lastSeenId = Math.max(lastSeenId ?? 0, payload.id)
+            advanceCursor(payload.id)
           }
         }
         dispatch(payload)

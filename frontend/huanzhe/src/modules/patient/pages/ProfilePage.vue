@@ -373,6 +373,7 @@ import {
   IonTitle,
   IonToolbar,
   alertController,
+  onIonViewWillEnter,
   toastController
 } from '@ionic/vue'
 import { cameraOutline, checkmarkCircleOutline, createOutline, documentTextOutline } from 'ionicons/icons'
@@ -679,6 +680,17 @@ const relationshipText = (value: string) => ({
   SPOUSE: '配偶', PARENT: '父母', CHILD: '子女', OTHER: '其他'
 }[value] || value)
 
+const resetFamilyState = () => {
+  familyRequestEpoch += 1
+  familyBindings.value = []
+  canManageFamily.value = false
+  familyLoading.value = false
+  familySaving.value = false
+  familyForm.familyMobile = ''
+  familyForm.familyDisplayName = ''
+  familyForm.relationshipType = 'OTHER'
+}
+
 const loadFamilyBindings = async () => {
   const expectedAccountSubject = patientSession.getAccountSubject()
   const expectedRequestEpoch = ++familyRequestEpoch
@@ -787,10 +799,15 @@ onMounted(async () => {
   userDataService.addListener(onUserDataChange)
 
   try {
-    await Promise.all([syncPatientProfileDTO(), syncHealthProfile(), loadFamilyBindings()])
+    await Promise.all([syncPatientProfileDTO(), syncHealthProfile()])
   } catch {
     // keep current session cache when sync fails
   }
+})
+
+onIonViewWillEnter(async () => {
+  resetFamilyState()
+  await loadFamilyBindings()
 })
 
 onUnmounted(() => {
