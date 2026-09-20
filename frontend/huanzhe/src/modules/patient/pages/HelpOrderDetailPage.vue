@@ -353,6 +353,9 @@ const loadSatisfactionStatus = async () => {
     satisfactionContextKey = contextKey
     satisfactionStatus.value = null
     satisfactionSubmitting.value = false
+    satisfactionExpanded.value = false
+    satisfactionRating.value = 0
+    satisfactionComment.value = ''
     satisfactionRequestEpoch += 1
   }
   if (satisfactionSubmitting.value) return
@@ -380,16 +383,20 @@ const submitSatisfaction = async () => {
   const expectedRequestEpoch = ++satisfactionRequestEpoch
   satisfactionSubmitting.value = true
   try {
-    await assessmentService.submitSatisfaction({
+    const response = await assessmentService.submitSatisfaction({
       helpOrderId: expectedOrderId,
       rating: satisfactionRating.value,
       comment: satisfactionComment.value.trim() || undefined
     })
-    const response = await assessmentService.getSatisfactionStatus(expectedOrderId)
     if (expectedRequestEpoch !== satisfactionRequestEpoch
       || patientSession.getAccountSubject() !== expectedAccountSubject
       || orderId.value !== expectedOrderId) return
-    satisfactionStatus.value = response.data ?? null
+    satisfactionStatus.value = {
+      helpOrderId: expectedOrderId,
+      eligible: false,
+      submitted: true,
+      survey: response.data
+    }
     showMessage('评价已提交，感谢反馈')
   } catch (error: any) {
     if (expectedRequestEpoch !== satisfactionRequestEpoch

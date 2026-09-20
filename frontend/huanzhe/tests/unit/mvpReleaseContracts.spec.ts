@@ -129,4 +129,18 @@ describe('MVP release patient contracts', () => {
     expect(orderSource).toContain('orderId.value !== expectedOrderId')
     expect(orderSource).toContain('if (satisfactionSubmitting.value) return')
   })
+
+  test('commits satisfaction from the POST response and clears drafts across contexts', () => {
+    const orderSource = readFileSync(resolve(process.cwd(), 'src/modules/patient/pages/HelpOrderDetailPage.vue'), 'utf8')
+    const submitFlow = orderSource.slice(
+      orderSource.indexOf('const submitSatisfaction'),
+      orderSource.indexOf('const sendReplyPayload')
+    )
+    expect(submitFlow).toContain('const response = await assessmentService.submitSatisfaction')
+    expect(submitFlow).toContain('submitted: true')
+    expect(submitFlow).not.toContain('getSatisfactionStatus')
+    expect(orderSource).toContain('satisfactionExpanded.value = false')
+    expect(orderSource).toContain('satisfactionRating.value = 0')
+    expect(orderSource).toContain("satisfactionComment.value = ''")
+  })
 })
