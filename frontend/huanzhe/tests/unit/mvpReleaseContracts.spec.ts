@@ -143,7 +143,7 @@ describe('MVP release patient contracts', () => {
     expect(mainSource).toContain("window.addEventListener('focus'")
     expect(mainSource).toContain("window.addEventListener('patient-session-authenticated'")
     expect(mainSource).toContain("document.addEventListener('visibilitychange'")
-    expect(mainSource).toContain('window.setInterval(() => void revalidateFamilyAccess(), 60_000)')
+    expect(mainSource).toContain('window.setInterval(() => void restoreAndReplay(), 60_000)')
     expect(profileSource).toContain('onIonViewWillEnter(async () => {')
     expect(profileSource).toContain('resetFamilyState()')
   })

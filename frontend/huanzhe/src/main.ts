@@ -101,11 +101,11 @@ if (typeof window !== 'undefined') {
   }
   window.addEventListener('online', () => void restoreAndReplay())
   window.addEventListener('patient-session-authenticated', () => void restoreAndReplay())
-  window.addEventListener('focus', () => void revalidateFamilyAccess())
+  window.addEventListener('focus', () => void restoreAndReplay())
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible') void revalidateFamilyAccess()
+    if (document.visibilityState === 'visible') void restoreAndReplay()
   })
-  window.setInterval(() => void revalidateFamilyAccess(), 60_000)
+  window.setInterval(() => void restoreAndReplay(), 60_000)
   void restoreAndReplay()
   void registerMedicationReminderActionHandler(async (route) => {
     await router.isReady()

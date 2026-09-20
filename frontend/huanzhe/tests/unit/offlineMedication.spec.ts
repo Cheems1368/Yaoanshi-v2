@@ -201,6 +201,29 @@ describe('native offline medication flow', () => {
     expect(saved.pendingCheckins.map((item: any) => item.doseTaskId)).toEqual([7, 8])
   })
 
+  test('replaces a pending check-in for the same task while reusing its idempotency key', async () => {
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: false })
+    mocks.submitCheckin.mockRejectedValue(new Error('Network error'))
+    let storedValue = JSON.stringify({
+      version: 1,
+      accountSubject: 'patient-1',
+      expiresAt: Date.now() + 60_000,
+      tasks: [cachedTask],
+      pendingCheckins: []
+    })
+    mocks.read.mockImplementation(async () => ({ value: storedValue }))
+    mocks.write.mockImplementation(async ({ value }) => { storedValue = value })
+
+    await submitOrQueueCheckin(cachedTask as any, 'TAKEN')
+    const firstRequestId = JSON.parse(storedValue).pendingCheckins[0].clientRequestId
+    await submitOrQueueCheckin(cachedTask as any, 'MISSED')
+
+    const pending = JSON.parse(storedValue).pendingCheckins
+    expect(pending).toHaveLength(1)
+    expect(pending[0].clientRequestId).toBe(firstRequestId)
+    expect(pending[0].result).toBe('MISSED')
+  })
+
   test('gives a newly queued check-in its own fresh expiry without extending cached tasks', async () => {
     Object.defineProperty(navigator, 'onLine', { configurable: true, value: false })
     mocks.submitCheckin.mockRejectedValue(new Error('Network error'))

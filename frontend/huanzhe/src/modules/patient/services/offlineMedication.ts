@@ -237,7 +237,15 @@ export async function submitOrQueueCheckin(
         || state.accountSubject !== expectedAccountSubject) {
         throw new Error('AUTHENTICATED_ACCOUNT_CHANGED')
       }
-      if (!state.pendingCheckins.some((item) => item.clientRequestId === payload.clientRequestId)) {
+      const existingIndex = state.pendingCheckins.findIndex((item) => item.doseTaskId === payload.doseTaskId)
+      if (existingIndex >= 0) {
+        const existing = state.pendingCheckins[existingIndex]
+        state.pendingCheckins[existingIndex] = {
+          ...payload,
+          clientRequestId: existing.clientRequestId,
+          expiresAt: Date.now() + CACHE_TTL_MS
+        }
+      } else {
         state.pendingCheckins.push({ ...payload, expiresAt: Date.now() + CACHE_TTL_MS })
       }
     })
