@@ -44,7 +44,10 @@ if (typeof window !== 'undefined') {
     void clearMedicalCache()
     void cancelAllMedicationReminders()
   })
-  window.addEventListener('patient-session-anonymous', () => void cancelAllMedicationReminders())
+  window.addEventListener('patient-session-anonymous', () => {
+    void clearMedicalCache()
+    void cancelAllMedicationReminders()
+  })
   const replayIfAuthenticated = () => {
     if (patientSession.getAccessToken()) void replayPendingCheckins()
   }

@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 
-const secureCacheMocks = vi.hoisted(() => ({ read: vi.fn() }))
+const secureCacheMocks = vi.hoisted(() => ({ read: vi.fn(), clear: vi.fn() }))
 
 vi.mock('@/app/secureMedicalCache', () => ({
   isNativeMedicalCache: () => true,
-  secureMedicalCache: { read: secureCacheMocks.read }
+  secureMedicalCache: { read: secureCacheMocks.read, clear: secureCacheMocks.clear }
 }))
 
 import { patientSession } from '@/app/session'
@@ -15,6 +15,8 @@ describe('patientSession', () => {
     sessionStorage.clear()
     patientSession.resetAuthStatus()
     secureCacheMocks.read.mockReset()
+    secureCacheMocks.clear.mockReset()
+    secureCacheMocks.clear.mockResolvedValue(undefined)
   })
 
   test('clears all authentication state', () => {
@@ -111,5 +113,6 @@ describe('patientSession', () => {
 
     await expect(patientSession.restoreOfflineContext()).resolves.toBe(false)
     expect(patientSession.getGateState().loggedIn).toBe(false)
+    expect(secureCacheMocks.clear).toHaveBeenCalledTimes(1)
   })
 })

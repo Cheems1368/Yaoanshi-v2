@@ -115,7 +115,10 @@ export const patientSession = {
         const expiry = parsed.version === 1 ? parsed.expiresAt : pending.expiresAt
         return typeof expiry === 'number' && expiry > now
       })
-      if (!hasValidTasks && !hasValidPending) return false
+      if (!hasValidTasks && !hasValidPending) {
+        await secureMedicalCache.clear().catch(() => undefined)
+        return false
+      }
       accountSubjectMemory = parsed.accountSubject
       this.setAccountType(parsed.accountType ?? '')
       authStatus = 'offline'

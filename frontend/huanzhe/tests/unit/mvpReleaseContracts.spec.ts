@@ -97,6 +97,16 @@ describe('MVP release patient contracts', () => {
     expect(unbindFlow).not.toContain('clearMedicalCache()')
   })
 
+  test('clears encrypted medical state when a session becomes definitively anonymous', () => {
+    const mainSource = readFileSync(resolve(process.cwd(), 'src/main.ts'), 'utf8')
+    const anonymousHandler = mainSource.slice(
+      mainSource.indexOf("window.addEventListener('patient-session-anonymous'"),
+      mainSource.indexOf('const replayIfAuthenticated')
+    )
+    expect(anonymousHandler).toContain('clearMedicalCache()')
+    expect(anonymousHandler).toContain('cancelAllMedicationReminders()')
+  })
+
   test('aligns satisfaction length and Android exact-alarm contracts', () => {
     const orderSource = readFileSync(resolve(process.cwd(), 'src/modules/patient/pages/HelpOrderDetailPage.vue'), 'utf8')
     const manifest = readFileSync(resolve(process.cwd(), 'android/app/src/main/AndroidManifest.xml'), 'utf8')
