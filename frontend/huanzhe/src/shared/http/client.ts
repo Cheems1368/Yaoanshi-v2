@@ -128,6 +128,9 @@ class HttpService {
 
     const nextAccessToken = await this.refreshAccessToken()
     if (!nextAccessToken) {
+      if (this.refreshUnavailable) {
+        return Promise.reject(new Error('Session temporarily unavailable'))
+      }
       this.clearToken()
       this.redirectToLogin()
       return Promise.reject(new Error(fallbackMessage))

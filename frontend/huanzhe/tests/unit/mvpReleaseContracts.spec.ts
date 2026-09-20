@@ -113,6 +113,7 @@ describe('MVP release patient contracts', () => {
     expect(clientSource).toContain('payload.code === 40004')
     expect(clientSource).toContain("error?.response?.status !== 401")
     expect(clientSource).toContain('this.refreshUnavailable = true')
+    expect(clientSource).toContain("new Error('Session temporarily unavailable')")
     expect(mainSource).toContain('await httpService.restoreSession()')
     expect(mainSource).toContain("window.addEventListener('online', () => void restoreAndReplay())")
   })
