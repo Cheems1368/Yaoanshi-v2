@@ -66,7 +66,7 @@ describe('MVP release patient contracts', () => {
     const homeSource = readFileSync(resolve(process.cwd(), 'src/modules/patient/pages/HomePage.vue'), 'utf8')
     const reminderSource = readFileSync(resolve(process.cwd(), 'src/modules/patient/pages/MedicationReminderPage.vue'), 'utf8')
     const tabSource = readFileSync(resolve(process.cwd(), 'src/modules/patient/pages/MedicationTabPage.vue'), 'utf8')
-    expect(homeSource).toContain('enableAndScheduleMedicationReminders(tasksResponse.tasks)')
+    expect(homeSource).toContain('enableAndScheduleMedicationReminders(tasksResponse.tasks, accountType)')
     expect(homeSource).toContain('expectedAccountSubject')
     expect(reminderSource).toContain('cancelMedicationReminder(task.id)')
     expect(reminderSource).toContain('expectedAccountSubject')

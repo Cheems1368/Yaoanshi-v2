@@ -153,6 +153,7 @@ import {
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import {
+  appAuthService,
   assessmentService,
   medicationService,
   type DoseTaskDTO,
@@ -207,10 +208,11 @@ const loadDashboard = async () => {
   loading.value = true
   const expectedAccountSubject = patientSession.getAccountSubject()
   try {
-    const [planResponse, tasksResponse, assessmentResponse] = await Promise.all([
+    const [planResponse, tasksResponse, assessmentResponse, accountResponse] = await Promise.all([
       medicationService.getActiveMedicationPlan().catch(() => ({ data: null })),
       loadMedicationTasks(),
-      assessmentService.getKnowledgeStatus().catch(() => ({ data: null }))
+      assessmentService.getKnowledgeStatus().catch(() => ({ data: null })),
+      appAuthService.getCurrentAccount().catch(() => ({ data: null }))
     ])
     if (!expectedAccountSubject || patientSession.getAccountSubject() !== expectedAccountSubject) {
       activePlan.value = null
@@ -221,9 +223,12 @@ const loadDashboard = async () => {
     activePlan.value = planResponse.data ?? null
     const today = new Date().toLocaleDateString('sv-SE')
     todayTasks.value = tasksResponse.tasks.filter((task) => task.taskDate === today)
-    void enableAndScheduleMedicationReminders(tasksResponse.tasks)
-      .then((mode) => { if (mode === 'inexact') showMessage('未授予精确闹钟权限，用药提醒可能延迟') })
-      .catch(() => undefined)
+    const accountType = String((accountResponse.data as any)?.accountType || '').toUpperCase()
+    if (accountType) {
+      void enableAndScheduleMedicationReminders(tasksResponse.tasks, accountType)
+        .then((mode) => { if (mode === 'inexact') showMessage('未授予精确闹钟权限，用药提醒可能延迟') })
+        .catch(() => undefined)
+    }
     assessmentStatus.value = assessmentResponse.data ?? null
     if (!tasksResponse.offline) patientSession.setActivePlanStatus(Boolean(planResponse.data))
   } catch (error: any) {

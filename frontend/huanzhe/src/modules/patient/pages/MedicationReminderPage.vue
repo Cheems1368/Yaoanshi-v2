@@ -166,7 +166,7 @@ const loadTasks = async () => {
     const [planResponse, taskResponse, accountResponse] = await Promise.all([
       medicationService.getActiveMedicationPlan().catch(() => ({ data: null })),
       loadMedicationTasks(),
-      appAuthService.getCurrentAccount().catch(() => ({ data: { accountType: 'PATIENT' } }))
+      appAuthService.getCurrentAccount().catch(() => ({ data: null }))
     ])
     if (!expectedAccountSubject || patientSession.getAccountSubject() !== expectedAccountSubject) {
       activePlan.value = null
@@ -178,10 +178,13 @@ const loadTasks = async () => {
     const today = new Date().toLocaleDateString('sv-SE')
     tasks.value = taskResponse.tasks.filter((task) => task.taskDate === today)
     offlineMode.value = taskResponse.offline
-    void enableAndScheduleMedicationReminders(taskResponse.tasks)
-      .then((mode) => { if (mode === 'inexact') showMessage('未授予精确闹钟权限，用药提醒可能延迟') })
-      .catch(() => undefined)
-    currentAccountType.value = String((accountResponse.data as any)?.accountType || 'PATIENT').toUpperCase()
+    const accountType = String((accountResponse.data as any)?.accountType || '').toUpperCase()
+    if (accountType) {
+      currentAccountType.value = accountType
+      void enableAndScheduleMedicationReminders(taskResponse.tasks, accountType)
+        .then((mode) => { if (mode === 'inexact') showMessage('未授予精确闹钟权限，用药提醒可能延迟') })
+        .catch(() => undefined)
+    }
     if (!taskResponse.offline) patientSession.setActivePlanStatus(Boolean(planResponse.data))
   } catch (error: any) {
     activePlan.value = null

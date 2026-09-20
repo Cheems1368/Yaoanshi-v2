@@ -113,4 +113,18 @@ describe('local medication reminder lifecycle', () => {
     expect(mocks.schedule.mock.calls[0][0].notifications[0].schedule.allowWhileIdle).toBe(false)
     expect(result).toBe('inexact')
   })
+
+  test('schedules family reminders thirty minutes after the patient dose time', async () => {
+    mocks.getPending.mockResolvedValue({ notifications: [] })
+    const scheduledAt = new Date(Date.now() - 10 * 60 * 1000)
+
+    await enableAndScheduleMedicationReminders([{
+      id: 7,
+      status: 'PENDING',
+      scheduledAt: scheduledAt.toISOString()
+    } as any], 'FAMILY')
+
+    expect(mocks.schedule.mock.calls[0][0].notifications[0].schedule.at.getTime())
+      .toBe(scheduledAt.getTime() + 30 * 60 * 1000)
+  })
 })

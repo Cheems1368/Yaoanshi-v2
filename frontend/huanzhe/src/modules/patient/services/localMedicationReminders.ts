@@ -46,14 +46,15 @@ export async function registerMedicationReminderActionHandler(
   })
 }
 
-export async function enableAndScheduleMedicationReminders(tasks: DoseTaskDTO[]) {
+export async function enableAndScheduleMedicationReminders(tasks: DoseTaskDTO[], accountType = 'PATIENT') {
   if (!Capacitor.isNativePlatform()) return false
   return enqueueReminderOperation(async () => {
     const now = Date.now()
+    const reminderDelayMs = accountType.toUpperCase() === 'FAMILY' ? 30 * 60 * 1000 : 0
     const reminderCandidates = tasks
       .filter((task) => task.status === 'PENDING')
       .filter((task) => Boolean(task.scheduledAt))
-      .map((task) => ({ task, at: new Date(task.scheduledAt as string) }))
+      .map((task) => ({ task, at: new Date(new Date(task.scheduledAt as string).getTime() + reminderDelayMs) }))
       .filter(({ at }) => !Number.isNaN(at.getTime()) && at.getTime() > now && at.getTime() <= now + 48 * 60 * 60 * 1000)
 
     const desiredIds = new Set(reminderCandidates.map(({ task }) => notificationId(task.id)))
