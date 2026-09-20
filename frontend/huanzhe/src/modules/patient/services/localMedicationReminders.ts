@@ -46,24 +46,29 @@ export async function registerMedicationReminderActionHandler(
   })
 }
 
-export async function enableAndScheduleMedicationReminders(tasks: DoseTaskDTO[], accountType = 'PATIENT') {
+export async function enableAndScheduleMedicationReminders(tasks: DoseTaskDTO[], accountType?: string) {
   if (!Capacitor.isNativePlatform()) return false
   return enqueueReminderOperation(async () => {
     const now = Date.now()
-    const reminderDelayMs = accountType.toUpperCase() === 'FAMILY' ? 30 * 60 * 1000 : 0
-    const reminderCandidates = tasks
+    const normalizedAccountType = accountType?.toUpperCase()
+    const reminderDelayMs = normalizedAccountType === 'FAMILY' ? 30 * 60 * 1000 : 0
+    const pendingTasks = tasks
       .filter((task) => task.status === 'PENDING')
       .filter((task) => Boolean(task.scheduledAt))
+    const reminderCandidates = normalizedAccountType ? pendingTasks
       .map((task) => ({ task, at: new Date(new Date(task.scheduledAt as string).getTime() + reminderDelayMs) }))
-      .filter(({ at }) => !Number.isNaN(at.getTime()) && at.getTime() > now && at.getTime() <= now + 48 * 60 * 60 * 1000)
+      .filter(({ at }) => !Number.isNaN(at.getTime()) && at.getTime() > now && at.getTime() <= now + 48 * 60 * 60 * 1000) : []
 
-    const desiredIds = new Set(reminderCandidates.map(({ task }) => notificationId(task.id)))
+    const desiredIds = new Set(
+      (normalizedAccountType ? reminderCandidates.map(({ task }) => task) : pendingTasks)
+        .map((task) => notificationId(task.id))
+    )
     const pending = await LocalNotifications.getPending()
     const obsolete = pending.notifications
       .filter((notification) => notification.extra?.kind === 'MEDICATION_TASK' && !desiredIds.has(notification.id))
       .map((notification) => ({ id: notification.id }))
     if (obsolete.length) await LocalNotifications.cancel({ notifications: obsolete })
-    if (!reminderCandidates.length) return true
+    if (!normalizedAccountType || !reminderCandidates.length) return true
 
     let permission = await LocalNotifications.checkPermissions()
     if (permission.display === 'prompt' || permission.display === 'prompt-with-rationale') {

@@ -224,11 +224,9 @@ const loadDashboard = async () => {
     const today = new Date().toLocaleDateString('sv-SE')
     todayTasks.value = tasksResponse.tasks.filter((task) => task.taskDate === today)
     const accountType = String((accountResponse.data as any)?.accountType || '').toUpperCase()
-    if (accountType) {
-      void enableAndScheduleMedicationReminders(tasksResponse.tasks, accountType)
-        .then((mode) => { if (mode === 'inexact') showMessage('未授予精确闹钟权限，用药提醒可能延迟') })
-        .catch(() => undefined)
-    }
+    void enableAndScheduleMedicationReminders(tasksResponse.tasks, accountType || undefined)
+      .then((mode) => { if (mode === 'inexact') showMessage('未授予精确闹钟权限，用药提醒可能延迟') })
+      .catch(() => undefined)
     assessmentStatus.value = assessmentResponse.data ?? null
     if (!tasksResponse.offline) patientSession.setActivePlanStatus(Boolean(planResponse.data))
   } catch (error: any) {

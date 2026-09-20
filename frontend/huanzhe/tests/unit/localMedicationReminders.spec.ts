@@ -77,7 +77,7 @@ describe('local medication reminder lifecycle', () => {
       id: 7,
       status: 'PENDING',
       scheduledAt: new Date(Date.now() + 60_000).toISOString()
-    } as any])
+    } as any], 'PATIENT')
     await vi.waitFor(() => expect(mocks.schedule).toHaveBeenCalledTimes(1))
     const clearing = cancelAllMedicationReminders()
     expect(mocks.getPending).toHaveBeenCalledTimes(1)
@@ -107,7 +107,7 @@ describe('local medication reminder lifecycle', () => {
       id: 7,
       status: 'PENDING',
       scheduledAt: new Date(Date.now() + 60_000).toISOString()
-    } as any])
+    } as any], 'PATIENT')
 
     expect(mocks.changeExactNotificationSetting).toHaveBeenCalled()
     expect(mocks.schedule.mock.calls[0][0].notifications[0].schedule.allowWhileIdle).toBe(false)
@@ -126,5 +126,22 @@ describe('local medication reminder lifecycle', () => {
 
     expect(mocks.schedule.mock.calls[0][0].notifications[0].schedule.at.getTime())
       .toBe(scheduledAt.getTime() + 30 * 60 * 1000)
+  })
+
+  test('cleans completed reminders but preserves pending reminders when account type is unavailable', async () => {
+    mocks.getPending.mockResolvedValue({
+      notifications: [
+        { id: 8, extra: { kind: 'MEDICATION_TASK' } },
+        { id: 9, extra: { kind: 'MEDICATION_TASK' } }
+      ]
+    })
+
+    await enableAndScheduleMedicationReminders([
+      { id: 7, status: 'PENDING', scheduledAt: new Date(Date.now() + 60_000).toISOString() } as any,
+      { id: 8, status: 'COMPLETED', scheduledAt: new Date(Date.now() + 60_000).toISOString() } as any
+    ])
+
+    expect(mocks.cancel).toHaveBeenCalledWith({ notifications: [{ id: 9 }] })
+    expect(mocks.schedule).not.toHaveBeenCalled()
   })
 })

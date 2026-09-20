@@ -179,12 +179,10 @@ const loadTasks = async () => {
     tasks.value = taskResponse.tasks.filter((task) => task.taskDate === today)
     offlineMode.value = taskResponse.offline
     const accountType = String((accountResponse.data as any)?.accountType || '').toUpperCase()
-    if (accountType) {
-      currentAccountType.value = accountType
-      void enableAndScheduleMedicationReminders(taskResponse.tasks, accountType)
-        .then((mode) => { if (mode === 'inexact') showMessage('未授予精确闹钟权限，用药提醒可能延迟') })
-        .catch(() => undefined)
-    }
+    if (accountType) currentAccountType.value = accountType
+    void enableAndScheduleMedicationReminders(taskResponse.tasks, accountType || undefined)
+      .then((mode) => { if (mode === 'inexact') showMessage('未授予精确闹钟权限，用药提醒可能延迟') })
+      .catch(() => undefined)
     if (!taskResponse.offline) patientSession.setActivePlanStatus(Boolean(planResponse.data))
   } catch (error: any) {
     activePlan.value = null
