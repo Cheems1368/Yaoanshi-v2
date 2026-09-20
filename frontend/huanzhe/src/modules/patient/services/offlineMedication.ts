@@ -110,17 +110,28 @@ function mutateState<T>(mutation: (state: MedicalCacheState) => T | Promise<T>):
   return operation
 }
 
+function applyPendingCheckins(tasks: DoseTaskDTO[], pendingCheckins: CachedPendingCheckin[]) {
+  const pendingByTaskId = new Map<number, CachedPendingCheckin>()
+  pendingCheckins.forEach((pending) => pendingByTaskId.set(pending.doseTaskId, pending))
+  return tasks.map((task) => {
+    const pending = pendingByTaskId.get(task.id)
+    if (!pending) return task
+    return { ...task, status: pending.result === 'TAKEN' ? 'COMPLETED' : 'MISSED' }
+  })
+}
+
 const makeRequestId = () => globalThis.crypto?.randomUUID?.()
   ?? `checkin-${Date.now()}-${Math.random().toString(16).slice(2)}`
 
 export async function cacheDoseTasks(tasks: DoseTaskDTO[], expectedAccountSubject: string) {
-  if (!isNative()) return
-  await mutateState((state) => {
+  if (!isNative()) return tasks
+  return mutateState((state) => {
     if (patientSession.getAccountSubject() !== expectedAccountSubject || state.accountSubject !== expectedAccountSubject) {
       throw new Error('AUTHENTICATED_ACCOUNT_CHANGED')
     }
-    state.tasks = tasks
+    state.tasks = applyPendingCheckins(tasks, state.pendingCheckins)
     state.tasksExpiresAt = Date.now() + CACHE_TTL_MS
+    return state.tasks
   })
 }
 
@@ -150,8 +161,8 @@ export async function loadMedicationTasks(days = 3): Promise<{ tasks: DoseTaskDT
       throw new Error('AUTHENTICATED_ACCOUNT_CHANGED')
     }
     const tasks = response.data ?? []
-    if (isNative()) await cacheDoseTasks(tasks, accountSubject as string)
-    return { tasks, offline: false }
+    const visibleTasks = isNative() ? await cacheDoseTasks(tasks, accountSubject as string) : tasks
+    return { tasks: visibleTasks, offline: false }
   } catch (error) {
     if (!isNative()) throw error
     const message = error instanceof Error ? error.message : ''

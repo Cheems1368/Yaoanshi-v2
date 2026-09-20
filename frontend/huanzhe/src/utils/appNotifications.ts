@@ -20,32 +20,60 @@ export function createAppNotificationClient(getToken?: () => string | null) {
   let connecting = false
   let pollingTimer: number | null = null
   let lastSeenId: number | undefined
+  let pollingAttempt: Promise<boolean> | null = null
+  let backfillComplete = false
+  const dispatchedIds = new Set<number>()
 
   const dispatch = (payload: unknown) => {
     window.dispatchEvent(new CustomEvent(EVENT_NAME, { detail: payload }))
   }
 
-  const pollLogs = async () => {
-    if (manualClose) return
-    try {
-      const response = await appNotificationService.getLogs(lastSeenId, 50)
-      for (const log of response.data ?? []) {
-        lastSeenId = Math.max(lastSeenId ?? 0, log.id)
-        let payload: Record<string, unknown> = {}
-        if (log.payloadJson) {
-          try { payload = JSON.parse(log.payloadJson) } catch { payload = {} }
+  const rememberDispatchedId = (id: number) => {
+    dispatchedIds.add(id)
+    if (dispatchedIds.size > 200) dispatchedIds.delete(dispatchedIds.values().next().value as number)
+  }
+
+  const pollLogs = () => {
+    if (manualClose) return Promise.resolve(false)
+    if (pollingAttempt) return pollingAttempt
+    const attempt = (async () => {
+      try {
+        while (!manualClose) {
+          const response = await appNotificationService.getLogs(lastSeenId, 50)
+          if (manualClose) return false
+          const logs = response.data ?? []
+          for (const log of logs) {
+            lastSeenId = Math.max(lastSeenId ?? 0, log.id)
+            let payload: Record<string, unknown> = {}
+            if (log.payloadJson) {
+              try { payload = JSON.parse(log.payloadJson) } catch { payload = {} }
+            }
+            if (!dispatchedIds.has(log.id)) {
+              rememberDispatchedId(log.id)
+              dispatch({ ...payload, id: log.id, businessType: log.businessType, businessId: log.businessId })
+            }
+          }
+          if (logs.length < 50) return true
         }
-        dispatch({ ...payload, id: log.id, businessType: log.businessType, businessId: log.businessId })
+        return false
+      } catch {
+        // The next bounded poll retries; the main UI remains usable.
+        return false
       }
-    } catch {
-      // The next bounded poll retries; the main UI remains usable.
-    }
+    })().finally(() => {
+      if (pollingAttempt === attempt) pollingAttempt = null
+    })
+    pollingAttempt = attempt
+    return attempt
   }
 
   const startPolling = () => {
     if (manualClose || pollingTimer !== null) return
-    void pollLogs()
-    pollingTimer = window.setInterval(() => void pollLogs(), 5000)
+    backfillComplete = false
+    void pollLogs().then((caughtUp) => { backfillComplete = caughtUp })
+    pollingTimer = window.setInterval(() => {
+      void pollLogs().then((caughtUp) => { if (caughtUp) backfillComplete = true })
+    }, 5000)
   }
 
   const stopPolling = () => {
@@ -112,12 +140,23 @@ export function createAppNotificationClient(getToken?: () => string | null) {
     socket.onmessage = (event) => {
       try {
         const payload = JSON.parse(event.data)
-        if (typeof payload?.id === 'number') lastSeenId = Math.max(lastSeenId ?? 0, payload.id)
+        if (typeof payload?.id === 'number') {
+          if (dispatchedIds.has(payload.id)) return
+          rememberDispatchedId(payload.id)
+          if (backfillComplete && pollingAttempt === null) {
+            lastSeenId = Math.max(lastSeenId ?? 0, payload.id)
+          }
+        }
         dispatch(payload)
       } catch { /* malformed realtime events are ignored */ }
     }
 
-    socket.onopen = stopPolling
+    socket.onopen = () => {
+      void pollLogs().then((caughtUp) => {
+        backfillComplete = caughtUp
+        if (caughtUp && socket?.readyState === WebSocket.OPEN) stopPolling()
+      })
+    }
 
     socket.onerror = () => {
       if (socket && socket.readyState === WebSocket.OPEN) {

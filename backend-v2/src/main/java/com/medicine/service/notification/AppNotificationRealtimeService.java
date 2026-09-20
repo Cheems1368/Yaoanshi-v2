@@ -58,6 +58,7 @@ public class AppNotificationRealtimeService {
         String message;
         try {
             message = objectMapper.writeValueAsString(Map.of(
+                    "id", log.getId(),
                     "businessType", safe(log.getBusinessType()),
                     "businessId", log.getBusinessId(),
                     "targetType", safe(log.getTargetType()),

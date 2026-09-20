@@ -211,6 +211,28 @@ describe('native offline medication flow', () => {
     expect(saved.pendingCheckins[0].expiresAt).toBe(pendingExpiry)
   })
 
+  test('keeps pending check-in results projected over a fresh server task snapshot', async () => {
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: true })
+    mocks.read.mockResolvedValue({
+      value: JSON.stringify({
+        version: 2,
+        accountSubject: 'patient-1',
+        tasksExpiresAt: Date.now() + 60_000,
+        tasks: [{ ...cachedTask, status: 'COMPLETED' }],
+        pendingCheckins: [{ clientRequestId: 'request-1', doseTaskId: 7, result: 'TAKEN', actualTakenAt: new Date().toISOString(), expiresAt: Date.now() + 60_000 }]
+      })
+    })
+    mocks.submitCheckin.mockRejectedValue(new Error('TEMPORARY_SERVER_ERROR'))
+    mocks.getDoseTasks.mockResolvedValue({ data: [{ ...cachedTask, status: 'PENDING' }] })
+
+    const result = await loadMedicationTasks()
+
+    expect(result.tasks[0].status).toBe('COMPLETED')
+    const saved = JSON.parse(mocks.write.mock.calls.at(-1)[0].value)
+    expect(saved.tasks[0].status).toBe('COMPLETED')
+    expect(saved.pendingCheckins).toHaveLength(1)
+  })
+
   test('does not cache a task response after the authenticated account changes', async () => {
     Object.defineProperty(navigator, 'onLine', { configurable: true, value: true })
     let resolveTasks!: (value: { data: any[] }) => void
