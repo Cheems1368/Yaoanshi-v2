@@ -49,8 +49,10 @@ if (typeof window !== 'undefined') {
     void clearMedicalCache()
     void cancelAllMedicationReminders()
   })
-  const clearRevokedMedicalContext = async () => {
+  const clearRevokedMedicalContext = async (expectedAccountSubject?: string) => {
+    if (expectedAccountSubject && patientSession.getAccountSubject() !== expectedAccountSubject) return
     await appAuthService.logout().catch(() => undefined)
+    if (expectedAccountSubject && patientSession.getAccountSubject() !== expectedAccountSubject) return
     await Promise.all([
       clearMedicalCache().catch(() => undefined),
       cancelAllMedicationReminders().catch(() => undefined)
@@ -60,31 +62,35 @@ if (typeof window !== 'undefined') {
     await router.replace('/login')
     window.location.reload()
   }
-  let familyAccessCheck: Promise<boolean> | null = null
+  let familyAccessCheck: { accountSubject: string; promise: Promise<boolean> } | null = null
   const revalidateFamilyAccess = () => {
+    const accountSubject = patientSession.getAccountSubject()
     if (patientSession.getAccountType() !== 'FAMILY'
+      || !accountSubject
       || !patientSession.getAccessToken()
       || !navigator.onLine) return Promise.resolve(true)
-    if (familyAccessCheck) return familyAccessCheck
+    if (familyAccessCheck?.accountSubject === accountSubject) return familyAccessCheck.promise
     const attempt = (async () => {
       try {
         const currentPatient = await patientService.getCurrentPatient()
+        if (patientSession.getAccountSubject() !== accountSubject) return false
         if (!currentPatient.data) {
-          await clearRevokedMedicalContext()
+          await clearRevokedMedicalContext(accountSubject)
           return false
         }
         return true
       } catch (error) {
+        if (patientSession.getAccountSubject() !== accountSubject) return false
         const message = error instanceof Error ? error.message : ''
         if (message === 'PATIENT_BIND_CONFLICT' || message === 'PATIENT_NOT_FOUND') {
-          await clearRevokedMedicalContext()
+          await clearRevokedMedicalContext(accountSubject)
         }
         return false
       }
     })().finally(() => {
-      if (familyAccessCheck === attempt) familyAccessCheck = null
+      if (familyAccessCheck?.promise === attempt) familyAccessCheck = null
     })
-    familyAccessCheck = attempt
+    familyAccessCheck = { accountSubject, promise: attempt }
     return attempt
   }
   const restoreAndReplay = async () => {

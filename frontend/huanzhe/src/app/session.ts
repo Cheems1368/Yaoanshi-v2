@@ -25,7 +25,13 @@ const readTokenIdentity = (token: string) => {
     if (!payload) return { subject: '', accountType: '' }
     const normalized = payload.replace(/-/g, '+').replace(/_/g, '/')
     const decoded = JSON.parse(atob(normalized.padEnd(Math.ceil(normalized.length / 4) * 4, '=')))
-    const accountType = typeof decoded.accountType === 'string' ? decoded.accountType.toUpperCase() : ''
+    const roles = Array.isArray(decoded.roles)
+      ? decoded.roles.map((role: unknown) => String(role).toUpperCase())
+      : []
+    const declaredAccountType = typeof decoded.accountType === 'string' ? decoded.accountType.toUpperCase() : ''
+    const accountType = roles.includes('ROLE_FAMILY')
+      ? 'FAMILY'
+      : roles.includes('ROLE_PATIENT') ? 'PATIENT' : declaredAccountType
     return {
       subject: typeof decoded.sub === 'string' ? decoded.sub : '',
       accountType: accountType === 'PATIENT' || accountType === 'FAMILY' ? accountType : ''

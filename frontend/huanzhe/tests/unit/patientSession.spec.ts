@@ -69,7 +69,7 @@ describe('patientSession', () => {
   })
 
   test('restores the account type from the access-token identity', () => {
-    const token = `header.${btoa(JSON.stringify({ sub: 'family-1', accountType: 'FAMILY' }))}.signature`
+    const token = `header.${btoa(JSON.stringify({ sub: 'family-1', accountType: 'APP', roles: ['ROLE_FAMILY'] }))}.signature`
 
     patientSession.setAccessToken(token)
 
