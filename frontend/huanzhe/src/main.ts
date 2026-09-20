@@ -60,25 +60,47 @@ if (typeof window !== 'undefined') {
     await router.replace('/login')
     window.location.reload()
   }
-  const restoreAndReplay = async () => {
-    if (await httpService.restoreSession() && patientSession.getAccessToken()) {
+  let familyAccessCheck: Promise<boolean> | null = null
+  const revalidateFamilyAccess = () => {
+    if (patientSession.getAccountType() !== 'FAMILY'
+      || !patientSession.getAccessToken()
+      || !navigator.onLine) return Promise.resolve(true)
+    if (familyAccessCheck) return familyAccessCheck
+    const attempt = (async () => {
       try {
         const currentPatient = await patientService.getCurrentPatient()
         if (!currentPatient.data) {
           await clearRevokedMedicalContext()
-          return
+          return false
         }
+        return true
       } catch (error) {
         const message = error instanceof Error ? error.message : ''
         if (message === 'PATIENT_BIND_CONFLICT' || message === 'PATIENT_NOT_FOUND') {
           await clearRevokedMedicalContext()
         }
-        return
+        return false
       }
+    })().finally(() => {
+      if (familyAccessCheck === attempt) familyAccessCheck = null
+    })
+    familyAccessCheck = attempt
+    return attempt
+  }
+  const restoreAndReplay = async () => {
+    if (await httpService.restoreSession() && patientSession.getAccessToken()) {
+      if (!await revalidateFamilyAccess()) return
       await replayPendingCheckins()
     }
   }
   window.addEventListener('online', () => void restoreAndReplay())
+  window.addEventListener('patient-session-authenticated', () => void restoreAndReplay())
+  window.addEventListener('focus', () => void revalidateFamilyAccess())
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') void revalidateFamilyAccess()
+  })
+  window.setInterval(() => void revalidateFamilyAccess(), 60_000)
+  void restoreAndReplay()
   void registerMedicationReminderActionHandler(async (route) => {
     await router.isReady()
     await router.push(route)

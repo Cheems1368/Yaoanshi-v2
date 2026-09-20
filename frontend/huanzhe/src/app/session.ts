@@ -19,15 +19,19 @@ const createDeviceId = () => {
   return `patient-web-${Date.now()}-${Math.random().toString(16).slice(2)}`
 }
 
-const readTokenSubject = (token: string) => {
+const readTokenIdentity = (token: string) => {
   try {
     const payload = token.split('.')[1]
-    if (!payload) return ''
+    if (!payload) return { subject: '', accountType: '' }
     const normalized = payload.replace(/-/g, '+').replace(/_/g, '/')
     const decoded = JSON.parse(atob(normalized.padEnd(Math.ceil(normalized.length / 4) * 4, '=')))
-    return typeof decoded.sub === 'string' ? decoded.sub : ''
+    const accountType = typeof decoded.accountType === 'string' ? decoded.accountType.toUpperCase() : ''
+    return {
+      subject: typeof decoded.sub === 'string' ? decoded.sub : '',
+      accountType: accountType === 'PATIENT' || accountType === 'FAMILY' ? accountType : ''
+    }
   } catch {
-    return ''
+    return { subject: '', accountType: '' }
   }
 }
 
@@ -43,13 +47,15 @@ export const patientSession = {
   },
 
   setAccessToken(token: string) {
-    const nextSubject = readTokenSubject(token)
+    const identity = readTokenIdentity(token)
+    const nextSubject = identity.subject
     if (accountSubjectMemory && nextSubject && accountSubjectMemory !== nextSubject) {
       accountTypeMemory = ''
       if (typeof window !== 'undefined') window.dispatchEvent(new Event('patient-account-switched'))
     }
     accessTokenMemory = token || ''
     accountSubjectMemory = nextSubject
+    if (identity.accountType) accountTypeMemory = identity.accountType
     authStatus = accessTokenMemory ? 'authenticated' : authStatus
     if (accessTokenMemory && typeof window !== 'undefined') window.dispatchEvent(new Event('patient-session-authenticated'))
   },

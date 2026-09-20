@@ -1281,6 +1281,7 @@ AI rules:
 | `POST` | `/app-api/assessments/satisfaction` | Yes | `SatisfactionSurveyDTO` | saved survey | write satisfaction row |
 | `GET` | `/app-api/dose-tasks` | Yes | `dateFrom`, `dateTo` (inclusive, at most 7 days) | dose-task list | none |
 | `GET` | `/app-api/notifications/logs` | Yes | optional `afterId`, `limit` | current patient's persisted notifications | none |
+| `GET` | `/app-api/notifications/logs/latest-id` | Yes | none | current patient's latest notification-log ID, or `0` | none |
 
 ### 6.2 Admin APIs
 

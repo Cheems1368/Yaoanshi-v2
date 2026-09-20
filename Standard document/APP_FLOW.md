@@ -352,7 +352,7 @@ Error:
 
 - Show detail load failure and retry
 - If realtime update is unavailable, keep the page usable with polling refresh
-- When the app WebSocket is unavailable, poll `/app-api/notifications/logs` with an `afterId` cursor and dispatch the same in-app event shape.
+- When the app WebSocket is unavailable, initialize the cold-start boundary from `/app-api/notifications/logs/latest-id`, then poll `/app-api/notifications/logs` with an `afterId` cursor and dispatch the same in-app event shape without replaying the full history.
 - A CLOSED order offers a non-blocking 1–5 satisfaction card; the patient may defer it and return later, but may submit only once.
 
 #### Prescription Screen

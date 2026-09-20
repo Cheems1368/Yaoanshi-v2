@@ -48,6 +48,10 @@ export function createAppNotificationClient(
     if (pollingAttempt) return pollingAttempt
     const attempt = (async () => {
       try {
+        if (lastSeenId === undefined) {
+          const latestResponse = await appNotificationService.getLatestLogId()
+          advanceCursor(latestResponse.data ?? 0)
+        }
         while (!manualClose) {
           const response = await appNotificationService.getLogs(lastSeenId, 50)
           if (manualClose) return false

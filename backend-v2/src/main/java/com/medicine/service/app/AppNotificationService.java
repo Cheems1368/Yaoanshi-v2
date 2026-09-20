@@ -27,6 +27,12 @@ public class AppNotificationService {
                 .stream().map(this::toDto).toList();
     }
 
+    public long latestId(String subject) {
+        AppPatientService.AccessContext context = appPatientService.requireAccessContext(subject);
+        Long latestId = notificationLogMapper.selectLatestPatientLogId(1L, context.patient().getId());
+        return latestId == null ? 0L : latestId;
+    }
+
     private NotificationLogDTO toDto(NotificationLog log) {
         NotificationLogDTO dto = new NotificationLogDTO();
         dto.setId(log.getId()); dto.setTargetType(log.getTargetType()); dto.setTargetId(log.getTargetId());

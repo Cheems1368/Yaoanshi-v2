@@ -573,9 +573,13 @@ export const appNotificationService = {
 
   getLogs(afterId?: number, limit = 50) {
     return httpService.get<AppNotificationLogDTO[]>('/app-api/notifications/logs', {
-      ...(afterId ? { afterId } : {}),
+      ...(afterId !== undefined ? { afterId } : {}),
       limit
     })
+  },
+
+  getLatestLogId() {
+    return httpService.get<number>('/app-api/notifications/logs/latest-id')
   }
 }
 
