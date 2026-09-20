@@ -215,6 +215,7 @@ const tasks = ref<DoseTaskDTO[]>([])
 const currentAccountType = ref('UNKNOWN')
 const submittingTaskId = ref<number | null>(null)
 const offlineMode = ref(false)
+let taskRequestEpoch = 0
 
 const reminderCompletedCount = computed(() => tasks.value.filter((t) => t.status === 'COMPLETED').length)
 const pendingCount = computed(() =>
@@ -224,6 +225,7 @@ const pendingCount = computed(() =>
 const loadTasks = async () => {
   reminderLoading.value = true
   const expectedAccountSubject = patientSession.getAccountSubject()
+  const expectedRequestEpoch = ++taskRequestEpoch
   currentAccountType.value = patientSession.getAccountType() ?? 'UNKNOWN'
   try {
     const [planRes, taskRes, accountRes] = await Promise.all([
@@ -231,12 +233,8 @@ const loadTasks = async () => {
       loadMedicationTasks(),
       appAuthService.getCurrentAccount().catch(() => ({ data: null }))
     ])
-    if (!expectedAccountSubject || patientSession.getAccountSubject() !== expectedAccountSubject) {
-      activePlan.value = null
-      tasks.value = []
-      offlineMode.value = false
-      return
-    }
+    if (!expectedAccountSubject || patientSession.getAccountSubject() !== expectedAccountSubject
+      || expectedRequestEpoch !== taskRequestEpoch) return
     activePlan.value = planRes.data ?? null
     const today = new Date().toLocaleDateString('sv-SE')
     tasks.value = taskRes.tasks.filter((task) => task.taskDate === today)
@@ -252,13 +250,16 @@ const loadTasks = async () => {
       .catch(() => undefined)
     if (!taskRes.offline) patientSession.setActivePlanStatus(Boolean(planRes.data))
   } catch {
+    if (!expectedAccountSubject || patientSession.getAccountSubject() !== expectedAccountSubject
+      || expectedRequestEpoch !== taskRequestEpoch) return
     activePlan.value = null
     tasks.value = []
     offlineMode.value = false
     patientSession.setActivePlanStatus(false)
     showMessage('提醒数据加载失败')
   } finally {
-    reminderLoading.value = false
+    if (patientSession.getAccountSubject() === expectedAccountSubject
+      && expectedRequestEpoch === taskRequestEpoch) reminderLoading.value = false
   }
 }
 

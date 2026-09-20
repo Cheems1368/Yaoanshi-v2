@@ -172,6 +172,7 @@ const todayTasks = ref<DoseTaskDTO[]>([])
 const showToast = ref(false)
 const toastMessage = ref('')
 const assessmentStatus = ref<KnowledgeAssessmentStatusDTO | null>(null)
+let dashboardRequestEpoch = 0
 
 const quickActions = [
   { id: 1, label: '处方上传', icon: 'documentTextOutline', color: 'primary', route: '/prescription' },
@@ -207,6 +208,7 @@ const showMessage = (message: string) => {
 const loadDashboard = async () => {
   loading.value = true
   const expectedAccountSubject = patientSession.getAccountSubject()
+  const expectedRequestEpoch = ++dashboardRequestEpoch
   try {
     const [planResponse, tasksResponse, assessmentResponse, accountResponse] = await Promise.all([
       medicationService.getActiveMedicationPlan().catch(() => ({ data: null })),
@@ -214,12 +216,8 @@ const loadDashboard = async () => {
       assessmentService.getKnowledgeStatus().catch(() => ({ data: null })),
       appAuthService.getCurrentAccount().catch(() => ({ data: null }))
     ])
-    if (!expectedAccountSubject || patientSession.getAccountSubject() !== expectedAccountSubject) {
-      activePlan.value = null
-      todayTasks.value = []
-      assessmentStatus.value = null
-      return
-    }
+    if (!expectedAccountSubject || patientSession.getAccountSubject() !== expectedAccountSubject
+      || expectedRequestEpoch !== dashboardRequestEpoch) return
     activePlan.value = planResponse.data ?? null
     const today = new Date().toLocaleDateString('sv-SE')
     todayTasks.value = tasksResponse.tasks.filter((task) => task.taskDate === today)
@@ -234,12 +232,15 @@ const loadDashboard = async () => {
     assessmentStatus.value = assessmentResponse.data ?? null
     if (!tasksResponse.offline) patientSession.setActivePlanStatus(Boolean(planResponse.data))
   } catch (error: any) {
+    if (!expectedAccountSubject || patientSession.getAccountSubject() !== expectedAccountSubject
+      || expectedRequestEpoch !== dashboardRequestEpoch) return
     activePlan.value = null
     todayTasks.value = []
     patientSession.setActivePlanStatus(false)
     showMessage(error?.message || '首页数据加载失败')
   } finally {
-    loading.value = false
+    if (patientSession.getAccountSubject() === expectedAccountSubject
+      && expectedRequestEpoch === dashboardRequestEpoch) loading.value = false
   }
 }
 

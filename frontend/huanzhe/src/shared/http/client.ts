@@ -7,6 +7,11 @@ export interface ApiResponse<T = unknown> {
   data: T
 }
 
+type AccountBoundRequestConfig = AxiosRequestConfig & {
+  _retry?: boolean
+  _accountSubject?: string | null
+}
+
 class HttpService {
   private readonly instance: AxiosInstance
   private refreshPromise: Promise<string | null> | null = null
@@ -25,6 +30,8 @@ class HttpService {
     })
 
     this.instance.interceptors.request.use(async (config) => {
+      const accountBoundConfig = config as typeof config & AccountBoundRequestConfig
+      const bindAccountSubject = accountBoundConfig._accountSubject === undefined
       const requestUrl = String(config.url ?? '')
       let token = patientSession.getAccessToken()
       config.headers = config.headers ?? {}
@@ -34,6 +41,7 @@ class HttpService {
       if (!token && !offlineSession && patientSession.getAuthStatus() !== 'anonymous' && !this.shouldSkipRefresh(requestUrl)) {
         token = await this.refreshAccessToken()
       }
+      if (bindAccountSubject) accountBoundConfig._accountSubject = patientSession.getAccountSubject()
 
       if (token) {
         config.headers.Authorization = `Bearer ${token}`
@@ -115,7 +123,7 @@ class HttpService {
   }
 
   private async retryWithRefresh(
-    config?: AxiosRequestConfig & { _retry?: boolean },
+    config?: AccountBoundRequestConfig,
     fallbackMessage = 'Login expired'
   ) {
     const requestUrl = String(config?.url ?? '')
@@ -126,6 +134,11 @@ class HttpService {
       return Promise.reject(new Error(fallbackMessage))
     }
 
+    if (config._accountSubject !== undefined
+      && patientSession.getAccountSubject() !== config._accountSubject) {
+      return Promise.reject(new Error('AUTHENTICATED_ACCOUNT_CHANGED'))
+    }
+
     const nextAccessToken = await this.refreshAccessToken()
     if (!nextAccessToken) {
       if (this.refreshUnavailable) {
@@ -134,6 +147,10 @@ class HttpService {
       this.clearToken()
       this.redirectToLogin()
       return Promise.reject(new Error(fallbackMessage))
+    }
+    if (config._accountSubject !== undefined
+      && patientSession.getAccountSubject() !== config._accountSubject) {
+      return Promise.reject(new Error('AUTHENTICATED_ACCOUNT_CHANGED'))
     }
 
     config._retry = true

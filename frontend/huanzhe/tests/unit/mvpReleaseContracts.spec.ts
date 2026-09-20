@@ -118,6 +118,19 @@ describe('MVP release patient contracts', () => {
     expect(mainSource).toContain("window.addEventListener('online', () => void restoreAndReplay())")
   })
 
+  test('binds automatic retries and page loads to the originating account', () => {
+    const clientSource = readFileSync(resolve(process.cwd(), 'src/shared/http/client.ts'), 'utf8')
+    const homeSource = readFileSync(resolve(process.cwd(), 'src/modules/patient/pages/HomePage.vue'), 'utf8')
+    const reminderSource = readFileSync(resolve(process.cwd(), 'src/modules/patient/pages/MedicationReminderPage.vue'), 'utf8')
+    const tabSource = readFileSync(resolve(process.cwd(), 'src/modules/patient/pages/MedicationTabPage.vue'), 'utf8')
+    expect(clientSource).toContain('_accountSubject')
+    expect(clientSource).toContain("new Error('AUTHENTICATED_ACCOUNT_CHANGED')")
+    for (const source of [homeSource, reminderSource, tabSource]) {
+      expect(source).toContain('expectedRequestEpoch')
+      expect(source).toContain('patientSession.getAccountSubject() !== expectedAccountSubject')
+    }
+  })
+
   test('aligns satisfaction length and Android exact-alarm contracts', () => {
     const orderSource = readFileSync(resolve(process.cwd(), 'src/modules/patient/pages/HelpOrderDetailPage.vue'), 'utf8')
     const manifest = readFileSync(resolve(process.cwd(), 'android/app/src/main/AndroidManifest.xml'), 'utf8')

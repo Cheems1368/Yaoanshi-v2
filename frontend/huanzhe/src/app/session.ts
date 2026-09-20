@@ -106,7 +106,10 @@ export const patientSession = {
         tasks?: unknown[]
         pendingCheckins?: Array<{ expiresAt?: number }>
       }
-      if ((parsed.version !== 1 && parsed.version !== 2) || !parsed.accountSubject) return false
+      if ((parsed.version !== 1 && parsed.version !== 2) || !parsed.accountSubject) {
+        await secureMedicalCache.clear().catch(() => undefined)
+        return false
+      }
       const now = Date.now()
       const tasksExpiry = parsed.version === 1 ? parsed.expiresAt : parsed.tasksExpiresAt
       const hasValidTasks = Array.isArray(parsed.tasks) && parsed.tasks.length > 0
@@ -124,6 +127,7 @@ export const patientSession = {
       authStatus = 'offline'
       return true
     } catch {
+      await secureMedicalCache.clear().catch(() => undefined)
       return false
     }
   },

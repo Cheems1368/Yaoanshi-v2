@@ -151,6 +151,7 @@ const submittingTaskId = ref<number | null>(null)
 const showToast = ref(false)
 const toastMessage = ref('')
 const offlineMode = ref(false)
+let taskRequestEpoch = 0
 
 const completedCount = computed(() => tasks.value.filter((task) => task.status === 'COMPLETED').length)
 const pendingCount = computed(() => tasks.value.filter((task) => !['COMPLETED', 'MISSED', 'SKIPPED'].includes(task.status)).length)
@@ -163,6 +164,7 @@ const showMessage = (message: string) => {
 const loadTasks = async () => {
   loading.value = true
   const expectedAccountSubject = patientSession.getAccountSubject()
+  const expectedRequestEpoch = ++taskRequestEpoch
   currentAccountType.value = patientSession.getAccountType() ?? 'UNKNOWN'
   try {
     const [planResponse, taskResponse, accountResponse] = await Promise.all([
@@ -170,12 +172,8 @@ const loadTasks = async () => {
       loadMedicationTasks(),
       appAuthService.getCurrentAccount().catch(() => ({ data: null }))
     ])
-    if (!expectedAccountSubject || patientSession.getAccountSubject() !== expectedAccountSubject) {
-      activePlan.value = null
-      tasks.value = []
-      offlineMode.value = false
-      return
-    }
+    if (!expectedAccountSubject || patientSession.getAccountSubject() !== expectedAccountSubject
+      || expectedRequestEpoch !== taskRequestEpoch) return
     activePlan.value = planResponse.data ?? null
     const today = new Date().toLocaleDateString('sv-SE')
     tasks.value = taskResponse.tasks.filter((task) => task.taskDate === today)
@@ -191,12 +189,15 @@ const loadTasks = async () => {
       .catch(() => undefined)
     if (!taskResponse.offline) patientSession.setActivePlanStatus(Boolean(planResponse.data))
   } catch (error: any) {
+    if (!expectedAccountSubject || patientSession.getAccountSubject() !== expectedAccountSubject
+      || expectedRequestEpoch !== taskRequestEpoch) return
     activePlan.value = null
     tasks.value = []
     patientSession.setActivePlanStatus(false)
     showMessage(error?.message || '提醒数据加载失败')
   } finally {
-    loading.value = false
+    if (patientSession.getAccountSubject() === expectedAccountSubject
+      && expectedRequestEpoch === taskRequestEpoch) loading.value = false
   }
 }
 

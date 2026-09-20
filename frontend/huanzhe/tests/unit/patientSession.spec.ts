@@ -115,4 +115,11 @@ describe('patientSession', () => {
     expect(patientSession.getGateState().loggedIn).toBe(false)
     expect(secureCacheMocks.clear).toHaveBeenCalledTimes(1)
   })
+
+  test('physically clears an unreadable encrypted native state', async () => {
+    secureCacheMocks.read.mockResolvedValue({ value: '{not-json' })
+
+    await expect(patientSession.restoreOfflineContext()).resolves.toBe(false)
+    expect(secureCacheMocks.clear).toHaveBeenCalledTimes(1)
+  })
 })
