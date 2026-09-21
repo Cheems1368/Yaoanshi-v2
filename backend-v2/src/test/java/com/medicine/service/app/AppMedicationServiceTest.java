@@ -164,7 +164,9 @@ class AppMedicationServiceTest {
 
         CheckinRecordDTO result = appMedicationService.correctCheckin("13800138000", 701L, request);
 
-        verify(medicationCheckinRecordMapper).markIneffectiveByDoseTaskId(eq(1L), eq(601L), eq("app-checkin-correct"), any(LocalDateTime.class));
+        verify(medicationCheckinRecordMapper).markOthersIneffectiveByDoseTaskId(
+                eq(1L), eq(601L), eq(702L), eq("app-checkin-correct"), any(LocalDateTime.class)
+        );
         verify(medicationDoseTaskMapper).updateStatus(task);
         assertThat(task.getLastEffectiveCheckinId()).isEqualTo(702L);
         assertThat(task.getStatus()).isEqualTo("MISSED");
@@ -190,6 +192,31 @@ class AppMedicationServiceTest {
         assertThat(appMedicationService.correctCheckin("13800138000", 701L, request).getId()).isEqualTo(702L);
         verify(medicationCheckinRecordMapper, never()).selectById(any(), any());
         verify(medicationCheckinRecordMapper, never()).insert(any());
+    }
+
+    @Test
+    void shouldReturnConcurrentCorrectionWithoutChangingEffectiveState() {
+        when(appPatientService.requireAccessContext("13800138000")).thenReturn(accessContext());
+        when(medicationCheckinRecordMapper.selectById(1L, 701L)).thenReturn(checkinRecord(701L, 601L, true));
+        when(medicationDoseTaskMapper.selectById(1L, 601L))
+                .thenReturn(doseTask(601L, LocalDateTime.now(ZoneOffset.UTC).plusHours(2)));
+        doThrow(new DataIntegrityViolationException("duplicate client request"))
+                .when(medicationCheckinRecordMapper).insert(any(MedicationCheckinRecord.class));
+        MedicationCheckinRecord existing = checkinRecord(702L, 601L, true);
+        existing.setClientRequestId("offline-correction-race");
+        existing.setIsCorrection(true);
+        when(medicationCheckinRecordMapper.selectByClientRequestIdForUpdate(1L, 201L, "offline-correction-race"))
+                .thenReturn(existing);
+
+        CheckinCorrectRequest request = new CheckinCorrectRequest();
+        request.setClientRequestId("offline-correction-race");
+        request.setResult("MISSED");
+
+        assertThat(appMedicationService.correctCheckin("13800138000", 701L, request).getId()).isEqualTo(702L);
+        verify(medicationCheckinRecordMapper, never()).markOthersIneffectiveByDoseTaskId(
+                any(), any(), any(), any(), any()
+        );
+        verify(medicationDoseTaskMapper, never()).updateStatus(any());
     }
 
     @Test

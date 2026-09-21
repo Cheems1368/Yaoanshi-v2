@@ -264,6 +264,41 @@ describe('native offline medication flow', () => {
     }))
   })
 
+  test('keeps and replays a correction queued while the original request is in flight', async () => {
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: true })
+    let storedValue = JSON.stringify({
+      version: 2,
+      accountSubject: 'patient-1',
+      tasksExpiresAt: Date.now() + 60_000,
+      tasks: [cachedTask],
+      pendingCheckins: [{
+        clientRequestId: 'original-request',
+        doseTaskId: 7,
+        result: 'TAKEN',
+        actualTakenAt: new Date().toISOString(),
+        expiresAt: Date.now() + 60_000
+      }]
+    })
+    mocks.read.mockImplementation(async () => ({ value: storedValue }))
+    mocks.write.mockImplementation(async ({ value }) => { storedValue = value })
+    let resolveReplay!: (value: { data: { id: number } }) => void
+    mocks.submitCheckin
+      .mockImplementationOnce(() => new Promise((resolve) => { resolveReplay = resolve }))
+      .mockRejectedValueOnce(new Error('Network error'))
+      .mockResolvedValue({ data: { id: 701 } })
+    mocks.correctCheckin.mockResolvedValue({ data: { id: 702 } })
+
+    const replay = replayPendingCheckins()
+    await vi.waitFor(() => expect(mocks.submitCheckin).toHaveBeenCalledTimes(1))
+    await expect(submitOrQueueCheckin(cachedTask as any, 'MISSED')).resolves.toBe('queued')
+    resolveReplay({ data: { id: 701 } })
+
+    await expect(replay).resolves.toBe(1)
+    expect(mocks.submitCheckin).toHaveBeenCalledTimes(3)
+    expect(mocks.correctCheckin).toHaveBeenCalledWith(701, expect.objectContaining({ result: 'MISSED' }))
+    expect(JSON.parse(storedValue).pendingCheckins).toEqual([])
+  })
+
   test('gives a newly queued check-in its own fresh expiry without extending cached tasks', async () => {
     Object.defineProperty(navigator, 'onLine', { configurable: true, value: false })
     mocks.submitCheckin.mockRejectedValue(new Error('Network error'))

@@ -178,6 +178,7 @@ public class AppMedicationService {
         return toCheckinDto(record);
     }
 
+    @Transactional
     public CheckinRecordDTO correctCheckin(String subject, Long checkinId, CheckinCorrectRequest request) {
         AppPatientService.AccessContext context = appPatientService.requireAccessContext(subject);
         String clientRequestId = normalizeClientRequestId(request == null ? null : request.getClientRequestId());
@@ -200,7 +201,6 @@ public class AppMedicationService {
         }
 
         LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
-        medicationCheckinRecordMapper.markIneffectiveByDoseTaskId(DEFAULT_TENANT_ID, task.getId(), "app-checkin-correct", now);
 
         MedicationCheckinRecord correction = new MedicationCheckinRecord();
         correction.setDoseTaskId(task.getId());
@@ -216,7 +216,20 @@ public class AppMedicationService {
         correction.setSupersedesRecordId(original.getId());
         correction.setIsEffective(true);
         applyAudit(correction, "app-checkin-correct", now);
-        medicationCheckinRecordMapper.insert(correction);
+        try {
+            medicationCheckinRecordMapper.insert(correction);
+        } catch (DataIntegrityViolationException ex) {
+            MedicationCheckinRecord existing = clientRequestId == null ? null : medicationCheckinRecordMapper.selectByClientRequestIdForUpdate(
+                    DEFAULT_TENANT_ID, context.patient().getId(), clientRequestId
+            );
+            if (existing == null) {
+                throw ex;
+            }
+            return toCheckinDto(existing);
+        }
+        medicationCheckinRecordMapper.markOthersIneffectiveByDoseTaskId(
+                DEFAULT_TENANT_ID, task.getId(), correction.getId(), "app-checkin-correct", now
+        );
 
         task.setStatus(toTaskStatus(correction.getResult()));
         task.setNotificationStatus("ACKED");

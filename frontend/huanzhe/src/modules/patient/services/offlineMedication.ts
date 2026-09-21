@@ -271,27 +271,42 @@ async function replayPendingCheckinsInternal(accountSubject: string) {
   if (state.accountSubject !== accountSubject || patientSession.getAccountSubject() !== accountSubject) return 0
   let synced = 0
   for (const pending of [...state.pendingCheckins]) {
+    let replaySnapshot: CachedPendingCheckin | undefined = pending
     try {
-      const submitted = await medicationService.submitCheckin({
-        clientRequestId: pending.clientRequestId,
-        doseTaskId: pending.doseTaskId,
-        result: pending.result,
-        actualTakenAt: pending.actualTakenAt,
-        note: pending.note,
-        skipReason: pending.skipReason
-      })
-      if (pending.correction) {
-        const originalId = submitted.data?.id
-        if (!originalId) break
-        await medicationService.correctCheckin(originalId, pending.correction)
-      }
-      if (patientSession.getAccountSubject() !== accountSubject) return synced
-      await mutateState((currentState) => {
-        currentState.pendingCheckins = currentState.pendingCheckins.filter(
-          (item) => item.clientRequestId !== pending.clientRequestId
+      while (replaySnapshot) {
+        const submitted = await medicationService.submitCheckin({
+          clientRequestId: replaySnapshot.clientRequestId,
+          doseTaskId: replaySnapshot.doseTaskId,
+          result: replaySnapshot.result,
+          actualTakenAt: replaySnapshot.actualTakenAt,
+          note: replaySnapshot.note,
+          skipReason: replaySnapshot.skipReason
+        })
+        if (replaySnapshot.correction) {
+          const originalId = submitted.data?.id
+          if (!originalId) break
+          await medicationService.correctCheckin(originalId, replaySnapshot.correction)
+        }
+        if (patientSession.getAccountSubject() !== accountSubject) return synced
+        const removed = await mutateState((currentState) => {
+          const currentIndex = currentState.pendingCheckins.findIndex(
+            (item) => item.clientRequestId === replaySnapshot?.clientRequestId
+          )
+          if (currentIndex < 0) return true
+          const current = currentState.pendingCheckins[currentIndex]
+          if (current.correction?.clientRequestId !== replaySnapshot?.correction?.clientRequestId) return false
+          currentState.pendingCheckins.splice(currentIndex, 1)
+          return true
+        })
+        if (removed) {
+          synced += 1
+          break
+        }
+        const latestState = await readState()
+        replaySnapshot = latestState.pendingCheckins.find(
+          (item) => item.clientRequestId === pending.clientRequestId
         )
-      })
-      synced += 1
+      }
     } catch (error) {
       const errorCode = (error as { code?: number })?.code
       const message = error instanceof Error ? error.message : ''
