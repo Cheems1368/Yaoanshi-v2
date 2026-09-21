@@ -194,10 +194,11 @@ describe('native offline medication flow', () => {
     const first = submitOrQueueCheckin(cachedTask as any, 'TAKEN')
     await vi.waitFor(() => expect(mocks.write).toHaveBeenCalledTimes(1))
     const second = submitOrQueueCheckin({ ...cachedTask, id: 8 } as any, 'MISSED')
-    await vi.waitFor(() => expect(mocks.submitCheckin).toHaveBeenCalledTimes(2))
-    expect(mocks.read).toHaveBeenCalledTimes(1)
+    expect(mocks.submitCheckin).toHaveBeenCalledTimes(1)
+    expect(mocks.read).toHaveBeenCalledTimes(2)
 
     releaseFirstWrite()
+    await vi.waitFor(() => expect(mocks.submitCheckin).toHaveBeenCalledTimes(2))
     await Promise.all([first, second])
 
     const saved = JSON.parse(storedValue)
@@ -228,6 +229,37 @@ describe('native offline medication flow', () => {
     expect(pending[0].result).toBe('TAKEN')
     expect(pending[0].correction.result).toBe('MISSED')
     expect(pending[0].correction.clientRequestId).not.toBe(firstRequestId)
+  })
+
+  test('merges a new online choice into an existing queue before direct submission', async () => {
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: true })
+    let storedValue = JSON.stringify({
+      version: 2,
+      accountSubject: 'patient-1',
+      tasksExpiresAt: Date.now() + 60_000,
+      tasks: [cachedTask],
+      pendingCheckins: [{
+        clientRequestId: 'original-request',
+        doseTaskId: 7,
+        result: 'TAKEN',
+        actualTakenAt: new Date().toISOString(),
+        expiresAt: Date.now() + 60_000
+      }]
+    })
+    mocks.read.mockImplementation(async () => ({ value: storedValue }))
+    mocks.write.mockImplementation(async ({ value }) => { storedValue = value })
+    mocks.submitCheckin.mockResolvedValue({ data: { id: 701 } })
+    mocks.correctCheckin.mockResolvedValue({ data: { id: 702 } })
+
+    await expect(submitOrQueueCheckin(cachedTask as any, 'MISSED')).resolves.toBe('submitted')
+
+    expect(mocks.submitCheckin).toHaveBeenCalledTimes(1)
+    expect(mocks.submitCheckin).toHaveBeenCalledWith(expect.objectContaining({
+      clientRequestId: 'original-request',
+      result: 'TAKEN'
+    }))
+    expect(mocks.correctCheckin).toHaveBeenCalledWith(701, expect.objectContaining({ result: 'MISSED' }))
+    expect(JSON.parse(storedValue).pendingCheckins).toEqual([])
   })
 
   test('replays a changed result as a correction after confirming the original record', async () => {
@@ -284,17 +316,18 @@ describe('native offline medication flow', () => {
     let resolveReplay!: (value: { data: { id: number } }) => void
     mocks.submitCheckin
       .mockImplementationOnce(() => new Promise((resolve) => { resolveReplay = resolve }))
-      .mockRejectedValueOnce(new Error('Network error'))
       .mockResolvedValue({ data: { id: 701 } })
     mocks.correctCheckin.mockResolvedValue({ data: { id: 702 } })
 
     const replay = replayPendingCheckins()
     await vi.waitFor(() => expect(mocks.submitCheckin).toHaveBeenCalledTimes(1))
-    await expect(submitOrQueueCheckin(cachedTask as any, 'MISSED')).resolves.toBe('queued')
+    const correction = submitOrQueueCheckin(cachedTask as any, 'MISSED')
+    await vi.waitFor(() => expect(mocks.write).toHaveBeenCalledTimes(1))
     resolveReplay({ data: { id: 701 } })
 
+    await expect(correction).resolves.toBe('submitted')
     await expect(replay).resolves.toBe(1)
-    expect(mocks.submitCheckin).toHaveBeenCalledTimes(3)
+    expect(mocks.submitCheckin).toHaveBeenCalledTimes(2)
     expect(mocks.correctCheckin).toHaveBeenCalledWith(701, expect.objectContaining({ result: 'MISSED' }))
     expect(JSON.parse(storedValue).pendingCheckins).toEqual([])
   })

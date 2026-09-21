@@ -143,6 +143,40 @@ function applyPendingCheckins(tasks: DoseTaskDTO[], pendingCheckins: CachedPendi
 const makeRequestId = () => globalThis.crypto?.randomUUID?.()
   ?? `checkin-${Date.now()}-${Math.random().toString(16).slice(2)}`
 
+async function mergePendingCheckin(
+  payload: PendingCheckin,
+  expectedAccountSubject: string,
+  enqueueIfMissing: boolean
+) {
+  const operation = stateMutationTail.then(async () => {
+    const state = await readState()
+    if (patientSession.getAccountSubject() !== expectedAccountSubject
+      || state.accountSubject !== expectedAccountSubject) {
+      throw new Error('AUTHENTICATED_ACCOUNT_CHANGED')
+    }
+    const existing = state.pendingCheckins.find((item) => item.doseTaskId === payload.doseTaskId)
+    if (!existing) {
+      if (enqueueIfMissing) {
+        state.pendingCheckins.push({ ...payload, expiresAt: Date.now() + CACHE_TTL_MS })
+        await writeState(state)
+      }
+      return enqueueIfMissing
+    }
+    existing.correction = {
+      clientRequestId: payload.clientRequestId,
+      result: payload.result,
+      actualTakenAt: payload.actualTakenAt,
+      note: payload.note,
+      skipReason: payload.skipReason
+    }
+    existing.expiresAt = Date.now() + CACHE_TTL_MS
+    await writeState(state)
+    return true
+  })
+  stateMutationTail = operation.then(() => undefined, () => undefined)
+  return operation
+}
+
 export async function cacheDoseTasks(tasks: DoseTaskDTO[], expectedAccountSubject: string) {
   if (!isNative()) return tasks
   return mutateState((state) => {
@@ -225,6 +259,21 @@ export async function submitOrQueueCheckin(
     skipReason: result === 'MISSED' ? 'PATIENT_REPORTED' : ''
   }
 
+  if (isNative() && expectedAccountSubject) {
+    const merged = await mergePendingCheckin(payload, expectedAccountSubject, false)
+    if (merged) {
+      if (patientSession.getAccountSubject() !== expectedAccountSubject) {
+        throw new Error('AUTHENTICATED_ACCOUNT_CHANGED')
+      }
+      if (navigator.onLine && patientSession.getAccessToken()) await replayPendingCheckins()
+      if (patientSession.getAccountSubject() !== expectedAccountSubject) {
+        throw new Error('AUTHENTICATED_ACCOUNT_CHANGED')
+      }
+      const latestState = await readState()
+      return latestState.pendingCheckins.some((item) => item.doseTaskId === task.id) ? 'queued' : 'submitted'
+    }
+  }
+
   try {
     await medicationService.submitCheckin(payload)
     return 'submitted'
@@ -234,26 +283,7 @@ export async function submitOrQueueCheckin(
     if (!expectedAccountSubject || patientSession.getAccountSubject() !== expectedAccountSubject) {
       throw new Error('AUTHENTICATED_ACCOUNT_CHANGED')
     }
-    await mutateState((state) => {
-      if (patientSession.getAccountSubject() !== expectedAccountSubject
-        || state.accountSubject !== expectedAccountSubject) {
-        throw new Error('AUTHENTICATED_ACCOUNT_CHANGED')
-      }
-      const existingIndex = state.pendingCheckins.findIndex((item) => item.doseTaskId === payload.doseTaskId)
-      if (existingIndex >= 0) {
-        const existing = state.pendingCheckins[existingIndex]
-        existing.correction = {
-          clientRequestId: payload.clientRequestId,
-          result: payload.result,
-          actualTakenAt: payload.actualTakenAt,
-          note: payload.note,
-          skipReason: payload.skipReason
-        }
-        existing.expiresAt = Date.now() + CACHE_TTL_MS
-      } else {
-        state.pendingCheckins.push({ ...payload, expiresAt: Date.now() + CACHE_TTL_MS })
-      }
-    })
+    await mergePendingCheckin(payload, expectedAccountSubject, true)
     return 'queued'
   }
 }
