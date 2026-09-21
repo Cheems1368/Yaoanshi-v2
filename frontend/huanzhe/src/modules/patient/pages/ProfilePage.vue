@@ -401,6 +401,7 @@ const familyBindings = ref<AppFamilyBindingDTO[]>([])
 const familyLoading = ref(false)
 const familySaving = ref(false)
 let familyRequestEpoch = 0
+let familyMutationEpoch = 0
 const familyForm = reactive({ familyMobile: '', familyDisplayName: '', relationshipType: 'OTHER' })
 const familyFormValid = computed(() => /^1\d{10}$/.test(familyForm.familyMobile) && Boolean(familyForm.familyDisplayName.trim()))
 
@@ -682,6 +683,7 @@ const relationshipText = (value: string) => ({
 
 const resetFamilyState = () => {
   familyRequestEpoch += 1
+  familyMutationEpoch += 1
   familyBindings.value = []
   canManageFamily.value = false
   familyLoading.value = false
@@ -722,9 +724,14 @@ const loadFamilyBindings = async () => {
 
 const addFamilyBinding = async () => {
   if (!familyFormValid.value || familySaving.value) return
+  const expectedAccountSubject = patientSession.getAccountSubject()
+  const expectedMutationEpoch = ++familyMutationEpoch
+  if (!expectedAccountSubject) return
   familySaving.value = true
   try {
     await patientService.createFamilyBinding({ ...familyForm, familyDisplayName: familyForm.familyDisplayName.trim() })
+    if (expectedMutationEpoch !== familyMutationEpoch
+      || patientSession.getAccountSubject() !== expectedAccountSubject) return
     familyForm.familyMobile = ''
     familyForm.familyDisplayName = ''
     familyForm.relationshipType = 'OTHER'
@@ -732,10 +739,13 @@ const addFamilyBinding = async () => {
     const toast = await toastController.create({ message: '亲情号绑定成功', duration: 1800, color: 'success' })
     await toast.present()
   } catch (error: any) {
+    if (expectedMutationEpoch !== familyMutationEpoch
+      || patientSession.getAccountSubject() !== expectedAccountSubject) return
     const toast = await toastController.create({ message: error?.message || '亲情号绑定失败', duration: 2200, color: 'danger' })
     await toast.present()
   } finally {
-    familySaving.value = false
+    if (expectedMutationEpoch === familyMutationEpoch
+      && patientSession.getAccountSubject() === expectedAccountSubject) familySaving.value = false
   }
 }
 
@@ -749,11 +759,18 @@ const confirmUnbind = async (binding: AppFamilyBindingDTO) => {
         text: '确认解绑',
         role: 'destructive',
         handler: () => {
+          const expectedAccountSubject = patientSession.getAccountSubject()
+          const expectedMutationEpoch = ++familyMutationEpoch
+          if (!expectedAccountSubject) return
           void patientService.deleteFamilyBinding(binding.id)
             .then(async () => {
+              if (expectedMutationEpoch !== familyMutationEpoch
+                || patientSession.getAccountSubject() !== expectedAccountSubject) return
               await loadFamilyBindings()
             })
             .catch(async (error: any) => {
+              if (expectedMutationEpoch !== familyMutationEpoch
+                || patientSession.getAccountSubject() !== expectedAccountSubject) return
               const toast = await toastController.create({ message: error?.message || '解绑失败', duration: 2200, color: 'danger' })
               await toast.present()
             })

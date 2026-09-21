@@ -180,6 +180,13 @@ public class AppMedicationService {
 
     public CheckinRecordDTO correctCheckin(String subject, Long checkinId, CheckinCorrectRequest request) {
         AppPatientService.AccessContext context = appPatientService.requireAccessContext(subject);
+        String clientRequestId = normalizeClientRequestId(request == null ? null : request.getClientRequestId());
+        if (clientRequestId != null) {
+            MedicationCheckinRecord existing = medicationCheckinRecordMapper.selectByClientRequestId(
+                    DEFAULT_TENANT_ID, context.patient().getId(), clientRequestId
+            );
+            if (existing != null) return toCheckinDto(existing);
+        }
         MedicationCheckinRecord original = medicationCheckinRecordMapper.selectById(DEFAULT_TENANT_ID, checkinId);
         if (original == null || !context.patient().getId().equals(original.getPatientId())) {
             throw new BusinessException(ErrorCode.CHECKIN_RECORD_NOT_FOUND.getCode(), ErrorCode.CHECKIN_RECORD_NOT_FOUND.getMessage());
@@ -198,6 +205,7 @@ public class AppMedicationService {
         MedicationCheckinRecord correction = new MedicationCheckinRecord();
         correction.setDoseTaskId(task.getId());
         correction.setPatientId(context.patient().getId());
+        correction.setClientRequestId(clientRequestId);
         correction.setOperatorType(context.operatorType());
         correction.setOperatorId(context.appAccount().getId());
         correction.setResult(normalizeResult(request.getResult()));

@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
-  read: vi.fn(), write: vi.fn(), clear: vi.fn(), getDoseTasks: vi.fn(), submitCheckin: vi.fn(),
+  read: vi.fn(), write: vi.fn(), clear: vi.fn(), getDoseTasks: vi.fn(), submitCheckin: vi.fn(), correctCheckin: vi.fn(),
   clearGateState: vi.fn(), cancelAllReminders: vi.fn(), accountSubject: 'patient-1', accountType: 'PATIENT',
   authStatus: 'authenticated'
 }))
@@ -12,7 +12,11 @@ vi.mock('@/app/secureMedicalCache', () => ({
 }))
 
 vi.mock('@/modules/patient/api/mvp', () => ({
-  medicationService: { getDoseTasks: mocks.getDoseTasks, submitCheckin: mocks.submitCheckin }
+  medicationService: {
+    getDoseTasks: mocks.getDoseTasks,
+    submitCheckin: mocks.submitCheckin,
+    correctCheckin: mocks.correctCheckin
+  }
 }))
 
 vi.mock('@/app/session', () => ({
@@ -201,7 +205,7 @@ describe('native offline medication flow', () => {
     expect(saved.pendingCheckins.map((item: any) => item.doseTaskId)).toEqual([7, 8])
   })
 
-  test('replaces a pending check-in for the same task while reusing its idempotency key', async () => {
+  test('queues an idempotent correction when the result changes for the same task', async () => {
     Object.defineProperty(navigator, 'onLine', { configurable: true, value: false })
     mocks.submitCheckin.mockRejectedValue(new Error('Network error'))
     let storedValue = JSON.stringify({
@@ -221,7 +225,43 @@ describe('native offline medication flow', () => {
     const pending = JSON.parse(storedValue).pendingCheckins
     expect(pending).toHaveLength(1)
     expect(pending[0].clientRequestId).toBe(firstRequestId)
-    expect(pending[0].result).toBe('MISSED')
+    expect(pending[0].result).toBe('TAKEN')
+    expect(pending[0].correction.result).toBe('MISSED')
+    expect(pending[0].correction.clientRequestId).not.toBe(firstRequestId)
+  })
+
+  test('replays a changed result as a correction after confirming the original record', async () => {
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: true })
+    mocks.read.mockResolvedValue({
+      value: JSON.stringify({
+        version: 2,
+        accountSubject: 'patient-1',
+        tasksExpiresAt: Date.now() + 60_000,
+        tasks: [cachedTask],
+        pendingCheckins: [{
+          clientRequestId: 'original-request',
+          doseTaskId: 7,
+          result: 'TAKEN',
+          actualTakenAt: new Date().toISOString(),
+          expiresAt: Date.now() + 60_000,
+          correction: {
+            clientRequestId: 'correction-request',
+            result: 'MISSED',
+            actualTakenAt: new Date().toISOString(),
+            skipReason: 'PATIENT_REPORTED'
+          }
+        }]
+      })
+    })
+    mocks.submitCheckin.mockResolvedValue({ data: { id: 701 } })
+    mocks.correctCheckin.mockResolvedValue({ data: { id: 702 } })
+
+    await expect(replayPendingCheckins()).resolves.toBe(1)
+
+    expect(mocks.correctCheckin).toHaveBeenCalledWith(701, expect.objectContaining({
+      clientRequestId: 'correction-request',
+      result: 'MISSED'
+    }))
   })
 
   test('gives a newly queued check-in its own fresh expiry without extending cached tasks', async () => {

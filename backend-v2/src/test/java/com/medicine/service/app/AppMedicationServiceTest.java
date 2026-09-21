@@ -158,6 +158,7 @@ class AppMedicationServiceTest {
 
         CheckinCorrectRequest request = new CheckinCorrectRequest();
         request.setResult("MISSED");
+        request.setClientRequestId("offline-correction-001");
         request.setSkipReason("PATIENT_REPORTED");
         request.setNote("late correction");
 
@@ -171,6 +172,24 @@ class AppMedicationServiceTest {
         assertThat(result.getCorrection()).isTrue();
         assertThat(result.getSupersedesRecordId()).isEqualTo(701L);
         assertThat(result.getEffective()).isTrue();
+    }
+
+    @Test
+    void shouldReturnExistingCorrectionForRepeatedClientRequest() {
+        when(appPatientService.requireAccessContext("13800138000")).thenReturn(accessContext());
+        MedicationCheckinRecord existing = checkinRecord(702L, 601L, true);
+        existing.setClientRequestId("offline-correction-001");
+        existing.setIsCorrection(true);
+        when(medicationCheckinRecordMapper.selectByClientRequestId(1L, 201L, "offline-correction-001"))
+                .thenReturn(existing);
+
+        CheckinCorrectRequest request = new CheckinCorrectRequest();
+        request.setClientRequestId("offline-correction-001");
+        request.setResult("MISSED");
+
+        assertThat(appMedicationService.correctCheckin("13800138000", 701L, request).getId()).isEqualTo(702L);
+        verify(medicationCheckinRecordMapper, never()).selectById(any(), any());
+        verify(medicationCheckinRecordMapper, never()).insert(any());
     }
 
     @Test

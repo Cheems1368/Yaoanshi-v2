@@ -146,6 +146,7 @@ describe('MVP release patient contracts', () => {
     expect(mainSource).toContain('window.setInterval(() => void restoreAndReplay(), 60_000)')
     expect(profileSource).toContain('onIonViewWillEnter(async () => {')
     expect(profileSource).toContain('resetFamilyState()')
+    expect(profileSource).toContain('const expectedMutationEpoch = ++familyMutationEpoch')
   })
 
   test('aligns satisfaction length and Android exact-alarm contracts', () => {

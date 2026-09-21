@@ -1124,7 +1124,7 @@ Note: `drug_catalog` is a standalone lookup table with no foreign-key relationsh
 | `GET` | `/app-api/dose-tasks/today` | Yes | date optional | list of `DoseTaskDTO` | none |
 | `GET` | `/app-api/checkins` | Yes | patient history query | paged `CheckinRecordDTO` list | none |
 | `POST` | `/app-api/checkins` | Yes | check-in submit DTO | `CheckinRecordDTO` | insert `medication_checkin_record`, update task effective record, maybe write notification/audit |
-| `PUT` | `/app-api/checkins/{id}/correct` | Yes | correction DTO | `CheckinRecordDTO` | insert correction row, switch effective row |
+| `PUT` | `/app-api/checkins/{id}/correct` | Yes | correction DTO（可选 `clientRequestId`） | `CheckinRecordDTO` | insert correction row, switch effective row; repeated `clientRequestId` returns the same correction |
 
 `DoseTaskDTO` includes additive app reminder fields for the T3 demo path:
 

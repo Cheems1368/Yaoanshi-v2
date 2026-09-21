@@ -16,6 +16,7 @@ interface PendingCheckin {
 
 interface CachedPendingCheckin extends PendingCheckin {
   expiresAt: number
+  correction?: Omit<PendingCheckin, 'doseTaskId'>
 }
 
 interface MedicalCacheState {
@@ -134,7 +135,8 @@ function applyPendingCheckins(tasks: DoseTaskDTO[], pendingCheckins: CachedPendi
   return tasks.map((task) => {
     const pending = pendingByTaskId.get(task.id)
     if (!pending) return task
-    return { ...task, status: pending.result === 'TAKEN' ? 'COMPLETED' : 'MISSED' }
+    const visibleResult = pending.correction?.result ?? pending.result
+    return { ...task, status: visibleResult === 'TAKEN' ? 'COMPLETED' : 'MISSED' }
   })
 }
 
@@ -240,11 +242,14 @@ export async function submitOrQueueCheckin(
       const existingIndex = state.pendingCheckins.findIndex((item) => item.doseTaskId === payload.doseTaskId)
       if (existingIndex >= 0) {
         const existing = state.pendingCheckins[existingIndex]
-        state.pendingCheckins[existingIndex] = {
-          ...payload,
-          clientRequestId: existing.clientRequestId,
-          expiresAt: Date.now() + CACHE_TTL_MS
+        existing.correction = {
+          clientRequestId: payload.clientRequestId,
+          result: payload.result,
+          actualTakenAt: payload.actualTakenAt,
+          note: payload.note,
+          skipReason: payload.skipReason
         }
+        existing.expiresAt = Date.now() + CACHE_TTL_MS
       } else {
         state.pendingCheckins.push({ ...payload, expiresAt: Date.now() + CACHE_TTL_MS })
       }
@@ -267,7 +272,7 @@ async function replayPendingCheckinsInternal(accountSubject: string) {
   let synced = 0
   for (const pending of [...state.pendingCheckins]) {
     try {
-      await medicationService.submitCheckin({
+      const submitted = await medicationService.submitCheckin({
         clientRequestId: pending.clientRequestId,
         doseTaskId: pending.doseTaskId,
         result: pending.result,
@@ -275,6 +280,11 @@ async function replayPendingCheckinsInternal(accountSubject: string) {
         note: pending.note,
         skipReason: pending.skipReason
       })
+      if (pending.correction) {
+        const originalId = submitted.data?.id
+        if (!originalId) break
+        await medicationService.correctCheckin(originalId, pending.correction)
+      }
       if (patientSession.getAccountSubject() !== accountSubject) return synced
       await mutateState((currentState) => {
         currentState.pendingCheckins = currentState.pendingCheckins.filter(

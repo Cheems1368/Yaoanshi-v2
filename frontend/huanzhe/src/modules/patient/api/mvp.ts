@@ -481,6 +481,7 @@ export const medicationService = {
       actualTakenAt?: string
       note?: string
       skipReason?: string
+      clientRequestId?: string
     }
   ) {
     return httpService.put<CheckinRecordDTO>(`/app-api/checkins/${checkinId}/correct`, payload)
