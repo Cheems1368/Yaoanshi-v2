@@ -57,6 +57,13 @@ describe('MVP release patient contracts', () => {
     expect(nativeSource).not.toContain('MODE_WORLD_READABLE')
   })
 
+  test('shows a generic global warning when an offline correction expires', () => {
+    const appSource = readFileSync(resolve(process.cwd(), 'src/App.vue'), 'utf8')
+    expect(appSource).toContain('OFFLINE_CHECKIN_CONFLICT_EVENT')
+    expect(appSource).toContain('离线打卡更正已超过可修改时限')
+    expect(appSource).not.toMatch(/药名|剂量|姓名/)
+  })
+
   test('uses generic lock-screen wording without identity, drug or dose', () => {
     expect(GENERIC_REMINDER_BODY).toBe('您有一项用药任务待处理，请打开药按时查看。')
     expect(GENERIC_REMINDER_BODY).not.toMatch(/患者|姓名|药名|剂量|毫克|mg/i)

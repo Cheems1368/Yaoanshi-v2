@@ -4,6 +4,19 @@ import { isNativeMedicalCache, secureMedicalCache } from '@/app/secureMedicalCac
 import { cancelAllMedicationReminders } from '@/modules/patient/services/localMedicationReminders'
 
 const CACHE_TTL_MS = 48 * 60 * 60 * 1000
+export const OFFLINE_CHECKIN_CONFLICT_EVENT = 'patient-offline-checkin-conflict'
+let offlineCheckinConflictCount = 0
+
+export function consumeOfflineCheckinConflictCount() {
+  const count = offlineCheckinConflictCount
+  offlineCheckinConflictCount = 0
+  return count
+}
+
+function notifyOfflineCheckinConflict() {
+  offlineCheckinConflictCount += 1
+  if (typeof window !== 'undefined') window.dispatchEvent(new Event(OFFLINE_CHECKIN_CONFLICT_EVENT))
+}
 
 interface PendingCheckin {
   clientRequestId: string
@@ -340,6 +353,15 @@ async function replayPendingCheckinsInternal(accountSubject: string) {
     } catch (error) {
       const errorCode = (error as { code?: number })?.code
       const message = error instanceof Error ? error.message : ''
+      if (errorCode === 40009 || message === 'DOSE_TASK_EDIT_WINDOW_EXPIRED') {
+        await mutateState((currentState) => {
+          currentState.pendingCheckins = currentState.pendingCheckins.filter(
+            (item) => item.clientRequestId !== pending.clientRequestId
+          )
+        })
+        if (patientSession.getAccountSubject() === accountSubject) notifyOfflineCheckinConflict()
+        continue
+      }
       if (errorCode === 40025 || message === 'DOSE_TASK_NOT_FOUND') {
         await mutateState((currentState) => {
           currentState.pendingCheckins = currentState.pendingCheckins.filter(

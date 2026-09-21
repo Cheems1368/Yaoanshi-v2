@@ -35,7 +35,9 @@ vi.mock('@/modules/patient/services/localMedicationReminders', () => ({
 
 import {
   cacheOfflineAccountType,
+  consumeOfflineCheckinConflictCount,
   loadMedicationTasks,
+  OFFLINE_CHECKIN_CONFLICT_EVENT,
   replayPendingCheckins,
   submitOrQueueCheckin
 } from '@/modules/patient/services/offlineMedication'
@@ -63,6 +65,7 @@ describe('native offline medication flow', () => {
     mocks.write.mockResolvedValue(undefined)
     mocks.clear.mockResolvedValue(undefined)
     mocks.cancelAllReminders.mockResolvedValue(undefined)
+    consumeOfflineCheckinConflictCount()
   })
 
   test('keeps encrypted cached tasks when the API is unreachable', async () => {
@@ -493,6 +496,41 @@ describe('native offline medication flow', () => {
 
     expect(mocks.submitCheckin).toHaveBeenCalledTimes(2)
     expect(JSON.parse(storedValue).pendingCheckins).toEqual([])
+  })
+
+  test('isolates an expired correction, notifies the patient and continues replay', async () => {
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: true })
+    let storedValue = JSON.stringify({
+      version: 2,
+      accountSubject: 'patient-1',
+      tasksExpiresAt: Date.now() + 60_000,
+      tasks: [cachedTask, { ...cachedTask, id: 8 }],
+      pendingCheckins: [
+        {
+          clientRequestId: 'expired-correction-original', doseTaskId: 7, result: 'TAKEN',
+          actualTakenAt: new Date().toISOString(), expiresAt: Date.now() + 60_000,
+          correction: { clientRequestId: 'expired-correction', result: 'MISSED', actualTakenAt: new Date().toISOString() }
+        },
+        { clientRequestId: 'valid-task', doseTaskId: 8, result: 'TAKEN', actualTakenAt: new Date().toISOString(), expiresAt: Date.now() + 60_000 }
+      ]
+    })
+    mocks.read.mockImplementation(async () => ({ value: storedValue }))
+    mocks.write.mockImplementation(async ({ value }) => { storedValue = value })
+    mocks.submitCheckin
+      .mockResolvedValueOnce({ data: { id: 701 } })
+      .mockResolvedValueOnce({ data: { id: 703 } })
+    mocks.correctCheckin.mockRejectedValue(Object.assign(new Error('DOSE_TASK_EDIT_WINDOW_EXPIRED'), { code: 40009 }))
+    const conflicts: Event[] = []
+    const listener = (event: Event) => conflicts.push(event)
+    window.addEventListener(OFFLINE_CHECKIN_CONFLICT_EVENT, listener)
+
+    await expect(replayPendingCheckins()).resolves.toBe(1)
+
+    window.removeEventListener(OFFLINE_CHECKIN_CONFLICT_EVENT, listener)
+    expect(mocks.submitCheckin).toHaveBeenCalledTimes(2)
+    expect(JSON.parse(storedValue).pendingCheckins).toEqual([])
+    expect(conflicts).toHaveLength(1)
+    expect(consumeOfflineCheckinConflictCount()).toBe(1)
   })
 
   test('does not expose cached tasks after the patient binding is revoked online', async () => {
