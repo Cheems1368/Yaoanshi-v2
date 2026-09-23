@@ -344,11 +344,14 @@ async function replayPendingCheckinsInternal(accountSubject: string) {
               note: replaySnapshot.note,
               skipReason: replaySnapshot.skipReason
             })
+        let effectiveRecordId = submitted.data?.id
         if (replaySnapshot.correction) {
           const originalId = replaySnapshot.existingCheckinId ?? submitted.data?.id
           if (!originalId) break
-          await medicationService.correctCheckin(originalId, replaySnapshot.correction)
+          const corrected = await medicationService.correctCheckin(originalId, replaySnapshot.correction)
+          effectiveRecordId = corrected.data?.id
         }
+        if (!effectiveRecordId) break
         if (patientSession.getAccountSubject() !== accountSubject) return synced
         const removed = await mutateState((currentState) => {
           const currentIndex = currentState.pendingCheckins.findIndex(
@@ -358,6 +361,14 @@ async function replayPendingCheckinsInternal(accountSubject: string) {
           const current = currentState.pendingCheckins[currentIndex]
           if (current.correction?.clientRequestId !== replaySnapshot?.correction?.clientRequestId) return false
           currentState.pendingCheckins.splice(currentIndex, 1)
+          const cachedTask = currentState.tasks.find((task) => task.id === current.doseTaskId)
+          if (cachedTask) {
+            const result = current.correction?.result ?? current.result
+            cachedTask.status = result === 'TAKEN' ? 'COMPLETED' : 'MISSED'
+            cachedTask.lastEffectiveCheckinId = effectiveRecordId
+            cachedTask.notificationStatus = 'ACKED'
+            cachedTask.reminderStage = 'HANDLED'
+          }
           return true
         })
         if (removed) {

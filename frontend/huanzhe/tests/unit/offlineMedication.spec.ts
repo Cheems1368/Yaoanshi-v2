@@ -36,6 +36,7 @@ vi.mock('@/modules/patient/services/localMedicationReminders', () => ({
 import {
   cacheOfflineAccountType,
   consumeOfflineCheckinConflictCount,
+  getCachedDoseTasks,
   loadMedicationTasks,
   OFFLINE_CHECKIN_CONFLICT_EVENT,
   replayPendingCheckins,
@@ -269,6 +270,7 @@ describe('native offline medication flow', () => {
     }))
     expect(mocks.submitCheckin).not.toHaveBeenCalled()
     expect(JSON.parse(storedValue).pendingCheckins).toEqual([])
+    expect(JSON.parse(storedValue).tasks[0]).toMatchObject({ status: 'COMPLETED', lastEffectiveCheckinId: 702 })
   })
 
   test('corrects an existing server check-in directly when online', async () => {
@@ -345,6 +347,33 @@ describe('native offline medication flow', () => {
       clientRequestId: 'correction-request',
       result: 'MISSED'
     }))
+  })
+
+  test('persists the effective task status and record ID before removing a replayed check-in', async () => {
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: true })
+    let storedValue = JSON.stringify({
+      version: 2, accountSubject: 'patient-1', tasksExpiresAt: Date.now() + 60_000,
+      tasks: [cachedTask],
+      pendingCheckins: [{
+        clientRequestId: 'queued-request', doseTaskId: 7, result: 'TAKEN',
+        actualTakenAt: new Date().toISOString(), expiresAt: Date.now() + 60_000
+      }]
+    })
+    mocks.read.mockImplementation(async () => ({ value: storedValue }))
+    mocks.write.mockImplementation(async ({ value }) => { storedValue = value })
+    mocks.submitCheckin.mockResolvedValue({ data: { id: 701 } })
+
+    await expect(replayPendingCheckins()).resolves.toBe(1)
+    const saved = JSON.parse(storedValue)
+    expect(saved.pendingCheckins).toEqual([])
+    expect(saved.tasks[0]).toMatchObject({
+      status: 'COMPLETED', lastEffectiveCheckinId: 701, notificationStatus: 'ACKED', reminderStage: 'HANDLED'
+    })
+
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: false })
+    await expect(getCachedDoseTasks()).resolves.toEqual([expect.objectContaining({
+      id: 7, status: 'COMPLETED', lastEffectiveCheckinId: 701
+    })])
   })
 
   test('keeps and replays a correction queued while the original request is in flight', async () => {
@@ -538,7 +567,7 @@ describe('native offline medication flow', () => {
     mocks.write.mockImplementation(async ({ value }) => { storedValue = value })
     mocks.submitCheckin
       .mockRejectedValueOnce(new Error('DOSE_TASK_NOT_FOUND'))
-      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce({ data: { id: 703 } })
 
     await expect(replayPendingCheckins()).resolves.toBe(1)
 
