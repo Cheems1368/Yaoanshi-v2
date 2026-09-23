@@ -303,7 +303,7 @@ export async function submitOrQueueCheckin(
     return 'submitted'
   } catch (error) {
     const message = error instanceof Error ? error.message : ''
-    if (!isNative() || (navigator.onLine && message !== 'Network error')) throw error
+    if (!isNative() || !canUseOfflineCache(message)) throw error
     if (!expectedAccountSubject || patientSession.getAccountSubject() !== expectedAccountSubject) {
       throw new Error('AUTHENTICATED_ACCOUNT_CHANGED')
     }
@@ -344,34 +344,57 @@ async function replayPendingCheckinsInternal(accountSubject: string) {
               note: replaySnapshot.note,
               skipReason: replaySnapshot.skipReason
             })
-        let effectiveRecordId = submitted.data?.id
+        let effectiveRecord = submitted.data
         if (replaySnapshot.correction) {
           const originalId = replaySnapshot.existingCheckinId ?? submitted.data?.id
           if (!originalId) break
           const corrected = await medicationService.correctCheckin(originalId, replaySnapshot.correction)
-          effectiveRecordId = corrected.data?.id
+          effectiveRecord = corrected.data
         }
-        if (!effectiveRecordId) break
+        if (!effectiveRecord?.id) break
+        let authoritativeTask: DoseTaskDTO | null | undefined
+        if (effectiveRecord.effective === false) {
+          const cachedTask = (await readState()).tasks.find((task) => task.id === replaySnapshot?.doseTaskId)
+          if (cachedTask?.taskDate) {
+            const response = await medicationService.getDoseTasks(cachedTask.taskDate, cachedTask.taskDate)
+            if (!Array.isArray(response.data)) break
+            authoritativeTask = response.data.find((task) => task.id === replaySnapshot?.doseTaskId) ?? null
+          } else {
+            authoritativeTask = null
+          }
+        }
         if (patientSession.getAccountSubject() !== accountSubject) return synced
-        const removed = await mutateState((currentState) => {
+        const outcome = await mutateState((currentState) => {
           const currentIndex = currentState.pendingCheckins.findIndex(
             (item) => item.clientRequestId === replaySnapshot?.clientRequestId
           )
-          if (currentIndex < 0) return true
+          if (currentIndex < 0) return { removed: true, cancelReminder: false }
           const current = currentState.pendingCheckins[currentIndex]
-          if (current.correction?.clientRequestId !== replaySnapshot?.correction?.clientRequestId) return false
+          if (current.correction?.clientRequestId !== replaySnapshot?.correction?.clientRequestId) {
+            return { removed: false, cancelReminder: false }
+          }
           currentState.pendingCheckins.splice(currentIndex, 1)
-          const cachedTask = currentState.tasks.find((task) => task.id === current.doseTaskId)
-          if (cachedTask) {
+          const taskIndex = currentState.tasks.findIndex((task) => task.id === current.doseTaskId)
+          if (authoritativeTask === null) {
+            if (taskIndex >= 0) currentState.tasks.splice(taskIndex, 1)
+            return { removed: true, cancelReminder: true }
+          }
+          if (taskIndex >= 0 && authoritativeTask) {
+            currentState.tasks[taskIndex] = authoritativeTask
+          } else if (taskIndex >= 0) {
+            const cachedTask = currentState.tasks[taskIndex]
             const result = current.correction?.result ?? current.result
             cachedTask.status = result === 'TAKEN' ? 'COMPLETED' : 'MISSED'
-            cachedTask.lastEffectiveCheckinId = effectiveRecordId
+            cachedTask.lastEffectiveCheckinId = effectiveRecord.id
             cachedTask.notificationStatus = 'ACKED'
             cachedTask.reminderStage = 'HANDLED'
           }
-          return true
+          return { removed: true, cancelReminder: false }
         })
-        if (removed) {
+        if (outcome.cancelReminder && patientSession.getAccountSubject() === accountSubject) {
+          await cancelMedicationReminder(replaySnapshot.doseTaskId).catch(() => undefined)
+        }
+        if (outcome.removed) {
           synced += 1
           break
         }

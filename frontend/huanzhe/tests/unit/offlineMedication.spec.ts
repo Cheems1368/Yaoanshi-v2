@@ -115,10 +115,33 @@ describe('native offline medication flow', () => {
     expect(saved.tasks[0].status).toBe('PENDING')
   })
 
+  test.each(['Server error', 'Session temporarily unavailable'])(
+    'queues a check-in during a restored offline session with %s', async (message) => {
+      Object.defineProperty(navigator, 'onLine', { configurable: true, value: true })
+      mocks.authStatus = 'offline'
+      mocks.submitCheckin.mockRejectedValue(new Error(message))
+
+      await expect(submitOrQueueCheckin(cachedTask as any, 'TAKEN')).resolves.toBe('queued')
+
+      const saved = JSON.parse(mocks.write.mock.calls[0][0].value)
+      expect(saved.pendingCheckins).toHaveLength(1)
+      expect(saved.pendingCheckins[0].result).toBe('TAKEN')
+    }
+  )
+
   test('does not queue online business failures', async () => {
     Object.defineProperty(navigator, 'onLine', { configurable: true, value: true })
     mocks.submitCheckin.mockRejectedValue(new Error('CHECKIN_WINDOW_EXPIRED'))
     await expect(submitOrQueueCheckin(cachedTask as any, 'TAKEN')).rejects.toThrow('CHECKIN_WINDOW_EXPIRED')
+    expect(mocks.write).not.toHaveBeenCalled()
+  })
+
+  test('does not queue business failures in a restored offline session', async () => {
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: true })
+    mocks.authStatus = 'offline'
+    mocks.submitCheckin.mockRejectedValue(new Error('No permission'))
+
+    await expect(submitOrQueueCheckin(cachedTask as any, 'TAKEN')).rejects.toThrow('No permission')
     expect(mocks.write).not.toHaveBeenCalled()
   })
 
@@ -376,6 +399,51 @@ describe('native offline medication flow', () => {
     await expect(getCachedDoseTasks()).resolves.toEqual([expect.objectContaining({
       id: 7, status: 'COMPLETED', lastEffectiveCheckinId: 701
     })])
+  })
+
+  test('refreshes an ineffective idempotent replay from the authoritative server task', async () => {
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: true })
+    let storedValue = JSON.stringify({
+      version: 2, accountSubject: 'patient-1', tasksExpiresAt: Date.now() + 60_000,
+      tasks: [cachedTask],
+      pendingCheckins: [{
+        clientRequestId: 'old-request', doseTaskId: 7, result: 'TAKEN',
+        actualTakenAt: new Date().toISOString(), expiresAt: Date.now() + 60_000
+      }]
+    })
+    mocks.read.mockImplementation(async () => ({ value: storedValue }))
+    mocks.write.mockImplementation(async ({ value }) => { storedValue = value })
+    mocks.submitCheckin.mockResolvedValue({ data: { id: 701, effective: false } })
+    mocks.getDoseTasks.mockResolvedValue({ data: [{
+      ...cachedTask, status: 'MISSED', lastEffectiveCheckinId: 888, notificationStatus: 'ACKED'
+    }] })
+
+    await expect(replayPendingCheckins()).resolves.toBe(1)
+
+    expect(mocks.getDoseTasks).toHaveBeenCalledWith(cachedTask.taskDate, cachedTask.taskDate)
+    expect(JSON.parse(storedValue).pendingCheckins).toEqual([])
+    expect(JSON.parse(storedValue).tasks[0]).toMatchObject({ status: 'MISSED', lastEffectiveCheckinId: 888 })
+  })
+
+  test('retains an ineffective replay in the queue until the authoritative task can be fetched', async () => {
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: true })
+    let storedValue = JSON.stringify({
+      version: 2, accountSubject: 'patient-1', tasksExpiresAt: Date.now() + 60_000,
+      tasks: [cachedTask],
+      pendingCheckins: [{
+        clientRequestId: 'old-request', doseTaskId: 7, result: 'TAKEN',
+        actualTakenAt: new Date().toISOString(), expiresAt: Date.now() + 60_000
+      }]
+    })
+    mocks.read.mockImplementation(async () => ({ value: storedValue }))
+    mocks.write.mockImplementation(async ({ value }) => { storedValue = value })
+    mocks.submitCheckin.mockResolvedValue({ data: { id: 701, effective: false } })
+    mocks.getDoseTasks.mockRejectedValue(new Error('Network error'))
+
+    await expect(replayPendingCheckins()).resolves.toBe(0)
+
+    expect(JSON.parse(storedValue).pendingCheckins).toHaveLength(1)
+    expect(JSON.parse(storedValue).tasks[0].lastEffectiveCheckinId).toBeUndefined()
   })
 
   test('keeps and replays a correction queued while the original request is in flight', async () => {
