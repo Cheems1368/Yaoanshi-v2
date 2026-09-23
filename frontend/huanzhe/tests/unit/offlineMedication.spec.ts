@@ -199,6 +199,36 @@ describe('native offline medication flow', () => {
     expect(mocks.write).not.toHaveBeenCalled()
   })
 
+  test('does not inspect the new account cache after an old replay fails', async () => {
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: true })
+    let storedValue = JSON.stringify({
+      version: 2, accountSubject: 'patient-1', tasksExpiresAt: Date.now() + 60_000,
+      tasks: [cachedTask],
+      pendingCheckins: [{
+        clientRequestId: 'old-request', doseTaskId: 7, result: 'TAKEN',
+        actualTakenAt: new Date().toISOString(), expiresAt: Date.now() + 60_000
+      }]
+    })
+    mocks.read.mockImplementation(async () => ({ value: storedValue }))
+    mocks.write.mockImplementation(async ({ value }) => { storedValue = value })
+    let rejectReplay!: (error: Error) => void
+    mocks.submitCheckin.mockImplementation(() => new Promise((_resolve, reject) => { rejectReplay = reject }))
+
+    const replay = replayPendingCheckins()
+    await vi.waitFor(() => expect(mocks.submitCheckin).toHaveBeenCalledTimes(1))
+    mocks.accountSubject = 'patient-2'
+    storedValue = JSON.stringify({
+      version: 2, accountSubject: 'patient-2', tasksExpiresAt: Date.now() + 60_000,
+      tasks: [{ ...cachedTask, id: 8 }], pendingCheckins: []
+    })
+    rejectReplay(Object.assign(new Error('DOSE_TASK_EDIT_WINDOW_EXPIRED'), { code: 40009 }))
+
+    await expect(replay).resolves.toBe(0)
+    expect(mocks.read).toHaveBeenCalledTimes(1)
+    expect(JSON.parse(storedValue)).toMatchObject({ accountSubject: 'patient-2', tasks: [{ id: 8 }] })
+    expect(mocks.write).not.toHaveBeenCalled()
+  })
+
   test('serializes concurrent offline check-ins without losing either pending request', async () => {
     Object.defineProperty(navigator, 'onLine', { configurable: true, value: false })
     mocks.submitCheckin.mockRejectedValue(new Error('Network error'))

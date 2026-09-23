@@ -404,6 +404,7 @@ async function replayPendingCheckinsInternal(accountSubject: string) {
         )
       }
     } catch (error) {
+      if (patientSession.getAccountSubject() !== accountSubject) return synced
       const errorCode = (error as { code?: number })?.code
       const message = error instanceof Error ? error.message : ''
       if (errorCode === 40009 || message === 'DOSE_TASK_EDIT_WINDOW_EXPIRED') {
@@ -420,6 +421,7 @@ async function replayPendingCheckinsInternal(accountSubject: string) {
         }
         if (patientSession.getAccountSubject() !== accountSubject) return synced
         const removed = await mutateState((currentState) => {
+          if (currentState.accountSubject !== accountSubject) return false
           const currentIndex = currentState.pendingCheckins.findIndex(
             (item) => item.clientRequestId === pending.clientRequestId
           )
@@ -438,6 +440,7 @@ async function replayPendingCheckinsInternal(accountSubject: string) {
       }
       if (errorCode === 40025 || message === 'DOSE_TASK_NOT_FOUND') {
         await mutateState((currentState) => {
+          if (currentState.accountSubject !== accountSubject) return
           currentState.pendingCheckins = currentState.pendingCheckins.filter(
             (item) => item.doseTaskId !== pending.doseTaskId
           )
