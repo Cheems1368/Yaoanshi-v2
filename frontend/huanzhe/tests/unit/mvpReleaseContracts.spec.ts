@@ -49,6 +49,8 @@ describe('MVP release patient contracts', () => {
     const nativeSource = readFileSync(resolve(process.cwd(), 'android/app/src/main/java/com/yaoanshi/patient/SecureMedicalCachePlugin.java'), 'utf8')
     expect(webSource).not.toMatch(/localStorage|sessionStorage|indexedDB/i)
     expect(nativeSource).toContain('AndroidKeyStore')
+    expect(nativeSource).toContain('getNoBackupFilesDir()')
+    expect(nativeSource).not.toContain('getFilesDir()')
     expect(nativeSource).toContain('AES/GCM/NoPadding')
     expect(nativeSource).toContain('AtomicFile')
     expect(nativeSource).toContain('openRead')

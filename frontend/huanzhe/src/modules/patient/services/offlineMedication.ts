@@ -1,7 +1,7 @@
 import { medicationService, type DoseTaskDTO } from '@/modules/patient/api/mvp'
 import { patientSession } from '@/app/session'
 import { isNativeMedicalCache, secureMedicalCache } from '@/app/secureMedicalCache'
-import { cancelAllMedicationReminders } from '@/modules/patient/services/localMedicationReminders'
+import { cancelAllMedicationReminders, cancelMedicationReminder } from '@/modules/patient/services/localMedicationReminders'
 
 const CACHE_TTL_MS = 48 * 60 * 60 * 1000
 export const OFFLINE_CHECKIN_CONFLICT_EVENT = 'patient-offline-checkin-conflict'
@@ -395,9 +395,13 @@ async function replayPendingCheckinsInternal(accountSubject: string) {
       if (errorCode === 40025 || message === 'DOSE_TASK_NOT_FOUND') {
         await mutateState((currentState) => {
           currentState.pendingCheckins = currentState.pendingCheckins.filter(
-            (item) => item.clientRequestId !== pending.clientRequestId
+            (item) => item.doseTaskId !== pending.doseTaskId
           )
+          currentState.tasks = currentState.tasks.filter((task) => task.id !== pending.doseTaskId)
         })
+        if (patientSession.getAccountSubject() === accountSubject) {
+          await cancelMedicationReminder(pending.doseTaskId).catch(() => undefined)
+        }
         continue
       }
       break

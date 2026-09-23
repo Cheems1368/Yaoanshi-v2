@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, test, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
   read: vi.fn(), write: vi.fn(), clear: vi.fn(), getDoseTasks: vi.fn(), submitCheckin: vi.fn(), correctCheckin: vi.fn(),
-  clearGateState: vi.fn(), cancelAllReminders: vi.fn(), accountSubject: 'patient-1', accountType: 'PATIENT',
+  clearGateState: vi.fn(), cancelAllReminders: vi.fn(), cancelReminder: vi.fn(), accountSubject: 'patient-1', accountType: 'PATIENT',
   authStatus: 'authenticated'
 }))
 
@@ -30,7 +30,8 @@ vi.mock('@/app/session', () => ({
 }))
 
 vi.mock('@/modules/patient/services/localMedicationReminders', () => ({
-  cancelAllMedicationReminders: mocks.cancelAllReminders
+  cancelAllMedicationReminders: mocks.cancelAllReminders,
+  cancelMedicationReminder: mocks.cancelReminder
 }))
 
 import {
@@ -66,6 +67,7 @@ describe('native offline medication flow', () => {
     mocks.write.mockResolvedValue(undefined)
     mocks.clear.mockResolvedValue(undefined)
     mocks.cancelAllReminders.mockResolvedValue(undefined)
+    mocks.cancelReminder.mockResolvedValue(undefined)
     consumeOfflineCheckinConflictCount()
   })
 
@@ -565,6 +567,7 @@ describe('native offline medication flow', () => {
     })
     mocks.read.mockImplementation(async () => ({ value: storedValue }))
     mocks.write.mockImplementation(async ({ value }) => { storedValue = value })
+    mocks.clear.mockImplementation(async () => { storedValue = '' })
     mocks.submitCheckin
       .mockRejectedValueOnce(new Error('DOSE_TASK_NOT_FOUND'))
       .mockResolvedValueOnce({ data: { id: 703 } })
@@ -572,7 +575,9 @@ describe('native offline medication flow', () => {
     await expect(replayPendingCheckins()).resolves.toBe(1)
 
     expect(mocks.submitCheckin).toHaveBeenCalledTimes(2)
-    expect(JSON.parse(storedValue).pendingCheckins).toEqual([])
+    expect(JSON.parse(mocks.write.mock.calls[0][0].value).tasks).toEqual([])
+    expect(storedValue).toBe('')
+    expect(mocks.cancelReminder).toHaveBeenCalledWith(7)
   })
 
   test('isolates an expired correction, notifies the patient and continues replay', async () => {

@@ -104,7 +104,7 @@ public class SecureMedicalCachePlugin extends Plugin {
     }
 
     private File cacheFile() {
-        return new File(getContext().getFilesDir(), FILE_NAME);
+        return new File(getContext().getNoBackupFilesDir(), FILE_NAME);
     }
 
     private byte[] readAll(AtomicFile file) throws Exception {
