@@ -8,6 +8,7 @@ let accessTokenMemory = ''
 let accountSubjectMemory = ''
 let accountTypeMemory = ''
 let authStatus: 'unknown' | 'authenticated' | 'offline' | 'anonymous' = 'unknown'
+let sessionGeneration = 0
 
 const getSessionStorage = () => (typeof window !== 'undefined' ? window.sessionStorage : null)
 
@@ -48,11 +49,20 @@ export interface PatientGateState {
 }
 
 export const patientSession = {
+  getSessionGeneration() {
+    return sessionGeneration
+  },
+
+  advanceSessionGeneration() {
+    sessionGeneration += 1
+  },
+
   getAccessToken(): string | null {
     return accessTokenMemory || null
   },
 
-  setAccessToken(token: string) {
+  setAccessToken(token: string, isRefresh = false) {
+    if (!isRefresh) sessionGeneration += 1
     const identity = readTokenIdentity(token)
     const nextSubject = identity.subject
     if (accountSubjectMemory && nextSubject && accountSubjectMemory !== nextSubject) {
@@ -80,6 +90,7 @@ export const patientSession = {
   },
 
   clearAccessToken() {
+    sessionGeneration += 1
     accessTokenMemory = ''
     accountSubjectMemory = ''
     accountTypeMemory = ''
@@ -90,6 +101,7 @@ export const patientSession = {
   },
 
   markAnonymous() {
+    sessionGeneration += 1
     authStatus = 'anonymous'
     accessTokenMemory = ''
     accountSubjectMemory = ''
@@ -98,6 +110,7 @@ export const patientSession = {
   },
 
   resetAuthStatus() {
+    sessionGeneration += 1
     authStatus = 'unknown'
     accessTokenMemory = ''
     accountSubjectMemory = ''
@@ -135,6 +148,7 @@ export const patientSession = {
         return false
       }
       accountSubjectMemory = parsed.accountSubject
+      sessionGeneration += 1
       this.setAccountType(parsed.accountType ?? '')
       authStatus = 'offline'
       return true

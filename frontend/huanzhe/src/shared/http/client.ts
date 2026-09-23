@@ -10,12 +10,14 @@ export interface ApiResponse<T = unknown> {
 type AccountBoundRequestConfig = AxiosRequestConfig & {
   _retry?: boolean
   _accountSubject?: string | null
+  _sessionGeneration?: number
 }
 
 class HttpService {
   private readonly instance: AxiosInstance
   private refreshPromise: Promise<string | null> | null = null
   private refreshUnavailable = false
+  private loginInProgress = false
 
   constructor() {
     const apiBaseUrl = typeof __API_BASE_URL__ === 'string' ? __API_BASE_URL__ : 'http://localhost:8080'
@@ -32,6 +34,7 @@ class HttpService {
     this.instance.interceptors.request.use(async (config) => {
       const accountBoundConfig = config as typeof config & AccountBoundRequestConfig
       const bindAccountSubject = accountBoundConfig._accountSubject === undefined
+      const requestGeneration = patientSession.getSessionGeneration()
       const requestUrl = String(config.url ?? '')
       let token = patientSession.getAccessToken()
       config.headers = config.headers ?? {}
@@ -40,8 +43,14 @@ class HttpService {
         && typeof navigator !== 'undefined' && !navigator.onLine
       if (!token && !offlineSession && patientSession.getAuthStatus() !== 'anonymous' && !this.shouldSkipRefresh(requestUrl)) {
         token = await this.refreshAccessToken()
+        if (patientSession.getSessionGeneration() !== requestGeneration) {
+          throw new Error('AUTHENTICATED_ACCOUNT_CHANGED')
+        }
       }
       if (bindAccountSubject) accountBoundConfig._accountSubject = patientSession.getAccountSubject()
+      if (accountBoundConfig._sessionGeneration === undefined) {
+        accountBoundConfig._sessionGeneration = patientSession.getSessionGeneration()
+      }
 
       if (token) {
         config.headers.Authorization = `Bearer ${token}`
@@ -101,6 +110,19 @@ class HttpService {
     patientSession.clearGateState()
   }
 
+  async loginSession<T extends { accessToken: string }>(payload: unknown): Promise<ApiResponse<T>> {
+    this.loginInProgress = true
+    patientSession.advanceSessionGeneration()
+    try {
+      await this.refreshPromise
+      const response = await this.post<T>('/app-api/auth/session/login', payload)
+      patientSession.setAccessToken(response.data.accessToken)
+      return response
+    } finally {
+      this.loginInProgress = false
+    }
+  }
+
   async restoreSession() {
     if (patientSession.getAccessToken()) {
       return true
@@ -128,18 +150,25 @@ class HttpService {
   ) {
     const requestUrl = String(config?.url ?? '')
 
+    if (this.loginInProgress
+      || (config?._sessionGeneration !== undefined
+        && patientSession.getSessionGeneration() !== config._sessionGeneration)
+      || (config?._accountSubject !== undefined
+        && patientSession.getAccountSubject() !== config._accountSubject)) {
+      return Promise.reject(new Error('AUTHENTICATED_ACCOUNT_CHANGED'))
+    }
     if (!config || config._retry || this.shouldSkipRefresh(requestUrl)) {
       this.clearToken()
       this.redirectToLogin()
       return Promise.reject(new Error(fallbackMessage))
     }
 
-    if (config._accountSubject !== undefined
-      && patientSession.getAccountSubject() !== config._accountSubject) {
+    const requestGeneration = patientSession.getSessionGeneration()
+    const nextAccessToken = await this.refreshAccessToken()
+    if (this.loginInProgress || patientSession.getSessionGeneration() !== requestGeneration) {
+      if (patientSession.getAuthStatus() === 'anonymous') this.redirectToLogin()
       return Promise.reject(new Error('AUTHENTICATED_ACCOUNT_CHANGED'))
     }
-
-    const nextAccessToken = await this.refreshAccessToken()
     if (!nextAccessToken) {
       if (this.refreshUnavailable) {
         return Promise.reject(new Error('Session temporarily unavailable'))
@@ -148,8 +177,8 @@ class HttpService {
       this.redirectToLogin()
       return Promise.reject(new Error(fallbackMessage))
     }
-    if (config._accountSubject !== undefined
-      && patientSession.getAccountSubject() !== config._accountSubject) {
+    if (config._sessionGeneration !== undefined
+      && patientSession.getSessionGeneration() !== config._sessionGeneration) {
       return Promise.reject(new Error('AUTHENTICATED_ACCOUNT_CHANGED'))
     }
 
@@ -163,8 +192,10 @@ class HttpService {
   }
 
   private async refreshAccessToken(): Promise<string | null> {
+    if (this.loginInProgress) return null
     if (!this.refreshPromise) {
       this.refreshUnavailable = false
+      const refreshGeneration = patientSession.getSessionGeneration()
       const baseURL = this.instance.defaults.baseURL ?? ''
       this.refreshPromise = axios
         .post<ApiResponse<{ accessToken: string; expiresIn: number; refreshExpiresIn: number; deviceId: string }>>(
@@ -181,6 +212,7 @@ class HttpService {
           }
         )
         .then((response) => {
+          if (patientSession.getSessionGeneration() !== refreshGeneration) return null
           const payload = response.data
           if (payload.code !== 200 && payload.code !== 0) {
             if (payload.code === 40004) {
@@ -191,10 +223,11 @@ class HttpService {
             return null
           }
 
-          patientSession.setAccessToken(payload.data.accessToken)
+          patientSession.setAccessToken(payload.data.accessToken, true)
           return payload.data.accessToken
         })
         .catch((error) => {
+          if (patientSession.getSessionGeneration() !== refreshGeneration) return null
           if (error?.response?.status !== 401 && error?.response?.data?.code !== 40004) {
             this.refreshUnavailable = true
             return null

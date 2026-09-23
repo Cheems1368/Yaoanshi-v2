@@ -393,7 +393,7 @@ export const appAuthService = {
   },
 
   login(payload: { mobile: string; otpCode: string; deviceId: string; deviceName?: string; platform?: string }) {
-    return httpService.post<SessionTokenDTO>('/app-api/auth/session/login', payload)
+    return httpService.loginSession<SessionTokenDTO>(payload)
   },
 
   logout() {

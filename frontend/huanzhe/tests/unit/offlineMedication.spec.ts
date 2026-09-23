@@ -374,6 +374,53 @@ describe('native offline medication flow', () => {
     }))
   })
 
+  test('keeps the confirmed original task when a queued correction has expired', async () => {
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: true })
+    let storedValue = JSON.stringify({
+      version: 2, accountSubject: 'patient-1', tasksExpiresAt: Date.now() + 60_000,
+      tasks: [cachedTask],
+      pendingCheckins: [{
+        clientRequestId: 'original-request', doseTaskId: 7, result: 'TAKEN',
+        actualTakenAt: new Date().toISOString(), expiresAt: Date.now() + 60_000,
+        correction: { clientRequestId: 'correction-request', result: 'MISSED', actualTakenAt: new Date().toISOString() }
+      }]
+    })
+    mocks.read.mockImplementation(async () => ({ value: storedValue }))
+    mocks.write.mockImplementation(async ({ value }) => { storedValue = value })
+    mocks.submitCheckin.mockResolvedValue({ data: { id: 701, result: 'TAKEN' } })
+    mocks.correctCheckin.mockRejectedValue(Object.assign(new Error('DOSE_TASK_EDIT_WINDOW_EXPIRED'), { code: 40009 }))
+    mocks.getDoseTasks.mockResolvedValue({ data: [{
+      ...cachedTask, status: 'COMPLETED', lastEffectiveCheckinId: 701, notificationStatus: 'ACKED'
+    }] })
+
+    await expect(replayPendingCheckins()).resolves.toBe(0)
+
+    expect(mocks.getDoseTasks).toHaveBeenCalledWith(cachedTask.taskDate, cachedTask.taskDate)
+    expect(JSON.parse(storedValue).pendingCheckins).toEqual([])
+    expect(JSON.parse(storedValue).tasks[0]).toMatchObject({ status: 'COMPLETED', lastEffectiveCheckinId: 701 })
+  })
+
+  test('retains an expired correction until the authoritative task can be fetched', async () => {
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: true })
+    let storedValue = JSON.stringify({
+      version: 2, accountSubject: 'patient-1', tasksExpiresAt: Date.now() + 60_000,
+      tasks: [cachedTask],
+      pendingCheckins: [{
+        clientRequestId: 'original-request', doseTaskId: 7, result: 'TAKEN',
+        actualTakenAt: new Date().toISOString(), expiresAt: Date.now() + 60_000,
+        correction: { clientRequestId: 'correction-request', result: 'MISSED', actualTakenAt: new Date().toISOString() }
+      }]
+    })
+    mocks.read.mockImplementation(async () => ({ value: storedValue }))
+    mocks.write.mockImplementation(async ({ value }) => { storedValue = value })
+    mocks.submitCheckin.mockResolvedValue({ data: { id: 701 } })
+    mocks.correctCheckin.mockRejectedValue(Object.assign(new Error('DOSE_TASK_EDIT_WINDOW_EXPIRED'), { code: 40009 }))
+    mocks.getDoseTasks.mockRejectedValue(new Error('Network error'))
+
+    await expect(replayPendingCheckins()).resolves.toBe(0)
+    expect(JSON.parse(storedValue).pendingCheckins).toHaveLength(1)
+  })
+
   test('persists the effective task status and record ID before removing a replayed check-in', async () => {
     Object.defineProperty(navigator, 'onLine', { configurable: true, value: true })
     let storedValue = JSON.stringify({
@@ -670,6 +717,7 @@ describe('native offline medication flow', () => {
       .mockResolvedValueOnce({ data: { id: 701 } })
       .mockResolvedValueOnce({ data: { id: 703 } })
     mocks.correctCheckin.mockRejectedValue(Object.assign(new Error('DOSE_TASK_EDIT_WINDOW_EXPIRED'), { code: 40009 }))
+    mocks.getDoseTasks.mockResolvedValue({ data: [{ ...cachedTask, status: 'COMPLETED', lastEffectiveCheckinId: 701 }] })
     const conflicts: Event[] = []
     const listener = (event: Event) => conflicts.push(event)
     window.addEventListener(OFFLINE_CHECKIN_CONFLICT_EVENT, listener)
@@ -679,6 +727,7 @@ describe('native offline medication flow', () => {
     window.removeEventListener(OFFLINE_CHECKIN_CONFLICT_EVENT, listener)
     expect(mocks.submitCheckin).toHaveBeenCalledTimes(2)
     expect(JSON.parse(storedValue).pendingCheckins).toEqual([])
+    expect(JSON.parse(storedValue).tasks[0]).toMatchObject({ status: 'COMPLETED', lastEffectiveCheckinId: 701 })
     expect(conflicts).toHaveLength(1)
     expect(consumeOfflineCheckinConflictCount()).toBe(1)
   })
@@ -698,6 +747,7 @@ describe('native offline medication flow', () => {
     mocks.submitCheckin
       .mockRejectedValueOnce(Object.assign(new Error('DOSE_TASK_EDIT_WINDOW_EXPIRED'), { code: 40009 }))
       .mockResolvedValueOnce({ data: { id: 703 } })
+    mocks.getDoseTasks.mockResolvedValue({ data: [cachedTask] })
 
     await expect(replayPendingCheckins()).resolves.toBe(1)
 

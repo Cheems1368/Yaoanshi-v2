@@ -407,12 +407,33 @@ async function replayPendingCheckinsInternal(accountSubject: string) {
       const errorCode = (error as { code?: number })?.code
       const message = error instanceof Error ? error.message : ''
       if (errorCode === 40009 || message === 'DOSE_TASK_EDIT_WINDOW_EXPIRED') {
-        await mutateState((currentState) => {
-          currentState.pendingCheckins = currentState.pendingCheckins.filter(
-            (item) => item.clientRequestId !== pending.clientRequestId
+        const cachedTask = (await readState()).tasks.find((task) => task.id === pending.doseTaskId)
+        let authoritativeTask: DoseTaskDTO | null = null
+        if (cachedTask?.taskDate) {
+          try {
+            const response = await medicationService.getDoseTasks(cachedTask.taskDate, cachedTask.taskDate)
+            if (!Array.isArray(response.data)) break
+            authoritativeTask = response.data.find((task) => task.id === pending.doseTaskId) ?? null
+          } catch {
+            break
+          }
+        }
+        if (patientSession.getAccountSubject() !== accountSubject) return synced
+        const removed = await mutateState((currentState) => {
+          const currentIndex = currentState.pendingCheckins.findIndex(
+            (item) => item.clientRequestId === pending.clientRequestId
           )
+          if (currentIndex < 0
+            || currentState.pendingCheckins[currentIndex].correction?.clientRequestId !== replaySnapshot?.correction?.clientRequestId) {
+            return false
+          }
+          currentState.pendingCheckins.splice(currentIndex, 1)
+          const taskIndex = currentState.tasks.findIndex((task) => task.id === pending.doseTaskId)
+          if (taskIndex >= 0 && authoritativeTask) currentState.tasks[taskIndex] = authoritativeTask
+          else if (taskIndex >= 0) currentState.tasks.splice(taskIndex, 1)
+          return true
         })
-        if (patientSession.getAccountSubject() === accountSubject) notifyOfflineCheckinConflict()
+        if (removed && patientSession.getAccountSubject() === accountSubject) notifyOfflineCheckinConflict()
         continue
       }
       if (errorCode === 40025 || message === 'DOSE_TASK_NOT_FOUND') {
