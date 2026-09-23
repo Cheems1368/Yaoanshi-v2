@@ -139,6 +139,12 @@ public class AppMedicationService {
         }
         MedicationDoseTask task = requireDoseTask(context.patient().getId(), request.getDoseTaskId());
         LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
+        if (task.getLockedAfter() != null && task.getLockedAfter().isBefore(now)) {
+            throw new BusinessException(
+                    ErrorCode.DOSE_TASK_EDIT_WINDOW_EXPIRED.getCode(),
+                    ErrorCode.DOSE_TASK_EDIT_WINDOW_EXPIRED.getMessage()
+            );
+        }
 
         MedicationCheckinRecord record = new MedicationCheckinRecord();
         record.setDoseTaskId(task.getId());

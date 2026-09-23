@@ -121,6 +121,23 @@ class AppMedicationServiceTest {
     }
 
     @Test
+    void shouldRejectFirstCheckinAfterEditWindowExpired() {
+        when(appPatientService.requireAccessContext("13800138000")).thenReturn(accessContext());
+        when(medicationDoseTaskMapper.selectById(1L, 601L))
+                .thenReturn(doseTask(601L, LocalDateTime.now(ZoneOffset.UTC).minusMinutes(1)));
+        CheckinSubmitRequest request = new CheckinSubmitRequest();
+        request.setDoseTaskId(601L);
+        request.setClientRequestId("offline-expired-001");
+        request.setResult("TAKEN");
+
+        assertThatThrownBy(() -> appMedicationService.submitCheckin("13800138000", request))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("DOSE_TASK_EDIT_WINDOW_EXPIRED");
+        verify(medicationCheckinRecordMapper, never()).insert(any());
+        verify(medicationDoseTaskMapper, never()).updateStatus(any());
+    }
+
+    @Test
     void shouldRejectDoseTaskRangeLongerThanSevenDays() {
         when(appPatientService.requireAccessContext("13800138000")).thenReturn(accessContext());
 

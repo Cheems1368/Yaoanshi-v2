@@ -26,8 +26,8 @@ const showOfflineConflict = () => {
   const count = consumeOfflineCheckinConflictCount()
   if (count < 1) return
   offlineConflictMessage.value = count > 1
-    ? `${count} 条离线打卡更正已超过可修改时限，未能同步；其他记录已继续处理。`
-    : '一条离线打卡更正已超过可修改时限，未能同步；其他记录已继续处理。'
+    ? `${count} 条离线打卡已超过可提交或修改时限，未能同步；其他记录已继续处理。`
+    : '一条离线打卡已超过可提交或修改时限，未能同步；其他记录已继续处理。'
   offlineConflictToastOpen.value = true
 }
 

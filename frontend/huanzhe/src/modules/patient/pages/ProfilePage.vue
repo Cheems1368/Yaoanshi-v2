@@ -402,6 +402,7 @@ const familyLoading = ref(false)
 const familySaving = ref(false)
 let familyRequestEpoch = 0
 let familyMutationEpoch = 0
+let profileRequestEpoch = 0
 const familyForm = reactive({ familyMobile: '', familyDisplayName: '', relationshipType: 'OTHER' })
 const familyFormValid = computed(() => /^1\d{10}$/.test(familyForm.familyMobile) && Boolean(familyForm.familyDisplayName.trim()))
 
@@ -568,22 +569,28 @@ const applyHealthSnapshot = (serverData: PatientHealthProfileDTO | null | undefi
   healthDataService.replaceHealthData(nextHealthData)
 }
 
-const syncPatientProfileDTO = async () => {
+const isCurrentProfileRequest = (accountSubject: string, requestEpoch: number) =>
+  requestEpoch === profileRequestEpoch && patientSession.getAccountSubject() === accountSubject
+
+const syncPatientProfileDTO = async (accountSubject: string, requestEpoch: number) => {
   const response = await patientService.getProfile()
-  if (response.data) {
+  if (isCurrentProfileRequest(accountSubject, requestEpoch) && response.data) {
     applyProfileSnapshot(response.data)
   }
 }
 
-const syncHealthProfile = async () => {
+const syncHealthProfile = async (accountSubject: string, requestEpoch: number) => {
   const response = await patientService.getHealthProfile()
-  applyHealthSnapshot(response.data)
+  if (isCurrentProfileRequest(accountSubject, requestEpoch)) applyHealthSnapshot(response.data)
 }
 
 const saveProfile = async () => {
   if (!validateForm()) {
     return
   }
+  const accountSubject = patientSession.getAccountSubject()
+  const requestEpoch = profileRequestEpoch
+  if (!accountSubject) return
 
   try {
     const response = await patientService.updateProfile({
@@ -597,11 +604,12 @@ const saveProfile = async () => {
       allergies: editForm.allergies,
       emergencyContact: { ...editForm.emergencyContact }
     })
+    if (!isCurrentProfileRequest(accountSubject, requestEpoch)) return
 
     if (response.data) {
       applyProfileSnapshot(response.data)
     } else {
-      await syncPatientProfileDTO()
+      await syncPatientProfileDTO(accountSubject, requestEpoch)
     }
 
     isEditing.value = false
@@ -614,6 +622,7 @@ const saveProfile = async () => {
     })
     await toast.present()
   } catch {
+    if (!isCurrentProfileRequest(accountSubject, requestEpoch)) return
     const toast = await toastController.create({
       message: '保存失败，请重试',
       duration: 2000,
@@ -670,6 +679,20 @@ const loadUserData = () => {
   Object.assign(profileData, userProfile)
 }
 
+const resetProfileState = () => {
+  profileRequestEpoch += 1
+  isEditing.value = false
+  Object.assign(editForm, {
+    name: '', phone: '', age: 0, gender: '', height: 0, weight: 0,
+    bloodType: '', allergies: '', emergencyContact: { name: '', phone: '', relationship: '' }
+  })
+  clearErrors()
+  userDataService.clearUserData()
+  healthDataService.clearHealthData()
+  loadUserData()
+  loadHealthData()
+}
+
 const clearLocalSession = () => {
   patientSession.clearAuthState()
   patientSession.clearGateState()
@@ -691,6 +714,11 @@ const resetFamilyState = () => {
   familyForm.familyMobile = ''
   familyForm.familyDisplayName = ''
   familyForm.relationshipType = 'OTHER'
+}
+
+const resetAccountPageState = () => {
+  resetProfileState()
+  resetFamilyState()
 }
 
 const loadFamilyBindings = async () => {
@@ -801,34 +829,28 @@ const handleLogout = async () => {
   }
 }
 
-const onUserDataChange = (newProfile: UserProfile) => {
-  Object.assign(profileData, newProfile)
-}
-
-onMounted(async () => {
-  if (!patientSession.getGateState().loggedIn) {
-    router.push('/login')
-    return
-  }
-
-  loadUserData()
-  loadHealthData()
-  userDataService.addListener(onUserDataChange)
-
-  try {
-    await Promise.all([syncPatientProfileDTO(), syncHealthProfile()])
-  } catch {
-    // keep current session cache when sync fails
-  }
+onMounted(() => {
+  window.addEventListener('patient-session-anonymous', resetAccountPageState)
+  window.addEventListener('patient-account-switched', resetAccountPageState)
 })
 
 onIonViewWillEnter(async () => {
-  resetFamilyState()
+  resetAccountPageState()
+  const accountSubject = patientSession.getAccountSubject()
+  const requestEpoch = profileRequestEpoch
+  if (!patientSession.getGateState().loggedIn || !accountSubject) {
+    await router.replace('/login')
+    return
+  }
+  void syncPatientProfileDTO(accountSubject, requestEpoch).catch(() => undefined)
+  void syncHealthProfile(accountSubject, requestEpoch).catch(() => undefined)
   await loadFamilyBindings()
 })
 
 onUnmounted(() => {
-  userDataService.removeListener(onUserDataChange)
+  profileRequestEpoch += 1
+  window.removeEventListener('patient-session-anonymous', resetAccountPageState)
+  window.removeEventListener('patient-account-switched', resetAccountPageState)
 })
 </script>
 

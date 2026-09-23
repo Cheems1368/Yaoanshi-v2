@@ -57,10 +57,10 @@ describe('MVP release patient contracts', () => {
     expect(nativeSource).not.toContain('MODE_WORLD_READABLE')
   })
 
-  test('shows a generic global warning when an offline correction expires', () => {
+  test('shows a generic global warning when an offline check-in expires', () => {
     const appSource = readFileSync(resolve(process.cwd(), 'src/App.vue'), 'utf8')
     expect(appSource).toContain('OFFLINE_CHECKIN_CONFLICT_EVENT')
-    expect(appSource).toContain('离线打卡更正已超过可修改时限')
+    expect(appSource).toContain('离线打卡已超过可提交或修改时限')
     expect(appSource).not.toMatch(/药名|剂量|姓名/)
   })
 

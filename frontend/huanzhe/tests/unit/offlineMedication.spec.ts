@@ -581,6 +581,29 @@ describe('native offline medication flow', () => {
     expect(consumeOfflineCheckinConflictCount()).toBe(1)
   })
 
+  test('isolates an expired first check-in and continues replaying valid tasks', async () => {
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: true })
+    let storedValue = JSON.stringify({
+      version: 2, accountSubject: 'patient-1', tasksExpiresAt: Date.now() + 60_000,
+      tasks: [cachedTask, { ...cachedTask, id: 8 }],
+      pendingCheckins: [
+        { clientRequestId: 'expired-task', doseTaskId: 7, result: 'TAKEN', actualTakenAt: new Date().toISOString(), expiresAt: Date.now() + 60_000 },
+        { clientRequestId: 'valid-task', doseTaskId: 8, result: 'TAKEN', actualTakenAt: new Date().toISOString(), expiresAt: Date.now() + 60_000 }
+      ]
+    })
+    mocks.read.mockImplementation(async () => ({ value: storedValue }))
+    mocks.write.mockImplementation(async ({ value }) => { storedValue = value })
+    mocks.submitCheckin
+      .mockRejectedValueOnce(Object.assign(new Error('DOSE_TASK_EDIT_WINDOW_EXPIRED'), { code: 40009 }))
+      .mockResolvedValueOnce({ data: { id: 703 } })
+
+    await expect(replayPendingCheckins()).resolves.toBe(1)
+
+    expect(mocks.submitCheckin).toHaveBeenCalledTimes(2)
+    expect(JSON.parse(storedValue).pendingCheckins).toEqual([])
+    expect(consumeOfflineCheckinConflictCount()).toBe(1)
+  })
+
   test('does not expose cached tasks after the patient binding is revoked online', async () => {
     Object.defineProperty(navigator, 'onLine', { configurable: true, value: true })
     mocks.getDoseTasks.mockRejectedValue(new Error('PATIENT_BIND_CONFLICT'))
