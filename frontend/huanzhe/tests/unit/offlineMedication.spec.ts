@@ -223,15 +223,63 @@ describe('native offline medication flow', () => {
     mocks.write.mockImplementation(async ({ value }) => { storedValue = value })
 
     await submitOrQueueCheckin(cachedTask as any, 'TAKEN')
-    const firstRequestId = JSON.parse(storedValue).pendingCheckins[0].clientRequestId
+    const firstPending = JSON.parse(storedValue).pendingCheckins[0]
+    const firstRequestId = firstPending.clientRequestId
     await submitOrQueueCheckin(cachedTask as any, 'MISSED')
 
     const pending = JSON.parse(storedValue).pendingCheckins
     expect(pending).toHaveLength(1)
     expect(pending[0].clientRequestId).toBe(firstRequestId)
+    expect(pending[0].expiresAt).toBe(firstPending.expiresAt)
     expect(pending[0].result).toBe('TAKEN')
     expect(pending[0].correction.result).toBe('MISSED')
     expect(pending[0].correction.clientRequestId).not.toBe(firstRequestId)
+  })
+
+  test('queues and replays an existing server check-in correction after a network failure', async () => {
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: false })
+    let storedValue = JSON.stringify({
+      version: 2, accountSubject: 'patient-1', tasksExpiresAt: Date.now() + 60_000,
+      tasks: [{ ...cachedTask, lastEffectiveCheckinId: 701 }], pendingCheckins: []
+    })
+    mocks.read.mockImplementation(async () => ({ value: storedValue }))
+    mocks.write.mockImplementation(async ({ value }) => { storedValue = value })
+    mocks.correctCheckin.mockRejectedValueOnce(new Error('Network error'))
+
+    const task = { ...cachedTask, lastEffectiveCheckinId: 701 }
+    await expect(submitOrQueueCheckin(task as any, 'MISSED')).resolves.toBe('queued')
+    const firstPending = JSON.parse(storedValue).pendingCheckins[0]
+    expect(firstPending.existingCheckinId).toBe(701)
+    expect(firstPending.result).toBe('MISSED')
+    expect(mocks.submitCheckin).not.toHaveBeenCalled()
+
+    await expect(submitOrQueueCheckin(task as any, 'TAKEN')).resolves.toBe('queued')
+    const pending = JSON.parse(storedValue).pendingCheckins[0]
+    expect(pending.expiresAt).toBe(firstPending.expiresAt)
+    expect(pending.correction.result).toBe('TAKEN')
+
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: true })
+    mocks.correctCheckin.mockResolvedValue({ data: { id: 702 } })
+    await expect(replayPendingCheckins()).resolves.toBe(1)
+    expect(mocks.correctCheckin).toHaveBeenCalledWith(701, expect.objectContaining({
+      clientRequestId: firstPending.clientRequestId, result: 'MISSED'
+    }))
+    expect(mocks.correctCheckin).toHaveBeenCalledWith(701, expect.objectContaining({
+      clientRequestId: pending.correction.clientRequestId, result: 'TAKEN'
+    }))
+    expect(mocks.submitCheckin).not.toHaveBeenCalled()
+    expect(JSON.parse(storedValue).pendingCheckins).toEqual([])
+  })
+
+  test('corrects an existing server check-in directly when online', async () => {
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: true })
+    mocks.correctCheckin.mockResolvedValue({ data: { id: 702 } })
+
+    await expect(submitOrQueueCheckin({ ...cachedTask, lastEffectiveCheckinId: 701 } as any, 'MISSED'))
+      .resolves.toBe('submitted')
+    expect(mocks.correctCheckin).toHaveBeenCalledWith(701, expect.objectContaining({ result: 'MISSED' }))
+    expect(mocks.submitCheckin).not.toHaveBeenCalled()
+    expect(mocks.write).not.toHaveBeenCalled()
   })
 
   test('merges a new online choice into an existing queue before direct submission', async () => {

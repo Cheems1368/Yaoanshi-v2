@@ -266,26 +266,12 @@ const loadTasks = async () => {
 const saveResult = async (task: DoseTaskDTO, result: 'TAKEN' | 'MISSED') => {
   submittingTaskId.value = task.id
   try {
-    const payload = {
-      result,
-      actualTakenAt: new Date().toISOString(),
-      note: result === 'TAKEN' ? '患者端提交' : '',
-      skipReason: result === 'MISSED' ? 'PATIENT_REPORTED' : ''
-    }
-    if (task.lastEffectiveCheckinId) {
-      if (offlineMode.value) {
-        showMessage('当前离线，已提交记录需联网后更正')
-        return
-      }
-      await medicationService.correctCheckin(task.lastEffectiveCheckinId, payload)
-    } else {
-      const outcome = await submitOrQueueCheckin(task, result)
-      if (outcome === 'queued') {
-        task.status = result === 'TAKEN' ? 'COMPLETED' : 'MISSED'
-        await cancelMedicationReminder(task.id).catch(() => undefined)
-        showMessage('当前离线，记录已加密保存，将在联网后自动同步')
-        return
-      }
+    const outcome = await submitOrQueueCheckin(task, result)
+    if (outcome === 'queued') {
+      task.status = result === 'TAKEN' ? 'COMPLETED' : 'MISSED'
+      await cancelMedicationReminder(task.id).catch(() => undefined)
+      showMessage('记录已加密保存，将在联网后自动同步')
+      return
     }
     showMessage(result === 'TAKEN' ? '已记录为已服药' : '已记录为漏服')
     await loadTasks()

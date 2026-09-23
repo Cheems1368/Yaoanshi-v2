@@ -21,6 +21,7 @@ function notifyOfflineCheckinConflict() {
 interface PendingCheckin {
   clientRequestId: string
   doseTaskId: number
+  existingCheckinId?: number
   result: 'TAKEN' | 'MISSED'
   actualTakenAt: string
   note?: string
@@ -182,7 +183,6 @@ async function mergePendingCheckin(
       note: payload.note,
       skipReason: payload.skipReason
     }
-    existing.expiresAt = Date.now() + CACHE_TTL_MS
     await writeState(state)
     return true
   })
@@ -266,6 +266,7 @@ export async function submitOrQueueCheckin(
   const payload: PendingCheckin = {
     clientRequestId: makeRequestId(),
     doseTaskId: task.id,
+    existingCheckinId: task.lastEffectiveCheckinId ?? undefined,
     result,
     actualTakenAt: new Date().toISOString(),
     note: result === 'TAKEN' ? '患者端提交' : '',
@@ -288,7 +289,17 @@ export async function submitOrQueueCheckin(
   }
 
   try {
-    await medicationService.submitCheckin(payload)
+    if (payload.existingCheckinId) {
+      await medicationService.correctCheckin(payload.existingCheckinId, {
+        clientRequestId: payload.clientRequestId,
+        result: payload.result,
+        actualTakenAt: payload.actualTakenAt,
+        note: payload.note,
+        skipReason: payload.skipReason
+      })
+    } else {
+      await medicationService.submitCheckin(payload)
+    }
     return 'submitted'
   } catch (error) {
     const message = error instanceof Error ? error.message : ''
@@ -317,16 +328,24 @@ async function replayPendingCheckinsInternal(accountSubject: string) {
     let replaySnapshot: CachedPendingCheckin | undefined = pending
     try {
       while (replaySnapshot) {
-        const submitted = await medicationService.submitCheckin({
-          clientRequestId: replaySnapshot.clientRequestId,
-          doseTaskId: replaySnapshot.doseTaskId,
-          result: replaySnapshot.result,
-          actualTakenAt: replaySnapshot.actualTakenAt,
-          note: replaySnapshot.note,
-          skipReason: replaySnapshot.skipReason
-        })
+        const submitted = replaySnapshot.existingCheckinId
+          ? await medicationService.correctCheckin(replaySnapshot.existingCheckinId, {
+              clientRequestId: replaySnapshot.clientRequestId,
+              result: replaySnapshot.result,
+              actualTakenAt: replaySnapshot.actualTakenAt,
+              note: replaySnapshot.note,
+              skipReason: replaySnapshot.skipReason
+            })
+          : await medicationService.submitCheckin({
+              clientRequestId: replaySnapshot.clientRequestId,
+              doseTaskId: replaySnapshot.doseTaskId,
+              result: replaySnapshot.result,
+              actualTakenAt: replaySnapshot.actualTakenAt,
+              note: replaySnapshot.note,
+              skipReason: replaySnapshot.skipReason
+            })
         if (replaySnapshot.correction) {
-          const originalId = submitted.data?.id
+          const originalId = replaySnapshot.existingCheckinId ?? submitted.data?.id
           if (!originalId) break
           await medicationService.correctCheckin(originalId, replaySnapshot.correction)
         }
