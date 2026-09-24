@@ -187,16 +187,17 @@ describe('native offline medication flow', () => {
         pendingCheckins: [{ clientRequestId: 'request-1', doseTaskId: 7, result: 'TAKEN', actualTakenAt: new Date().toISOString() }]
       })
     })
-    let resolveSubmit!: () => void
-    mocks.submitCheckin.mockImplementation(() => new Promise<void>((resolve) => { resolveSubmit = resolve }))
+    let resolveSubmit!: (value: unknown) => void
+    mocks.submitCheckin.mockImplementation(() => new Promise((resolve) => { resolveSubmit = resolve }))
 
     const replay = replayPendingCheckins()
     await vi.waitFor(() => expect(mocks.submitCheckin).toHaveBeenCalledTimes(1))
     mocks.accountSubject = 'patient-2'
-    resolveSubmit()
+    resolveSubmit({ data: { id: 701, effective: true } })
     await replay
 
     expect(mocks.write).not.toHaveBeenCalled()
+    expect(mocks.cancelReminder).not.toHaveBeenCalled()
   })
 
   test('does not inspect the new account cache after an old replay fails', async () => {
@@ -498,6 +499,7 @@ describe('native offline medication flow', () => {
     expect(mocks.getDoseTasks).toHaveBeenCalledWith(cachedTask.taskDate, cachedTask.taskDate)
     expect(JSON.parse(storedValue).pendingCheckins).toEqual([])
     expect(JSON.parse(storedValue).tasks[0]).toMatchObject({ status: 'COMPLETED', lastEffectiveCheckinId: 701 })
+    expect(mocks.cancelReminder).toHaveBeenCalledWith(7)
   })
 
   test('retains an expired correction until the authoritative task can be fetched', async () => {
@@ -519,6 +521,34 @@ describe('native offline medication flow', () => {
 
     await expect(replayPendingCheckins()).resolves.toBe(0)
     expect(JSON.parse(storedValue).pendingCheckins).toHaveLength(1)
+  })
+
+  test.each([undefined, 600])('retries reminder cancellation after replay (existing record %s)', async (existingCheckinId) => {
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: true })
+    let storedValue = JSON.stringify({
+      version: 2, accountSubject: 'patient-1', tasksExpiresAt: Date.now() + 60_000,
+      tasks: [cachedTask],
+      pendingCheckins: [{
+        clientRequestId: 'cancel-retry', doseTaskId: 7, result: 'TAKEN', existingCheckinId,
+        actualTakenAt: new Date().toISOString(), expiresAt: Date.now() + 60_000
+      }]
+    })
+    mocks.read.mockImplementation(async () => ({ value: storedValue }))
+    mocks.write.mockImplementation(async ({ value }) => { storedValue = value })
+    mocks.submitCheckin.mockResolvedValue({ data: { id: 701, effective: true } })
+    mocks.correctCheckin.mockResolvedValue({ data: { id: 701, effective: true } })
+    // Model an alarm left behind by a failed enqueue-time cancellation or process termination.
+    const scheduledTaskIds = new Set([7])
+    mocks.cancelReminder.mockImplementation(async (taskId) => {
+      expect(JSON.parse(storedValue).pendingCheckins).toEqual([])
+      expect(JSON.parse(storedValue).tasks[0].reminderStage).toBe('HANDLED')
+      scheduledTaskIds.delete(taskId)
+    })
+
+    await expect(replayPendingCheckins()).resolves.toBe(1)
+    expect(scheduledTaskIds.size).toBe(0)
+    await expect(replayPendingCheckins()).resolves.toBe(0)
+    expect(mocks.submitCheckin.mock.calls.length + mocks.correctCheckin.mock.calls.length).toBe(1)
   })
 
   test('persists the effective task status and record ID before removing a replayed check-in', async () => {
@@ -548,7 +578,7 @@ describe('native offline medication flow', () => {
     })])
   })
 
-  test('refreshes an ineffective idempotent replay from the authoritative server task', async () => {
+  test.each(['MISSED', 'PENDING'])('refreshes an ineffective replay from the authoritative %s task', async (status) => {
     Object.defineProperty(navigator, 'onLine', { configurable: true, value: true })
     let storedValue = JSON.stringify({
       version: 2, accountSubject: 'patient-1', tasksExpiresAt: Date.now() + 60_000,
@@ -562,14 +592,16 @@ describe('native offline medication flow', () => {
     mocks.write.mockImplementation(async ({ value }) => { storedValue = value })
     mocks.submitCheckin.mockResolvedValue({ data: { id: 701, effective: false } })
     mocks.getDoseTasks.mockResolvedValue({ data: [{
-      ...cachedTask, status: 'MISSED', lastEffectiveCheckinId: 888, notificationStatus: 'ACKED'
+      ...cachedTask, status, lastEffectiveCheckinId: 888, notificationStatus: 'ACKED'
     }] })
 
     await expect(replayPendingCheckins()).resolves.toBe(1)
 
     expect(mocks.getDoseTasks).toHaveBeenCalledWith(cachedTask.taskDate, cachedTask.taskDate)
     expect(JSON.parse(storedValue).pendingCheckins).toEqual([])
-    expect(JSON.parse(storedValue).tasks[0]).toMatchObject({ status: 'MISSED', lastEffectiveCheckinId: 888 })
+    expect(JSON.parse(storedValue).tasks[0]).toMatchObject({ status, lastEffectiveCheckinId: 888 })
+    if (status === 'PENDING') expect(mocks.cancelReminder).not.toHaveBeenCalled()
+    else expect(mocks.cancelReminder).toHaveBeenCalledWith(7)
   })
 
   test('retains an ineffective replay in the queue until the authoritative task can be fetched', async () => {

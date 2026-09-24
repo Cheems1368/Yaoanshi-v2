@@ -430,7 +430,7 @@ async function replayPendingCheckinsInternal(accountSubject: string) {
             cachedTask.notificationStatus = 'ACKED'
             cachedTask.reminderStage = 'HANDLED'
           }
-          return { removed: true, cancelReminder: false }
+          return { removed: true, cancelReminder: !authoritativeTask || authoritativeTask.status !== 'PENDING' }
         })
         if (outcome.cancelReminder && patientSession.getAccountSubject() === accountSubject) {
           await cancelMedicationReminder(replaySnapshot.doseTaskId).catch(() => undefined)
@@ -476,7 +476,12 @@ async function replayPendingCheckinsInternal(accountSubject: string) {
           else if (taskIndex >= 0) currentState.tasks.splice(taskIndex, 1)
           return true
         })
-        if (removed && patientSession.getAccountSubject() === accountSubject) notifyOfflineCheckinConflict()
+        if (removed && patientSession.getAccountSubject() === accountSubject) {
+          notifyOfflineCheckinConflict()
+          if (!authoritativeTask || authoritativeTask.status !== 'PENDING') {
+            await cancelMedicationReminder(pending.doseTaskId).catch(() => undefined)
+          }
+        }
         continue
       }
       if (errorCode === 40025 || message === 'DOSE_TASK_NOT_FOUND') {

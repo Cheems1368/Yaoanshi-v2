@@ -12,6 +12,16 @@ Rules:
 4. This document covers `P0` and `P0+` MVP phases, plus the Post-P0 trial readiness sprint.
 5. `P2` and later capabilities must stay in backlog and must not enter the primary build sequence.
 
+## 1.4 Review convergence and evidence discipline
+
+- Identify the active worktree, branch, HEAD and dirty files before reading progress or running gates. Record command results against that revision, including any uncommitted patch.
+- Classify review reports with reproduction and impact evidence. Repair a root-cause family across affected entry points; do not turn unrelated style/optimization suggestions into release blockers. Material risk deferral requires owner approval.
+- Run behavioral regression before affected full gates. Source-string assertions prove static constraints only. Sequence Web build -> Capacitor sync -> Android build; parallelize independent work only.
+- If the same root cause escapes two repair rounds, stop mechanical pushes and full-review requests; map the state transitions and sibling entry points, reproduce the omission and obtain new local evidence before resuming.
+- Review ends when the branch is current, required checks pass on current HEAD, all valid findings have evidenced dispositions, conversations are resolved and affected-chain regression is complete. A new full bot review after every repair commit is not an additional gate. Existing protection and explicitly approved release acceptance remain mandatory.
+- Recheck HEAD/gates immediately before an authorized merge and verify post-merge main CI. Preserve unaffected Android/Docker acceptance with its original provenance; rerun only evidence invalidated by relevant changes.
+- Durable rules belong here; incident sources, fix revisions, validation outcomes and the next action belong in `progress.txt`. The project-specific skill holds the detailed root-cause checklist, not transient release status.
+
 ## 1.5 Execution Status Summary (as of 2026-09-18)
 
 | Phase | Description | Status |
@@ -38,7 +48,7 @@ Rules:
 **Known open items:**
 - `MEDICINE_OCR_API_KEY` must be set in `.env.local` for live OCR (graceful fallback if omitted)
 - The project owner approved `medication-literacy-v1` on 2026-08-24 as general medication science education and explicitly accepted the risk of releasing without a separate licensed-clinician sign-off; this is an owner waiver, not a claim of clinical credentials
-- T9 disposable MinIO cleanup/rollback acceptance and PR C release closure remain release gates; PR B physical Android acceptance passed on 2026-09-18
+- T9 disposable MySQL/MinIO migration, cleanup and cleanup-switch rollback acceptance passed on 2026-09-24 (see `progress.txt`); PR C must consolidate this evidence and production execution conditions. PR B physical Android acceptance passed on 2026-09-18; relevant later changes still require impact-based regression.
 - Ops cleanup: `ops/sql/sec-003-clear-legacy-patient-id-card-masked.sql` needs to be run
 
 ## 1.6 Post-P0 Trial Demo Closed-Loop Sequence
