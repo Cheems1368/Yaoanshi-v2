@@ -373,6 +373,24 @@ describe('native offline medication flow', () => {
     expect(mocks.cancelReminder).toHaveBeenCalledWith(7)
   })
 
+  test('queues a record-page correction using only its task and check-in IDs', async () => {
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: false })
+    let storedValue = JSON.stringify({
+      version: 2, accountSubject: 'patient-1', tasksExpiresAt: Date.now() + 60_000,
+      tasks: [], pendingCheckins: []
+    })
+    mocks.read.mockImplementation(async () => ({ value: storedValue }))
+    mocks.write.mockImplementation(async ({ value }) => { storedValue = value })
+    mocks.correctCheckin.mockRejectedValue(new Error('Network error'))
+
+    await expect(submitOrQueueCheckin({ id: 7, lastEffectiveCheckinId: 701 }, 'MISSED'))
+      .resolves.toBe('queued')
+    expect(mocks.correctCheckin).toHaveBeenCalledWith(701, expect.objectContaining({ result: 'MISSED' }))
+    expect(JSON.parse(storedValue).pendingCheckins[0]).toMatchObject({
+      doseTaskId: 7, existingCheckinId: 701, result: 'MISSED'
+    })
+  })
+
   test('persists a direct check-in before an offline restart without a task refresh', async () => {
     Object.defineProperty(navigator, 'onLine', { configurable: true, value: true })
     let storedValue = JSON.stringify({

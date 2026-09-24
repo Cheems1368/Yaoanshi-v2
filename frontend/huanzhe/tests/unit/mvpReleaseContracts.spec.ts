@@ -92,6 +92,8 @@ describe('MVP release patient contracts', () => {
     expect(orderSource).toContain('satisfactionStatus?.eligible || satisfactionStatus?.submitted')
     expect(reminderSource).toContain('const outcome = await submitOrQueueCheckin(task, result)')
     expect(tabSource).toContain('const outcome = await submitOrQueueCheckin(task, result)')
+    expect(tabSource).toContain('submitOrQueueCheckin({ id: record.doseTaskId, lastEffectiveCheckinId: record.id }, result)')
+    expect(tabSource).not.toContain('medicationService.correctCheckin(record.id')
   })
 
   test('preserves patient offline checkins when a family binding is removed', () => {

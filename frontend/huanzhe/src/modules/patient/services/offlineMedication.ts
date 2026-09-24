@@ -259,7 +259,7 @@ export async function loadMedicationTasks(days = 3): Promise<{ tasks: DoseTaskDT
 }
 
 export async function submitOrQueueCheckin(
-  task: DoseTaskDTO,
+  task: Pick<DoseTaskDTO, 'id' | 'lastEffectiveCheckinId' | 'taskDate'>,
   result: 'TAKEN' | 'MISSED'
 ): Promise<'submitted' | 'queued'> {
   const expectedAccountSubject = patientSession.getAccountSubject()

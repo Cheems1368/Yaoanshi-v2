@@ -148,10 +148,10 @@
             <div v-if="record.skipReason" class="record-note">原因：{{ record.skipReason }}</div>
             <div v-if="!record.effective" class="record-note muted">已被后续更正覆盖</div>
             <div v-if="record.effective" class="record-actions">
-              <ion-button size="small" color="success" fill="outline" @click="correctRecord(record, 'TAKEN')">
+              <ion-button size="small" color="success" fill="outline" :disabled="correctingRecordId === record.id" @click="correctRecord(record, 'TAKEN')">
                 更正为已服药
               </ion-button>
-              <ion-button size="small" color="warning" fill="outline" @click="correctRecord(record, 'MISSED')">
+              <ion-button size="small" color="warning" fill="outline" :disabled="correctingRecordId === record.id" @click="correctRecord(record, 'MISSED')">
                 更正为漏服
               </ion-button>
             </div>
@@ -333,6 +333,7 @@ const reminderNotice = (task: DoseTaskDTO) => {
 // ── Record state ────────────────────────────────────────────────────────────
 const recordLoading = ref(false)
 const records = ref<CheckinRecordDTO[]>([])
+const correctingRecordId = ref<number | null>(null)
 
 const effectiveCount = computed(() => records.value.filter((r) => r.effective).length)
 const recordCompletedCount = computed(
@@ -353,17 +354,19 @@ const loadRecords = async () => {
 }
 
 const correctRecord = async (record: CheckinRecordDTO, result: 'TAKEN' | 'MISSED') => {
+  correctingRecordId.value = record.id
   try {
-    await medicationService.correctCheckin(record.id, {
-      result,
-      actualTakenAt: new Date().toISOString(),
-      note: '记录页更正',
-      skipReason: result === 'MISSED' ? 'PATIENT_REPORTED' : ''
-    })
+    const outcome = await submitOrQueueCheckin({ id: record.doseTaskId, lastEffectiveCheckinId: record.id }, result)
+    if (outcome === 'queued') {
+      showMessage('更正已加密保存，将在联网后自动同步')
+      return
+    }
     showMessage(result === 'TAKEN' ? '已更正为已服药' : '已更正为漏服')
     await loadRecords()
   } catch {
     showMessage('更正失败')
+  } finally {
+    correctingRecordId.value = null
   }
 }
 

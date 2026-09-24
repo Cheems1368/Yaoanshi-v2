@@ -40,6 +40,14 @@ public interface MedicationDoseTaskMapper {
     MedicationDoseTask selectById(@Param("tenantId") Long tenantId, @Param("id") Long id);
 
     @Select("""
+            SELECT id, patient_id, last_effective_checkin_id, locked_after, status, notification_status, tenant_id
+            FROM medication_dose_task
+            WHERE tenant_id = #{tenantId} AND id = #{id} AND deleted = 0
+            FOR UPDATE
+            """)
+    MedicationDoseTask selectByIdForUpdate(@Param("tenantId") Long tenantId, @Param("id") Long id);
+
+    @Select("""
             SELECT id, patient_id, plan_id, plan_item_id, task_date, scheduled_at, status, notification_status, last_effective_checkin_id, locked_after,
                    drug_name, dosage, frequency_code, route, meal_relation, instructions,
                    creator, create_time, updater, update_time, deleted, tenant_id
