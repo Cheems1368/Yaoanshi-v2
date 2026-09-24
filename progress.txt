@@ -18,9 +18,9 @@ Project
 - Yaoshian MVP P0
 
 Branch / Context
-- Delivery state: `main` through PR #40 (`fc3b646`); post-merge `main` CI run `32570783413` passed
-- Active workstream: T9 PR A / MVP v0.1.0 backend contract and reliability closure
-- Active surfaces: backend-v2 V14, app assessment/medication/family/notification/file contracts, admin reassignment and patient metrics, reliability workers
+- Delivery state: `main` through PR #41 (`2614271`); post-merge `main` CI run `32692544044` passed all six jobs
+- Active workstream: T9 PR B / patient MVP gap closure on `codex/mvp-v0.1.0-patient`
+- Active surfaces: patient family management, knowledge assessment, satisfaction, notification polling, native reminders, and encrypted offline check-ins
 
 Current State
 - 2026-08-14 update: PR #32 was squash-merged as `35b1e8a`; the post-merge `main` CI run #38 passed. The old `codex/mobile-demo` branches were deleted while local protection reference `codex/backup-mobile-demo-20260814` was retained.
@@ -40,14 +40,14 @@ Current State
 - Last session (2026-03-27): Phase A–F completed (see below)
 
 In Progress
-- T9 PR A implementation and disposable MySQL migration validation are in progress on `codex/mvp-v0.1.0-backend`.
+- T9 PR B implementation and protected review preparation are in progress on `codex/mvp-v0.1.0-patient`.
 
 Next
-- Finish PR A documentation/migration evidence, publish the protected PR, resolve review conversations, and squash merge after required checks pass.
+- Publish PR B and clear protected checks/review conversations. Complete Android physical-device offline, force-stop, encrypted persistence, idempotent replay, and logout-clear acceptance before squash merge.
 
 Last Updated
-- 2026-08-22 Asia/Shanghai
-- Reason: T8 PR #40 passed the protected review-remediation run and all three review conversations are resolved; it is ready for merge handoff.
+- 2026-08-24 Asia/Shanghai
+- Reason: PR A is delivered and PR B code/browser/Android compilation gates pass; no ADB device is currently connected for the required physical-device acceptance.
 
 Android JDK 21 and APK Gate (2026-08-14)
 - Changed:
@@ -982,3 +982,90 @@ T9 PR A Help-Order/Reassignment Serialization (2026-08-22)
 Last Updated
 - 2026-08-22 Asia/Shanghai
 - Reason: T8 is formally delivered and T9 PR A is implemented locally; medical approval and protected PR qualification remain open.
+
+T9 PR A Delivery and PR B Patient Closure (2026-08-24)
+- Delivered:
+  - The project owner approved all ten `medication-literacy-v1` stems/options/answers as general science education, accepted the residual content risk, and waived a separate licensed-clinician sign-off. The record does not claim that the owner is a licensed clinician.
+  - Squash-merged PR #41 as `261427132b13fc2c53483b95f2d12208190e026a`; post-merge `main` run #32692544044 passed backend, patient Web, patient Android, pharmacist, doctor, and the required aggregate gate.
+- Changed on PR B:
+  - Added patient-only family-binding management, a separate `/knowledge-assessment` route with server-owned scoring, a deferrable one-time CLOSED-order satisfaction card, and `fileAssetId`-preferred upload registration.
+  - Added `/app-api/notifications/logs` cursor polling whenever the patient WebSocket is unavailable.
+  - Locked `@capacitor/local-notifications` to `7.0.7`; local reminders use generic lock-screen copy.
+  - Added a native Capacitor secure-cache plugin using Android Keystore and AES/GCM, a 48-hour task cache, encrypted pending check-ins with stable `clientRequestId`, page/online replay, and logout/unbind clearing. Web medical state is never written to Web Storage.
+- Validated:
+  - Patient lint, production build, 16/16 Vitest tests, and `git diff --check` passed; regressions cover offline auxiliary-API failure, account cache isolation/session expiry, online business errors, and cancellation of obsolete local reminders.
+  - `e2e:mvp-release` passed family management, 10-question assessment submission, satisfaction, notification polling fallback, and 390x844 / 430x932 overflow checks.
+  - Capacitor sync found `@capacitor/local-notifications@7.0.7`; Android `assembleDebug` passed.
+  - `D:\ANDROIDSDK\platform-tools\adb.exe devices -l` returned no connected device.
+- Open gate:
+  - Physical Android acceptance remains mandatory before PR B merge: offline check-in, force-stop encrypted persistence, online replay producing one effective record, and logout cache deletion.
+- Next:
+  - Publish the protected PR, clear CI and review conversations, connect a physical Android device, run the four required device scenarios, and only then squash merge PR B.
+
+Last Updated
+- 2026-08-24 Asia/Shanghai
+- Reason: PR A is formally delivered; PR B automated gates pass and only physical-device acceptance remains external.
+
+T9 PR B Physical Android Acceptance and Review Remediation (2026-09-18)
+- Changed:
+  - Home now schedules native medication reminders after loading the task cache; offline check-ins immediately cancel the corresponding reminder.
+  - Pending-check-in replay is scoped to the authenticated account and rechecks identity after each network result, preventing an in-flight replay from rewriting another account's cache.
+  - All encrypted-cache read/modify/write operations are serialized so rapid offline check-ins cannot overwrite each other; mutations preserve the original absolute 48-hour expiry instead of extending it.
+  - Task responses are rejected if the authenticated account changes in flight; terminal `DOSE_TASK_NOT_FOUND` replay entries are removed so later valid check-ins continue syncing.
+  - Offline task fallback is now limited to explicit network failures; revoked patient/family access clears the native cache and local binding gate instead of exposing cached medication data.
+  - Family binding creation rejects a mobile number already owned by a `PATIENT` account and never mutates that account into `FAMILY`.
+  - Logout, anonymous-session transition, and account switch cancel all medication reminders through the same serialized notification queue; unrelated notifications remain untouched.
+  - Native notification taps are handled at application scope and navigate, after router readiness, to the formal `/medication-reminder` route.
+  - Offline cached tasks now distinguish new check-ins from corrections: both are encrypted and queued for idempotent replay; an existing effective record is corrected rather than submitted again.
+  - Submitted satisfaction results remain visible even though the backend correctly marks them no longer eligible for another submission.
+  - Revoked patient/family access now cancels previously scheduled medication reminders in addition to clearing the encrypted cache and local binding gate.
+  - Removing one family binding no longer clears the patient's own encrypted medication cache or pending offline check-ins; full cache deletion remains limited to logout, account switch, expiry, invalid cache, or actual patient-access revocation.
+  - Home and both medication entry points capture the authenticated account subject before parallel loading and discard plan, task, assessment, and account responses if the subject changes before commit, preventing cross-account medical-plan display.
+  - Android now declares, checks, and requests exact-alarm access before reminder scheduling. If the user leaves it denied, reminders explicitly fall back to inexact delivery and the UI warns that delivery may be delayed.
+  - Obsolete medication reminders are canceled before display-permission checks, so revoking notification permission cannot leave a completed dose queued to fire after permission is restored.
+  - Satisfaction comments are capped at 255 characters in the patient UI and rejected above 255 by backend validation, matching the V14 database column.
+  - The Android encrypted cache now uses `AtomicFile` start/finish/fail writes, file-descriptor sync, and recovery-aware reads so interrupted writes retain the last complete ciphertext.
+  - Temporary refresh failure leaves the encrypted native cache sealed while unauthenticated; explicit logout, unbind, account switch, expiry, or invalid cache version still clears it.
+  - Added an exact credentialed Capacitor CORS allowlist and a debug-only `http://localhost` WebView origin for ADB reverse. Packaged builds keep the default secure origin.
+  - Fixed Spring constructor selection for the HTTP AI upstream client so the application context starts with both production dependencies available.
+- Validated:
+  - On a physical Android 14 device, the app cached tasks as app-private AES/GCM ciphertext, queued a check-in with the backend unavailable, retained identical ciphertext across force-stop/relaunch, and replayed exactly one effective record after reconnect and same-account login.
+  - Repeated page entry did not duplicate the replayed check-in. Logout removed the encrypted cache; final device application data was cleared.
+  - Android notification permission was granted, AlarmManager registered the Capacitor receiver, and the system notification service recorded one enqueue and one post using generic lock-screen copy. Lack of exact-alarm permission degraded to a non-exact alarm without exposing identity, medicine, or dose.
+  - Full backend `clean verify` passed 200/200 tests. Patient lint, 34/34 Vitest tests, production build, Android debug build, pharmacist build, doctor build, `git diff --check`, and `e2e:mvp-release` all passed.
+  - The local acceptance-only task/check-in rows, temporary screenshots, Cookie database copies, and device application data were deleted. No production database or production service was contacted.
+- Remaining gate:
+  - Push the remediation head, pass all protected checks, resolve all latest-head review conversations, and squash-merge PR #42 before starting PR C.
+
+Last Updated
+- 2026-09-19 Asia/Shanghai
+- Reason: PR B physical-device acceptance and latest-head review remediation are complete; protected PR qualification remains.
+- 2026-09-19：PR #42 最新 head 审查补齐知识测评页账号隔离：加载时清空题目、状态和答案，以账号 subject + 请求 epoch 丢弃账号切换或过期响应；提交结果同样只允许写回原账号会话。患者端单测增至 35 项。
+- 2026-09-19：PR #42 后续审查将原生离线缓存升级为任务快照与逐条待同步打卡各自独立的 48 小时期限，补齐亲情号列表账号竞态隔离，并修正 MVP E2E mock JWT 的 `sub`。患者端单测增至 37 项。
+- 2026-09-19：PR #42 继续封堵账号切换期间在途打卡失败写入错误队列，以及满意度轮询旧响应覆盖已提交结果；入队与状态写回均按账号、工单和请求代数复核。患者端单测增至 39 项。
+- 2026-09-20：PR #42 对仍在待同步队列中的打卡结果在任务刷新后继续投影为已完成/漏服；患者通知日志降级改为连续排空分页，WebSocket 实时消息携带日志 ID，重连前完成补偿并按 ID 去重。
+- 2026-09-20：PR #42 满意度提交成功后直接以 POST 返回问卷确认已提交，不再受后续状态刷新失败影响；账号或工单上下文切换时同步清空评分、备注与展开状态。
+- 2026-09-20：PR #42 原生缓存读取发现过期医疗数据时立即持久化裁剪，全部过期则删除缓存文件与 Keystore 密钥；待同步打卡状态只在返回视图中临时投影，磁盘任务快照始终保留服务端原始状态。
+- 2026-09-20：PR #42 过期裁剪持久化失败时保留 AtomicFile 旧密文与仍有效队列，不再进入统一损坏清理；满意度提交锁仅允许原账号、原工单、原请求代数的 finally 解除。
+- 2026-09-23：PR #42 将已有服务端打卡的离线更正纳入原生加密队列，同剂次再次修改不延长首次入队的 48 小时期限；服务端首次打卡也执行 lockedAfter 截止校验，过期队列项隔离后继续重放后续记录。个人页每次进入重置并重载资料、健康档案和亲情号，旧账号迟到响应不能覆盖新账号。后端 clean verify、患者端 70 项单测、lint、Web 与 Android debug 构建通过；最新受保护 CI 与复审仍待完成。
+- 2026-09-23：PR #42 重放成功后在删除队列项的同一次原生加密缓存写入中记录最终任务状态、有效打卡 ID 与提醒状态；若在任务刷新前再断网，缓存不会把已打卡任务显示为待执行。新增对应断网回归测试；患者端 71 项单测、lint、Web 与 Android debug 构建通过，最新受保护门禁与复审待完成。
+- 2026-09-23：PR #42 对服务端已删除的剂次，在重放返回 DOSE_TASK_NOT_FOUND 时同步移除加密任务与同剂次队列项并取消本地提醒；原生医疗密文改存 Android noBackupFilesDir，避免系统自动备份。患者端 71 项单测、lint、Web 与 Android debug 构建通过，最新受保护门禁与复审待完成。
+- 2026-09-23：PR #42 受限离线会话在网络标志仍在线、但 refresh/服务端临时不可用时也加密入队打卡，权限及业务错误仍拒绝入队；幂等重放返回 effective=false 时重新读取服务端当前剂次，并只用权威状态更新加密快照，权威查询失败则保留队列待下次重试。后端 clean verify、患者端 76 项单测、lint、Web 与 Android debug 构建通过；最新受保护门禁与复审待完成。
+- 2026-09-23：PR #42 再次复审补齐会话刷新竞态：每次登录、退出和离线会话恢复都有会话代数；迟到刷新在写入 token 前拒绝，新的登录等待旧刷新完成后才发起，避免旧 refresh Cookie 响应覆盖新登录。过期离线更正先读取服务端权威剂次再删除队列，查询失败则保留待重试；旧请求 401 和离线重放异常均不能读取、清除或改写新账号缓存。患者端 80 项单测、lint、Web 与 Android debug 构建通过；最新受保护门禁与复审待完成。
+- 2026-09-24：PR #42 最新复审补齐在线打卡成功后立即持久化加密任务状态、有效记录 ID 并取消本地提醒；连续离线更正沿刚生成的记录 ID 追溯，幂等响应若已失效则先读取服务端当前有效记录。患者端 82 项单测、lint、Web 与 Android debug 构建通过；最新受保护门禁与复审待完成。用户明确恢复 Docker 验收为正式发布门槛，本机 Docker daemon 已可用；一次性 MySQL/MinIO 验收将在 PR C 执行，不连接生产。
+- 2026-09-24：按用户恢复的 Docker 门槛完成一次性 MySQL 8/MinIO 验收：空库 V1→V14、已有 V13→V14 均成功；重复 ACTIVE 亲情号被 V14 预检明确阻断且停留 V13。预上传孤儿对象超过 1 小时后删除并记为 ORPHAN_CLEANED，已登记对象保留；关闭清理开关时对象保留，重新启用后清理成功。一次性库中 SEC-003 仅清除未删除患者历史掩码，SEC-005 仅删除过期审计记录；未连接生产。专用容器与网络已按精确名称移除，合成数据随容器删除，不可恢复。PR C 仍需将此证据和生产执行条件写入正式验收矩阵。
+- 2026-09-24：PR #42 复审修复并发剂次打卡：事务内先锁定剂次，迟到的首次提交建立更正审计链，并发更正指向锁后最新有效记录；“服药记录”更正也走原生加密离线队列。后端 clean verify、患者端 83 项单测、lint、Web 与 Android debug 构建、git diff --check 通过；最新受保护 CI 与复审仍待完成。
+- 2026-09-24：PR #42 后续复审补齐 APK 实时通知 WebSocket Origin：默认允许正式 `https://localhost` 与本地调试 `http://localhost`，生产默认只允许前者，其他正式来源须显式配置 `MEDICINE_APP_WS_ALLOWED_ORIGINS`。新增配置回归测试，后端 clean verify 通过；最新 CI 与复审仍待完成。
+- 2026-09-24：PR #42 最新复审修复 Ionic 首页账号切换时测评卡片残留：新账号开始加载即清空旧账号首页计划、任务和测评状态，任务加载失败时亦清空测评状态。患者端 84 项单测、lint、Web 与 Android debug 构建、`e2e:mvp-release` 通过；最新 CI 与复审仍待完成。
+- 2026-09-24：同类账号隔离审计补齐两个用药入口：新账号开始加载时清空旧计划、剂次及服药记录；记录请求按账号和请求代数拒绝迟到响应。最新复审同时补齐服务端亲情号列表 PATIENT 权限检查，离线记录更正在卡片和汇总中立即投影所选结果、标为待同步并避免重复点击。后端 clean verify、患者端 85 项单测、lint、Web 与 Android debug 构建、`e2e:mvp-release` 和 git diff --check 通过；最新 CI 与复审仍待完成。
+
+T9 Review Convergence Retrospective (2026-09-24)
+- Incident baseline: PR #42 had 42 bot review rounds and 88 review conversations at the planning audit; these were not 42 CI failures. HEAD b034036 had six successful checks (run 35961575459). A subsequent review added the reminder-cancellation finding: https://github.com/Cheems1368/Yaoanshi-v2/pull/42#discussion_r4090407571 . Counts are historical snapshots, not current gate assertions.
+- Process errors: an unrequested fresh clean bot review after every fix became an endless gate; repairs followed individual comments rather than affected root-cause chains; source-text assertions/build success were overused as behavioral evidence; worktree/SHA provenance and retry escalation were insufficient.
+- Owner-approved correction: original protected gates plus targeted regression and sibling-path audit; same root cause escaping two repair rounds triggers focused diagnosis before more pushes. Non-blocking style/optimization goes to later candidates; functional/security/data/required-acceptance risk cannot be silently deferred.
+- Updated local medicine-contract-and-architecture skill and its references/pr-review-convergence.md; generic Code skill unchanged. Durable repository rules are in IMPLEMENTATION_PLAN section 1.4. Skill metadata validation passed; five scenario walkthroughs covered valid exit, two-round escalation, style deferral, blocking authorization defects and changed-SHA evidence invalidation. No new mandatory clean-bot-review gate was introduced.
+- Working scope: D:/yaoanshi-t9-patient on codex/mvp-v0.1.0-patient, starting from b034036; unrelated dirty AdminDrugCatalogController.java in the root checkout is untouched.
+- Reminder family sweep: online success already cancels; deleted-task replay already cancels; normal/correction success and expired-correction reconciliation missed cancellation. Added behavioral assertions (four failed before the fix), fixed both branches, preserved reminders for authoritative PENDING tasks and guarded cancellation after account switches. Existing native reminder tests cover permissions, obsolete alarms and privacy.
+- Evidence applicability: no backend/schema/native encryption/plugin changes in this batch; historical MySQL/MinIO and device encryption/restart/logout evidence retained with original dates. New replay-to-cancel behavior is covered by mocked plugin behavioral tests, not claimed as a fresh physical-device result. Full affected gates and current-head protected CI must pass before merge.
+- Next: qualify this repair/documentation batch, resolve the evidenced reminder finding, recheck branch freshness/checks/conversations and merge PR B under original authorization; then PR C and release evidence consolidation. Do not automatically request another full bot review.
+- Batch local validation (b034036 plus this four-file tracked patch): patient lint, 88/88 unit tests, Web build, sequential Capacitor sync/Android assembleDebug, MVP E2E at 390x844 and 430x932, and git diff --check passed. No physical device was attached; no fresh device result is claimed. Only existing bundle-size/Browserslist/Gradle flatDir warnings remain, outside this functional repair. Protected CI on the published revision remains to be checked.

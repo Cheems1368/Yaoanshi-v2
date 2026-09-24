@@ -36,6 +36,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -137,7 +138,7 @@ class AdminPatientServiceTest {
         JwtClaims claims = professionalClaims();
         when(professionalIdentityService.getOrCreatePharmacistProfile(claims)).thenReturn(pharmacistProfile(9001L));
         when(patientMapper.selectByIdAndTenant(1L, 3001L)).thenReturn(patient(3001L, 9001L));
-        when(medicationPlanMapper.selectFirstActivatedAt(1L, 3001L)).thenReturn(LocalDate.now().plusDays(1).atStartOfDay());
+        when(medicationPlanMapper.selectFirstActivatedAt(1L, 3001L)).thenReturn(LocalDate.now(ZoneOffset.UTC).plusDays(1).atStartOfDay());
 
         assertThatThrownBy(() -> adminPatientService.remindKnowledgeAssessment(claims, 3001L))
                 .isInstanceOf(BusinessException.class)
@@ -151,7 +152,7 @@ class AdminPatientServiceTest {
         claims.setRoles(List.of("admin"));
         claims.setEffectiveRole("doctor");
         when(patientMapper.selectByIdAndTenant(1L, 3001L)).thenReturn(patient(3001L, 9001L));
-        when(medicationPlanMapper.selectFirstActivatedAt(1L, 3001L)).thenReturn(LocalDate.now().atStartOfDay());
+        when(medicationPlanMapper.selectFirstActivatedAt(1L, 3001L)).thenReturn(LocalDate.now(ZoneOffset.UTC).atStartOfDay());
 
         assertThat(adminPatientService.remindKnowledgeAssessment(claims, 3001L)).isTrue();
 

@@ -6,6 +6,7 @@ import com.medicine.common.exception.BusinessException;
 import com.medicine.common.exception.ErrorCode;
 import com.medicine.config.AiProperties;
 import org.junit.jupiter.api.Test;
+import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -31,6 +32,18 @@ import static org.mockito.Mockito.when;
 class HttpAiUpstreamClientTest {
 
     private final ObjectMapper objectMapper = new ObjectMapper();
+
+    @Test
+    void shouldBeConstructedBySpringWithItsProductionDependencies() {
+        try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
+            context.registerBean(AiProperties.class, this::configuredProperties);
+            context.registerBean(ObjectMapper.class, () -> objectMapper);
+            context.register(HttpAiUpstreamClient.class);
+            context.refresh();
+
+            assertThat(context.getBean(HttpAiUpstreamClient.class)).isNotNull();
+        }
+    }
 
     @Test
     void shouldRejectHostOutsideExactAllowlist() {

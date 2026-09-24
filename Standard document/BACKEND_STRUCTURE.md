@@ -148,6 +148,7 @@ Compatibility DTO for the existing auth endpoints. Official patient, pharmacist,
 9. App refresh rotation uses a database old-hash conditional update before Redis synchronization; professional refresh rotation uses Redis compare-and-set.
 10. Cookie logout conditionally revokes only the currently matching refresh state, then clears the Cookie with `Max-Age=0`.
 11. Refresh Cookies never authenticate business APIs; business authorization remains Bearer access-token based.
+12. Credentialed Capacitor WebView requests use an exact-origin CORS allowlist: `https://localhost` in every profile, plus `http://localhost` only in the `local` profile for ADB-reversed debug acceptance. Wildcard origins are forbidden.
 
 ## 4. Database schema
 
@@ -266,6 +267,7 @@ Constraints:
 1. One family account can have only one active patient binding per tenant; V14 enforces this with `tenant_id + active_family_account_id`.
 2. Maximum two active family bindings per patient is enforced by service rule.
 3. Unbound rows remain queryable for history but lose permission immediately.
+4. An existing `PATIENT` app account must never be converted in place to `FAMILY`; family binding creation rejects that mobile number and preserves the original patient identity.
 
 Before V14, the read-only preflight at `backend-v2/src/main/resources/db/preflight/V14__mvp_release_closure_preflight.sql` must run and block the release if one family account has multiple active patient bindings. The operator must review those relationships before continuing. As a fail-safe if the preflight is bypassed, V14 retains the earliest authorization as `ACTIVE` and converts later duplicates to `UNBOUND` with an explicit migration reason; no binding row is deleted.
 
@@ -1122,7 +1124,7 @@ Note: `drug_catalog` is a standalone lookup table with no foreign-key relationsh
 | `GET` | `/app-api/dose-tasks/today` | Yes | date optional | list of `DoseTaskDTO` | none |
 | `GET` | `/app-api/checkins` | Yes | patient history query | paged `CheckinRecordDTO` list | none |
 | `POST` | `/app-api/checkins` | Yes | check-in submit DTO | `CheckinRecordDTO` | insert `medication_checkin_record`, update task effective record, maybe write notification/audit |
-| `PUT` | `/app-api/checkins/{id}/correct` | Yes | correction DTO | `CheckinRecordDTO` | insert correction row, switch effective row |
+| `PUT` | `/app-api/checkins/{id}/correct` | Yes | correction DTO（可选 `clientRequestId`） | `CheckinRecordDTO` | insert correction row, switch effective row; repeated `clientRequestId` returns the same correction |
 
 `DoseTaskDTO` includes additive app reminder fields for the T3 demo path:
 
@@ -1279,6 +1281,7 @@ AI rules:
 | `POST` | `/app-api/assessments/satisfaction` | Yes | `SatisfactionSurveyDTO` | saved survey | write satisfaction row |
 | `GET` | `/app-api/dose-tasks` | Yes | `dateFrom`, `dateTo` (inclusive, at most 7 days) | dose-task list | none |
 | `GET` | `/app-api/notifications/logs` | Yes | optional `afterId`, `limit` | current patient's persisted notifications | none |
+| `GET` | `/app-api/notifications/logs/latest-id` | Yes | none | current patient's latest notification-log ID, or `0` | none |
 
 ### 6.2 Admin APIs
 

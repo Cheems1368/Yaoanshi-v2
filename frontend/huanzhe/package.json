@@ -18,6 +18,7 @@
     "e2e:admin-notifications": "node scripts/e2e-admin-notifications.mjs",
     "e2e:challenge-cup": "node scripts/e2e-challenge-cup.mjs",
     "e2e:challenge-cup:live": "node scripts/e2e-challenge-cup-live.mjs",
+    "e2e:mvp-release": "node scripts/e2e-mvp-release.mjs",
     "test:unit": "vitest",
     "test:unit:ci": "vitest run",
     "lint": "eslint .",
@@ -27,6 +28,7 @@
   },
   "dependencies": {
     "@capacitor/core": "7.4.3",
+    "@capacitor/local-notifications": "7.0.7",
     "@ionic/vue": "^8.0.0",
     "@ionic/vue-router": "^8.0.0",
     "axios": "^1.11.0",

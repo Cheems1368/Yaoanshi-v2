@@ -8,7 +8,7 @@ import { defineConfig, loadEnv } from 'vite'
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, __dirname, '')
-  const apiTarget = env.VITE_APP_API_TARGET || 'http://127.0.0.1:8080'
+  const apiTarget = env.VITE_APP_API_TARGET || 'http://localhost:8080'
 
   return {
     plugins: [

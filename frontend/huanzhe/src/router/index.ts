@@ -70,6 +70,11 @@ const routes: Array<RouteRecordRaw> = [
     meta: { requiresAuth: true, requiresBinding: true }
   },
   {
+    path: '/knowledge-assessment',
+    component: () => import('@/modules/patient/pages/KnowledgeAssessmentPage.vue'),
+    meta: { requiresAuth: true, requiresBinding: true }
+  },
+  {
     path: '/help-order/:id',
     component: () => import('@/modules/patient/pages/HelpOrderDetailPage.vue'),
     meta: { requiresAuth: true, requiresBinding: true }
@@ -124,6 +129,8 @@ const resolveAuthenticatedHome = () => {
   return '/tabs/home'
 }
 
+const offlineRoutes = new Set(['/tabs/home', '/tabs/medication', '/medication-reminder'])
+
 router.beforeEach(async (to, _from, next) => {
   await httpService.restoreSession()
   const gateState = patientSession.getGateState()
@@ -138,6 +145,11 @@ router.beforeEach(async (to, _from, next) => {
 
   if (isPublicRoute) {
     next()
+    return
+  }
+
+  if (patientSession.getAuthStatus() === 'offline' && !offlineRoutes.has(to.path)) {
+    next('/tabs/medication')
     return
   }
 

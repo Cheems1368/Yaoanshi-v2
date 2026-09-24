@@ -1,9 +1,14 @@
+import { isNativeMedicalCache, secureMedicalCache } from '@/app/secureMedicalCache'
+
 const DEVICE_ID_KEY = 'patient_device_id'
 const MOBILE_KEY = 'patient_mobile'
 const BINDING_STATUS_KEY = 'patient_binding_status'
 const ACTIVE_PLAN_KEY = 'patient_has_active_plan'
 let accessTokenMemory = ''
-let authStatus: 'unknown' | 'authenticated' | 'anonymous' = 'unknown'
+let accountSubjectMemory = ''
+let accountTypeMemory = ''
+let authStatus: 'unknown' | 'authenticated' | 'offline' | 'anonymous' = 'unknown'
+let sessionGeneration = 0
 
 const getSessionStorage = () => (typeof window !== 'undefined' ? window.sessionStorage : null)
 
@@ -15,6 +20,28 @@ const createDeviceId = () => {
   return `patient-web-${Date.now()}-${Math.random().toString(16).slice(2)}`
 }
 
+const readTokenIdentity = (token: string) => {
+  try {
+    const payload = token.split('.')[1]
+    if (!payload) return { subject: '', accountType: '' }
+    const normalized = payload.replace(/-/g, '+').replace(/_/g, '/')
+    const decoded = JSON.parse(atob(normalized.padEnd(Math.ceil(normalized.length / 4) * 4, '=')))
+    const roles = Array.isArray(decoded.roles)
+      ? decoded.roles.map((role: unknown) => String(role).toUpperCase())
+      : []
+    const declaredAccountType = typeof decoded.accountType === 'string' ? decoded.accountType.toUpperCase() : ''
+    const accountType = roles.includes('ROLE_FAMILY')
+      ? 'FAMILY'
+      : roles.includes('ROLE_PATIENT') ? 'PATIENT' : declaredAccountType
+    return {
+      subject: typeof decoded.sub === 'string' ? decoded.sub : '',
+      accountType: accountType === 'PATIENT' || accountType === 'FAMILY' ? accountType : ''
+    }
+  } catch {
+    return { subject: '', accountType: '' }
+  }
+}
+
 export interface PatientGateState {
   loggedIn: boolean
   isBound: boolean
@@ -22,17 +49,51 @@ export interface PatientGateState {
 }
 
 export const patientSession = {
+  getSessionGeneration() {
+    return sessionGeneration
+  },
+
+  advanceSessionGeneration() {
+    sessionGeneration += 1
+  },
+
   getAccessToken(): string | null {
     return accessTokenMemory || null
   },
 
-  setAccessToken(token: string) {
+  setAccessToken(token: string, isRefresh = false) {
+    if (!isRefresh) sessionGeneration += 1
+    const identity = readTokenIdentity(token)
+    const nextSubject = identity.subject
+    if (accountSubjectMemory && nextSubject && accountSubjectMemory !== nextSubject) {
+      accountTypeMemory = ''
+      if (typeof window !== 'undefined') window.dispatchEvent(new Event('patient-account-switched'))
+    }
     accessTokenMemory = token || ''
+    accountSubjectMemory = nextSubject
+    if (identity.accountType) accountTypeMemory = identity.accountType
     authStatus = accessTokenMemory ? 'authenticated' : authStatus
+    if (accessTokenMemory && typeof window !== 'undefined') window.dispatchEvent(new Event('patient-session-authenticated'))
+  },
+
+  setAccountType(accountType: string) {
+    const normalized = accountType.toUpperCase()
+    accountTypeMemory = normalized === 'PATIENT' || normalized === 'FAMILY' ? normalized : ''
+  },
+
+  getAccountType() {
+    return accountTypeMemory || null
+  },
+
+  getAccountSubject() {
+    return accountSubjectMemory || null
   },
 
   clearAccessToken() {
+    sessionGeneration += 1
     accessTokenMemory = ''
+    accountSubjectMemory = ''
+    accountTypeMemory = ''
   },
 
   getAuthStatus() {
@@ -40,13 +101,61 @@ export const patientSession = {
   },
 
   markAnonymous() {
+    sessionGeneration += 1
     authStatus = 'anonymous'
     accessTokenMemory = ''
+    accountSubjectMemory = ''
+    accountTypeMemory = ''
+    if (typeof window !== 'undefined') window.dispatchEvent(new Event('patient-session-anonymous'))
   },
 
   resetAuthStatus() {
+    sessionGeneration += 1
     authStatus = 'unknown'
     accessTokenMemory = ''
+    accountSubjectMemory = ''
+    accountTypeMemory = ''
+  },
+
+  async restoreOfflineContext() {
+    if (!isNativeMedicalCache() || authStatus === 'anonymous') return false
+    try {
+      const { value } = await secureMedicalCache.read()
+      if (!value) return false
+      const parsed = JSON.parse(value) as {
+        version?: number
+        accountSubject?: string
+        accountType?: string
+        expiresAt?: number
+        tasksExpiresAt?: number
+        tasks?: unknown[]
+        pendingCheckins?: Array<{ expiresAt?: number }>
+      }
+      if ((parsed.version !== 1 && parsed.version !== 2) || !parsed.accountSubject) {
+        await secureMedicalCache.clear().catch(() => undefined)
+        return false
+      }
+      const now = Date.now()
+      const tasksExpiry = parsed.version === 1 ? parsed.expiresAt : parsed.tasksExpiresAt
+      const hasValidTasks = Array.isArray(parsed.tasks) && parsed.tasks.length > 0
+        && typeof tasksExpiry === 'number' && tasksExpiry > now
+      const hasValidPending = Array.isArray(parsed.pendingCheckins) && parsed.pendingCheckins.some((pending) => {
+        const expiry = parsed.version === 1 ? parsed.expiresAt : pending.expiresAt
+        return typeof expiry === 'number' && expiry > now
+      })
+      if (!hasValidTasks && !hasValidPending) {
+        await secureMedicalCache.clear().catch(() => undefined)
+        return false
+      }
+      accountSubjectMemory = parsed.accountSubject
+      sessionGeneration += 1
+      this.setAccountType(parsed.accountType ?? '')
+      authStatus = 'offline'
+      return true
+    } catch {
+      await secureMedicalCache.clear().catch(() => undefined)
+      return false
+    }
   },
 
   getDeviceId(): string | null {
@@ -108,8 +217,9 @@ export const patientSession = {
 
   getGateState(): PatientGateState {
     return {
-      loggedIn: authStatus === 'authenticated' && Boolean(accessTokenMemory),
-      isBound: localStorage.getItem(BINDING_STATUS_KEY) === 'BOUND',
+      loggedIn: (authStatus === 'authenticated' && Boolean(accessTokenMemory))
+        || (authStatus === 'offline' && Boolean(accountSubjectMemory)),
+      isBound: authStatus === 'offline' || localStorage.getItem(BINDING_STATUS_KEY) === 'BOUND',
       hasActivePlan: localStorage.getItem(ACTIVE_PLAN_KEY) === 'true'
     }
   }

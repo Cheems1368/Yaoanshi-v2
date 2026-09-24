@@ -38,6 +38,11 @@ public class AppNotificationController {
         return CommonResult.ok(appNotificationService.list(authentication.getName(), afterId, limit));
     }
 
+    @GetMapping("/logs/latest-id")
+    public CommonResult<Long> latestLogId(Authentication authentication) {
+        return CommonResult.ok(appNotificationService.latestId(authentication.getName()));
+    }
+
     @PostMapping("/socket-ticket")
     public CommonResult<AppNotificationSocketTicketResponse> createSocketTicket(Authentication authentication) {
         if (!(authentication.getCredentials() instanceof String token) || !StringUtils.hasText(token)) {

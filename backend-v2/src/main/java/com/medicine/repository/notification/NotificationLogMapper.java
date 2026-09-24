@@ -131,6 +131,13 @@ public interface NotificationLogMapper {
     List<NotificationLog> selectPatientLogs(@Param("tenantId") Long tenantId, @Param("patientId") Long patientId,
                                              @Param("afterId") Long afterId, @Param("limit") int limit);
 
+    @Select("""
+            SELECT MAX(id)
+            FROM notification_log
+            WHERE tenant_id = #{tenantId} AND target_type = 'PATIENT' AND target_id = #{patientId} AND deleted = 0
+            """)
+    Long selectLatestPatientLogId(@Param("tenantId") Long tenantId, @Param("patientId") Long patientId);
+
     @Update("""
             UPDATE notification_log
             SET claim_token = #{claimToken}, claimed_at = #{now}, updater = 'notification-retry', update_time = #{now}

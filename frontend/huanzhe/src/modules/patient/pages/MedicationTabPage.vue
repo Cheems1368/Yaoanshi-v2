@@ -23,6 +23,9 @@
 
       <!-- 今日提醒 -->
       <div v-show="activeSegment === 'reminder'" class="container">
+        <div v-if="offlineMode" class="offline-banner" role="status">
+          当前离线，展示 48 小时内的加密缓存；新打卡将在联网后自动同步，已提交记录需联网更正。
+        </div>
         <ion-card class="overview-card">
           <ion-card-content class="overview-grid">
             <div class="overview-item">
@@ -52,7 +55,7 @@
         </div>
 
         <EmptyState
-          v-else-if="!activePlan"
+          v-else-if="!activePlan && tasks.length === 0"
           type="no-plan"
           title="暂无生效用药计划"
           description="等待药师建立计划，或发起求助"
@@ -139,16 +142,17 @@
                 <div class="record-meta">{{ formatDateTime(record.actualTakenAt || record.createdAt) }}</div>
                 <div class="record-meta">提交人：{{ operatorText(record.operatorType) }}</div>
               </div>
-              <ion-badge :color="resultColor(record.result)">{{ resultText(record.result) }}</ion-badge>
+              <ion-badge :color="resultColor(pendingRecordCorrections[record.id] || record.result)">{{ resultText(pendingRecordCorrections[record.id] || record.result) }}</ion-badge>
             </div>
             <div v-if="record.note" class="record-note">{{ record.note }}</div>
             <div v-if="record.skipReason" class="record-note">原因：{{ record.skipReason }}</div>
             <div v-if="!record.effective" class="record-note muted">已被后续更正覆盖</div>
+            <div v-if="pendingRecordCorrections[record.id]" class="record-note">更正已加密保存，待联网同步</div>
             <div v-if="record.effective" class="record-actions">
-              <ion-button size="small" color="success" fill="outline" @click="correctRecord(record, 'TAKEN')">
+              <ion-button size="small" color="success" fill="outline" :disabled="correctingRecordId === record.id || Boolean(pendingRecordCorrections[record.id])" @click="correctRecord(record, 'TAKEN')">
                 更正为已服药
               </ion-button>
-              <ion-button size="small" color="warning" fill="outline" @click="correctRecord(record, 'MISSED')">
+              <ion-button size="small" color="warning" fill="outline" :disabled="correctingRecordId === record.id || Boolean(pendingRecordCorrections[record.id])" @click="correctRecord(record, 'MISSED')">
                 更正为漏服
               </ion-button>
             </div>
@@ -193,6 +197,15 @@ import {
   type MedicationPlanDTO
 } from '@/modules/patient/api/mvp'
 import { patientSession } from '@/app/session'
+import {
+  cacheOfflineAccountType,
+  loadMedicationTasks,
+  submitOrQueueCheckin
+} from '@/modules/patient/services/offlineMedication'
+import {
+  cancelMedicationReminder,
+  enableAndScheduleMedicationReminders
+} from '@/modules/patient/services/localMedicationReminders'
 
 const activeSegment = ref<'reminder' | 'record'>('reminder')
 
@@ -200,8 +213,11 @@ const activeSegment = ref<'reminder' | 'record'>('reminder')
 const reminderLoading = ref(false)
 const activePlan = ref<MedicationPlanDTO | null>(null)
 const tasks = ref<DoseTaskDTO[]>([])
-const currentAccountType = ref('PATIENT')
+const currentAccountType = ref('UNKNOWN')
 const submittingTaskId = ref<number | null>(null)
+const offlineMode = ref(false)
+let taskRequestEpoch = 0
+let viewAccountSubject: string | null = null
 
 const reminderCompletedCount = computed(() => tasks.value.filter((t) => t.status === 'COMPLETED').length)
 const pendingCount = computed(() =>
@@ -210,39 +226,54 @@ const pendingCount = computed(() =>
 
 const loadTasks = async () => {
   reminderLoading.value = true
+  const expectedAccountSubject = patientSession.getAccountSubject()
+  const expectedRequestEpoch = ++taskRequestEpoch
+  currentAccountType.value = patientSession.getAccountType() ?? 'UNKNOWN'
   try {
     const [planRes, taskRes, accountRes] = await Promise.all([
-      medicationService.getActiveMedicationPlan(),
-      medicationService.getTodayDoseTasks(),
-      appAuthService.getCurrentAccount()
+      medicationService.getActiveMedicationPlan().catch(() => ({ data: null })),
+      loadMedicationTasks(),
+      appAuthService.getCurrentAccount().catch(() => ({ data: null }))
     ])
+    if (!expectedAccountSubject || patientSession.getAccountSubject() !== expectedAccountSubject
+      || expectedRequestEpoch !== taskRequestEpoch) return
     activePlan.value = planRes.data ?? null
-    tasks.value = taskRes.data ?? []
-    currentAccountType.value = String((accountRes.data as any)?.accountType || 'PATIENT').toUpperCase()
-    patientSession.setActivePlanStatus(Boolean(planRes.data))
+    const today = new Date().toLocaleDateString('sv-SE')
+    tasks.value = taskRes.tasks.filter((task) => task.taskDate === today)
+    offlineMode.value = taskRes.offline
+    const accountType = String((accountRes.data as any)?.accountType || '').toUpperCase()
+    if (accountType) {
+      currentAccountType.value = accountType
+      patientSession.setAccountType(accountType)
+      void cacheOfflineAccountType(accountType, expectedAccountSubject).catch(() => undefined)
+    }
+    void enableAndScheduleMedicationReminders(taskRes.tasks, accountType || patientSession.getAccountType() || undefined)
+      .then((mode) => { if (mode === 'inexact') showMessage('未授予精确闹钟权限，用药提醒可能延迟') })
+      .catch(() => undefined)
+    if (!taskRes.offline) patientSession.setActivePlanStatus(Boolean(planRes.data))
   } catch {
+    if (!expectedAccountSubject || patientSession.getAccountSubject() !== expectedAccountSubject
+      || expectedRequestEpoch !== taskRequestEpoch) return
     activePlan.value = null
     tasks.value = []
+    offlineMode.value = false
     patientSession.setActivePlanStatus(false)
     showMessage('提醒数据加载失败')
   } finally {
-    reminderLoading.value = false
+    if (patientSession.getAccountSubject() === expectedAccountSubject
+      && expectedRequestEpoch === taskRequestEpoch) reminderLoading.value = false
   }
 }
 
 const saveResult = async (task: DoseTaskDTO, result: 'TAKEN' | 'MISSED') => {
   submittingTaskId.value = task.id
   try {
-    const payload = {
-      result,
-      actualTakenAt: new Date().toISOString(),
-      note: result === 'TAKEN' ? '患者端提交' : '',
-      skipReason: result === 'MISSED' ? 'PATIENT_REPORTED' : ''
-    }
-    if (task.lastEffectiveCheckinId) {
-      await medicationService.correctCheckin(task.lastEffectiveCheckinId, payload)
-    } else {
-      await medicationService.submitCheckin({ doseTaskId: task.id, ...payload })
+    const outcome = await submitOrQueueCheckin(task, result)
+    if (outcome === 'queued') {
+      task.status = result === 'TAKEN' ? 'COMPLETED' : 'MISSED'
+      await cancelMedicationReminder(task.id).catch(() => undefined)
+      showMessage('记录已加密保存，将在联网后自动同步')
+      return
     }
     showMessage(result === 'TAKEN' ? '已记录为已服药' : '已记录为漏服')
     await loadTasks()
@@ -281,9 +312,13 @@ const formatOverdue = (minutes?: number | null) => {
 
 const reminderNotice = (task: DoseTaskDTO) => {
   if (task.reminderStage === 'FAMILY_REMINDER_DUE') {
-    return currentAccountType.value === 'FAMILY'
-      ? `已超过 ${formatOverdue(task.overdueMinutes)}，需要你协助记录`
-      : `已超过 ${formatOverdue(task.overdueMinutes)}，已提醒家属协助`
+    if (currentAccountType.value === 'FAMILY') {
+      return `已超过 ${formatOverdue(task.overdueMinutes)}，需要你协助记录`
+    }
+    if (currentAccountType.value === 'PATIENT') {
+      return `已超过 ${formatOverdue(task.overdueMinutes)}，已提醒家属协助`
+    }
+    return `已超过 ${formatOverdue(task.overdueMinutes)}，请尽快处理`
   }
   if (task.reminderStage === 'OVERDUE') {
     return `已超过 ${formatOverdue(task.overdueMinutes)}，请尽快记录`
@@ -300,37 +335,54 @@ const reminderNotice = (task: DoseTaskDTO) => {
 // ── Record state ────────────────────────────────────────────────────────────
 const recordLoading = ref(false)
 const records = ref<CheckinRecordDTO[]>([])
+const correctingRecordId = ref<number | null>(null)
+const pendingRecordCorrections = ref<Record<number, 'TAKEN' | 'MISSED'>>({})
+let recordRequestEpoch = 0
 
 const effectiveCount = computed(() => records.value.filter((r) => r.effective).length)
 const recordCompletedCount = computed(
-  () => records.value.filter((r) => r.effective && r.result === 'TAKEN').length
+  () => records.value.filter((r) => r.effective && (pendingRecordCorrections.value[r.id] || r.result) === 'TAKEN').length
 )
 
 const loadRecords = async () => {
   recordLoading.value = true
+  const expectedAccountSubject = patientSession.getAccountSubject()
+  const expectedRequestEpoch = ++recordRequestEpoch
   try {
     const res = await medicationService.getCheckins({ pageNo: 1, pageSize: 30 })
+    if (!expectedAccountSubject || patientSession.getAccountSubject() !== expectedAccountSubject
+      || expectedRequestEpoch !== recordRequestEpoch) return
     records.value = res.data?.list ?? []
+    pendingRecordCorrections.value = {}
   } catch {
+    if (!expectedAccountSubject || patientSession.getAccountSubject() !== expectedAccountSubject
+      || expectedRequestEpoch !== recordRequestEpoch) return
     records.value = []
     showMessage('服药记录加载失败')
   } finally {
-    recordLoading.value = false
+    if (patientSession.getAccountSubject() === expectedAccountSubject
+      && expectedRequestEpoch === recordRequestEpoch) recordLoading.value = false
   }
 }
 
 const correctRecord = async (record: CheckinRecordDTO, result: 'TAKEN' | 'MISSED') => {
+  const expectedAccountSubject = patientSession.getAccountSubject()
+  correctingRecordId.value = record.id
   try {
-    await medicationService.correctCheckin(record.id, {
-      result,
-      actualTakenAt: new Date().toISOString(),
-      note: '记录页更正',
-      skipReason: result === 'MISSED' ? 'PATIENT_REPORTED' : ''
-    })
+    const outcome = await submitOrQueueCheckin({ id: record.doseTaskId, lastEffectiveCheckinId: record.id }, result)
+    if (!expectedAccountSubject || patientSession.getAccountSubject() !== expectedAccountSubject
+      || viewAccountSubject !== expectedAccountSubject) return
+    if (outcome === 'queued') {
+      pendingRecordCorrections.value = { ...pendingRecordCorrections.value, [record.id]: result }
+      showMessage('更正已加密保存，将在联网后自动同步')
+      return
+    }
     showMessage(result === 'TAKEN' ? '已更正为已服药' : '已更正为漏服')
     await loadRecords()
   } catch {
-    showMessage('更正失败')
+    if (patientSession.getAccountSubject() === expectedAccountSubject) showMessage('更正失败')
+  } finally {
+    if (patientSession.getAccountSubject() === expectedAccountSubject) correctingRecordId.value = null
   }
 }
 
@@ -360,7 +412,20 @@ const showMessage = (message: string) => {
   showToast.value = true
 }
 
-const loadAll = () => Promise.all([loadTasks(), loadRecords()])
+const loadAll = () => {
+  const accountSubject = patientSession.getAccountSubject()
+  if (viewAccountSubject !== accountSubject) {
+    activePlan.value = null
+    tasks.value = []
+    records.value = []
+    pendingRecordCorrections.value = {}
+    offlineMode.value = false
+    submittingTaskId.value = null
+    correctingRecordId.value = null
+    viewAccountSubject = accountSubject
+  }
+  return Promise.all([loadTasks(), loadRecords()])
+}
 
 async function handleRefresh(event: CustomEvent) {
   try {
@@ -370,7 +435,9 @@ async function handleRefresh(event: CustomEvent) {
   }
 }
 
-onIonViewWillEnter(loadAll)
+onIonViewWillEnter(async () => {
+  await loadAll()
+})
 </script>
 
 <style scoped>
@@ -381,6 +448,15 @@ onIonViewWillEnter(loadAll)
 .med-segment {
   padding: 0 var(--patient-space-4);
   --background: transparent;
+}
+
+.offline-banner {
+  padding: var(--patient-space-3);
+  border-radius: var(--patient-radius-md);
+  color: var(--patient-warning-dark, #8a4b08);
+  background: rgba(245, 158, 11, 0.14);
+  font-size: var(--patient-font-helper);
+  line-height: var(--patient-leading-normal);
 }
 
 ion-segment-button {

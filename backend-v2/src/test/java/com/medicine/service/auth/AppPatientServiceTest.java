@@ -46,6 +46,42 @@ class AppPatientServiceTest {
     private AppPatientService appPatientService;
 
     @Test
+    void shouldRejectFamilyAccountListingPatientFamilyBindings() {
+        AppAccount family = appAccount(2001L, "13900139000");
+        family.setAccountType("FAMILY");
+        when(appAccountMapper.selectActiveByMobile(1L, "13900139000")).thenReturn(family);
+
+        assertThatThrownBy(() -> appPatientService.getFamilyBindings("13900139000"))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("BAD_REQUEST");
+        verify(patientFamilyBindingMapper, never()).selectActiveByFamilyAccountId(1L, 2001L);
+    }
+
+    @Test
+    void shouldRejectAnExistingPatientAccountAsAFamilyAccount() {
+        AppAccount owner = appAccount(1001L, "13800138000");
+        owner.setAccountType("PATIENT");
+        AppAccount existingPatient = appAccount(2001L, "13900139000");
+        existingPatient.setAccountType("PATIENT");
+        Patient patient = new Patient();
+        patient.setId(3001L);
+        when(appAccountMapper.selectActiveByMobile(1L, "13800138000")).thenReturn(owner);
+        when(patientMapper.selectByAppAccountId(1L, 1001L)).thenReturn(patient);
+        when(patientFamilyBindingMapper.countActiveByPatientId(1L, 3001L)).thenReturn(0);
+        when(appAccountMapper.selectActiveByMobile(1L, "13900139000")).thenReturn(existingPatient);
+        CreateFamilyBindingRequest request = new CreateFamilyBindingRequest();
+        request.setFamilyMobile("13900139000");
+        request.setFamilyDisplayName("家属");
+        request.setRelationshipType("child");
+
+        assertThatThrownBy(() -> appPatientService.createFamilyBinding("13800138000", request))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("PATIENT_ACCOUNT_CANNOT_BE_FAMILY");
+        verify(appAccountMapper, never()).updateLoginInfo(any());
+        verify(patientFamilyBindingMapper, never()).insert(any());
+    }
+
+    @Test
     void shouldRejectFamilyAccountAlreadyBoundToAnotherPatient() {
         AppAccount owner = appAccount(1001L, "13800138000");
         owner.setAccountType("PATIENT");
@@ -143,6 +179,7 @@ class AppPatientServiceTest {
     @Test
     void shouldReadCurrentPatientAndFamilyBindingsFromPersistence() {
         AppAccount appAccount = appAccount(1001L, "13800138000");
+        appAccount.setAccountType("PATIENT");
         Patient patient = new Patient();
         patient.setId(3001L);
         patient.setAppAccountId(1001L);

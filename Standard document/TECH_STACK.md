@@ -239,6 +239,7 @@ Runtime dependencies resolved from `package-lock.json`:
 |---|---|
 | `@capacitor/camera` | `7.0.2` |
 | `@capacitor/core` | `7.4.3` |
+| `@capacitor/local-notifications` | `7.0.7` |
 | `@ionic/vue` | `8.7.3` |
 | `@ionic/vue-router` | `8.7.3` |
 | `axios` | `1.11.0` |
@@ -283,6 +284,9 @@ Android build rules:
 2. `npx cap sync android` must not leave unexplained tracked-file changes.
 3. Pull Requests build an unsigned debug APK for deterministic compilation verification; release signing credentials are outside the repository and outside this gate.
 4. The debug APK is retained by GitHub Actions for 14 days and must never be committed.
+5. Medical offline state is native-only: an in-repository Capacitor plugin stores AES/GCM ciphertext in the application-private directory and keeps its 256-bit key in Android Keystore. Browser `localStorage`, `sessionStorage`, and IndexedDB are forbidden for that state.
+6. Local notification lock-screen text must remain generic and must not include patient identity, medicine name, or dose.
+7. The packaged Android application keeps the default secure `https://localhost` WebView origin. The debug build script may set `CAPACITOR_ANDROID_LOCAL_HTTP=true` to use `http://localhost` with ADB reverse for local-device acceptance; this override must not enter release builds.
 
 Standard route/API binding:
 

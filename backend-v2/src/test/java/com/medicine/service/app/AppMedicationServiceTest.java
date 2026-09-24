@@ -19,6 +19,7 @@ import com.medicine.service.auth.AppPatientService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -35,6 +36,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.never;
@@ -91,7 +93,7 @@ class AppMedicationServiceTest {
     @Test
     void shouldReturnWinningCheckinAfterConcurrentClientRequestConflict() {
         when(appPatientService.requireAccessContext("13800138000")).thenReturn(accessContext());
-        when(medicationDoseTaskMapper.selectById(1L, 601L))
+        when(medicationDoseTaskMapper.selectByIdForUpdate(1L, 601L))
                 .thenReturn(doseTask(601L, LocalDateTime.now(ZoneOffset.UTC).plusHours(1)));
         MedicationCheckinRecord winner = checkinRecord(702L, 601L, true);
         winner.setClientRequestId("offline-race-001");
@@ -121,6 +123,49 @@ class AppMedicationServiceTest {
     }
 
     @Test
+    void shouldRejectFirstCheckinAfterEditWindowExpired() {
+        when(appPatientService.requireAccessContext("13800138000")).thenReturn(accessContext());
+        when(medicationDoseTaskMapper.selectByIdForUpdate(1L, 601L))
+                .thenReturn(doseTask(601L, LocalDateTime.now(ZoneOffset.UTC).minusMinutes(1)));
+        CheckinSubmitRequest request = new CheckinSubmitRequest();
+        request.setDoseTaskId(601L);
+        request.setClientRequestId("offline-expired-001");
+        request.setResult("TAKEN");
+
+        assertThatThrownBy(() -> appMedicationService.submitCheckin("13800138000", request))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("DOSE_TASK_EDIT_WINDOW_EXPIRED");
+        verify(medicationCheckinRecordMapper, never()).insert(any());
+        verify(medicationDoseTaskMapper, never()).updateStatus(any());
+    }
+
+    @Test
+    void shouldPromoteLateFirstSubmissionToCorrectionAfterLockingTask() {
+        when(appPatientService.requireAccessContext("13800138000")).thenReturn(accessContext());
+        MedicationDoseTask task = doseTask(601L, LocalDateTime.now(ZoneOffset.UTC).plusHours(1));
+        task.setLastEffectiveCheckinId(700L);
+        when(medicationDoseTaskMapper.selectByIdForUpdate(1L, 601L)).thenReturn(task);
+        doAnswer(invocation -> {
+            MedicationCheckinRecord record = invocation.getArgument(0);
+            record.setId(702L);
+            return 1;
+        }).when(medicationCheckinRecordMapper).insert(any(MedicationCheckinRecord.class));
+        CheckinSubmitRequest request = new CheckinSubmitRequest();
+        request.setDoseTaskId(601L);
+        request.setClientRequestId("late-offline-first");
+        request.setResult("MISSED");
+
+        CheckinRecordDTO result = appMedicationService.submitCheckin("13800138000", request);
+
+        assertThat(result.getCorrection()).isTrue();
+        assertThat(result.getSupersedesRecordId()).isEqualTo(700L);
+        assertThat(task.getLastEffectiveCheckinId()).isEqualTo(702L);
+        InOrder order = inOrder(medicationDoseTaskMapper, medicationCheckinRecordMapper);
+        order.verify(medicationDoseTaskMapper).selectByIdForUpdate(1L, 601L);
+        order.verify(medicationCheckinRecordMapper).insert(any(MedicationCheckinRecord.class));
+    }
+
+    @Test
     void shouldRejectDoseTaskRangeLongerThanSevenDays() {
         when(appPatientService.requireAccessContext("13800138000")).thenReturn(accessContext());
 
@@ -133,7 +178,7 @@ class AppMedicationServiceTest {
     void shouldRejectCorrectionWhenEditWindowExpired() {
         when(appPatientService.requireAccessContext("13800138000")).thenReturn(accessContext());
         when(medicationCheckinRecordMapper.selectById(1L, 701L)).thenReturn(checkinRecord(701L, 601L, true));
-        when(medicationDoseTaskMapper.selectById(1L, 601L)).thenReturn(doseTask(601L, LocalDateTime.now(ZoneOffset.UTC).minusMinutes(1)));
+        when(medicationDoseTaskMapper.selectByIdForUpdate(1L, 601L)).thenReturn(doseTask(601L, LocalDateTime.now(ZoneOffset.UTC).minusMinutes(1)));
 
         CheckinCorrectRequest request = new CheckinCorrectRequest();
         request.setResult("TAKEN");
@@ -149,7 +194,7 @@ class AppMedicationServiceTest {
         when(medicationCheckinRecordMapper.selectById(1L, 701L)).thenReturn(checkinRecord(701L, 601L, true));
 
         MedicationDoseTask task = doseTask(601L, LocalDateTime.now(ZoneOffset.UTC).plusHours(2));
-        when(medicationDoseTaskMapper.selectById(1L, 601L)).thenReturn(task);
+        when(medicationDoseTaskMapper.selectByIdForUpdate(1L, 601L)).thenReturn(task);
         doAnswer(invocation -> {
             MedicationCheckinRecord record = invocation.getArgument(0);
             record.setId(702L);
@@ -158,12 +203,15 @@ class AppMedicationServiceTest {
 
         CheckinCorrectRequest request = new CheckinCorrectRequest();
         request.setResult("MISSED");
+        request.setClientRequestId("offline-correction-001");
         request.setSkipReason("PATIENT_REPORTED");
         request.setNote("late correction");
 
         CheckinRecordDTO result = appMedicationService.correctCheckin("13800138000", 701L, request);
 
-        verify(medicationCheckinRecordMapper).markIneffectiveByDoseTaskId(eq(1L), eq(601L), eq("app-checkin-correct"), any(LocalDateTime.class));
+        verify(medicationCheckinRecordMapper).markOthersIneffectiveByDoseTaskId(
+                eq(1L), eq(601L), eq(702L), eq("app-checkin-correct"), any(LocalDateTime.class)
+        );
         verify(medicationDoseTaskMapper).updateStatus(task);
         assertThat(task.getLastEffectiveCheckinId()).isEqualTo(702L);
         assertThat(task.getStatus()).isEqualTo("MISSED");
@@ -171,6 +219,74 @@ class AppMedicationServiceTest {
         assertThat(result.getCorrection()).isTrue();
         assertThat(result.getSupersedesRecordId()).isEqualTo(701L);
         assertThat(result.getEffective()).isTrue();
+    }
+
+    @Test
+    void shouldChainConcurrentCorrectionsToLatestLockedRecord() {
+        when(appPatientService.requireAccessContext("13800138000")).thenReturn(accessContext());
+        when(medicationCheckinRecordMapper.selectById(1L, 701L)).thenReturn(checkinRecord(701L, 601L, false));
+        MedicationDoseTask task = doseTask(601L, LocalDateTime.now(ZoneOffset.UTC).plusHours(2));
+        task.setLastEffectiveCheckinId(703L);
+        when(medicationDoseTaskMapper.selectByIdForUpdate(1L, 601L)).thenReturn(task);
+        doAnswer(invocation -> {
+            MedicationCheckinRecord record = invocation.getArgument(0);
+            record.setId(704L);
+            return 1;
+        }).when(medicationCheckinRecordMapper).insert(any(MedicationCheckinRecord.class));
+        CheckinCorrectRequest request = new CheckinCorrectRequest();
+        request.setResult("TAKEN");
+        request.setClientRequestId("concurrent-correction");
+
+        CheckinRecordDTO result = appMedicationService.correctCheckin("13800138000", 701L, request);
+
+        assertThat(result.getSupersedesRecordId()).isEqualTo(703L);
+        assertThat(task.getLastEffectiveCheckinId()).isEqualTo(704L);
+        InOrder order = inOrder(medicationDoseTaskMapper, medicationCheckinRecordMapper);
+        order.verify(medicationDoseTaskMapper).selectByIdForUpdate(1L, 601L);
+        order.verify(medicationCheckinRecordMapper).insert(any(MedicationCheckinRecord.class));
+    }
+
+    @Test
+    void shouldReturnExistingCorrectionForRepeatedClientRequest() {
+        when(appPatientService.requireAccessContext("13800138000")).thenReturn(accessContext());
+        MedicationCheckinRecord existing = checkinRecord(702L, 601L, true);
+        existing.setClientRequestId("offline-correction-001");
+        existing.setIsCorrection(true);
+        when(medicationCheckinRecordMapper.selectByClientRequestId(1L, 201L, "offline-correction-001"))
+                .thenReturn(existing);
+
+        CheckinCorrectRequest request = new CheckinCorrectRequest();
+        request.setClientRequestId("offline-correction-001");
+        request.setResult("MISSED");
+
+        assertThat(appMedicationService.correctCheckin("13800138000", 701L, request).getId()).isEqualTo(702L);
+        verify(medicationCheckinRecordMapper, never()).selectById(any(), any());
+        verify(medicationCheckinRecordMapper, never()).insert(any());
+    }
+
+    @Test
+    void shouldReturnConcurrentCorrectionWithoutChangingEffectiveState() {
+        when(appPatientService.requireAccessContext("13800138000")).thenReturn(accessContext());
+        when(medicationCheckinRecordMapper.selectById(1L, 701L)).thenReturn(checkinRecord(701L, 601L, true));
+        when(medicationDoseTaskMapper.selectByIdForUpdate(1L, 601L))
+                .thenReturn(doseTask(601L, LocalDateTime.now(ZoneOffset.UTC).plusHours(2)));
+        doThrow(new DataIntegrityViolationException("duplicate client request"))
+                .when(medicationCheckinRecordMapper).insert(any(MedicationCheckinRecord.class));
+        MedicationCheckinRecord existing = checkinRecord(702L, 601L, true);
+        existing.setClientRequestId("offline-correction-race");
+        existing.setIsCorrection(true);
+        when(medicationCheckinRecordMapper.selectByClientRequestIdForUpdate(1L, 201L, "offline-correction-race"))
+                .thenReturn(existing);
+
+        CheckinCorrectRequest request = new CheckinCorrectRequest();
+        request.setClientRequestId("offline-correction-race");
+        request.setResult("MISSED");
+
+        assertThat(appMedicationService.correctCheckin("13800138000", 701L, request).getId()).isEqualTo(702L);
+        verify(medicationCheckinRecordMapper, never()).markOthersIneffectiveByDoseTaskId(
+                any(), any(), any(), any(), any()
+        );
+        verify(medicationDoseTaskMapper, never()).updateStatus(any());
     }
 
     @Test

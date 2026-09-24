@@ -14,6 +14,9 @@
         <ion-refresher-content></ion-refresher-content>
       </ion-refresher>
       <div class="container">
+        <div v-if="offlineMode" class="offline-banner" role="status">
+          当前离线，展示 48 小时内的加密缓存；新打卡将在联网后自动同步，已提交记录需联网更正。
+        </div>
         <ion-card class="overview-card">
           <ion-card-content class="overview-grid">
             <div class="overview-item">
@@ -45,7 +48,7 @@
         </div>
 
         <EmptyState
-          v-else-if="!activePlan"
+          v-else-if="!activePlan && tasks.length === 0"
           type="no-plan"
           title="暂无生效用药计划"
           description="等待药师建立计划，或发起求助"
@@ -130,14 +133,26 @@ import {
 import { computed, ref } from 'vue'
 import { appAuthService, medicationService, type DoseTaskDTO, type MedicationPlanDTO } from '@/modules/patient/api/mvp'
 import { patientSession } from '@/app/session'
+import {
+  cacheOfflineAccountType,
+  loadMedicationTasks,
+  submitOrQueueCheckin
+} from '@/modules/patient/services/offlineMedication'
+import {
+  cancelMedicationReminder,
+  enableAndScheduleMedicationReminders
+} from '@/modules/patient/services/localMedicationReminders'
 
 const loading = ref(false)
 const activePlan = ref<MedicationPlanDTO | null>(null)
 const tasks = ref<DoseTaskDTO[]>([])
-const currentAccountType = ref('PATIENT')
+const currentAccountType = ref('UNKNOWN')
 const submittingTaskId = ref<number | null>(null)
 const showToast = ref(false)
 const toastMessage = ref('')
+const offlineMode = ref(false)
+let taskRequestEpoch = 0
+let taskAccountSubject: string | null = null
 
 const completedCount = computed(() => tasks.value.filter((task) => task.status === 'COMPLETED').length)
 const pendingCount = computed(() => tasks.value.filter((task) => !['COMPLETED', 'MISSED', 'SKIPPED'].includes(task.status)).length)
@@ -149,40 +164,60 @@ const showMessage = (message: string) => {
 
 const loadTasks = async () => {
   loading.value = true
+  const expectedAccountSubject = patientSession.getAccountSubject()
+  const expectedRequestEpoch = ++taskRequestEpoch
+  if (taskAccountSubject !== expectedAccountSubject) {
+    activePlan.value = null
+    tasks.value = []
+    offlineMode.value = false
+    submittingTaskId.value = null
+    taskAccountSubject = expectedAccountSubject
+  }
+  currentAccountType.value = patientSession.getAccountType() ?? 'UNKNOWN'
   try {
     const [planResponse, taskResponse, accountResponse] = await Promise.all([
-      medicationService.getActiveMedicationPlan(),
-      medicationService.getTodayDoseTasks(),
-      appAuthService.getCurrentAccount()
+      medicationService.getActiveMedicationPlan().catch(() => ({ data: null })),
+      loadMedicationTasks(),
+      appAuthService.getCurrentAccount().catch(() => ({ data: null }))
     ])
+    if (!expectedAccountSubject || patientSession.getAccountSubject() !== expectedAccountSubject
+      || expectedRequestEpoch !== taskRequestEpoch) return
     activePlan.value = planResponse.data ?? null
-    tasks.value = taskResponse.data ?? []
-    currentAccountType.value = String((accountResponse.data as any)?.accountType || 'PATIENT').toUpperCase()
-    patientSession.setActivePlanStatus(Boolean(planResponse.data))
+    const today = new Date().toLocaleDateString('sv-SE')
+    tasks.value = taskResponse.tasks.filter((task) => task.taskDate === today)
+    offlineMode.value = taskResponse.offline
+    const accountType = String((accountResponse.data as any)?.accountType || '').toUpperCase()
+    if (accountType) {
+      currentAccountType.value = accountType
+      patientSession.setAccountType(accountType)
+      void cacheOfflineAccountType(accountType, expectedAccountSubject).catch(() => undefined)
+    }
+    void enableAndScheduleMedicationReminders(taskResponse.tasks, accountType || patientSession.getAccountType() || undefined)
+      .then((mode) => { if (mode === 'inexact') showMessage('未授予精确闹钟权限，用药提醒可能延迟') })
+      .catch(() => undefined)
+    if (!taskResponse.offline) patientSession.setActivePlanStatus(Boolean(planResponse.data))
   } catch (error: any) {
+    if (!expectedAccountSubject || patientSession.getAccountSubject() !== expectedAccountSubject
+      || expectedRequestEpoch !== taskRequestEpoch) return
     activePlan.value = null
     tasks.value = []
     patientSession.setActivePlanStatus(false)
     showMessage(error?.message || '提醒数据加载失败')
   } finally {
-    loading.value = false
+    if (patientSession.getAccountSubject() === expectedAccountSubject
+      && expectedRequestEpoch === taskRequestEpoch) loading.value = false
   }
 }
 
 const saveResult = async (task: DoseTaskDTO, result: 'TAKEN' | 'MISSED') => {
   submittingTaskId.value = task.id
   try {
-    const payload = {
-      result,
-      actualTakenAt: new Date().toISOString(),
-      note: result === 'TAKEN' ? '患者端提交' : '',
-      skipReason: result === 'MISSED' ? 'PATIENT_REPORTED' : ''
-    }
-
-    if (task.lastEffectiveCheckinId) {
-      await medicationService.correctCheckin(task.lastEffectiveCheckinId, payload)
-    } else {
-      await medicationService.submitCheckin({ doseTaskId: task.id, ...payload })
+    const outcome = await submitOrQueueCheckin(task, result)
+    if (outcome === 'queued') {
+      task.status = result === 'TAKEN' ? 'COMPLETED' : 'MISSED'
+      await cancelMedicationReminder(task.id).catch(() => undefined)
+      showMessage('记录已加密保存，将在联网后自动同步')
+      return
     }
 
     showMessage(result === 'TAKEN' ? '已记录为已服药' : '已记录为漏服')
@@ -224,9 +259,13 @@ const formatOverdue = (minutes?: number | null) => {
 
 const reminderNotice = (task: DoseTaskDTO) => {
   if (task.reminderStage === 'FAMILY_REMINDER_DUE') {
-    return currentAccountType.value === 'FAMILY'
-      ? `已超过 ${formatOverdue(task.overdueMinutes)}，需要你协助记录`
-      : `已超过 ${formatOverdue(task.overdueMinutes)}，已提醒家属协助`
+    if (currentAccountType.value === 'FAMILY') {
+      return `已超过 ${formatOverdue(task.overdueMinutes)}，需要你协助记录`
+    }
+    if (currentAccountType.value === 'PATIENT') {
+      return `已超过 ${formatOverdue(task.overdueMinutes)}，已提醒家属协助`
+    }
+    return `已超过 ${formatOverdue(task.overdueMinutes)}，请尽快处理`
   }
   if (task.reminderStage === 'OVERDUE') {
     return `已超过 ${formatOverdue(task.overdueMinutes)}，请尽快记录`
@@ -248,7 +287,9 @@ async function handleRefresh(event: CustomEvent) {
   }
 }
 
-onIonViewWillEnter(loadTasks)
+onIonViewWillEnter(async () => {
+  await loadTasks()
+})
 </script>
 
 <style scoped>
@@ -261,6 +302,15 @@ onIonViewWillEnter(loadTasks)
   display: flex;
   flex-direction: column;
   gap: var(--patient-space-3);
+}
+
+.offline-banner {
+  padding: var(--patient-space-3);
+  border-radius: var(--patient-radius-md);
+  color: var(--patient-warning-dark, #8a4b08);
+  background: rgba(245, 158, 11, 0.14);
+  font-size: var(--patient-font-helper);
+  line-height: var(--patient-leading-normal);
 }
 
 /* ── 概览卡片 ── */

@@ -120,11 +120,8 @@ public class AppPatientService {
             return List.of();
         }
 
-        if ("FAMILY".equalsIgnoreCase(appAccount.getAccountType())) {
-            return patientFamilyBindingMapper.selectActiveByFamilyAccountId(DEFAULT_TENANT_ID, appAccount.getId())
-                    .stream()
-                    .map(this::toFamilyBindingSummary)
-                    .toList();
+        if (!"PATIENT".equalsIgnoreCase(appAccount.getAccountType())) {
+            throw new BusinessException(400, "BAD_REQUEST");
         }
 
         Patient patient = patientMapper.selectByAppAccountId(DEFAULT_TENANT_ID, appAccount.getId());
@@ -167,7 +164,9 @@ public class AppPatientService {
             applyAuditFields(familyAccount, "app-family");
             appAccountMapper.insert(familyAccount);
         } else {
-            familyAccount.setAccountType("FAMILY");
+            if (!"FAMILY".equalsIgnoreCase(familyAccount.getAccountType())) {
+                throw new BusinessException(400, "PATIENT_ACCOUNT_CANNOT_BE_FAMILY");
+            }
             if (StringUtils.hasText(request.getFamilyDisplayName())) {
                 familyAccount.setDisplayName(request.getFamilyDisplayName().trim());
             }

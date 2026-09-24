@@ -43,6 +43,7 @@ $root = Split-Path -Parent $PSScriptRoot
 $jdk21 = Resolve-Jdk21
 $env:JAVA_HOME = $jdk21
 $env:Path = "$jdk21\bin;$env:Path"
+$env:CAPACITOR_ANDROID_LOCAL_HTTP = "true"
 
 Push-Location $root
 try {

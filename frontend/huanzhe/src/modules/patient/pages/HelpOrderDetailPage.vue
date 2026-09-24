@@ -119,6 +119,38 @@
               </div>
             </ion-card-content>
           </ion-card>
+
+          <ion-card v-if="order.status === 'CLOSED' && (satisfactionStatus?.eligible || satisfactionStatus?.submitted)" class="satisfaction-card" data-testid="satisfaction-card">
+            <ion-card-header>
+              <ion-card-title>服务满意度</ion-card-title>
+              <ion-card-subtitle v-if="satisfactionStatus.submitted">
+                已提交 {{ satisfactionStatus.survey?.rating }} 分，感谢反馈
+              </ion-card-subtitle>
+              <ion-card-subtitle v-else>可稍后再评，不影响查看工单</ion-card-subtitle>
+            </ion-card-header>
+            <ion-card-content v-if="!satisfactionStatus.submitted">
+              <ion-button v-if="!satisfactionExpanded" fill="outline" @click="satisfactionExpanded = true">评价本次服务</ion-button>
+              <div v-else class="satisfaction-form">
+                <div class="rating-row" aria-label="满意度评分">
+                  <button
+                    v-for="score in 5"
+                    :key="score"
+                    type="button"
+                    class="rating-button"
+                    :class="{ 'rating-button--selected': satisfactionRating === score }"
+                    @click="satisfactionRating = score"
+                  >{{ score }}</button>
+                </div>
+                <ion-textarea v-model="satisfactionComment" :maxlength="255" :rows="3" placeholder="可选：说说本次服务体验" />
+                <div class="satisfaction-actions">
+                  <ion-button fill="clear" @click="satisfactionExpanded = false">稍后再评</ion-button>
+                  <ion-button :disabled="!satisfactionRating || satisfactionSubmitting" @click="submitSatisfaction">
+                    {{ satisfactionSubmitting ? '提交中...' : '提交评价' }}
+                  </ion-button>
+                </div>
+              </div>
+            </ion-card-content>
+          </ion-card>
         </template>
       </div>
 
@@ -222,9 +254,11 @@ import { computed, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import {
   helpOrderService,
+  assessmentService,
   type HelpOrderAttachmentDTO,
   type HelpOrderDTO,
-  type HelpOrderEventDTO
+  type HelpOrderEventDTO,
+  type SatisfactionStatusDTO
 } from '@/modules/patient/api/mvp'
 import { cancelVoiceRecording, startVoiceRecording, stopVoiceRecording } from '@/modules/patient/composables/useVoiceRecorder'
 import { uploadHelpOrderVoice } from '@/modules/patient/composables/useHelpOrderVoiceUpload'
@@ -244,9 +278,16 @@ const transcribingIds = ref<Set<number>>(new Set())
 const cameraInput = ref<HTMLInputElement | null>(null)
 const galleryInput = ref<HTMLInputElement | null>(null)
 const selectedImages = ref<SelectedImage[]>([])
+const satisfactionStatus = ref<SatisfactionStatusDTO | null>(null)
+const satisfactionExpanded = ref(false)
+const satisfactionRating = ref(0)
+const satisfactionComment = ref('')
+const satisfactionSubmitting = ref(false)
 
 let pollTimer: number | null = null
 let notificationClient: ReturnType<typeof createAppNotificationClient> | null = null
+let satisfactionRequestEpoch = 0
+let satisfactionContextKey = ''
 
 const orderId = computed(() => Number(route.params.id))
 const events = computed(() => order.value?.events ?? [])
@@ -274,6 +315,7 @@ const loadDetail = async (silent = false) => {
   try {
     const response = await helpOrderService.getHelpOrderDetail(orderId.value)
     order.value = response.data ?? null
+    if (order.value?.status === 'CLOSED') void loadSatisfactionStatus()
     connectRealtime()
   } catch (error: any) {
     if (!silent) {
@@ -300,6 +342,71 @@ const sendReply = async () => {
     showMessage(error?.message || '发送失败')
   } finally {
     replying.value = false
+  }
+}
+
+const loadSatisfactionStatus = async () => {
+  const expectedAccountSubject = patientSession.getAccountSubject()
+  const expectedOrderId = orderId.value
+  const contextKey = `${expectedAccountSubject || ''}:${expectedOrderId}`
+  if (contextKey !== satisfactionContextKey) {
+    satisfactionContextKey = contextKey
+    satisfactionStatus.value = null
+    satisfactionSubmitting.value = false
+    satisfactionExpanded.value = false
+    satisfactionRating.value = 0
+    satisfactionComment.value = ''
+    satisfactionRequestEpoch += 1
+  }
+  if (satisfactionSubmitting.value) return
+  const expectedRequestEpoch = ++satisfactionRequestEpoch
+  if (!expectedAccountSubject) return
+  try {
+    const response = await assessmentService.getSatisfactionStatus(expectedOrderId)
+    if (expectedRequestEpoch !== satisfactionRequestEpoch
+      || patientSession.getAccountSubject() !== expectedAccountSubject
+      || orderId.value !== expectedOrderId) return
+    satisfactionStatus.value = response.data ?? null
+  } catch {
+    if (expectedRequestEpoch !== satisfactionRequestEpoch
+      || patientSession.getAccountSubject() !== expectedAccountSubject
+      || orderId.value !== expectedOrderId) return
+    satisfactionStatus.value = null
+  }
+}
+
+const submitSatisfaction = async () => {
+  if (!satisfactionRating.value || satisfactionSubmitting.value) return
+  const expectedAccountSubject = patientSession.getAccountSubject()
+  if (!expectedAccountSubject) return
+  const expectedOrderId = orderId.value
+  const expectedRequestEpoch = ++satisfactionRequestEpoch
+  satisfactionSubmitting.value = true
+  try {
+    const response = await assessmentService.submitSatisfaction({
+      helpOrderId: expectedOrderId,
+      rating: satisfactionRating.value,
+      comment: satisfactionComment.value.trim() || undefined
+    })
+    if (expectedRequestEpoch !== satisfactionRequestEpoch
+      || patientSession.getAccountSubject() !== expectedAccountSubject
+      || orderId.value !== expectedOrderId) return
+    satisfactionStatus.value = {
+      helpOrderId: expectedOrderId,
+      eligible: false,
+      submitted: true,
+      survey: response.data
+    }
+    showMessage('评价已提交，感谢反馈')
+  } catch (error: any) {
+    if (expectedRequestEpoch !== satisfactionRequestEpoch
+      || patientSession.getAccountSubject() !== expectedAccountSubject
+      || orderId.value !== expectedOrderId) return
+    showMessage(error?.message || '评价提交失败')
+  } finally {
+    if (expectedRequestEpoch === satisfactionRequestEpoch
+      && patientSession.getAccountSubject() === expectedAccountSubject
+      && orderId.value === expectedOrderId) satisfactionSubmitting.value = false
   }
 }
 
@@ -424,6 +531,7 @@ const uploadSelectedImages = async () => {
     })
     await helpOrderService.uploadToPresignedUrl(presign.data.uploadUrl, image.file, contentType)
     const registered = await helpOrderService.registerImage({
+      fileAssetId: presign.data.fileAssetId,
       objectKey: presign.data.objectKey,
       originalFilename: image.file.name || presign.data.filename,
       contentType,
@@ -455,7 +563,10 @@ const connectRealtime = () => {
   if (notificationClient) {
     return
   }
-  notificationClient = createAppNotificationClient(() => patientSession.getAccessToken())
+  notificationClient = createAppNotificationClient(
+    () => patientSession.getAccessToken(),
+    () => patientSession.getAccountSubject()
+  )
   void notificationClient.connect()
 }
 
@@ -607,10 +718,17 @@ onIonViewDidLeave(() => {
 
 .summary-card,
 .timeline-card,
+.satisfaction-card,
 .empty-card {
   border-radius: var(--patient-radius-lg);
   box-shadow: var(--patient-shadow-sm);
 }
+
+.satisfaction-form { display: flex; flex-direction: column; gap: var(--patient-space-3); }
+.rating-row { display: grid; grid-template-columns: repeat(5, 1fr); gap: var(--patient-space-2); }
+.rating-button { min-height: 44px; border: 1px solid var(--patient-border); border-radius: var(--patient-radius-md); background: var(--patient-bg-card); color: var(--patient-text-primary); }
+.rating-button--selected { border-color: var(--patient-primary); background: var(--patient-primary-light); color: var(--patient-primary); font-weight: var(--patient-font-bold); }
+.satisfaction-actions { display: flex; justify-content: flex-end; gap: var(--patient-space-2); }
 
 .summary-top {
   display: flex;

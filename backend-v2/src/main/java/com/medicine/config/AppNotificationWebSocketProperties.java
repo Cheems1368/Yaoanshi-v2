@@ -9,6 +9,8 @@ import java.util.List;
 public class AppNotificationWebSocketProperties {
 
     private List<String> allowedOrigins = new ArrayList<>(List.of(
+            "https://localhost",
+            "http://localhost",
             "http://localhost:3001",
             "http://127.0.0.1:3001",
             "http://localhost:5173",

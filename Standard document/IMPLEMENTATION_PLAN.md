@@ -12,7 +12,17 @@ Rules:
 4. This document covers `P0` and `P0+` MVP phases, plus the Post-P0 trial readiness sprint.
 5. `P2` and later capabilities must stay in backlog and must not enter the primary build sequence.
 
-## 1.5 Execution Status Summary (as of 2026-08-22)
+## 1.4 Review convergence and evidence discipline
+
+- Identify the active worktree, branch, HEAD and dirty files before reading progress or running gates. Record command results against that revision, including any uncommitted patch.
+- Classify review reports with reproduction and impact evidence. Repair a root-cause family across affected entry points; do not turn unrelated style/optimization suggestions into release blockers. Material risk deferral requires owner approval.
+- Run behavioral regression before affected full gates. Source-string assertions prove static constraints only. Sequence Web build -> Capacitor sync -> Android build; parallelize independent work only.
+- If the same root cause escapes two repair rounds, stop mechanical pushes and full-review requests; map the state transitions and sibling entry points, reproduce the omission and obtain new local evidence before resuming.
+- Review ends when the branch is current, required checks pass on current HEAD, all valid findings have evidenced dispositions, conversations are resolved and affected-chain regression is complete. A new full bot review after every repair commit is not an additional gate. Existing protection and explicitly approved release acceptance remain mandatory.
+- Recheck HEAD/gates immediately before an authorized merge and verify post-merge main CI. Preserve unaffected Android/Docker acceptance with its original provenance; rerun only evidence invalidated by relevant changes.
+- Durable rules belong here; incident sources, fix revisions, validation outcomes and the next action belong in `progress.txt`. The project-specific skill holds the detailed root-cause checklist, not transient release status.
+
+## 1.5 Execution Status Summary (as of 2026-09-18)
 
 | Phase | Description | Status |
 |-------|-------------|--------|
@@ -29,16 +39,16 @@ Rules:
 | Phase T6 | Android JDK 21 and enforced APK build gate | ✅ Delivered through PR #37 (`98115b9`) |
 | Phase T7 | SEC-002 refresh-token HttpOnly Cookie closure | ✅ Delivered through PR #39 (`4c90292`) |
 | Phase T8 | SEC-005 AI data-boundary closure | ✅ Delivered through PR #40 (`fc3b646`); post-merge `main` CI run `32570783413` passed |
-| Phase T9 | MVP v0.1.0 formal delivery and gap closure | 🚧 PR A backend contract/reliability implementation in progress on `codex/mvp-v0.1.0-backend` |
+| Phase T9 | MVP v0.1.0 formal delivery and gap closure | 🚧 PR A delivered through PR #41 (`2614271`); PR B patient implementation and physical Android acceptance are complete, with protected review qualification in progress |
 
 **Current active work:** T9 closes the remaining MVP contract, patient, professional-client, reliability, operations, and release-evidence gaps through three protected PRs. T8/SEC-005 is formally delivered. Android release signing and store publishing remain out of scope.
 
-**Flyway current latest on `main`:** V13 (`V13__ai_data_boundary.sql`). T9 PR A reserves V14 as `V14__mvp_release_closure.sql`; V1–V13 remain immutable.
+**Flyway current latest on `main`:** V14 (`V14__mvp_release_closure.sql`), delivered through PR #41. V1–V14 remain immutable.
 
 **Known open items:**
 - `MEDICINE_OCR_API_KEY` must be set in `.env.local` for live OCR (graceful fallback if omitted)
-- T9 knowledge bank wording/options/answers require documented approval by a licensed pharmacist or physician before `v0.1.0` may be tagged
-- T9 Android physical-device and disposable MySQL/MinIO acceptance remain release gates
+- The project owner approved `medication-literacy-v1` on 2026-08-24 as general medication science education and explicitly accepted the risk of releasing without a separate licensed-clinician sign-off; this is an owner waiver, not a claim of clinical credentials
+- T9 disposable MySQL/MinIO migration, cleanup and cleanup-switch rollback acceptance passed on 2026-09-24 (see `progress.txt`); PR C must consolidate this evidence and production execution conditions. PR B physical Android acceptance passed on 2026-09-18; relevant later changes still require impact-based regression.
 - Ops cleanup: `ops/sql/sec-003-clear-legacy-patient-id-card-masked.sql` needs to be run
 
 ## 1.6 Post-P0 Trial Demo Closed-Loop Sequence

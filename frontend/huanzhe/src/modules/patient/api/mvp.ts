@@ -14,6 +14,7 @@ export interface BindPatientRequest {
 }
 
 export interface FilePresignResponse {
+  fileAssetId: number
   objectKey: string
   uploadUrl: string
   downloadUrl: string
@@ -21,6 +22,72 @@ export interface FilePresignResponse {
   filename: string
   contentType: string
   sizeBytes: number
+}
+
+export interface AppFamilyBindingDTO {
+  id: number
+  familyAccountId: number
+  displayName: string
+  mobileMasked: string
+  relationshipType: string
+  status: string
+  authorizedAt: string
+}
+
+export interface KnowledgeQuestionDTO {
+  questionCode: string
+  questionText: string
+  options: Array<{ code: string; text: string }>
+}
+
+export interface KnowledgeAssessmentDTO {
+  id: number
+  phase: 'DAY_1' | 'WEEK_4' | string
+  questionSetVersion: string
+  score: number
+  maxScore: number
+  submittedAt: string
+  answers: Array<{
+    questionCode: string
+    questionText: string
+    selectedOption: string
+    correctOption: string
+    correct: boolean
+  }>
+}
+
+export interface KnowledgeAssessmentStatusDTO {
+  questionSetVersion: string
+  planStartDate?: string | null
+  currentPhase?: 'DAY_1' | 'WEEK_4' | null
+  due: boolean
+  day1?: KnowledgeAssessmentDTO | null
+  week4?: KnowledgeAssessmentDTO | null
+}
+
+export interface SatisfactionSurveyDTO {
+  id?: number
+  helpOrderId: number
+  rating: number
+  comment?: string
+  submittedAt?: string
+}
+
+export interface SatisfactionStatusDTO {
+  helpOrderId: number
+  eligible: boolean
+  submitted: boolean
+  survey?: SatisfactionSurveyDTO | null
+}
+
+export interface AppNotificationLogDTO {
+  id: number
+  channel: string
+  businessType: string
+  businessId?: number | null
+  deliveryStatus: string
+  payloadJson?: string | null
+  sentAt?: string | null
 }
 
 export interface FileAssetDTO {
@@ -326,7 +393,7 @@ export const appAuthService = {
   },
 
   login(payload: { mobile: string; otpCode: string; deviceId: string; deviceName?: string; platform?: string }) {
-    return httpService.post<SessionTokenDTO>('/app-api/auth/session/login', payload)
+    return httpService.loginSession<SessionTokenDTO>(payload)
   },
 
   logout() {
@@ -351,11 +418,11 @@ export const patientService = {
   },
 
   getFamilyBindings() {
-    return httpService.get('/app-api/patients/me/family-bindings')
+    return httpService.get<AppFamilyBindingDTO[]>('/app-api/patients/me/family-bindings')
   },
 
   createFamilyBinding(payload: { familyMobile: string; familyDisplayName?: string; relationshipType?: string }) {
-    return httpService.post('/app-api/patients/me/family-bindings', payload)
+    return httpService.post<AppFamilyBindingDTO>('/app-api/patients/me/family-bindings', payload)
   },
 
   deleteFamilyBinding(id: number) {
@@ -388,12 +455,17 @@ export const medicationService = {
     return httpService.get<DoseTaskDTO[]>('/app-api/dose-tasks/today', date ? { date } : undefined)
   },
 
+  getDoseTasks(dateFrom: string, dateTo: string) {
+    return httpService.get<DoseTaskDTO[]>('/app-api/dose-tasks', { dateFrom, dateTo })
+  },
+
   getCheckins(params?: Record<string, unknown>) {
     return httpService.get<PageResult<CheckinRecordDTO>>('/app-api/checkins', params)
   },
 
   submitCheckin(payload: {
     doseTaskId: number
+    clientRequestId?: string
     result: string
     actualTakenAt?: string
     note?: string
@@ -409,6 +481,7 @@ export const medicationService = {
       actualTakenAt?: string
       note?: string
       skipReason?: string
+      clientRequestId?: string
     }
   ) {
     return httpService.put<CheckinRecordDTO>(`/app-api/checkins/${checkinId}/correct`, payload)
@@ -440,6 +513,7 @@ export const helpOrderService = {
   },
 
   registerImage(payload: {
+    fileAssetId?: number
     objectKey: string
     originalFilename: string
     contentType: string
@@ -460,6 +534,7 @@ export const helpOrderService = {
   },
 
   registerAudio(payload: {
+    fileAssetId?: number
     objectKey: string
     originalFilename: string
     contentType: string
@@ -495,16 +570,43 @@ export const helpOrderService = {
 export const appNotificationService = {
   createSocketTicket() {
     return httpService.post<{ ticket: string; expiresInSeconds: number }>('/app-api/notifications/socket-ticket')
+  },
+
+  getLogs(afterId?: number, limit = 50) {
+    return httpService.get<AppNotificationLogDTO[]>('/app-api/notifications/logs', {
+      ...(afterId !== undefined ? { afterId } : {}),
+      limit
+    })
+  },
+
+  getLatestLogId() {
+    return httpService.get<number>('/app-api/notifications/logs/latest-id')
   }
 }
 
 export const assessmentService = {
-  submitKnowledge(payload: Record<string, unknown>) {
-    return httpService.post('/app-api/assessments/knowledge', payload)
+  getKnowledgeQuestions() {
+    return httpService.get<KnowledgeQuestionDTO[]>('/app-api/assessments/knowledge/questions')
   },
 
-  submitSatisfaction(payload: Record<string, unknown>) {
-    return httpService.post('/app-api/assessments/satisfaction', payload)
+  getKnowledgeStatus() {
+    return httpService.get<KnowledgeAssessmentStatusDTO>('/app-api/assessments/knowledge/status')
+  },
+
+  submitKnowledge(payload: {
+    phase: string
+    questionSetVersion: string
+    answers: Array<{ questionCode: string; selectedOption: string }>
+  }) {
+    return httpService.post<KnowledgeAssessmentDTO>('/app-api/assessments/knowledge', payload)
+  },
+
+  getSatisfactionStatus(helpOrderId: number) {
+    return httpService.get<SatisfactionStatusDTO>('/app-api/assessments/satisfaction/status', { helpOrderId })
+  },
+
+  submitSatisfaction(payload: SatisfactionSurveyDTO) {
+    return httpService.post<SatisfactionSurveyDTO>('/app-api/assessments/satisfaction', payload)
   }
 }
 
@@ -595,6 +697,7 @@ export const prescriptionService = {
   },
 
   registerUpload(payload: {
+    fileAssetId?: number
     objectKey: string
     originalFilename: string
     contentType: string

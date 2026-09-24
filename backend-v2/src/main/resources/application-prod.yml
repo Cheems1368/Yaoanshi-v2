@@ -36,6 +36,9 @@ medicine:
     websocket:
       allowed-origins: ${MEDICINE_ADMIN_WS_ALLOWED_ORIGINS}
       ticket-ttl-seconds: ${MEDICINE_ADMIN_WS_TICKET_TTL_SECONDS:30}
+  app-notifications:
+    websocket:
+      allowed-origins: ${MEDICINE_APP_WS_ALLOWED_ORIGINS:https://localhost}
   storage:
     endpoint: ${MEDICINE_STORAGE_ENDPOINT}
     public-endpoint: ${MEDICINE_STORAGE_PUBLIC_ENDPOINT:${MEDICINE_STORAGE_ENDPOINT}}

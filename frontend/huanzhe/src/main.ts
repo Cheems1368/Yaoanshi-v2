@@ -2,6 +2,13 @@ import { createApp } from 'vue'
 import App from './App.vue'
 import router from './router';
 import { appAuthService, patientService } from '@/modules/patient/api/mvp'
+import { clearMedicalCache, replayPendingCheckins } from '@/modules/patient/services/offlineMedication'
+import {
+  cancelAllMedicationReminders,
+  registerMedicationReminderActionHandler
+} from '@/modules/patient/services/localMedicationReminders'
+import { patientSession } from '@/app/session'
+import { httpService } from '@/shared/http/client'
 
 import { IonicVue } from '@ionic/vue';
 import AppIcon from '@/shared/components/AppIcon.vue'
@@ -32,6 +39,79 @@ import '@ionic/vue/css/display.css';
 
 /* Theme variables */
 import './theme/variables.css';
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('patient-account-switched', () => {
+    void clearMedicalCache()
+    void cancelAllMedicationReminders()
+  })
+  window.addEventListener('patient-session-anonymous', () => {
+    void clearMedicalCache()
+    void cancelAllMedicationReminders()
+  })
+  const clearRevokedMedicalContext = async (expectedAccountSubject?: string) => {
+    if (expectedAccountSubject && patientSession.getAccountSubject() !== expectedAccountSubject) return
+    await appAuthService.logout().catch(() => undefined)
+    if (expectedAccountSubject && patientSession.getAccountSubject() !== expectedAccountSubject) return
+    await Promise.all([
+      clearMedicalCache().catch(() => undefined),
+      cancelAllMedicationReminders().catch(() => undefined)
+    ])
+    patientSession.clearAuthState()
+    patientSession.clearGateState()
+    await router.replace('/login')
+    window.location.reload()
+  }
+  let familyAccessCheck: { accountSubject: string; promise: Promise<boolean> } | null = null
+  const revalidateFamilyAccess = () => {
+    const accountSubject = patientSession.getAccountSubject()
+    if (patientSession.getAccountType() !== 'FAMILY'
+      || !accountSubject
+      || !patientSession.getAccessToken()
+      || !navigator.onLine) return Promise.resolve(true)
+    if (familyAccessCheck?.accountSubject === accountSubject) return familyAccessCheck.promise
+    const attempt = (async () => {
+      try {
+        const currentPatient = await patientService.getCurrentPatient()
+        if (patientSession.getAccountSubject() !== accountSubject) return false
+        if (!currentPatient.data) {
+          await clearRevokedMedicalContext(accountSubject)
+          return false
+        }
+        return true
+      } catch (error) {
+        if (patientSession.getAccountSubject() !== accountSubject) return false
+        const message = error instanceof Error ? error.message : ''
+        if (message === 'PATIENT_BIND_CONFLICT' || message === 'PATIENT_NOT_FOUND') {
+          await clearRevokedMedicalContext(accountSubject)
+        }
+        return false
+      }
+    })().finally(() => {
+      if (familyAccessCheck?.promise === attempt) familyAccessCheck = null
+    })
+    familyAccessCheck = { accountSubject, promise: attempt }
+    return attempt
+  }
+  const restoreAndReplay = async () => {
+    if (await httpService.restoreSession() && patientSession.getAccessToken()) {
+      if (!await revalidateFamilyAccess()) return
+      await replayPendingCheckins()
+    }
+  }
+  window.addEventListener('online', () => void restoreAndReplay())
+  window.addEventListener('patient-session-authenticated', () => void restoreAndReplay())
+  window.addEventListener('focus', () => void restoreAndReplay())
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') void restoreAndReplay()
+  })
+  window.setInterval(() => void restoreAndReplay(), 60_000)
+  void restoreAndReplay()
+  void registerMedicationReminderActionHandler(async (route) => {
+    await router.isReady()
+    await router.push(route)
+  })
+}
 
 if (import.meta.env.DEV && typeof window !== 'undefined') {
   const runtimeWindow = window as typeof window & {

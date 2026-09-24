@@ -30,6 +30,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -148,6 +149,20 @@ class AppAssessmentServiceTest {
         assertThat(result.getId()).isEqualTo(901L);
         assertThat(result.getHelpOrderId()).isEqualTo(801L);
         assertThat(result.getRating()).isEqualTo(5);
+    }
+
+    @Test
+    void shouldRejectSatisfactionCommentLongerThanDatabaseLimit() {
+        when(appPatientService.requireAccessContext("13800138000")).thenReturn(accessContext());
+        when(helpOrderMapper.selectById(1L, 801L)).thenReturn(helpOrder("CLOSED"));
+        when(satisfactionSurveyMapper.selectByHelpOrderId(1L, 801L)).thenReturn(null);
+        SatisfactionSurveyDTO request = request();
+        request.setComment("x".repeat(256));
+
+        assertThatThrownBy(() -> appAssessmentService.submitSatisfaction("13800138000", request))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("BAD_REQUEST");
+        verify(satisfactionSurveyMapper, never()).insert(any(SatisfactionSurvey.class));
     }
 
     private AppPatientService.AccessContext accessContext() {

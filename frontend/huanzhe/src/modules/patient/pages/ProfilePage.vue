@@ -290,6 +290,49 @@
           </ion-card-content>
         </ion-card>
 
+        <ion-card v-if="canManageFamily" class="info-card" data-testid="family-binding-card">
+          <ion-card-header>
+            <ion-card-title class="card-title">亲情号管理</ion-card-title>
+          </ion-card-header>
+          <ion-card-content>
+            <p class="family-hint">最多绑定 2 位亲友。解绑前会再次确认。</p>
+            <div v-if="familyLoading" class="family-empty">加载中...</div>
+            <div v-else-if="familyBindings.length === 0" class="family-empty">暂未绑定亲情号</div>
+            <div v-else class="family-list">
+              <div v-for="binding in familyBindings" :key="binding.id" class="family-row">
+                <div>
+                  <div class="family-name">{{ binding.displayName || '亲友' }}</div>
+                  <div class="family-meta">{{ binding.mobileMasked }} · {{ relationshipText(binding.relationshipType) }}</div>
+                </div>
+                <ion-button fill="clear" color="danger" size="small" @click="confirmUnbind(binding)">解绑</ion-button>
+              </div>
+            </div>
+
+            <div v-if="familyBindings.length < 2" class="family-form">
+              <ion-item>
+                <ion-label position="stacked">亲友手机号</ion-label>
+                <ion-input v-model="familyForm.familyMobile" data-testid="family-mobile" type="tel" :maxlength="11" placeholder="请输入 11 位手机号" />
+              </ion-item>
+              <ion-item>
+                <ion-label position="stacked">称呼</ion-label>
+                <ion-input v-model="familyForm.familyDisplayName" data-testid="family-display-name" :maxlength="20" placeholder="如：女儿" />
+              </ion-item>
+              <ion-item>
+                <ion-label position="stacked">关系</ion-label>
+                <ion-select v-model="familyForm.relationshipType">
+                  <ion-select-option value="SPOUSE">配偶</ion-select-option>
+                  <ion-select-option value="PARENT">父母</ion-select-option>
+                  <ion-select-option value="CHILD">子女</ion-select-option>
+                  <ion-select-option value="OTHER">其他</ion-select-option>
+                </ion-select>
+              </ion-item>
+              <ion-button data-testid="family-submit" expand="block" :disabled="familySaving || !familyFormValid" @click="addFamilyBinding">
+                {{ familySaving ? '绑定中...' : '新增亲情号' }}
+              </ion-button>
+            </div>
+          </ion-card-content>
+        </ion-card>
+
         <div class="session-actions">
           <ion-button
             expand="block"
@@ -329,20 +372,39 @@ import {
   IonTextarea,
   IonTitle,
   IonToolbar,
+  alertController,
+  onIonViewWillEnter,
   toastController
 } from '@ionic/vue'
 import { cameraOutline, checkmarkCircleOutline, createOutline, documentTextOutline } from 'ionicons/icons'
 import defaultAvatarImg from '@/shared/assets/images/user_avatar.png'
 import { patientSession } from '@/app/session'
-import { appAuthService, patientService, type PatientProfileDTO, type PatientHealthProfileDTO } from '@/modules/patient/api/mvp'
+import {
+  appAuthService,
+  patientService,
+  type AppFamilyBindingDTO,
+  type PatientProfileDTO,
+  type PatientHealthProfileDTO
+} from '@/modules/patient/api/mvp'
 import { healthDataService, type HealthData } from '@/services/healthDataService'
 import { userDataService, type UserProfile } from '@/services/userDataService'
+import { clearMedicalCache } from '@/modules/patient/services/offlineMedication'
+import { cancelAllMedicationReminders } from '@/modules/patient/services/localMedicationReminders'
 
 const router = useRouter()
 
 const isEditing = ref(false)
 const logoutLoading = ref(false)
 const healthData = ref<HealthData | null>(null)
+const canManageFamily = ref(false)
+const familyBindings = ref<AppFamilyBindingDTO[]>([])
+const familyLoading = ref(false)
+const familySaving = ref(false)
+let familyRequestEpoch = 0
+let familyMutationEpoch = 0
+let profileRequestEpoch = 0
+const familyForm = reactive({ familyMobile: '', familyDisplayName: '', relationshipType: 'OTHER' })
+const familyFormValid = computed(() => /^1\d{10}$/.test(familyForm.familyMobile) && Boolean(familyForm.familyDisplayName.trim()))
 
 const profileData = reactive<UserProfile>({
   userId: 'P2024001',
@@ -507,22 +569,28 @@ const applyHealthSnapshot = (serverData: PatientHealthProfileDTO | null | undefi
   healthDataService.replaceHealthData(nextHealthData)
 }
 
-const syncPatientProfileDTO = async () => {
+const isCurrentProfileRequest = (accountSubject: string, requestEpoch: number) =>
+  requestEpoch === profileRequestEpoch && patientSession.getAccountSubject() === accountSubject
+
+const syncPatientProfileDTO = async (accountSubject: string, requestEpoch: number) => {
   const response = await patientService.getProfile()
-  if (response.data) {
+  if (isCurrentProfileRequest(accountSubject, requestEpoch) && response.data) {
     applyProfileSnapshot(response.data)
   }
 }
 
-const syncHealthProfile = async () => {
+const syncHealthProfile = async (accountSubject: string, requestEpoch: number) => {
   const response = await patientService.getHealthProfile()
-  applyHealthSnapshot(response.data)
+  if (isCurrentProfileRequest(accountSubject, requestEpoch)) applyHealthSnapshot(response.data)
 }
 
 const saveProfile = async () => {
   if (!validateForm()) {
     return
   }
+  const accountSubject = patientSession.getAccountSubject()
+  const requestEpoch = profileRequestEpoch
+  if (!accountSubject) return
 
   try {
     const response = await patientService.updateProfile({
@@ -536,11 +604,12 @@ const saveProfile = async () => {
       allergies: editForm.allergies,
       emergencyContact: { ...editForm.emergencyContact }
     })
+    if (!isCurrentProfileRequest(accountSubject, requestEpoch)) return
 
     if (response.data) {
       applyProfileSnapshot(response.data)
     } else {
-      await syncPatientProfileDTO()
+      await syncPatientProfileDTO(accountSubject, requestEpoch)
     }
 
     isEditing.value = false
@@ -553,6 +622,7 @@ const saveProfile = async () => {
     })
     await toast.present()
   } catch {
+    if (!isCurrentProfileRequest(accountSubject, requestEpoch)) return
     const toast = await toastController.create({
       message: '保存失败，请重试',
       duration: 2000,
@@ -609,11 +679,134 @@ const loadUserData = () => {
   Object.assign(profileData, userProfile)
 }
 
+const resetProfileState = () => {
+  profileRequestEpoch += 1
+  isEditing.value = false
+  Object.assign(editForm, {
+    name: '', phone: '', age: 0, gender: '', height: 0, weight: 0,
+    bloodType: '', allergies: '', emergencyContact: { name: '', phone: '', relationship: '' }
+  })
+  clearErrors()
+  userDataService.clearUserData()
+  healthDataService.clearHealthData()
+  loadUserData()
+  loadHealthData()
+}
+
 const clearLocalSession = () => {
   patientSession.clearAuthState()
   patientSession.clearGateState()
   userDataService.clearUserData()
   healthDataService.clearHealthData()
+}
+
+const relationshipText = (value: string) => ({
+  SPOUSE: '配偶', PARENT: '父母', CHILD: '子女', OTHER: '其他'
+}[value] || value)
+
+const resetFamilyState = () => {
+  familyRequestEpoch += 1
+  familyMutationEpoch += 1
+  familyBindings.value = []
+  canManageFamily.value = false
+  familyLoading.value = false
+  familySaving.value = false
+  familyForm.familyMobile = ''
+  familyForm.familyDisplayName = ''
+  familyForm.relationshipType = 'OTHER'
+}
+
+const resetAccountPageState = () => {
+  resetProfileState()
+  resetFamilyState()
+}
+
+const loadFamilyBindings = async () => {
+  const expectedAccountSubject = patientSession.getAccountSubject()
+  const expectedRequestEpoch = ++familyRequestEpoch
+  familyBindings.value = []
+  canManageFamily.value = false
+  familyLoading.value = true
+  if (!expectedAccountSubject) {
+    familyLoading.value = false
+    return
+  }
+  try {
+    const account = await appAuthService.getCurrentAccount()
+    if (expectedRequestEpoch !== familyRequestEpoch
+      || patientSession.getAccountSubject() !== expectedAccountSubject) return
+    canManageFamily.value = String((account.data as any)?.accountType || 'PATIENT').toUpperCase() === 'PATIENT'
+    if (!canManageFamily.value) return
+    const response = await patientService.getFamilyBindings()
+    if (expectedRequestEpoch !== familyRequestEpoch
+      || patientSession.getAccountSubject() !== expectedAccountSubject) return
+    familyBindings.value = response.data ?? []
+  } catch {
+    if (expectedRequestEpoch !== familyRequestEpoch
+      || patientSession.getAccountSubject() !== expectedAccountSubject) return
+    familyBindings.value = []
+  } finally {
+    if (expectedRequestEpoch === familyRequestEpoch) familyLoading.value = false
+  }
+}
+
+const addFamilyBinding = async () => {
+  if (!familyFormValid.value || familySaving.value) return
+  const expectedAccountSubject = patientSession.getAccountSubject()
+  const expectedMutationEpoch = ++familyMutationEpoch
+  if (!expectedAccountSubject) return
+  familySaving.value = true
+  try {
+    await patientService.createFamilyBinding({ ...familyForm, familyDisplayName: familyForm.familyDisplayName.trim() })
+    if (expectedMutationEpoch !== familyMutationEpoch
+      || patientSession.getAccountSubject() !== expectedAccountSubject) return
+    familyForm.familyMobile = ''
+    familyForm.familyDisplayName = ''
+    familyForm.relationshipType = 'OTHER'
+    await loadFamilyBindings()
+    const toast = await toastController.create({ message: '亲情号绑定成功', duration: 1800, color: 'success' })
+    await toast.present()
+  } catch (error: any) {
+    if (expectedMutationEpoch !== familyMutationEpoch
+      || patientSession.getAccountSubject() !== expectedAccountSubject) return
+    const toast = await toastController.create({ message: error?.message || '亲情号绑定失败', duration: 2200, color: 'danger' })
+    await toast.present()
+  } finally {
+    if (expectedMutationEpoch === familyMutationEpoch
+      && patientSession.getAccountSubject() === expectedAccountSubject) familySaving.value = false
+  }
+}
+
+const confirmUnbind = async (binding: AppFamilyBindingDTO) => {
+  const alert = await alertController.create({
+    header: '确认解绑亲情号？',
+    message: `解绑后 ${binding.displayName || '该亲友'} 将无法协助查看与打卡。`,
+    buttons: [
+      { text: '取消', role: 'cancel' },
+      {
+        text: '确认解绑',
+        role: 'destructive',
+        handler: () => {
+          const expectedAccountSubject = patientSession.getAccountSubject()
+          const expectedMutationEpoch = ++familyMutationEpoch
+          if (!expectedAccountSubject) return
+          void patientService.deleteFamilyBinding(binding.id)
+            .then(async () => {
+              if (expectedMutationEpoch !== familyMutationEpoch
+                || patientSession.getAccountSubject() !== expectedAccountSubject) return
+              await loadFamilyBindings()
+            })
+            .catch(async (error: any) => {
+              if (expectedMutationEpoch !== familyMutationEpoch
+                || patientSession.getAccountSubject() !== expectedAccountSubject) return
+              const toast = await toastController.create({ message: error?.message || '解绑失败', duration: 2200, color: 'danger' })
+              await toast.present()
+            })
+        }
+      }
+    ]
+  })
+  await alert.present()
 }
 
 const handleLogout = async () => {
@@ -628,35 +821,36 @@ const handleLogout = async () => {
   } catch {
     // ignore logout network failure and close local session
   } finally {
+    await cancelAllMedicationReminders().catch(() => undefined)
+    await clearMedicalCache().catch(() => undefined)
     clearLocalSession()
     logoutLoading.value = false
     await router.replace('/login')
   }
 }
 
-const onUserDataChange = (newProfile: UserProfile) => {
-  Object.assign(profileData, newProfile)
-}
+onMounted(() => {
+  window.addEventListener('patient-session-anonymous', resetAccountPageState)
+  window.addEventListener('patient-account-switched', resetAccountPageState)
+})
 
-onMounted(async () => {
-  if (!patientSession.getGateState().loggedIn) {
-    router.push('/login')
+onIonViewWillEnter(async () => {
+  resetAccountPageState()
+  const accountSubject = patientSession.getAccountSubject()
+  const requestEpoch = profileRequestEpoch
+  if (!patientSession.getGateState().loggedIn || !accountSubject) {
+    await router.replace('/login')
     return
   }
-
-  loadUserData()
-  loadHealthData()
-  userDataService.addListener(onUserDataChange)
-
-  try {
-    await Promise.all([syncPatientProfileDTO(), syncHealthProfile()])
-  } catch {
-    // keep current session cache when sync fails
-  }
+  void syncPatientProfileDTO(accountSubject, requestEpoch).catch(() => undefined)
+  void syncHealthProfile(accountSubject, requestEpoch).catch(() => undefined)
+  await loadFamilyBindings()
 })
 
 onUnmounted(() => {
-  userDataService.removeListener(onUserDataChange)
+  profileRequestEpoch += 1
+  window.removeEventListener('patient-session-anonymous', resetAccountPageState)
+  window.removeEventListener('patient-account-switched', resetAccountPageState)
 })
 </script>
 
@@ -921,6 +1115,38 @@ onUnmounted(() => {
   --border-radius: var(--patient-radius-md);
   height: 48px;
   font-weight: var(--patient-font-semibold);
+}
+
+.family-hint,
+.family-empty,
+.family-meta {
+  color: var(--patient-text-secondary);
+  font-size: var(--patient-font-helper);
+}
+
+.family-list {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: var(--patient-space-3);
+}
+
+.family-row {
+  min-height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: var(--patient-border-light);
+}
+
+.family-name {
+  color: var(--patient-text-primary);
+  font-weight: var(--patient-font-semibold);
+}
+
+.family-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--patient-space-2);
 }
 </style>
 
