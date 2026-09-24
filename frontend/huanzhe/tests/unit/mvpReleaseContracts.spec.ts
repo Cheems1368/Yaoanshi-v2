@@ -85,6 +85,14 @@ describe('MVP release patient contracts', () => {
     expect(reminderSource).toContain('请尽快处理')
   })
 
+  test('clears the cached home assessment when accounts change or task loading fails', () => {
+    const homeSource = readFileSync(resolve(process.cwd(), 'src/modules/patient/pages/HomePage.vue'), 'utf8')
+    const loadFlow = homeSource.slice(homeSource.indexOf('const loadDashboard'), homeSource.indexOf('const formatTime'))
+    expect(loadFlow).toContain('if (dashboardAccountSubject !== expectedAccountSubject) {')
+    expect(loadFlow).toMatch(/if \(dashboardAccountSubject !== expectedAccountSubject\) \{[\s\S]*?assessmentStatus\.value = null/)
+    expect(loadFlow).toMatch(/} catch \(error: any\) \{[\s\S]*?assessmentStatus\.value = null/)
+  })
+
   test('keeps submitted satisfaction visible and routes corrections through the offline queue', () => {
     const orderSource = readFileSync(resolve(process.cwd(), 'src/modules/patient/pages/HelpOrderDetailPage.vue'), 'utf8')
     const reminderSource = readFileSync(resolve(process.cwd(), 'src/modules/patient/pages/MedicationReminderPage.vue'), 'utf8')

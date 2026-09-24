@@ -173,6 +173,7 @@ const showToast = ref(false)
 const toastMessage = ref('')
 const assessmentStatus = ref<KnowledgeAssessmentStatusDTO | null>(null)
 let dashboardRequestEpoch = 0
+let dashboardAccountSubject: string | null = null
 
 const quickActions = [
   { id: 1, label: '处方上传', icon: 'documentTextOutline', color: 'primary', route: '/prescription' },
@@ -209,6 +210,12 @@ const loadDashboard = async () => {
   loading.value = true
   const expectedAccountSubject = patientSession.getAccountSubject()
   const expectedRequestEpoch = ++dashboardRequestEpoch
+  if (dashboardAccountSubject !== expectedAccountSubject) {
+    activePlan.value = null
+    todayTasks.value = []
+    assessmentStatus.value = null
+    dashboardAccountSubject = expectedAccountSubject
+  }
   try {
     const [planResponse, tasksResponse, assessmentResponse, accountResponse] = await Promise.all([
       medicationService.getActiveMedicationPlan().catch(() => ({ data: null })),
@@ -236,6 +243,7 @@ const loadDashboard = async () => {
       || expectedRequestEpoch !== dashboardRequestEpoch) return
     activePlan.value = null
     todayTasks.value = []
+    assessmentStatus.value = null
     patientSession.setActivePlanStatus(false)
     showMessage(error?.message || '首页数据加载失败')
   } finally {
