@@ -152,6 +152,7 @@ const showToast = ref(false)
 const toastMessage = ref('')
 const offlineMode = ref(false)
 let taskRequestEpoch = 0
+let taskAccountSubject: string | null = null
 
 const completedCount = computed(() => tasks.value.filter((task) => task.status === 'COMPLETED').length)
 const pendingCount = computed(() => tasks.value.filter((task) => !['COMPLETED', 'MISSED', 'SKIPPED'].includes(task.status)).length)
@@ -165,6 +166,13 @@ const loadTasks = async () => {
   loading.value = true
   const expectedAccountSubject = patientSession.getAccountSubject()
   const expectedRequestEpoch = ++taskRequestEpoch
+  if (taskAccountSubject !== expectedAccountSubject) {
+    activePlan.value = null
+    tasks.value = []
+    offlineMode.value = false
+    submittingTaskId.value = null
+    taskAccountSubject = expectedAccountSubject
+  }
   currentAccountType.value = patientSession.getAccountType() ?? 'UNKNOWN'
   try {
     const [planResponse, taskResponse, accountResponse] = await Promise.all([

@@ -46,6 +46,18 @@ class AppPatientServiceTest {
     private AppPatientService appPatientService;
 
     @Test
+    void shouldRejectFamilyAccountListingPatientFamilyBindings() {
+        AppAccount family = appAccount(2001L, "13900139000");
+        family.setAccountType("FAMILY");
+        when(appAccountMapper.selectActiveByMobile(1L, "13900139000")).thenReturn(family);
+
+        assertThatThrownBy(() -> appPatientService.getFamilyBindings("13900139000"))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("BAD_REQUEST");
+        verify(patientFamilyBindingMapper, never()).selectActiveByFamilyAccountId(1L, 2001L);
+    }
+
+    @Test
     void shouldRejectAnExistingPatientAccountAsAFamilyAccount() {
         AppAccount owner = appAccount(1001L, "13800138000");
         owner.setAccountType("PATIENT");
@@ -167,6 +179,7 @@ class AppPatientServiceTest {
     @Test
     void shouldReadCurrentPatientAndFamilyBindingsFromPersistence() {
         AppAccount appAccount = appAccount(1001L, "13800138000");
+        appAccount.setAccountType("PATIENT");
         Patient patient = new Patient();
         patient.setId(3001L);
         patient.setAppAccountId(1001L);

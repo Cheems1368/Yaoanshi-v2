@@ -93,6 +93,18 @@ describe('MVP release patient contracts', () => {
     expect(loadFlow).toMatch(/} catch \(error: any\) \{[\s\S]*?assessmentStatus\.value = null/)
   })
 
+  test('clears cached medication views and rejects old-account record responses', () => {
+    const reminderSource = readFileSync(resolve(process.cwd(), 'src/modules/patient/pages/MedicationReminderPage.vue'), 'utf8')
+    const tabSource = readFileSync(resolve(process.cwd(), 'src/modules/patient/pages/MedicationTabPage.vue'), 'utf8')
+    expect(reminderSource).toContain('if (taskAccountSubject !== expectedAccountSubject) {')
+    expect(reminderSource).toContain('tasks.value = []')
+    expect(tabSource).toContain('if (viewAccountSubject !== accountSubject) {')
+    expect(tabSource).toContain('records.value = []')
+    const recordLoadFlow = tabSource.slice(tabSource.indexOf('const loadRecords'), tabSource.indexOf('const correctRecord'))
+    expect(recordLoadFlow).toContain('expectedRequestEpoch !== recordRequestEpoch')
+    expect(recordLoadFlow).toContain('patientSession.getAccountSubject() !== expectedAccountSubject')
+  })
+
   test('keeps submitted satisfaction visible and routes corrections through the offline queue', () => {
     const orderSource = readFileSync(resolve(process.cwd(), 'src/modules/patient/pages/HelpOrderDetailPage.vue'), 'utf8')
     const reminderSource = readFileSync(resolve(process.cwd(), 'src/modules/patient/pages/MedicationReminderPage.vue'), 'utf8')
@@ -101,6 +113,8 @@ describe('MVP release patient contracts', () => {
     expect(reminderSource).toContain('const outcome = await submitOrQueueCheckin(task, result)')
     expect(tabSource).toContain('const outcome = await submitOrQueueCheckin(task, result)')
     expect(tabSource).toContain('submitOrQueueCheckin({ id: record.doseTaskId, lastEffectiveCheckinId: record.id }, result)')
+    expect(tabSource).toContain('pendingRecordCorrections.value = { ...pendingRecordCorrections.value, [record.id]: result }')
+    expect(tabSource).toContain('更正已加密保存，待联网同步')
     expect(tabSource).not.toContain('medicationService.correctCheckin(record.id')
   })
 

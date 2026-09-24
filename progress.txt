@@ -1057,3 +1057,4 @@ Last Updated
 - 2026-09-24：PR #42 复审修复并发剂次打卡：事务内先锁定剂次，迟到的首次提交建立更正审计链，并发更正指向锁后最新有效记录；“服药记录”更正也走原生加密离线队列。后端 clean verify、患者端 83 项单测、lint、Web 与 Android debug 构建、git diff --check 通过；最新受保护 CI 与复审仍待完成。
 - 2026-09-24：PR #42 后续复审补齐 APK 实时通知 WebSocket Origin：默认允许正式 `https://localhost` 与本地调试 `http://localhost`，生产默认只允许前者，其他正式来源须显式配置 `MEDICINE_APP_WS_ALLOWED_ORIGINS`。新增配置回归测试，后端 clean verify 通过；最新 CI 与复审仍待完成。
 - 2026-09-24：PR #42 最新复审修复 Ionic 首页账号切换时测评卡片残留：新账号开始加载即清空旧账号首页计划、任务和测评状态，任务加载失败时亦清空测评状态。患者端 84 项单测、lint、Web 与 Android debug 构建、`e2e:mvp-release` 通过；最新 CI 与复审仍待完成。
+- 2026-09-24：同类账号隔离审计补齐两个用药入口：新账号开始加载时清空旧计划、剂次及服药记录；记录请求按账号和请求代数拒绝迟到响应。最新复审同时补齐服务端亲情号列表 PATIENT 权限检查，离线记录更正在卡片和汇总中立即投影所选结果、标为待同步并避免重复点击。后端 clean verify、患者端 85 项单测、lint、Web 与 Android debug 构建、`e2e:mvp-release` 和 git diff --check 通过；最新 CI 与复审仍待完成。

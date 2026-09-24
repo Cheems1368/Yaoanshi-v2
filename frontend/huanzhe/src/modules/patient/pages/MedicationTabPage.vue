@@ -142,16 +142,17 @@
                 <div class="record-meta">{{ formatDateTime(record.actualTakenAt || record.createdAt) }}</div>
                 <div class="record-meta">提交人：{{ operatorText(record.operatorType) }}</div>
               </div>
-              <ion-badge :color="resultColor(record.result)">{{ resultText(record.result) }}</ion-badge>
+              <ion-badge :color="resultColor(pendingRecordCorrections[record.id] || record.result)">{{ resultText(pendingRecordCorrections[record.id] || record.result) }}</ion-badge>
             </div>
             <div v-if="record.note" class="record-note">{{ record.note }}</div>
             <div v-if="record.skipReason" class="record-note">原因：{{ record.skipReason }}</div>
             <div v-if="!record.effective" class="record-note muted">已被后续更正覆盖</div>
+            <div v-if="pendingRecordCorrections[record.id]" class="record-note">更正已加密保存，待联网同步</div>
             <div v-if="record.effective" class="record-actions">
-              <ion-button size="small" color="success" fill="outline" :disabled="correctingRecordId === record.id" @click="correctRecord(record, 'TAKEN')">
+              <ion-button size="small" color="success" fill="outline" :disabled="correctingRecordId === record.id || Boolean(pendingRecordCorrections[record.id])" @click="correctRecord(record, 'TAKEN')">
                 更正为已服药
               </ion-button>
-              <ion-button size="small" color="warning" fill="outline" :disabled="correctingRecordId === record.id" @click="correctRecord(record, 'MISSED')">
+              <ion-button size="small" color="warning" fill="outline" :disabled="correctingRecordId === record.id || Boolean(pendingRecordCorrections[record.id])" @click="correctRecord(record, 'MISSED')">
                 更正为漏服
               </ion-button>
             </div>
@@ -216,6 +217,7 @@ const currentAccountType = ref('UNKNOWN')
 const submittingTaskId = ref<number | null>(null)
 const offlineMode = ref(false)
 let taskRequestEpoch = 0
+let viewAccountSubject: string | null = null
 
 const reminderCompletedCount = computed(() => tasks.value.filter((t) => t.status === 'COMPLETED').length)
 const pendingCount = computed(() =>
@@ -334,39 +336,53 @@ const reminderNotice = (task: DoseTaskDTO) => {
 const recordLoading = ref(false)
 const records = ref<CheckinRecordDTO[]>([])
 const correctingRecordId = ref<number | null>(null)
+const pendingRecordCorrections = ref<Record<number, 'TAKEN' | 'MISSED'>>({})
+let recordRequestEpoch = 0
 
 const effectiveCount = computed(() => records.value.filter((r) => r.effective).length)
 const recordCompletedCount = computed(
-  () => records.value.filter((r) => r.effective && r.result === 'TAKEN').length
+  () => records.value.filter((r) => r.effective && (pendingRecordCorrections.value[r.id] || r.result) === 'TAKEN').length
 )
 
 const loadRecords = async () => {
   recordLoading.value = true
+  const expectedAccountSubject = patientSession.getAccountSubject()
+  const expectedRequestEpoch = ++recordRequestEpoch
   try {
     const res = await medicationService.getCheckins({ pageNo: 1, pageSize: 30 })
+    if (!expectedAccountSubject || patientSession.getAccountSubject() !== expectedAccountSubject
+      || expectedRequestEpoch !== recordRequestEpoch) return
     records.value = res.data?.list ?? []
+    pendingRecordCorrections.value = {}
   } catch {
+    if (!expectedAccountSubject || patientSession.getAccountSubject() !== expectedAccountSubject
+      || expectedRequestEpoch !== recordRequestEpoch) return
     records.value = []
     showMessage('服药记录加载失败')
   } finally {
-    recordLoading.value = false
+    if (patientSession.getAccountSubject() === expectedAccountSubject
+      && expectedRequestEpoch === recordRequestEpoch) recordLoading.value = false
   }
 }
 
 const correctRecord = async (record: CheckinRecordDTO, result: 'TAKEN' | 'MISSED') => {
+  const expectedAccountSubject = patientSession.getAccountSubject()
   correctingRecordId.value = record.id
   try {
     const outcome = await submitOrQueueCheckin({ id: record.doseTaskId, lastEffectiveCheckinId: record.id }, result)
+    if (!expectedAccountSubject || patientSession.getAccountSubject() !== expectedAccountSubject
+      || viewAccountSubject !== expectedAccountSubject) return
     if (outcome === 'queued') {
+      pendingRecordCorrections.value = { ...pendingRecordCorrections.value, [record.id]: result }
       showMessage('更正已加密保存，将在联网后自动同步')
       return
     }
     showMessage(result === 'TAKEN' ? '已更正为已服药' : '已更正为漏服')
     await loadRecords()
   } catch {
-    showMessage('更正失败')
+    if (patientSession.getAccountSubject() === expectedAccountSubject) showMessage('更正失败')
   } finally {
-    correctingRecordId.value = null
+    if (patientSession.getAccountSubject() === expectedAccountSubject) correctingRecordId.value = null
   }
 }
 
@@ -396,7 +412,20 @@ const showMessage = (message: string) => {
   showToast.value = true
 }
 
-const loadAll = () => Promise.all([loadTasks(), loadRecords()])
+const loadAll = () => {
+  const accountSubject = patientSession.getAccountSubject()
+  if (viewAccountSubject !== accountSubject) {
+    activePlan.value = null
+    tasks.value = []
+    records.value = []
+    pendingRecordCorrections.value = {}
+    offlineMode.value = false
+    submittingTaskId.value = null
+    correctingRecordId.value = null
+    viewAccountSubject = accountSubject
+  }
+  return Promise.all([loadTasks(), loadRecords()])
+}
 
 async function handleRefresh(event: CustomEvent) {
   try {
