@@ -67,7 +67,7 @@ medicine:
       ticket-ttl-seconds: ${MEDICINE_ADMIN_WS_TICKET_TTL_SECONDS:30}
   app-notifications:
     websocket:
-      allowed-origins: ${MEDICINE_APP_WS_ALLOWED_ORIGINS:http://localhost:3001,http://127.0.0.1:3001,http://localhost:5173,http://127.0.0.1:5173}
+      allowed-origins: ${MEDICINE_APP_WS_ALLOWED_ORIGINS:https://localhost,http://localhost,http://localhost:3001,http://127.0.0.1:3001,http://localhost:5173,http://127.0.0.1:5173}
       ticket-ttl-seconds: ${MEDICINE_APP_WS_TICKET_TTL_SECONDS:30}
   storage:
     endpoint: ${MEDICINE_STORAGE_ENDPOINT:http://127.0.0.1:9000}
