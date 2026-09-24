@@ -22,7 +22,7 @@ Rules:
 - Recheck HEAD/gates immediately before an authorized merge and verify post-merge main CI. Preserve unaffected Android/Docker acceptance with its original provenance; rerun only evidence invalidated by relevant changes.
 - Durable rules belong here; incident sources, fix revisions, validation outcomes and the next action belong in `progress.txt`. The project-specific skill holds the detailed root-cause checklist, not transient release status.
 
-## 1.5 Execution Status Summary (as of 2026-09-18)
+## 1.5 Execution Status Summary (as of 2026-09-24)
 
 | Phase | Description | Status |
 |-------|-------------|--------|
@@ -39,7 +39,7 @@ Rules:
 | Phase T6 | Android JDK 21 and enforced APK build gate | ✅ Delivered through PR #37 (`98115b9`) |
 | Phase T7 | SEC-002 refresh-token HttpOnly Cookie closure | ✅ Delivered through PR #39 (`4c90292`) |
 | Phase T8 | SEC-005 AI data-boundary closure | ✅ Delivered through PR #40 (`fc3b646`); post-merge `main` CI run `32570783413` passed |
-| Phase T9 | MVP v0.1.0 formal delivery and gap closure | 🚧 PR A delivered through PR #41 (`2614271`); PR B patient implementation and physical Android acceptance are complete, with protected review qualification in progress |
+| Phase T9 | MVP v0.1.0 formal delivery and gap closure | 🚧 PR A delivered through PR #41 (`2614271`); PR B delivered through PR #42 (`db00636`), post-merge main CI `36001150025` passed; PR C professional-client/operations/release closure remains |
 
 **Current active work:** T9 closes the remaining MVP contract, patient, professional-client, reliability, operations, and release-evidence gaps through three protected PRs. T8/SEC-005 is formally delivered. Android release signing and store publishing remain out of scope.
 
