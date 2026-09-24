@@ -315,28 +315,80 @@ describe('native offline medication flow', () => {
     expect(pending.correction.result).toBe('TAKEN')
 
     Object.defineProperty(navigator, 'onLine', { configurable: true, value: true })
-    mocks.correctCheckin.mockResolvedValue({ data: { id: 702 } })
+    mocks.correctCheckin
+      .mockResolvedValueOnce({ data: { id: 702, result: 'MISSED' } })
+      .mockResolvedValueOnce({ data: { id: 703, result: 'TAKEN' } })
     await expect(replayPendingCheckins()).resolves.toBe(1)
     expect(mocks.correctCheckin).toHaveBeenCalledWith(701, expect.objectContaining({
       clientRequestId: firstPending.clientRequestId, result: 'MISSED'
     }))
-    expect(mocks.correctCheckin).toHaveBeenCalledWith(701, expect.objectContaining({
+    expect(mocks.correctCheckin).toHaveBeenCalledWith(702, expect.objectContaining({
       clientRequestId: pending.correction.clientRequestId, result: 'TAKEN'
     }))
     expect(mocks.submitCheckin).not.toHaveBeenCalled()
     expect(JSON.parse(storedValue).pendingCheckins).toEqual([])
-    expect(JSON.parse(storedValue).tasks[0]).toMatchObject({ status: 'COMPLETED', lastEffectiveCheckinId: 702 })
+    expect(JSON.parse(storedValue).tasks[0]).toMatchObject({ status: 'COMPLETED', lastEffectiveCheckinId: 703 })
+  })
+
+  test('targets the current effective record when an idempotent first correction was superseded', async () => {
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: true })
+    let storedValue = JSON.stringify({
+      version: 2, accountSubject: 'patient-1', tasksExpiresAt: Date.now() + 60_000,
+      tasks: [{ ...cachedTask, lastEffectiveCheckinId: 701 }],
+      pendingCheckins: [{
+        clientRequestId: 'first-correction', doseTaskId: 7, existingCheckinId: 701,
+        result: 'MISSED', actualTakenAt: new Date().toISOString(), expiresAt: Date.now() + 60_000,
+        correction: { clientRequestId: 'second-correction', result: 'TAKEN', actualTakenAt: new Date().toISOString() }
+      }]
+    })
+    mocks.read.mockImplementation(async () => ({ value: storedValue }))
+    mocks.write.mockImplementation(async ({ value }) => { storedValue = value })
+    mocks.correctCheckin
+      .mockResolvedValueOnce({ data: { id: 702, result: 'MISSED', effective: false } })
+      .mockResolvedValueOnce({ data: { id: 889, result: 'TAKEN', effective: true } })
+    mocks.getDoseTasks.mockResolvedValue({ data: [{ ...cachedTask, lastEffectiveCheckinId: 888 }] })
+
+    await expect(replayPendingCheckins()).resolves.toBe(1)
+    expect(mocks.correctCheckin).toHaveBeenCalledWith(888, expect.objectContaining({
+      clientRequestId: 'second-correction'
+    }))
+    expect(JSON.parse(storedValue).tasks[0].lastEffectiveCheckinId).toBe(889)
   })
 
   test('corrects an existing server check-in directly when online', async () => {
     Object.defineProperty(navigator, 'onLine', { configurable: true, value: true })
-    mocks.correctCheckin.mockResolvedValue({ data: { id: 702 } })
+    let storedValue = JSON.stringify({
+      version: 2, accountSubject: 'patient-1', tasksExpiresAt: Date.now() + 60_000,
+      tasks: [{ ...cachedTask, status: 'COMPLETED', lastEffectiveCheckinId: 701 }], pendingCheckins: []
+    })
+    mocks.read.mockImplementation(async () => ({ value: storedValue }))
+    mocks.write.mockImplementation(async ({ value }) => { storedValue = value })
+    mocks.correctCheckin.mockResolvedValue({ data: { id: 702, result: 'MISSED', effective: true } })
 
     await expect(submitOrQueueCheckin({ ...cachedTask, lastEffectiveCheckinId: 701 } as any, 'MISSED'))
       .resolves.toBe('submitted')
     expect(mocks.correctCheckin).toHaveBeenCalledWith(701, expect.objectContaining({ result: 'MISSED' }))
     expect(mocks.submitCheckin).not.toHaveBeenCalled()
-    expect(mocks.write).not.toHaveBeenCalled()
+    expect(JSON.parse(storedValue).tasks[0]).toMatchObject({ status: 'MISSED', lastEffectiveCheckinId: 702 })
+    expect(mocks.cancelReminder).toHaveBeenCalledWith(7)
+  })
+
+  test('persists a direct check-in before an offline restart without a task refresh', async () => {
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: true })
+    let storedValue = JSON.stringify({
+      version: 2, accountSubject: 'patient-1', tasksExpiresAt: Date.now() + 60_000,
+      tasks: [cachedTask], pendingCheckins: []
+    })
+    mocks.read.mockImplementation(async () => ({ value: storedValue }))
+    mocks.write.mockImplementation(async ({ value }) => { storedValue = value })
+    mocks.submitCheckin.mockResolvedValue({ data: { id: 701, result: 'TAKEN', effective: true } })
+
+    await expect(submitOrQueueCheckin(cachedTask as any, 'TAKEN')).resolves.toBe('submitted')
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: false })
+    await expect(getCachedDoseTasks()).resolves.toEqual([expect.objectContaining({
+      id: 7, status: 'COMPLETED', lastEffectiveCheckinId: 701, notificationStatus: 'ACKED', reminderStage: 'HANDLED'
+    })])
+    expect(mocks.cancelReminder).toHaveBeenCalledWith(7)
   })
 
   test('merges a new online choice into an existing queue before direct submission', async () => {

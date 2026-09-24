@@ -288,9 +288,10 @@ export async function submitOrQueueCheckin(
     }
   }
 
+  let submitted: Awaited<ReturnType<typeof medicationService.submitCheckin>>
   try {
     if (payload.existingCheckinId) {
-      await medicationService.correctCheckin(payload.existingCheckinId, {
+      submitted = await medicationService.correctCheckin(payload.existingCheckinId, {
         clientRequestId: payload.clientRequestId,
         result: payload.result,
         actualTakenAt: payload.actualTakenAt,
@@ -298,9 +299,8 @@ export async function submitOrQueueCheckin(
         skipReason: payload.skipReason
       })
     } else {
-      await medicationService.submitCheckin(payload)
+      submitted = await medicationService.submitCheckin(payload)
     }
-    return 'submitted'
   } catch (error) {
     const message = error instanceof Error ? error.message : ''
     if (!isNative() || !canUseOfflineCache(message)) throw error
@@ -310,6 +310,41 @@ export async function submitOrQueueCheckin(
     await mergePendingCheckin(payload, expectedAccountSubject, true)
     return 'queued'
   }
+  if (isNative() && expectedAccountSubject && submitted.data?.id) {
+    if (patientSession.getAccountSubject() !== expectedAccountSubject) {
+      throw new Error('AUTHENTICATED_ACCOUNT_CHANGED')
+    }
+    let authoritativeTask: DoseTaskDTO | null | undefined
+    if (submitted.data.effective === false) {
+      if (task.taskDate) {
+        const response = await medicationService.getDoseTasks(task.taskDate, task.taskDate)
+        authoritativeTask = response.data.find((item) => item.id === task.id) ?? null
+      } else {
+        authoritativeTask = null
+      }
+    }
+    await mutateState((state) => {
+      if (state.accountSubject !== expectedAccountSubject
+        || patientSession.getAccountSubject() !== expectedAccountSubject) {
+        throw new Error('AUTHENTICATED_ACCOUNT_CHANGED')
+      }
+      const taskIndex = state.tasks.findIndex((item) => item.id === task.id)
+      if (taskIndex < 0) return
+      if (authoritativeTask === null) state.tasks.splice(taskIndex, 1)
+      else if (authoritativeTask) state.tasks[taskIndex] = authoritativeTask
+      else {
+        const cachedTask = state.tasks[taskIndex]
+        cachedTask.status = (submitted.data.result || payload.result) === 'MISSED' ? 'MISSED' : 'COMPLETED'
+        cachedTask.lastEffectiveCheckinId = submitted.data.id
+        cachedTask.notificationStatus = 'ACKED'
+        cachedTask.reminderStage = 'HANDLED'
+      }
+    })
+    if (patientSession.getAccountSubject() === expectedAccountSubject) {
+      await cancelMedicationReminder(task.id).catch(() => undefined)
+    }
+  }
+  return 'submitted'
 }
 
 interface ReplayAttempt {
@@ -346,9 +381,15 @@ async function replayPendingCheckinsInternal(accountSubject: string) {
             })
         let effectiveRecord = submitted.data
         if (replaySnapshot.correction) {
-          const originalId = replaySnapshot.existingCheckinId ?? submitted.data?.id
-          if (!originalId) break
-          const corrected = await medicationService.correctCheckin(originalId, replaySnapshot.correction)
+          let correctionTargetId: number | null | undefined = submitted.data?.id ?? replaySnapshot.existingCheckinId
+          if (submitted.data?.effective === false) {
+            const cachedTask = (await readState()).tasks.find((task) => task.id === replaySnapshot?.doseTaskId)
+            if (!cachedTask?.taskDate) break
+            const response = await medicationService.getDoseTasks(cachedTask.taskDate, cachedTask.taskDate)
+            correctionTargetId = response.data.find((task) => task.id === replaySnapshot?.doseTaskId)?.lastEffectiveCheckinId
+          }
+          if (!correctionTargetId) break
+          const corrected = await medicationService.correctCheckin(correctionTargetId, replaySnapshot.correction)
           effectiveRecord = corrected.data
         }
         if (!effectiveRecord?.id) break
