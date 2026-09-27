@@ -7,6 +7,11 @@ import com.medicine.api.dto.identity.PatientReassignRequest;
 import com.medicine.common.model.CommonResult;
 import com.medicine.common.model.PageResult;
 import com.medicine.service.admin.AdminPatientService;
+import com.medicine.service.admin.AdherenceService;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import java.nio.charset.StandardCharsets;
 import com.medicine.service.auth.JwtClaims;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -65,5 +70,21 @@ public class AdminPatientController {
     @PostMapping("/{id}/knowledge-assessments/remind")
     public CommonResult<Boolean> remindKnowledgeAssessment(@PathVariable("id") Long id, Authentication authentication) {
         return CommonResult.ok(adminPatientService.remindKnowledgeAssessment((JwtClaims) authentication.getDetails(), id));
+    }
+
+    @GetMapping("/{id}/adherence-summary")
+    public CommonResult<AdherenceService.Summary> adherenceSummary(@PathVariable("id") Long id,
+            @RequestParam(value = "days", defaultValue = "30") int days, Authentication authentication) {
+        return CommonResult.ok(adminPatientService.getPatientAdherence((JwtClaims) authentication.getDetails(), id, days));
+    }
+
+    @GetMapping("/{id}/adherence-report.csv")
+    public ResponseEntity<byte[]> adherenceCsv(@PathVariable("id") Long id,
+            @RequestParam(value = "days", defaultValue = "30") int days, Authentication authentication) {
+        String csv = adminPatientService.exportPatientAdherence((JwtClaims) authentication.getDetails(), id, days);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=patient-adherence-" + id + "-" + days + "d.csv")
+                .contentType(MediaType.parseMediaType("text/csv;charset=UTF-8"))
+                .body(csv.getBytes(StandardCharsets.UTF_8));
     }
 }

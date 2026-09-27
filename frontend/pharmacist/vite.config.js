@@ -10,6 +10,7 @@ export default defineConfig(({ mode }) => {
   const backendV2AdminPrefixes = [
     '/admin-api/system',
     '/admin-api/patients',
+    '/admin-api/pharmacists',
     '/admin-api/prescriptions',
     '/admin-api/ddi',
     '/admin-api/medication-plans',
@@ -23,7 +24,10 @@ export default defineConfig(({ mode }) => {
     proxy[prefix] = {
       target: backendV2Target,
       changeOrigin: true,
-      secure: false
+      secure: false,
+      configure(proxy) {
+        proxy.on('proxyReq', (request) => request.removeHeader('origin'))
+      }
     }
   })
 

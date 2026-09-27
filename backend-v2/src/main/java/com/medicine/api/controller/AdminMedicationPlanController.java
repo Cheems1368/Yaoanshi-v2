@@ -3,6 +3,7 @@ package com.medicine.api.controller;
 import com.medicine.api.dto.ddi.AdminDdiScreenResult;
 import com.medicine.api.dto.medication.DoseTaskDTO;
 import com.medicine.api.dto.medication.MedicationPlanDTO;
+import com.medicine.api.dto.medication.PlanActivationRequest;
 import com.medicine.common.model.CommonResult;
 import com.medicine.service.admin.AdminMedicationPlanService;
 import com.medicine.service.auth.JwtClaims;
@@ -43,8 +44,20 @@ public class AdminMedicationPlanController {
     }
 
     @PostMapping("/{id}/activate")
-    public CommonResult<MedicationPlanDTO> activatePlan(@PathVariable("id") Long id, Authentication authentication) {
-        return CommonResult.ok(adminMedicationPlanService.activatePlan((JwtClaims) authentication.getDetails(), id));
+    public CommonResult<MedicationPlanDTO> activatePlan(@PathVariable("id") Long id,
+                                                         @RequestBody(required = false) PlanActivationRequest request,
+                                                         Authentication authentication) {
+        return CommonResult.ok(adminMedicationPlanService.activatePlan((JwtClaims) authentication.getDetails(), id, request));
+    }
+
+    @PostMapping("/{id}/stop")
+    public CommonResult<MedicationPlanDTO> stopPlan(@PathVariable("id") Long id, Authentication authentication) {
+        return CommonResult.ok(adminMedicationPlanService.stopPlan((JwtClaims) authentication.getDetails(), id));
+    }
+
+    @GetMapping("/{id}/activation-conflicts")
+    public CommonResult<List<DoseTaskDTO>> getActivationConflicts(@PathVariable("id") Long id, Authentication authentication) {
+        return CommonResult.ok(adminMedicationPlanService.getActivationConflicts((JwtClaims) authentication.getDetails(), id));
     }
 
     @GetMapping("/{id}")

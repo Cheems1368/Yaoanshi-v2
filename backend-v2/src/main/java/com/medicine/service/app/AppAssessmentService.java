@@ -27,6 +27,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
+import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.util.HashSet;
 import java.util.List;
@@ -34,6 +35,7 @@ import java.util.Set;
 
 @Service
 public class AppAssessmentService {
+    private static final ZoneId SHANGHAI = ZoneId.of("Asia/Shanghai");
     private static final long DEFAULT_TENANT_ID = 1L;
     private static final Set<String> PHASES = Set.of("DAY_1", "WEEK_4");
 
@@ -65,7 +67,7 @@ public class AppAssessmentService {
 
     public KnowledgeAssessmentStatusDTO getKnowledgeStatus(String subject) {
         AppPatientService.AccessContext context = appPatientService.requireAccessContext(subject);
-        return buildKnowledgeStatus(context.patient().getId(), LocalDate.now(ZoneOffset.UTC));
+        return buildKnowledgeStatus(context.patient().getId(), LocalDate.now(SHANGHAI));
     }
 
     @Transactional
@@ -75,7 +77,7 @@ public class AppAssessmentService {
         }
         String phase = normalizePhase(request.getPhase());
         AppPatientService.AccessContext context = appPatientService.requireAccessContext(subject);
-        KnowledgeAssessmentStatusDTO status = buildKnowledgeStatus(context.patient().getId(), LocalDate.now(ZoneOffset.UTC));
+        KnowledgeAssessmentStatusDTO status = buildKnowledgeStatus(context.patient().getId(), LocalDate.now(SHANGHAI));
         if (!status.isDue() || !phase.equals(status.getCurrentPhase())) {
             throw new BusinessException(409, "KNOWLEDGE_ASSESSMENT_NOT_DUE");
         }
@@ -164,7 +166,7 @@ public class AppAssessmentService {
         status.setDay1(toKnowledgeDto(day1));
         status.setWeek4(toKnowledgeDto(week4));
         if (firstActivatedAt == null) return status;
-        LocalDate startDate = firstActivatedAt.toLocalDate();
+        LocalDate startDate = firstActivatedAt.atOffset(ZoneOffset.UTC).atZoneSameInstant(SHANGHAI).toLocalDate();
         if (today.isBefore(startDate)) {
             status.setPlanStartDate(startDate.toString());
             return status;

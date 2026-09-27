@@ -44,6 +44,19 @@ public class AdminNotificationController {
         );
     }
 
+    @GetMapping("/me/baseline")
+    public CommonResult<AdminNotificationService.Cursor> baseline(Authentication authentication) {
+        return CommonResult.ok(adminNotificationService.baseline((JwtClaims) authentication.getDetails()));
+    }
+
+    @GetMapping("/me/logs")
+    public CommonResult<AdminNotificationService.PersonalPage> personalLogs(
+            @RequestParam(value = "afterId", defaultValue = "0") long afterId,
+            @RequestParam(value = "limit", defaultValue = "50") int limit,
+            Authentication authentication) {
+        return CommonResult.ok(adminNotificationService.personalLogs((JwtClaims) authentication.getDetails(), afterId, limit));
+    }
+
     @PostMapping("/socket-ticket")
     public CommonResult<AdminNotificationSocketTicketResponse> createSocketTicket(Authentication authentication) {
         if (!(authentication.getCredentials() instanceof String token) || !StringUtils.hasText(token)) {

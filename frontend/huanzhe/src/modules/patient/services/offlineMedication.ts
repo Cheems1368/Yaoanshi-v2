@@ -6,6 +6,7 @@ import { cancelAllMedicationReminders, cancelMedicationReminder } from '@/module
 const CACHE_TTL_MS = 48 * 60 * 60 * 1000
 export const OFFLINE_CHECKIN_CONFLICT_EVENT = 'patient-offline-checkin-conflict'
 let offlineCheckinConflictCount = 0
+let offlineCheckinCancelledCount = 0
 
 export function consumeOfflineCheckinConflictCount() {
   const count = offlineCheckinConflictCount
@@ -13,8 +14,15 @@ export function consumeOfflineCheckinConflictCount() {
   return count
 }
 
-function notifyOfflineCheckinConflict() {
+export function consumeOfflineCheckinCancelledCount() {
+  const count = offlineCheckinCancelledCount
+  offlineCheckinCancelledCount = 0
+  return count
+}
+
+function notifyOfflineCheckinConflict(cancelled = false) {
   offlineCheckinConflictCount += 1
+  if (cancelled) offlineCheckinCancelledCount += 1
   if (typeof window !== 'undefined') window.dispatchEvent(new Event(OFFLINE_CHECKIN_CONFLICT_EVENT))
 }
 
@@ -22,8 +30,8 @@ interface PendingCheckin {
   clientRequestId: string
   doseTaskId: number
   existingCheckinId?: number
-  result: 'TAKEN' | 'MISSED'
-  actualTakenAt: string
+  result: 'TAKEN' | 'MISSED' | 'SKIPPED'
+  actualTakenAt?: string
   note?: string
   skipReason?: string
 }
@@ -150,12 +158,19 @@ function applyPendingCheckins(tasks: DoseTaskDTO[], pendingCheckins: CachedPendi
     const pending = pendingByTaskId.get(task.id)
     if (!pending) return task
     const visibleResult = pending.correction?.result ?? pending.result
-    return { ...task, status: visibleResult === 'TAKEN' ? 'COMPLETED' : 'MISSED' }
+    return { ...task, status: visibleResult === 'TAKEN' ? 'COMPLETED' : visibleResult === 'SKIPPED' ? 'SKIPPED' : 'MISSED' }
   })
 }
 
 const makeRequestId = () => globalThis.crypto?.randomUUID?.()
   ?? `checkin-${Date.now()}-${Math.random().toString(16).slice(2)}`
+
+export function toShanghaiIso(localValue?: string) {
+  if (!localValue) return undefined
+  const date = new Date(`${localValue.length === 16 ? `${localValue}:00` : localValue}+08:00`)
+  if (Number.isNaN(date.getTime())) throw new Error('实际服药时间无效')
+  return date.toISOString()
+}
 
 async function mergePendingCheckin(
   payload: PendingCheckin,
@@ -220,23 +235,22 @@ export async function getCachedDoseTasks() {
 }
 
 const formatLocalDate = (date: Date) => {
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
+  return new Intl.DateTimeFormat('sv-SE', {
+    timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit'
+  }).format(date)
 }
 
 export async function loadMedicationTasks(days = 3): Promise<{ tasks: DoseTaskDTO[]; offline: boolean }> {
   const accountSubject = patientSession.getAccountSubject()
-  const dateFrom = new Date()
-  const dateTo = new Date()
-  dateTo.setDate(dateTo.getDate() + Math.min(Math.max(days, 1), 7) - 1)
+  const dateFrom = formatLocalDate(new Date())
+  const dateTo = new Date(`${dateFrom}T00:00:00+08:00`)
+  dateTo.setUTCDate(dateTo.getUTCDate() + Math.min(Math.max(days, 1), 7) - 1)
   try {
     await replayPendingCheckins()
     if (isNative() && (!accountSubject || patientSession.getAccountSubject() !== accountSubject)) {
       throw new Error('AUTHENTICATED_ACCOUNT_CHANGED')
     }
-    const response = await medicationService.getDoseTasks(formatLocalDate(dateFrom), formatLocalDate(dateTo))
+    const response = await medicationService.getDoseTasks(dateFrom, formatLocalDate(dateTo))
     if (isNative() && patientSession.getAccountSubject() !== accountSubject) {
       throw new Error('AUTHENTICATED_ACCOUNT_CHANGED')
     }
@@ -260,7 +274,8 @@ export async function loadMedicationTasks(days = 3): Promise<{ tasks: DoseTaskDT
 
 export async function submitOrQueueCheckin(
   task: Pick<DoseTaskDTO, 'id' | 'lastEffectiveCheckinId' | 'taskDate'>,
-  result: 'TAKEN' | 'MISSED'
+  result: 'TAKEN' | 'MISSED' | 'SKIPPED',
+  options: { actualTakenAt?: string; skipReason?: string } = {}
 ): Promise<'submitted' | 'queued'> {
   const expectedAccountSubject = patientSession.getAccountSubject()
   const payload: PendingCheckin = {
@@ -268,9 +283,9 @@ export async function submitOrQueueCheckin(
     doseTaskId: task.id,
     existingCheckinId: task.lastEffectiveCheckinId ?? undefined,
     result,
-    actualTakenAt: new Date().toISOString(),
+    actualTakenAt: result === 'TAKEN' ? (options.actualTakenAt || new Date().toISOString()) : undefined,
     note: result === 'TAKEN' ? '患者端提交' : '',
-    skipReason: result === 'MISSED' ? 'PATIENT_REPORTED' : ''
+    skipReason: options.skipReason?.trim() || undefined
   }
 
   if (isNative() && expectedAccountSubject) {
@@ -334,7 +349,8 @@ export async function submitOrQueueCheckin(
       else if (authoritativeTask) state.tasks[taskIndex] = authoritativeTask
       else {
         const cachedTask = state.tasks[taskIndex]
-        cachedTask.status = (submitted.data.result || payload.result) === 'MISSED' ? 'MISSED' : 'COMPLETED'
+        const result = submitted.data.result || payload.result
+        cachedTask.status = result === 'TAKEN' ? 'COMPLETED' : result === 'SKIPPED' ? 'SKIPPED' : 'MISSED'
         cachedTask.lastEffectiveCheckinId = submitted.data.id
         cachedTask.notificationStatus = 'ACKED'
         cachedTask.reminderStage = 'HANDLED'
@@ -425,7 +441,7 @@ async function replayPendingCheckinsInternal(accountSubject: string) {
           } else if (taskIndex >= 0) {
             const cachedTask = currentState.tasks[taskIndex]
             const result = current.correction?.result ?? current.result
-            cachedTask.status = result === 'TAKEN' ? 'COMPLETED' : 'MISSED'
+            cachedTask.status = result === 'TAKEN' ? 'COMPLETED' : result === 'SKIPPED' ? 'SKIPPED' : 'MISSED'
             cachedTask.lastEffectiveCheckinId = effectiveRecord.id
             cachedTask.notificationStatus = 'ACKED'
             cachedTask.reminderStage = 'HANDLED'
@@ -448,7 +464,8 @@ async function replayPendingCheckinsInternal(accountSubject: string) {
       if (patientSession.getAccountSubject() !== accountSubject) return synced
       const errorCode = (error as { code?: number })?.code
       const message = error instanceof Error ? error.message : ''
-      if (errorCode === 40009 || message === 'DOSE_TASK_EDIT_WINDOW_EXPIRED') {
+      if (errorCode === 40009 || errorCode === 40036 ||
+          message === 'DOSE_TASK_EDIT_WINDOW_EXPIRED' || message === 'DOSE_TASK_CANCELLED') {
         const cachedTask = (await readState()).tasks.find((task) => task.id === pending.doseTaskId)
         let authoritativeTask: DoseTaskDTO | null = null
         if (cachedTask?.taskDate) {
@@ -477,7 +494,7 @@ async function replayPendingCheckinsInternal(accountSubject: string) {
           return true
         })
         if (removed && patientSession.getAccountSubject() === accountSubject) {
-          notifyOfflineCheckinConflict()
+          notifyOfflineCheckinConflict(errorCode === 40036 || message === 'DOSE_TASK_CANCELLED')
           if (!authoritativeTask || authoritativeTask.status !== 'PENDING') {
             await cancelMedicationReminder(pending.doseTaskId).catch(() => undefined)
           }

@@ -26,6 +26,7 @@ import com.medicine.domain.identity.PharmacistProfile;
 import com.medicine.domain.medication.MedicationPlan;
 import com.medicine.repository.assessment.Abcd2AssessmentMapper;
 import com.medicine.repository.assessment.KnowledgeAssessmentMapper;
+import com.medicine.repository.assessment.AssessmentReminderMapper;
 import com.medicine.repository.assessment.SatisfactionSurveyMapper;
 import com.medicine.repository.helporder.HelpOrderMapper;
 import com.medicine.repository.helporder.HelpOrderEventMapper;
@@ -44,6 +45,7 @@ import org.springframework.util.StringUtils;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -54,6 +56,8 @@ import java.time.temporal.ChronoUnit;
 
 @Service
 public class AdminPatientService {
+
+    private static final ZoneId SHANGHAI = ZoneId.of("Asia/Shanghai");
 
     private static final String FIELD_GENDER = "性别";
     private static final String FIELD_AGE = "年龄";
@@ -67,11 +71,13 @@ public class AdminPatientService {
     private final Abcd2AssessmentMapper abcd2AssessmentMapper;
     private final MedicationPlanMapper medicationPlanMapper;
     private final KnowledgeAssessmentMapper knowledgeAssessmentMapper;
+    private final AssessmentReminderMapper assessmentReminderMapper;
     private final SatisfactionSurveyMapper satisfactionSurveyMapper;
     private final HelpOrderMapper helpOrderMapper;
     private final HelpOrderEventMapper helpOrderEventMapper;
     private final NotificationDispatchService notificationDispatchService;
     private final ProfessionalIdentityService professionalIdentityService;
+    private final AdherenceService adherenceService;
     private final ObjectMapper objectMapper;
 
     public AdminPatientService(
@@ -81,11 +87,13 @@ public class AdminPatientService {
             Abcd2AssessmentMapper abcd2AssessmentMapper,
             MedicationPlanMapper medicationPlanMapper,
             KnowledgeAssessmentMapper knowledgeAssessmentMapper,
+            AssessmentReminderMapper assessmentReminderMapper,
             SatisfactionSurveyMapper satisfactionSurveyMapper,
             HelpOrderMapper helpOrderMapper,
             HelpOrderEventMapper helpOrderEventMapper,
             NotificationDispatchService notificationDispatchService,
             ProfessionalIdentityService professionalIdentityService,
+            AdherenceService adherenceService,
             ObjectMapper objectMapper
     ) {
         this.patientMapper = patientMapper;
@@ -94,11 +102,13 @@ public class AdminPatientService {
         this.abcd2AssessmentMapper = abcd2AssessmentMapper;
         this.medicationPlanMapper = medicationPlanMapper;
         this.knowledgeAssessmentMapper = knowledgeAssessmentMapper;
+        this.assessmentReminderMapper = assessmentReminderMapper;
         this.satisfactionSurveyMapper = satisfactionSurveyMapper;
         this.helpOrderMapper = helpOrderMapper;
         this.helpOrderEventMapper = helpOrderEventMapper;
         this.notificationDispatchService = notificationDispatchService;
         this.professionalIdentityService = professionalIdentityService;
+        this.adherenceService = adherenceService;
         this.objectMapper = objectMapper;
     }
 
@@ -111,7 +121,8 @@ public class AdminPatientService {
     @Transactional
     public AdminPatientDetailDTO reassignPatient(JwtClaims claims, Long patientId, PatientReassignRequest request) {
         requireAdmin(claims);
-        if (request == null || request.getPharmacistId() == null) throw new BusinessException(400, "BAD_REQUEST");
+        if (request == null || request.getPharmacistId() == null || !StringUtils.hasText(request.getReason()))
+            throw new BusinessException(400, "REASSIGN_REASON_REQUIRED");
         Patient patient = patientMapper.lockByIdAndTenant(claims.getTenantId(), patientId);
         if (patient == null) {
             throw new BusinessException(ErrorCode.PATIENT_NOT_FOUND.getCode(), ErrorCode.PATIENT_NOT_FOUND.getMessage());
@@ -131,8 +142,10 @@ public class AdminPatientService {
         return buildDetailDto(claims.getTenantId(), patient);
     }
 
+    @Transactional
     public boolean remindKnowledgeAssessment(JwtClaims claims, Long patientId) {
-        Patient patient = requirePatient(claims.getTenantId(), patientId);
+        Patient patient = patientMapper.lockByIdAndTenant(claims.getTenantId(), patientId);
+        if (patient == null) throw new BusinessException(ErrorCode.PATIENT_NOT_FOUND.getCode(), ErrorCode.PATIENT_NOT_FOUND.getMessage());
         if (!isAdmin(claims)) {
             PharmacistProfile pharmacist = professionalIdentityService.getOrCreatePharmacistProfile(claims);
             if (!pharmacist.getId().equals(patient.getBoundByPharmacistId())) {
@@ -141,40 +154,63 @@ public class AdminPatientService {
         }
         LocalDateTime firstActivatedAt = medicationPlanMapper.selectFirstActivatedAt(claims.getTenantId(), patientId);
         if (firstActivatedAt == null) throw new BusinessException(409, "KNOWLEDGE_ASSESSMENT_NOT_DUE");
-        LocalDate today = LocalDate.now(ZoneOffset.UTC);
-        if (today.isBefore(firstActivatedAt.toLocalDate())) throw new BusinessException(409, "KNOWLEDGE_ASSESSMENT_NOT_DUE");
-        String phase = ChronoUnit.DAYS.between(firstActivatedAt.toLocalDate(), today) >= 27 ? "WEEK_4" : "DAY_1";
+        LocalDate today = LocalDate.now(SHANGHAI);
+        LocalDate startDate = firstActivatedAt.atOffset(ZoneOffset.UTC).atZoneSameInstant(SHANGHAI).toLocalDate();
+        if (today.isBefore(startDate)) throw new BusinessException(409, "KNOWLEDGE_ASSESSMENT_NOT_DUE");
+        String phase = ChronoUnit.DAYS.between(startDate, today) >= 27 ? "WEEK_4" : "DAY_1";
         if (knowledgeAssessmentMapper.selectByPatientPhaseAndVersion(claims.getTenantId(), patientId, phase, KnowledgeQuestionBank.VERSION) != null) {
             throw new BusinessException(409, "KNOWLEDGE_ASSESSMENT_NOT_DUE");
         }
-        notificationDispatchService.createAndDispatch(claims.getTenantId(), "assessment-reminder", "PATIENT", patientId,
-                "KNOWLEDGE_ASSESSMENT_REMINDER", patientId, Map.of("phase", phase), LocalDateTime.now(ZoneOffset.UTC));
+        if (assessmentReminderMapper.selectId(claims.getTenantId(), patientId, phase) != null) return true;
+        LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
+        assessmentReminderMapper.insert(claims.getTenantId(), patientId, phase, now);
+        var log = notificationDispatchService.createAndDispatch(claims.getTenantId(), "assessment-reminder", "PATIENT", patientId,
+                "KNOWLEDGE_ASSESSMENT_REMINDER", patientId, Map.of("phase", phase), now);
+        assessmentReminderMapper.attachLog(claims.getTenantId(), patientId, phase, log.getId());
         return true;
     }
 
     public PageResult<AdminPatientListItemDTO> getPatients(JwtClaims claims, String keyword, int pageNo, int pageSize) {
-        PharmacistProfile pharmacistProfile = professionalIdentityService.getOrCreatePharmacistProfile(claims);
+        boolean includeAll = isAdmin(claims);
+        PharmacistProfile pharmacistProfile = includeAll ? null : professionalIdentityService.getOrCreatePharmacistProfile(claims);
         int normalizedPageNo = Math.max(pageNo, 1);
         int normalizedPageSize = Math.min(Math.max(pageSize, 1), 50);
         int offset = (normalizedPageNo - 1) * normalizedPageSize;
 
         List<PatientAdminListRow> rows = patientMapper.searchForPharmacist(
                 claims.getTenantId(),
-                pharmacistProfile.getId(),
+                pharmacistProfile == null ? null : pharmacistProfile.getId(),
+                includeAll,
                 normalize(keyword),
                 offset,
                 normalizedPageSize
         );
-        long total = patientMapper.countForPharmacist(claims.getTenantId(), pharmacistProfile.getId(), normalize(keyword));
+        long total = patientMapper.countForPharmacist(claims.getTenantId(), pharmacistProfile == null ? null : pharmacistProfile.getId(), includeAll, normalize(keyword));
         List<AdminPatientListItemDTO> items = rows.stream().map(this::toListItem).toList();
         return new PageResult<>(normalizedPageNo, normalizedPageSize, total, items);
     }
 
     public AdminPatientDetailDTO getPatientDetail(JwtClaims claims, Long patientId) {
-        PharmacistProfile pharmacistProfile = professionalIdentityService.getOrCreatePharmacistProfile(claims);
         Patient patient = requirePatient(claims.getTenantId(), patientId);
-        ensurePatientEditableByPharmacist(patient, pharmacistProfile);
+        if (!isAdmin(claims)) {
+            PharmacistProfile pharmacistProfile = professionalIdentityService.getOrCreatePharmacistProfile(claims);
+            ensurePatientEditableByPharmacist(patient, pharmacistProfile);
+        }
         return buildDetailDto(claims.getTenantId(), patient);
+    }
+
+    public AdherenceService.Summary getPatientAdherence(JwtClaims claims, Long patientId, int days) {
+        Patient patient = requirePatient(claims.getTenantId(), patientId);
+        if (!isAdmin(claims)) {
+            PharmacistProfile pharmacist = professionalIdentityService.getOrCreatePharmacistProfile(claims);
+            ensurePatientEditableByPharmacist(patient, pharmacist);
+        }
+        return adherenceService.summarize(claims.getTenantId(), patientId, null, days, LocalDateTime.now(ZoneOffset.UTC));
+    }
+
+    public String exportPatientAdherence(JwtClaims claims, Long patientId, int days) {
+        AdherenceService.Summary summary = getPatientAdherence(claims, patientId, days);
+        return adherenceService.toCsv(patientId, null, summary);
     }
 
     public AdminPatientDetailDTO updatePatient(JwtClaims claims, Long patientId, AdminPatientUpdateRequest request) {
@@ -271,11 +307,19 @@ public class AdminPatientService {
         ));
         detail.setFamilyBindings(loadFamilyBindings(tenantId, patient.getId()));
         detail.setLatestAbcd2Assessment(toAssessmentDto(abcd2AssessmentMapper.selectLatestByPatientId(tenantId, patient.getId())));
-        detail.setAdherenceSummary(buildAdherenceSummary());
+        detail.setAdherenceSummary(buildAdherenceSummary(tenantId, patient.getId()));
         detail.setDay1KnowledgeAssessment(toKnowledgeAssessmentDto(knowledgeAssessmentMapper.selectByPatientPhaseAndVersion(
                 tenantId, patient.getId(), "DAY_1", KnowledgeQuestionBank.VERSION)));
         detail.setWeek4KnowledgeAssessment(toKnowledgeAssessmentDto(knowledgeAssessmentMapper.selectByPatientPhaseAndVersion(
                 tenantId, patient.getId(), "WEEK_4", KnowledgeQuestionBank.VERSION)));
+        LocalDateTime firstActivatedAt = medicationPlanMapper.selectFirstActivatedAt(tenantId, patient.getId());
+        LocalDate firstDate = firstActivatedAt == null ? null : firstActivatedAt.atOffset(ZoneOffset.UTC).atZoneSameInstant(SHANGHAI).toLocalDate();
+        LocalDate today = LocalDate.now(SHANGHAI);
+        boolean day1Due = firstDate != null && !today.isBefore(firstDate);
+        boolean week4Due = day1Due && !today.isBefore(firstDate.plusDays(27));
+        detail.setDay1AssessmentStatus(detail.getDay1KnowledgeAssessment() != null ? "COMPLETED" : day1Due ? "NOT_SUBMITTED" : "NOT_DUE");
+        detail.setWeek4AssessmentStatus(detail.getWeek4KnowledgeAssessment() != null ? "COMPLETED" : week4Due ? "NOT_SUBMITTED" : "NOT_DUE");
+        detail.setCurrentKnowledgePhase(week4Due ? "WEEK_4" : day1Due ? "DAY_1" : null);
         detail.setSatisfactionCount(satisfactionSurveyMapper.countByPatientId(tenantId, patient.getId()));
         BigDecimal satisfactionAverage = satisfactionSurveyMapper.averageByPatientId(tenantId, patient.getId());
         detail.setSatisfactionAverage(satisfactionAverage == null ? null : satisfactionAverage.doubleValue());
@@ -333,11 +377,23 @@ public class AdminPatientService {
         }).toList();
     }
 
-    private PatientAdherenceSummaryDTO buildAdherenceSummary() {
+    private PatientAdherenceSummaryDTO buildAdherenceSummary(Long tenantId, Long patientId) {
+        LocalDateTime asOf = LocalDateTime.now(ZoneOffset.UTC);
+        AdherenceService.Summary seven = adherenceService.summarize(tenantId, patientId, null, 7, asOf);
+        AdherenceService.Summary thirty = adherenceService.summarize(tenantId, patientId, null, 30, asOf);
         PatientAdherenceSummaryDTO summary = new PatientAdherenceSummaryDTO();
-        summary.setStatus("NOT_AVAILABLE");
-        summary.setSevenDayAdherence(null);
-        summary.setThirtyDayAdherence(null);
+        summary.setStatus(thirty.dueTasks() == 0 ? "NOT_AVAILABLE" : "AVAILABLE");
+        summary.setSevenDayAdherence(seven.selfReportedOnTimeRate());
+        summary.setThirtyDayAdherence(thirty.selfReportedOnTimeRate());
+        summary.setAsOf(asOf.toInstant(ZoneOffset.UTC).toString());
+        summary.setSevenDayDueTasks(seven.dueTasks());
+        summary.setSevenDayOnTimeTaken(seven.onTimeTakenTasks());
+        summary.setSevenDayEarlyOver60Minutes(seven.earlyOver60Minutes());
+        summary.setSevenDayPendingOnTimeWindow(seven.pendingOnTimeWindow());
+        summary.setThirtyDayDueTasks(thirty.dueTasks());
+        summary.setThirtyDayOnTimeTaken(thirty.onTimeTakenTasks());
+        summary.setThirtyDayEarlyOver60Minutes(thirty.earlyOver60Minutes());
+        summary.setThirtyDayPendingOnTimeWindow(thirty.pendingOnTimeWindow());
         return summary;
     }
 

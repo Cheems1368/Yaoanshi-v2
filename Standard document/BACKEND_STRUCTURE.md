@@ -1303,14 +1303,17 @@ Existing `/admin-api/system/auth/login`, `/refresh-token`, and `/logout` contrac
 
 | Method | Path | Auth role | Request | Response `data` | Side effects |
 |---|---|---|---|---|---|
-| `GET` | `/admin-api/patients` | pharmacist | patient query | paged patient list | none |
-| `GET` | `/admin-api/patients/{id}` | pharmacist | none | patient detail | none |
-| `PUT` | `/admin-api/patients/{id}` | pharmacist | patient update DTO | updated detail | update patient medical fields, maybe trigger ABCD2 recalculation |
+| `GET` | `/admin-api/patients` | responsible pharmacist or same-tenant admin | patient query | paged patient list; admin sees entire tenant | none |
+| `GET` | `/admin-api/patients/{id}` | responsible pharmacist or same-tenant admin | none | detail with DAY_1, WEEK_4, satisfaction and 7/30-day adherence | none |
+| `GET` | `/admin-api/patients/{id}/adherence-summary` | responsible pharmacist or same-tenant admin | `days=7` or `30` | due, on-time, early and pending-window counts with UTC `asOf` | none |
+| `GET` | `/admin-api/patients/{id}/adherence-report.csv` | responsible pharmacist or same-tenant admin | `days=7` or `30` | one-row UTF-8 BOM CSV; rate column headed `自报按时服药率` | none |
+| `PUT` | `/admin-api/patients/{id}` | responsible pharmacist | patient update DTO | updated detail | update clinical fields, maybe recalculate ABCD2 |
 | `PUT` | `/admin-api/patients/{id}/responsible-pharmacist` | admin / super_admin / tenant_admin | `{ pharmacistId, reason }` | updated detail | atomically update patient and non-terminal orders; append `REASSIGNED` events |
-| `POST` | `/admin-api/patients/{id}/knowledge-assessments/remind` | responsible pharmacist or admin | none | Boolean | persist/send current-phase reminder when due |
+| `POST` | `/admin-api/patients/{id}/knowledge-assessments/remind` | responsible pharmacist or same-tenant admin | none | Boolean | at most one durable logical reminder per patient and due phase |
 
 Responsibility reassignment locks and rereads the patient row before deriving the old pharmacist. Concurrent admin requests therefore serialize on the patient and update in-flight orders and `REASSIGNED` audit events from the actual preceding assignment.
 Patient help-order creation takes the same patient-row lock before reading `bound_by_pharmacist_id`, so a concurrent reassignment completes either before or after order creation and cannot leave a newly submitted non-terminal order assigned to a stale pharmacist.
+Adherence uses Shanghai calendar days including today, due non-cancelled doses across plan versions through query time, and only the latest effective TAKEN with an actual time within the inclusive ±60-minute window. Historical TAKEN without actual time remains in the denominator. Empty denominator yields no rate. `pendingOnTimeWindow` prevents the UI from calling every not-yet-final dose missed. V15's `(tenant_id, patient_id, phase)` reminder uniqueness provides concurrent idempotency.
 | `GET` | `/admin-api/pharmacists/options` | admin / super_admin / tenant_admin | none | ACTIVE pharmacist options | none |
 
 #### Prescription and OCR
@@ -1326,13 +1329,17 @@ Patient help-order creation takes the same patient-row lock before reading `boun
 
 | Method | Path | Auth role | Request | Response `data` | Side effects |
 |---|---|---|---|---|---|
-| `GET` | `/admin-api/medication-plans/{id}` | pharmacist | none | `MedicationPlanDTO` | none |
-| `POST` | `/admin-api/medication-plans` | pharmacist | `MedicationPlanDTO` | created plan | create plan/items, events |
-| `PUT` | `/admin-api/medication-plans/{id}` | pharmacist | update DTO | updated plan | create new version, replace active plan, recalc tasks |
-| `POST` | `/admin-api/medication-plans/{id}/activate` | pharmacist | none | active plan summary | activate plan, generate/recalc tasks |
-| `GET` | `/admin-api/medication-plans/{id}/tasks` | pharmacist | date range | task list | none |
-| `GET` | `/admin-api/medication-plans/{id}/adherence-report` | pharmacist | range | export metadata / report | read-only export |
-| `GET` | `/admin-api/medication-plans/{id}/ddi-check` | pharmacist | none | list of `AppDdiAlert` | check DDI conflicts before activation; reads plan items as new drugs against patient ACTIVE self-reported meds |
+| `GET` | `/admin-api/medication-plans/{id}` | responsible pharmacist or same-tenant admin | none | `MedicationPlanDTO` | none |
+| `POST` | `/admin-api/medication-plans` | responsible pharmacist | `MedicationPlanDTO` | new DRAFT | create version/items/events; never activate on save |
+| `PUT` | `/admin-api/medication-plans/{id}` | responsible pharmacist | update DTO | DRAFT | edit an existing draft in place; editing an effective plan creates a new draft version and preserves prior tasks |
+| `POST` | `/admin-api/medication-plans/{id}/activate` | responsible pharmacist | `PlanActivationRequest` | active plan | server DDI recheck, risk acknowledgement, immediate UTC activation, cancel future unhandled old doses and generate 30 Shanghai days |
+| `POST` | `/admin-api/medication-plans/{id}/stop` | responsible pharmacist | none | stopped plan | cancel future unhandled doses, retain due and checked history |
+| `GET` | `/admin-api/medication-plans/{id}/activation-conflicts` | responsible pharmacist | none | old future TAKEN doses | display before choosing each new item's first scheduled execution and reason |
+| `GET` | `/admin-api/medication-plans/{id}/tasks` | responsible pharmacist or same-tenant admin | Shanghai date range | task list | none |
+| `GET` | `/admin-api/medication-plans/{id}/adherence-report` | responsible pharmacist or same-tenant admin | range | existing JSON-wrapped CSV string | legacy `completedTasks` and `adherenceRate` remain completion counts/rate; appended `onTimeTakenTasks`, `earlyOver60Minutes`, `selfReportedOnTimeRate` use the new on-time definition |
+| `GET` | `/admin-api/medication-plans/{id}/ddi-check` | responsible pharmacist or same-tenant admin | none | `AdminDdiScreenResult` | preview only; activation always reruns screening against plan and ACTIVE self-reported drugs |
+
+`PlanActivationRequest` contains exact `acknowledgedRiskKeys`, optional `firstExecutionAtByItemId` (item ID to UTC-offset timestamp) and `conflictReason`. When the old plan has a future effective TAKEN dose, every new item needs an explicit first plan time and a reason. Repeated activation and stop calls are idempotent. The patient row serializes plan lifecycle and hourly task maintenance; V15 makes active `(tenant_id, plan_item_id, scheduled_at)` doses unique. UTC `DATETIME` columns remain UTC; `task_date` and time points use `Asia/Shanghai`. Late maintenance fills overdue scheduled doses with `delayed_generated=1` and no past reminder.
 
 #### Help order
 
@@ -1370,6 +1377,10 @@ Patient help-order creation takes the same patient-row lock before reading `boun
 | `POST` | `/admin-api/education/cards/imports` | pharmacist | multipart CSV + `dryRun` | `CsvImportResultDTO` | preview or overwrite by `contentCode` |
 | `POST` | `/admin-api/notifications/socket-ticket` | pharmacist or doctor | none | `{ ticket }` | generate one-time WebSocket ticket in Redis |
 | `GET` | `/admin-api/notifications/logs` | pharmacist admin | query | paged logs | none |
+| `GET` | `/admin-api/notifications/me/baseline` | pharmacist or doctor | none | `{ cursor }` | latest committed log ID for current tenant, professional type and person; start each login here |
+| `GET` | `/admin-api/notifications/me/logs` | pharmacist or doctor | `afterId`, `limit` (1–100) | `{ list, nextCursor, hasMore }` ascending | session compensation; includes personal and same-type broadcast logs only |
+
+Professional WebSocket events carry `logId`. Personal targets are keyed by tenant, professional type and profile ID. A serialized insert gate preserves notification ID commit order; dispatch starts after the business transaction commits. Clients subscribe after obtaining the login baseline, page from that cursor after connection and reconnect, deduplicate IDs and aggregate missed notices silently. Sound defaults off each page session and applies only to live events.
 
 CSV import limits and semantics:
 

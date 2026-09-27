@@ -138,11 +138,34 @@ public interface NotificationLogMapper {
             """)
     Long selectLatestPatientLogId(@Param("tenantId") Long tenantId, @Param("patientId") Long patientId);
 
+    @Select("""
+            SELECT COALESCE(MAX(id), 0) FROM notification_log
+            WHERE tenant_id = #{tenantId} AND target_type = #{targetType}
+              AND target_id IN (0, #{targetId}) AND deleted = b'0'
+            """)
+    Long selectLatestPersonalLogId(@Param("tenantId") Long tenantId,
+                                   @Param("targetType") String targetType, @Param("targetId") Long targetId);
+
+    @Select("""
+            SELECT id, target_type, target_id, channel, business_type, business_id, scheduled_at, sent_at, delivery_status,
+                   attempt_count, next_retry_at, last_attempt_at, claim_token, claimed_at, failure_code, failure_reason, payload_json,
+                   creator, create_time, updater, update_time, deleted, tenant_id
+            FROM notification_log
+            WHERE tenant_id = #{tenantId} AND target_type = #{targetType}
+              AND target_id IN (0, #{targetId}) AND id > #{afterId} AND deleted = b'0'
+            ORDER BY id ASC LIMIT #{limit}
+            """)
+    List<NotificationLog> selectPersonalLogs(@Param("tenantId") Long tenantId, @Param("targetType") String targetType,
+                                             @Param("targetId") Long targetId, @Param("afterId") Long afterId,
+                                             @Param("limit") int limit);
+
     @Update("""
             UPDATE notification_log
             SET claim_token = #{claimToken}, claimed_at = #{now}, updater = 'notification-retry', update_time = #{now}
-            WHERE tenant_id = #{tenantId} AND id = #{id} AND delivery_status = 'FAILED' AND deleted = 0
-              AND next_retry_at <= #{now} AND (claimed_at IS NULL OR claimed_at < #{staleBefore})
+            WHERE tenant_id = #{tenantId} AND id = #{id} AND deleted = 0
+              AND ((delivery_status = 'FAILED' AND next_retry_at <= #{now})
+                OR (delivery_status = 'PENDING' AND create_time <= #{staleBefore}))
+              AND (claimed_at IS NULL OR claimed_at < #{staleBefore})
             """)
     int claimRetry(@Param("tenantId") Long tenantId, @Param("id") Long id, @Param("claimToken") String claimToken,
                    @Param("now") LocalDateTime now, @Param("staleBefore") LocalDateTime staleBefore);
@@ -152,9 +175,10 @@ public interface NotificationLogMapper {
                    attempt_count, next_retry_at, last_attempt_at, claim_token, claimed_at, failure_code, failure_reason, payload_json,
                    creator, create_time, updater, update_time, deleted, tenant_id
             FROM notification_log
-            WHERE delivery_status = 'FAILED' AND next_retry_at <= #{now} AND deleted = 0
+            WHERE ((delivery_status = 'FAILED' AND next_retry_at <= #{now})
+                OR (delivery_status = 'PENDING' AND create_time <= #{staleBefore})) AND deleted = 0
               AND (claimed_at IS NULL OR claimed_at < #{staleBefore})
-            ORDER BY next_retry_at ASC, id ASC LIMIT #{limit}
+            ORDER BY id ASC LIMIT #{limit}
             """)
     List<NotificationLog> selectRetryCandidates(@Param("now") LocalDateTime now,
                                                  @Param("staleBefore") LocalDateTime staleBefore, @Param("limit") int limit);

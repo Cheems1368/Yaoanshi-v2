@@ -27,3 +27,38 @@ export function updatePatient(id, data) {
     data
   })
 }
+
+export function remindKnowledgeAssessment(id) {
+  return request({
+    baseURL: backendV2BaseUrl,
+    url: `/admin-api/patients/${id}/knowledge-assessments/remind`,
+    method: 'post'
+  })
+}
+
+export function getPharmacistOptions() {
+  return request({
+    baseURL: backendV2BaseUrl,
+    url: '/admin-api/pharmacists/options',
+    method: 'get'
+  })
+}
+
+export function reassignPatient(id, data) {
+  return request({
+    baseURL: backendV2BaseUrl,
+    url: `/admin-api/patients/${id}/responsible-pharmacist`,
+    method: 'put',
+    data
+  })
+}
+
+export function downloadPatientAdherence(id, days) {
+  return request({
+    baseURL: backendV2BaseUrl,
+    url: `/admin-api/patients/${id}/adherence-report.csv`,
+    method: 'get',
+    params: { days },
+    responseType: 'blob'
+  })
+}

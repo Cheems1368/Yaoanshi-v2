@@ -35,6 +35,9 @@ public class AdminPatientDetailDTO {
     private String latestMedicationPlanConfirmedAt;
     private KnowledgeAssessmentDTO day1KnowledgeAssessment;
     private KnowledgeAssessmentDTO week4KnowledgeAssessment;
+    private String day1AssessmentStatus;
+    private String week4AssessmentStatus;
+    private String currentKnowledgePhase;
     private long satisfactionCount;
     private Double satisfactionAverage;
 
@@ -250,6 +253,12 @@ public class AdminPatientDetailDTO {
     public void setDay1KnowledgeAssessment(KnowledgeAssessmentDTO value) { this.day1KnowledgeAssessment = value; }
     public KnowledgeAssessmentDTO getWeek4KnowledgeAssessment() { return week4KnowledgeAssessment; }
     public void setWeek4KnowledgeAssessment(KnowledgeAssessmentDTO value) { this.week4KnowledgeAssessment = value; }
+    public String getDay1AssessmentStatus() { return day1AssessmentStatus; }
+    public void setDay1AssessmentStatus(String value) { this.day1AssessmentStatus = value; }
+    public String getWeek4AssessmentStatus() { return week4AssessmentStatus; }
+    public void setWeek4AssessmentStatus(String value) { this.week4AssessmentStatus = value; }
+    public String getCurrentKnowledgePhase() { return currentKnowledgePhase; }
+    public void setCurrentKnowledgePhase(String value) { this.currentKnowledgePhase = value; }
     public long getSatisfactionCount() { return satisfactionCount; }
     public void setSatisfactionCount(long satisfactionCount) { this.satisfactionCount = satisfactionCount; }
     public Double getSatisfactionAverage() { return satisfactionAverage; }

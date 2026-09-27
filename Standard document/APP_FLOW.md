@@ -257,6 +257,7 @@ Error:
 - If offline, cache locally and auto-sync later
 - Native Android caches at most 48 hours of tasks and pending check-ins in app-private AES/GCM ciphertext backed by Android Keystore. Web does not persist medical task/check-in data in Web Storage.
 - Every queued check-in carries a stable `clientRequestId`; entry, login/online recovery, and medication-page entry attempt replay, and the server idempotency contract prevents duplicates.
+- The patient or family user can choose TAKEN, MISSED or SKIPPED with an optional reason. TAKEN defaults to the current actual time; an edited actual time cannot be in the future or more than 24 hours before the planned dose. A cancelled-dose replay stays ineffective and explicitly reports why; the next online sync removes its obsolete local reminder.
 - Local lock-screen reminders use generic wording and contain no identity, medicine name, or dose.
 
 #### Medication Record Screen

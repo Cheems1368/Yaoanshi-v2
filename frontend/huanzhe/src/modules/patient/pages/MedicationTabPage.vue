@@ -86,7 +86,11 @@
               </div>
               <ion-badge :color="statusColor(task.status)">{{ statusText(task.status) }}</ion-badge>
             </div>
-            <div class="task-actions">
+            <div v-if="task.status !== 'CANCELLED'" class="task-actions">
+              <label>实际服药时间（补录可改，北京时间）
+                <input v-model="takenAtByTaskId[task.id]" type="datetime-local" />
+              </label>
+              <input v-model="skipReasonByTaskId[task.id]" placeholder="跳过或漏服原因（选填）" />
               <ion-button
                 expand="block"
                 color="success"
@@ -100,6 +104,7 @@
                 :disabled="submittingTaskId === task.id"
                 @click="saveResult(task, 'MISSED')"
               >漏服</ion-button>
+              <ion-button expand="block" fill="outline" color="medium" :disabled="submittingTaskId === task.id" @click="saveResult(task, 'SKIPPED')">跳过</ion-button>
             </div>
           </ion-card-content>
         </ion-card>
@@ -149,12 +154,15 @@
             <div v-if="!record.effective" class="record-note muted">已被后续更正覆盖</div>
             <div v-if="pendingRecordCorrections[record.id]" class="record-note">更正已加密保存，待联网同步</div>
             <div v-if="record.effective" class="record-actions">
+              <label>实际服药时间（补录可改，北京时间）<input v-model="takenAtByRecordId[record.id]" type="datetime-local" /></label>
+              <input v-model="reasonByRecordId[record.id]" placeholder="跳过或漏服原因（选填）" />
               <ion-button size="small" color="success" fill="outline" :disabled="correctingRecordId === record.id || Boolean(pendingRecordCorrections[record.id])" @click="correctRecord(record, 'TAKEN')">
                 更正为已服药
               </ion-button>
               <ion-button size="small" color="warning" fill="outline" :disabled="correctingRecordId === record.id || Boolean(pendingRecordCorrections[record.id])" @click="correctRecord(record, 'MISSED')">
                 更正为漏服
               </ion-button>
+              <ion-button size="small" color="medium" fill="outline" :disabled="correctingRecordId === record.id || Boolean(pendingRecordCorrections[record.id])" @click="correctRecord(record, 'SKIPPED')">更正为跳过</ion-button>
             </div>
           </ion-card-content>
         </ion-card>
@@ -200,7 +208,8 @@ import { patientSession } from '@/app/session'
 import {
   cacheOfflineAccountType,
   loadMedicationTasks,
-  submitOrQueueCheckin
+  submitOrQueueCheckin,
+  toShanghaiIso
 } from '@/modules/patient/services/offlineMedication'
 import {
   cancelMedicationReminder,
@@ -215,13 +224,15 @@ const activePlan = ref<MedicationPlanDTO | null>(null)
 const tasks = ref<DoseTaskDTO[]>([])
 const currentAccountType = ref('UNKNOWN')
 const submittingTaskId = ref<number | null>(null)
+const takenAtByTaskId = ref<Record<number, string>>({})
+const skipReasonByTaskId = ref<Record<number, string>>({})
 const offlineMode = ref(false)
 let taskRequestEpoch = 0
 let viewAccountSubject: string | null = null
 
 const reminderCompletedCount = computed(() => tasks.value.filter((t) => t.status === 'COMPLETED').length)
 const pendingCount = computed(() =>
-  tasks.value.filter((t) => !['COMPLETED', 'MISSED', 'SKIPPED'].includes(t.status)).length
+  tasks.value.filter((t) => !['COMPLETED', 'MISSED', 'SKIPPED', 'CANCELLED'].includes(t.status)).length
 )
 
 const loadTasks = async () => {
@@ -265,17 +276,20 @@ const loadTasks = async () => {
   }
 }
 
-const saveResult = async (task: DoseTaskDTO, result: 'TAKEN' | 'MISSED') => {
+const saveResult = async (task: DoseTaskDTO, result: 'TAKEN' | 'MISSED' | 'SKIPPED') => {
   submittingTaskId.value = task.id
   try {
-    const outcome = await submitOrQueueCheckin(task, result)
+    const outcome = await submitOrQueueCheckin(task, result, {
+      actualTakenAt: result === 'TAKEN' ? toShanghaiIso(takenAtByTaskId.value[task.id]) : undefined,
+      skipReason: skipReasonByTaskId.value[task.id]
+    })
     if (outcome === 'queued') {
-      task.status = result === 'TAKEN' ? 'COMPLETED' : 'MISSED'
+      task.status = result === 'TAKEN' ? 'COMPLETED' : result === 'SKIPPED' ? 'SKIPPED' : 'MISSED'
       await cancelMedicationReminder(task.id).catch(() => undefined)
       showMessage('记录已加密保存，将在联网后自动同步')
       return
     }
-    showMessage(result === 'TAKEN' ? '已记录为已服药' : '已记录为漏服')
+    showMessage(result === 'TAKEN' ? '已记录为已服药' : result === 'SKIPPED' ? '已记录为跳过' : '已记录为漏服')
     await loadTasks()
   } catch {
     showMessage('提交失败')
@@ -293,7 +307,7 @@ const formatTime = (value?: string | null) => {
 }
 
 const statusText = (status: string) =>
-  ({ PENDING: '待执行', COMPLETED: '已服药', MISSED: '漏服', SKIPPED: '跳过' })[status] ?? status
+  ({ PENDING: '待执行', COMPLETED: '已服药', MISSED: '漏服', SKIPPED: '跳过', CANCELLED: '已取消' })[status] ?? status
 
 const statusColor = (status: string) => {
   if (status === 'COMPLETED') return 'success'
@@ -336,7 +350,9 @@ const reminderNotice = (task: DoseTaskDTO) => {
 const recordLoading = ref(false)
 const records = ref<CheckinRecordDTO[]>([])
 const correctingRecordId = ref<number | null>(null)
-const pendingRecordCorrections = ref<Record<number, 'TAKEN' | 'MISSED'>>({})
+const pendingRecordCorrections = ref<Record<number, 'TAKEN' | 'MISSED' | 'SKIPPED'>>({})
+const takenAtByRecordId = ref<Record<number, string>>({})
+const reasonByRecordId = ref<Record<number, string>>({})
 let recordRequestEpoch = 0
 
 const effectiveCount = computed(() => records.value.filter((r) => r.effective).length)
@@ -365,11 +381,14 @@ const loadRecords = async () => {
   }
 }
 
-const correctRecord = async (record: CheckinRecordDTO, result: 'TAKEN' | 'MISSED') => {
+const correctRecord = async (record: CheckinRecordDTO, result: 'TAKEN' | 'MISSED' | 'SKIPPED') => {
   const expectedAccountSubject = patientSession.getAccountSubject()
   correctingRecordId.value = record.id
   try {
-    const outcome = await submitOrQueueCheckin({ id: record.doseTaskId, lastEffectiveCheckinId: record.id }, result)
+    const outcome = await submitOrQueueCheckin({ id: record.doseTaskId, lastEffectiveCheckinId: record.id }, result, {
+      actualTakenAt: result === 'TAKEN' ? toShanghaiIso(takenAtByRecordId.value[record.id]) : undefined,
+      skipReason: reasonByRecordId.value[record.id]
+    })
     if (!expectedAccountSubject || patientSession.getAccountSubject() !== expectedAccountSubject
       || viewAccountSubject !== expectedAccountSubject) return
     if (outcome === 'queued') {
@@ -377,7 +396,7 @@ const correctRecord = async (record: CheckinRecordDTO, result: 'TAKEN' | 'MISSED
       showMessage('更正已加密保存，将在联网后自动同步')
       return
     }
-    showMessage(result === 'TAKEN' ? '已更正为已服药' : '已更正为漏服')
+    showMessage(result === 'TAKEN' ? '已更正为已服药' : result === 'SKIPPED' ? '已更正为跳过' : '已更正为漏服')
     await loadRecords()
   } catch {
     if (patientSession.getAccountSubject() === expectedAccountSubject) showMessage('更正失败')

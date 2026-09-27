@@ -12,7 +12,7 @@
 
     <groupId>com.medicine</groupId>
     <artifactId>backend-v2</artifactId>
-    <version>0.0.1-SNAPSHOT</version>
+    <version>0.1.0</version>
     <name>backend-v2</name>
     <description>Yaoshian MVP backend-v2 modular monolith baseline</description>
     <packaging>jar</packaging>

@@ -28,6 +28,9 @@
           </div>
         </div>
 
+        <el-button text :aria-pressed="soundEnabled" @click="toggleSound">
+          {{ soundEnabled ? '通知声音：开' : '通知声音：关' }}
+        </el-button>
         <el-dropdown @command="handleCommand">
           <div class="user-entry">
             <el-avatar :size="34" :src="userStore.userInfo.avatar">
@@ -61,11 +64,17 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessageBox } from 'element-plus'
 import { ArrowDown, Expand, Fold, List, UserFilled } from '@element-plus/icons-vue'
 import { useUserStore } from '@/store/user'
+import { isNotificationSoundEnabled, setNotificationSoundEnabled } from '@/utils/adminNotifications'
 
 const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
 const isCollapse = ref(false)
+const soundEnabled = ref(isNotificationSoundEnabled())
+const toggleSound = () => {
+  soundEnabled.value = !soundEnabled.value
+  setNotificationSoundEnabled(soundEnabled.value)
+}
 
 const menuItems = [
   { path: '/workorders', title: '升级工单', icon: List },

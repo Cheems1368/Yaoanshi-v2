@@ -27,7 +27,7 @@ public interface MedicationPlanItemMapper {
     int insert(MedicationPlanItem item);
 
     @Select("""
-            SELECT id, plan_id, drug_name, drug_spec, dosage, frequency_code, time_points_json, meal_relation, route, instructions, sort_order,
+            SELECT id, plan_id, drug_name, drug_spec, dosage, frequency_code, time_points_json, meal_relation, route, instructions, sort_order, first_execution_at,
                    creator, create_time, updater, update_time, deleted, tenant_id
             FROM medication_plan_item
             WHERE tenant_id = #{tenantId} AND id = #{id} AND deleted = 0
@@ -35,13 +35,19 @@ public interface MedicationPlanItemMapper {
     MedicationPlanItem selectById(@Param("tenantId") Long tenantId, @Param("id") Long id);
 
     @Select("""
-            SELECT id, plan_id, drug_name, drug_spec, dosage, frequency_code, time_points_json, meal_relation, route, instructions, sort_order,
+            SELECT id, plan_id, drug_name, drug_spec, dosage, frequency_code, time_points_json, meal_relation, route, instructions, sort_order, first_execution_at,
                    creator, create_time, updater, update_time, deleted, tenant_id
             FROM medication_plan_item
             WHERE tenant_id = #{tenantId} AND plan_id = #{planId} AND deleted = 0
             ORDER BY sort_order ASC, id ASC
             """)
     List<MedicationPlanItem> selectByPlanId(@Param("tenantId") Long tenantId, @Param("planId") Long planId);
+
+    @Update("""
+            UPDATE medication_plan_item SET first_execution_at = #{firstExecutionAt}, updater = #{updater}, update_time = #{updateTime}
+            WHERE tenant_id = #{tenantId} AND id = #{id} AND deleted = 0
+            """)
+    int updateFirstExecution(MedicationPlanItem item);
 
     @Update("""
             UPDATE medication_plan_item

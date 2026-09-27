@@ -123,6 +123,57 @@ class AppMedicationServiceTest {
     }
 
     @Test
+    void cancelledDoseCannotBeReactivatedByOfflineReplay() {
+        when(appPatientService.requireAccessContext("13800138000")).thenReturn(accessContext());
+        MedicationDoseTask task = doseTask(601L, LocalDateTime.now(ZoneOffset.UTC).plusHours(1));
+        task.setStatus("CANCELLED");
+        when(medicationDoseTaskMapper.selectByIdForUpdate(1L, 601L)).thenReturn(task);
+        CheckinSubmitRequest request = new CheckinSubmitRequest();
+        request.setDoseTaskId(601L);
+        request.setResult("TAKEN");
+
+        assertThatThrownBy(() -> appMedicationService.submitCheckin("13800138000", request))
+                .isInstanceOf(BusinessException.class).hasMessage("DOSE_TASK_CANCELLED");
+        verify(medicationCheckinRecordMapper, never()).insert(any());
+    }
+
+    @Test
+    void takenTimeCannotBeInFutureOrMoreThanDayBeforeDose() {
+        when(appPatientService.requireAccessContext("13800138000")).thenReturn(accessContext());
+        MedicationDoseTask task = doseTask(601L, LocalDateTime.now(ZoneOffset.UTC).plusHours(1));
+        task.setScheduledAt(LocalDateTime.now(ZoneOffset.UTC).minusHours(2));
+        when(medicationDoseTaskMapper.selectByIdForUpdate(1L, 601L)).thenReturn(task);
+        CheckinSubmitRequest request = new CheckinSubmitRequest();
+        request.setDoseTaskId(601L);
+        request.setResult("TAKEN");
+        request.setActualTakenAt(LocalDateTime.now(ZoneOffset.UTC).plusHours(1).atOffset(ZoneOffset.UTC).toString());
+        assertThatThrownBy(() -> appMedicationService.submitCheckin("13800138000", request))
+                .isInstanceOf(BusinessException.class).hasMessage("ACTUAL_TAKEN_AT_INVALID");
+        request.setActualTakenAt(task.getScheduledAt().minusHours(25).atOffset(ZoneOffset.UTC).toString());
+        assertThatThrownBy(() -> appMedicationService.submitCheckin("13800138000", request))
+                .isInstanceOf(BusinessException.class).hasMessage("ACTUAL_TAKEN_AT_INVALID");
+    }
+
+    @Test
+    void skippedCheckinKeepsOptionalReasonAndNoTakenTime() {
+        when(appPatientService.requireAccessContext("13800138000")).thenReturn(accessContext());
+        MedicationDoseTask task = doseTask(601L, LocalDateTime.now(ZoneOffset.UTC).plusHours(1));
+        when(medicationDoseTaskMapper.selectByIdForUpdate(1L, 601L)).thenReturn(task);
+        CheckinSubmitRequest request = new CheckinSubmitRequest();
+        request.setDoseTaskId(601L);
+        request.setResult("SKIPPED");
+        request.setSkipReason("不适");
+        appMedicationService.submitCheckin("13800138000", request);
+
+        org.mockito.ArgumentCaptor<MedicationCheckinRecord> record = org.mockito.ArgumentCaptor.forClass(MedicationCheckinRecord.class);
+        verify(medicationCheckinRecordMapper).insert(record.capture());
+        assertThat(record.getValue().getResult()).isEqualTo("SKIPPED");
+        assertThat(record.getValue().getSkipReason()).isEqualTo("不适");
+        assertThat(record.getValue().getActualTakenAt()).isNull();
+        assertThat(task.getStatus()).isEqualTo("SKIPPED");
+    }
+
+    @Test
     void shouldRejectFirstCheckinAfterEditWindowExpired() {
         when(appPatientService.requireAccessContext("13800138000")).thenReturn(accessContext());
         when(medicationDoseTaskMapper.selectByIdForUpdate(1L, 601L))

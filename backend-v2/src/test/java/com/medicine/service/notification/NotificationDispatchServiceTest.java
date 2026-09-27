@@ -3,6 +3,7 @@ package com.medicine.service.notification;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.medicine.domain.notification.NotificationLog;
 import com.medicine.repository.notification.NotificationLogMapper;
+import com.medicine.repository.notification.NotificationCommitGateMapper;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -25,6 +26,9 @@ class NotificationDispatchServiceTest {
 
     @Mock
     private NotificationLogMapper notificationLogMapper;
+
+    @Mock
+    private NotificationCommitGateMapper notificationCommitGateMapper;
 
     @Mock
     private AdminNotificationRealtimeService realtimeService;

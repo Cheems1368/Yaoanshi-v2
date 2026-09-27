@@ -6,7 +6,7 @@
         <span>在患者详情页内完成创建、版本更新、启用和任务查看。</span>
       </div>
       <div class="header-actions">
-        <el-button @click="resetDraft">新建草稿</el-button>
+        <el-button v-if="!readOnly" @click="resetDraft">新建草稿</el-button>
         <el-button :loading="loading" @click="reloadCurrentPlan">刷新</el-button>
       </div>
     </div>
@@ -28,7 +28,7 @@
       </article>
     </div>
 
-    <el-form label-position="top" class="detail-form">
+    <el-form label-position="top" class="detail-form" :disabled="readOnly">
       <div class="form-grid">
         <el-form-item label="计划名称">
           <el-input v-model="form.planName" placeholder="例如：高血压随访用药计划" />
@@ -42,12 +42,7 @@
         </el-form-item>
 
         <el-form-item label="生效开始">
-          <el-date-picker
-            v-model="form.effectiveFrom"
-            type="datetime"
-            placeholder="请选择生效时间"
-            value-format="YYYY-MM-DD HH:mm:ss"
-          />
+          <el-input :model-value="form.status === 'ACTIVE' ? form.effectiveFrom : '启用时由服务端确定'" disabled />
         </el-form-item>
 
         <el-form-item label="生效结束">
@@ -68,15 +63,15 @@
     <section class="items-section">
       <div class="section-header">
         <h4>计划药品项</h4>
-        <el-button @click="addItem">新增药品</el-button>
+        <el-button v-if="!readOnly" @click="addItem">新增药品</el-button>
       </div>
       <div class="item-list">
         <article v-for="(item, index) in form.items" :key="index" class="item-card">
           <div class="item-grid">
-            <el-input v-model="item.drugName" placeholder="药品名称" />
-            <el-input v-model="item.drugSpec" placeholder="规格" />
-            <el-input v-model="item.dosage" placeholder="剂量" />
-            <el-select v-model="item.frequencyCode" placeholder="频次">
+            <el-input v-model="item.drugName" :disabled="readOnly" placeholder="药品名称" />
+            <el-input v-model="item.drugSpec" :disabled="readOnly" placeholder="规格" />
+            <el-input v-model="item.dosage" :disabled="readOnly" placeholder="剂量" />
+            <el-select v-model="item.frequencyCode" :disabled="readOnly" placeholder="频次">
               <el-option label="QD (每日一次)" value="QD" />
               <el-option label="BID (每日两次)" value="BID" />
               <el-option label="TID (每日三次)" value="TID" />
@@ -84,28 +79,31 @@
               <el-option label="HS (睡前)" value="HS" />
               <el-option label="PRN (必要时)" value="PRN" />
             </el-select>
-            <el-input v-model="item.timePointsText" placeholder="服药时间，多个用逗号分隔，如 08:00,14:00,20:00" />
-            <el-select v-model="item.mealRelation" placeholder="与进餐关系">
+            <el-input v-model="item.timePointsText" :disabled="readOnly" placeholder="服药时间，多个用逗号分隔，如 08:00,14:00,20:00" />
+            <el-select v-model="item.mealRelation" :disabled="readOnly" placeholder="与进餐关系">
               <el-option label="餐后" value="AFTER_MEAL" />
               <el-option label="餐前" value="BEFORE_MEAL" />
               <el-option label="不限" value="ANYTIME" />
             </el-select>
-            <el-input v-model="item.route" placeholder="给药途径，例如 PO" />
-            <el-input v-model="item.instructions" placeholder="用药说明" />
+            <el-input v-model="item.route" :disabled="readOnly" placeholder="给药途径，例如 PO" />
+            <el-input v-model="item.instructions" :disabled="readOnly" placeholder="用药说明" />
           </div>
           <div class="item-actions">
             <span>药品项 #{{ index + 1 }}</span>
-            <el-button link type="danger" @click="removeItem(index)">删除</el-button>
+            <el-button v-if="!readOnly" link type="danger" @click="removeItem(index)">删除</el-button>
           </div>
         </article>
       </div>
     </section>
 
-    <div class="plan-actions">
+    <div v-if="!readOnly" class="plan-actions">
       <el-button type="primary" :loading="saving" @click="saveDraft">保存草稿</el-button>
       <el-button type="success" :loading="saving" @click="saveAndActivate">保存并启用</el-button>
-      <el-button v-if="form.id" type="warning" plain :loading="activating" @click="activateCurrentVersion">
+      <el-button v-if="form.id && form.status === 'DRAFT'" type="warning" plain :loading="activating" @click="activateCurrentVersion">
         启用当前版本
+      </el-button>
+      <el-button v-if="form.id && form.status === 'ACTIVE'" type="danger" plain :loading="activating" @click="stopCurrentVersion">
+        停用当前计划
       </el-button>
     </div>
 
@@ -116,6 +114,23 @@
       <template #footer>
         <el-button @click="ddiDialogVisible = false">取消启用</el-button>
         <el-button type="warning" :loading="activating" @click="doActivate">已知晓风险，确认启用</el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog v-model="conflictDialogVisible" title="未来已服药记录冲突" width="620px" :close-on-click-modal="false">
+      <p>旧计划已有以下未来剂次的有效服药记录。请为新计划每种药选择首次执行时点，并说明原因。</p>
+      <ul>
+        <li v-for="task in activationConflicts" :key="task.id">{{ task.drugName }}：{{ displayDate(task.scheduledAt) }}</li>
+      </ul>
+      <el-form label-position="top">
+        <el-form-item v-for="item in form.items" :key="item.id" :label="`${item.drugName}（${item.timePointsText}）首次执行`">
+          <el-date-picker v-model="firstExecutionChoices[item.id]" type="datetime" value-format="YYYY-MM-DD HH:mm:ss" placeholder="选择计划时点" />
+        </el-form-item>
+        <el-form-item label="调整原因"><el-input v-model="conflictReason" type="textarea" :rows="2" /></el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="conflictDialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="confirmConflictChoices">继续启用</el-button>
       </template>
     </el-dialog>
 
@@ -141,7 +156,11 @@
 
     <section class="report-section">
       <div class="section-header">
-        <h4>依从性报表</h4>
+        <h4>近 30 天自报按时服药率（按计划）</h4>
+        <div class="header-actions">
+          <el-button :disabled="!form.id" :loading="exporting" @click="downloadAdherence(7)">下载近 7 天 CSV</el-button>
+          <el-button :disabled="!form.id" :loading="exporting" @click="downloadAdherence(30)">下载近 30 天 CSV</el-button>
+        </div>
       </div>
       <pre v-if="adherenceReport" class="report-box">{{ adherenceReport }}</pre>
       <el-empty v-else description="启用计划后可查看报表摘要" />
@@ -157,11 +176,13 @@ import AdminDdiRiskCardList from '@/components/ddi/AdminDdiRiskCardList.vue'
 import {
   activateMedicationPlan,
   createMedicationPlan,
+  getMedicationPlanActivationConflicts,
   getMedicationPlan,
   getMedicationPlanAdherenceReport,
   getMedicationPlanDdiCheck,
   getMedicationPlanTasks,
-  updateMedicationPlan
+  updateMedicationPlan,
+  stopMedicationPlan
 } from '@/modules/pharmacist/api/medicationPlans'
 import {
   getSelfReportedMedicationTransferPrefill,
@@ -169,6 +190,7 @@ import {
 } from '@/modules/pharmacist/api/workorders'
 
 const props = defineProps({
+  readOnly: { type: Boolean, default: false },
   patientId: {
     type: Number,
     required: true
@@ -189,12 +211,17 @@ const activating = ref(false)
 const errorMessage = ref('')
 const taskRows = ref([])
 const adherenceReport = ref('')
+const exporting = ref(false)
 
 const ddiDialogVisible = ref(false)
 const pendingDdiAlerts = ref([])
 const pendingActivatePlanId = ref(null)
 const expandedDdiAlertKey = ref('')
 const pendingTransfer = ref(null)
+const activationConflicts = ref([])
+const conflictDialogVisible = ref(false)
+const firstExecutionChoices = reactive({})
+const conflictReason = ref('')
 
 const createEmptyItem = () => ({
   drugName: '',
@@ -228,6 +255,8 @@ const currentPlanLabel = computed(() => {
 })
 
 const hydratePlan = (plan) => {
+  Object.keys(firstExecutionChoices).forEach((key) => delete firstExecutionChoices[key])
+  conflictReason.value = ''
   form.id = plan?.id || null
   form.versionNo = plan?.versionNo || null
   form.status = plan?.status || 'DRAFT'
@@ -239,11 +268,12 @@ const hydratePlan = (plan) => {
   form.confirmedAt = plan?.confirmedAt || ''
   form.items = plan?.items?.length
     ? plan.items.map((item) => ({
+        id: item.id,
         drugName: item.drugName || '',
         drugSpec: item.drugSpec || '',
         dosage: item.dosage || '',
         frequencyCode: item.frequencyCode || 'BID',
-        timePointsText: Array.isArray(item.timePoints) ? item.timePoints.join(',') : '',
+        timePointsText: Array.isArray(item.timePoints) ? item.timePoints.join(',') : item.timePointsText || '',
         mealRelation: item.mealRelation || 'AFTER_MEAL',
         route: item.route || 'PO',
         instructions: item.instructions || ''
@@ -350,15 +380,38 @@ const loadDerivedData = async (planId) => {
     adherenceReport.value = ''
     return
   }
-  const today = new Date()
-  const dateFrom = formatDateOnly(today)
-  const dateTo = formatDateOnly(new Date(today.getTime() + 6 * 24 * 60 * 60 * 1000))
+  const dateFrom = formatDateOnly(new Date())
+  const dateTo = offsetShanghaiDate(dateFrom, 6)
+  const reportFrom = offsetShanghaiDate(dateFrom, -29)
   const [tasksResponse, reportResponse] = await Promise.all([
     getMedicationPlanTasks(planId, { dateFrom, dateTo }),
-    getMedicationPlanAdherenceReport(planId, { dateFrom, dateTo })
+    getMedicationPlanAdherenceReport(planId, { dateFrom: reportFrom, dateTo: dateFrom })
   ])
   taskRows.value = tasksResponse.data || []
   adherenceReport.value = reportResponse.data || ''
+}
+
+const downloadAdherence = async (days) => {
+  if (!form.id) return
+  const planId = form.id
+  const dateTo = formatDateOnly(new Date())
+  const dateFrom = offsetShanghaiDate(dateTo, 1 - days)
+  exporting.value = true
+  try {
+    const response = await getMedicationPlanAdherenceReport(planId, { dateFrom, dateTo })
+    if (form.id !== planId) return
+    const blob = new Blob(['\uFEFF', response.data || ''], { type: 'text/csv;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `adherence-plan-${planId}-${days}d-${dateTo}.csv`
+    link.click()
+    URL.revokeObjectURL(url)
+  } catch (error) {
+    errorMessage.value = error.message || '依从性报表下载失败'
+  } finally {
+    exporting.value = false
+  }
 }
 
 const reloadCurrentPlan = async () => {
@@ -416,7 +469,7 @@ const buildPayload = (status) => {
     planName: form.planName.trim(),
     status,
     sourceType: form.sourceType || 'MANUAL',
-    effectiveFrom: toIsoString(form.effectiveFrom),
+    effectiveFrom: null,
     effectiveTo: toIsoString(form.effectiveTo),
     notes: form.notes?.trim() || '',
     items
@@ -474,29 +527,46 @@ const activateCurrentVersion = async () => {
   if (!form.id) return
   errorMessage.value = ''
   try {
-    const ddiRes = await getMedicationPlanDdiCheck(form.id)
+    const [ddiRes, conflictRes] = await Promise.all([
+      getMedicationPlanDdiCheck(form.id),
+      getMedicationPlanActivationConflicts(form.id)
+    ])
     const alerts = ddiRes.data?.alerts ?? []
-    if (alerts.length > 0) {
-      pendingDdiAlerts.value = alerts
-      expandedDdiAlertKey.value = ''
-      pendingActivatePlanId.value = form.id
-      ddiDialogVisible.value = true
-    } else {
-      await doActivate()
-    }
-  } catch {
-    // DDI check failure is non-blocking — proceed with activation
-    await doActivate()
+    pendingDdiAlerts.value = alerts
+    activationConflicts.value = conflictRes.data || []
+    Object.keys(firstExecutionChoices).forEach((key) => delete firstExecutionChoices[key])
+    conflictReason.value = ''
+    expandedDdiAlertKey.value = ''
+    pendingActivatePlanId.value = form.id
+    if (activationConflicts.value.length) conflictDialogVisible.value = true
+    else if (alerts.length) ddiDialogVisible.value = true
+    else await doActivate()
+  } catch (error) {
+    errorMessage.value = error.message || '用药风险检查失败，请稍后重试'
   }
+}
+
+const confirmConflictChoices = async () => {
+  if (!conflictReason.value.trim() || form.items.some((item) => !firstExecutionChoices[item.id])) {
+    errorMessage.value = '请为每种药选择首次执行时点并填写原因'
+    return
+  }
+  conflictDialogVisible.value = false
+  if (pendingDdiAlerts.value.length) ddiDialogVisible.value = true
+  else await doActivate()
 }
 
 const doActivate = async () => {
   ddiDialogVisible.value = false
-  if (!form.id) return
+  if (!form.id || form.id !== pendingActivatePlanId.value) return
   activating.value = true
   errorMessage.value = ''
   try {
-    const response = await activateMedicationPlan(form.id)
+    const response = await activateMedicationPlan(form.id, {
+      acknowledgedRiskKeys: pendingDdiAlerts.value.map((alert) => alert.cardKey),
+      firstExecutionAtByItemId: Object.fromEntries(form.items.map((item) => [item.id, toIsoString(firstExecutionChoices[item.id])])),
+      conflictReason: conflictReason.value.trim()
+    })
     hydratePlan(response.data)
     await loadDerivedData(response.data.id)
     emit('plan-updated', response.data)
@@ -508,10 +578,24 @@ const doActivate = async () => {
   }
 }
 
+const stopCurrentVersion = async () => {
+  activating.value = true
+  try {
+    const response = await stopMedicationPlan(form.id)
+    hydratePlan(response.data)
+    await loadDerivedData(response.data.id)
+    emit('plan-updated', response.data)
+  } catch (error) {
+    errorMessage.value = error.message || '停用计划失败'
+  } finally {
+    activating.value = false
+  }
+}
+
 const displayDate = (value) => {
   if (!value) return '--'
   const date = new Date(value)
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleString('zh-CN', { hour12: false })
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleString('zh-CN', { hour12: false, timeZone: 'Asia/Shanghai' })
 }
 
 const statusText = (status) => {
@@ -562,7 +646,7 @@ const toIsoString = (value) => {
   if (!value) {
     return null
   }
-  const date = new Date(value.replace(' ', 'T'))
+  const date = new Date(`${value.replace(' ', 'T')}+08:00`)
   return Number.isNaN(date.getTime()) ? null : date.toISOString()
 }
 
@@ -574,13 +658,22 @@ const toPickerValue = (value) => {
   if (Number.isNaN(date.getTime())) {
     return ''
   }
-  const pad = (input) => String(input).padStart(2, '0')
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`
+  return new Intl.DateTimeFormat('sv-SE', {
+    timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
+  }).format(date)
 }
 
 const formatDateOnly = (date) => {
-  const pad = (input) => String(input).padStart(2, '0')
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
+  return new Intl.DateTimeFormat('sv-SE', {
+    timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit'
+  }).format(date)
+}
+
+const offsetShanghaiDate = (date, days) => {
+  const instant = new Date(`${date}T00:00:00+08:00`)
+  instant.setUTCDate(instant.getUTCDate() + days)
+  return formatDateOnly(instant)
 }
 
 watch(

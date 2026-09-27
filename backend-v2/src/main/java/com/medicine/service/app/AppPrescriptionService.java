@@ -180,7 +180,7 @@ public class AppPrescriptionService {
         PrescriptionOcrRecord ocrRecord = new PrescriptionOcrRecord();
         ocrRecord.setPrescriptionId(prescription.getId());
         if (ocrResult.isSuccess()) {
-            ocrRecord.setProvider("DEEPSEEK_OCR");
+            ocrRecord.setProvider("SILICONFLOW_OCR");
             ocrRecord.setConfidence(ocrResult.getConfidence());
             boolean highConfidence = ocrResult.getConfidence().compareTo(new BigDecimal("0.80")) >= 0 && !ocrResult.getItems().isEmpty();
             ocrRecord.setStatus(highConfidence

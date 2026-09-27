@@ -9,6 +9,7 @@ import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Mapper
 public interface MedicationPlanMapper {
@@ -106,4 +107,10 @@ public interface MedicationPlanMapper {
               AND deleted = 0
             """)
     int replaceOtherActivePlans(MedicationPlan plan);
+
+    @Select("""
+            SELECT DISTINCT tenant_id, patient_id FROM medication_plan
+            WHERE status = 'ACTIVE' AND deleted = 0
+            """)
+    List<MedicationPlan> selectActivePatientKeys();
 }

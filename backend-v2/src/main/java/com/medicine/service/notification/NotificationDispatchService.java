@@ -3,7 +3,14 @@ package com.medicine.service.notification;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.medicine.domain.notification.NotificationLog;
 import com.medicine.repository.notification.NotificationLogMapper;
+import com.medicine.repository.notification.NotificationCommitGateMapper;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.LocalDateTime;
 import java.util.Map;
@@ -31,22 +38,29 @@ public class NotificationDispatchService {
     );
 
     private final NotificationLogMapper notificationLogMapper;
+    private final NotificationCommitGateMapper notificationCommitGateMapper;
+    private final PlatformTransactionManager transactionManager;
     private final AdminNotificationRealtimeService adminRealtimeService;
     private final AppNotificationRealtimeService appRealtimeService;
     private final ObjectMapper objectMapper;
 
     public NotificationDispatchService(
             NotificationLogMapper notificationLogMapper,
+            NotificationCommitGateMapper notificationCommitGateMapper,
+            PlatformTransactionManager transactionManager,
             AdminNotificationRealtimeService adminRealtimeService,
             AppNotificationRealtimeService appRealtimeService,
             ObjectMapper objectMapper
     ) {
         this.notificationLogMapper = notificationLogMapper;
+        this.notificationCommitGateMapper = notificationCommitGateMapper;
+        this.transactionManager = transactionManager;
         this.adminRealtimeService = adminRealtimeService;
         this.appRealtimeService = appRealtimeService;
         this.objectMapper = objectMapper;
     }
 
+    @Transactional
     public NotificationLog createAndDispatch(
             Long tenantId,
             String operator,
@@ -75,8 +89,25 @@ public class NotificationDispatchService {
         log.setFailureReason(null);
         log.setPayloadJson(writeJson(payload));
         applyAudit(log, tenantId, operator, now);
+        notificationCommitGateMapper.lock();
         notificationLogMapper.insert(log);
-        updateDispatchResult(log, now, null);
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    try {
+                        TransactionTemplate delivery = new TransactionTemplate(transactionManager);
+                        delivery.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+                        delivery.executeWithoutResult(status ->
+                                updateDispatchResult(log, LocalDateTime.now(java.time.ZoneOffset.UTC), null));
+                    } catch (RuntimeException ignored) {
+                        // A stale PENDING log is claimed by the retry job.
+                    }
+                }
+            });
+        } else {
+            updateDispatchResult(log, now, null);
+        }
         return log;
     }
 
@@ -108,7 +139,8 @@ public class NotificationDispatchService {
     }
 
     public void retryClaimed(NotificationLog log, LocalDateTime now) {
-        if (log == null || !"FAILED".equals(log.getDeliveryStatus()) || log.getClaimToken() == null) {
+        if (log == null || !("FAILED".equals(log.getDeliveryStatus()) || "PENDING".equals(log.getDeliveryStatus()))
+                || log.getClaimToken() == null) {
             return;
         }
         updateDispatchResult(log, now, log.getClaimToken());
