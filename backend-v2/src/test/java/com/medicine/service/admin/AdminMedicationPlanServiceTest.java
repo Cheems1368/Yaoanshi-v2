@@ -127,6 +127,7 @@ class AdminMedicationPlanServiceTest {
         JwtClaims claims = pharmacistClaims();
         MedicationPlan plan = plan();
         when(medicationPlanMapper.selectById(1L, 300L)).thenReturn(plan);
+        when(medicationPlanMapper.selectByIdForUpdate(1L, 300L)).thenReturn(plan);
         when(patientMapper.lockByIdAndTenant(1L, 201L)).thenReturn(patient());
         when(patientMapper.selectByIdAndTenant(1L, 201L)).thenReturn(patient());
         when(professionalIdentityService.getOrCreatePharmacistProfile(claims)).thenReturn(pharmacistProfile());
@@ -152,10 +153,30 @@ class AdminMedicationPlanServiceTest {
     }
 
     @Test
+    void concurrentActivationSeesCommittedStatusAfterPatientLock() {
+        JwtClaims claims = pharmacistClaims();
+        MedicationPlan staleDraft = plan();
+        MedicationPlan committedActive = plan();
+        committedActive.setStatus("ACTIVE");
+        when(medicationPlanMapper.selectById(1L, 300L)).thenReturn(staleDraft);
+        when(medicationPlanMapper.selectByIdForUpdate(1L, 300L)).thenReturn(committedActive);
+        when(patientMapper.lockByIdAndTenant(1L, 201L)).thenReturn(patient());
+        when(professionalIdentityService.getOrCreatePharmacistProfile(claims)).thenReturn(pharmacistProfile());
+
+        MedicationPlanDTO result = adminMedicationPlanService.activatePlan(claims, 300L, new PlanActivationRequest());
+
+        assertThat(result.getStatus()).isEqualTo("ACTIVE");
+        verify(medicationPlanMapper, never()).replaceOtherActivePlans(org.mockito.ArgumentMatchers.any());
+        verify(medicationDoseTaskMapper, never()).insert(org.mockito.ArgumentMatchers.any());
+        verify(medicationPlanEventMapper, never()).insert(org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
     void activationRejectsMissingDdiConfirmationWithoutChangingPlan() {
         JwtClaims claims = pharmacistClaims();
         MedicationPlan plan = plan();
         when(medicationPlanMapper.selectById(1L, 300L)).thenReturn(plan);
+        when(medicationPlanMapper.selectByIdForUpdate(1L, 300L)).thenReturn(plan);
         when(patientMapper.lockByIdAndTenant(1L, 201L)).thenReturn(patient());
         when(patientMapper.selectByIdAndTenant(1L, 201L)).thenReturn(patient());
         when(professionalIdentityService.getOrCreatePharmacistProfile(claims)).thenReturn(pharmacistProfile());
@@ -197,6 +218,7 @@ class AdminMedicationPlanServiceTest {
         draft.setSourceType("MANUAL");
         draft.setCreatedByPharmacistId(101L);
         when(medicationPlanMapper.selectById(1L, 300L)).thenReturn(draft);
+        when(medicationPlanMapper.selectByIdForUpdate(1L, 300L)).thenReturn(draft);
         when(patientMapper.lockByIdAndTenant(1L, 201L)).thenReturn(patient());
         when(patientMapper.selectByIdAndTenant(1L, 201L)).thenReturn(patient());
         when(professionalIdentityService.getOrCreatePharmacistProfile(claims)).thenReturn(pharmacistProfile());

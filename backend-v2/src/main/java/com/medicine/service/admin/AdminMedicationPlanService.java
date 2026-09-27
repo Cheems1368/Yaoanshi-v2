@@ -23,6 +23,7 @@ import com.medicine.service.app.AppDdiScreeningService;
 import com.medicine.service.auth.JwtClaims;
 import com.medicine.service.auth.ProfessionalIdentityService;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
@@ -106,11 +107,11 @@ public class AdminMedicationPlanService {
         return getPlan(claims, plan.getId());
     }
 
-    @Transactional
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     public MedicationPlanDTO updatePlan(JwtClaims claims, Long id, MedicationPlanDTO request) {
         MedicationPlan existing = requirePlan(claims, id);
         requireResponsiblePharmacist(claims, existing.getPatientId(), true);
-        existing = requirePlan(claims, id);
+        existing = requireLockedPlan(claims, id);
         if (request == null) throw new BusinessException(400, "BAD_REQUEST");
         if ("DRAFT".equals(existing.getStatus())) {
             LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
@@ -141,11 +142,11 @@ public class AdminMedicationPlanService {
         return createPlan(claims, copy);
     }
 
-    @Transactional
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     public MedicationPlanDTO activatePlan(JwtClaims claims, Long id, PlanActivationRequest request) {
         MedicationPlan plan = requirePlan(claims, id);
         Long pharmacistId = requireResponsiblePharmacist(claims, plan.getPatientId(), true);
-        plan = requirePlan(claims, id);
+        plan = requireLockedPlan(claims, id);
         if ("ACTIVE".equals(plan.getStatus())) return toPlanDto(plan);
         if (!"DRAFT".equals(plan.getStatus())) throw new BusinessException(409, "PLAN_NOT_DRAFT");
         if (plan.getEffectiveTo() != null && plan.getEffectiveTo().isBefore(LocalDateTime.now(ZoneOffset.UTC))) {
@@ -167,11 +168,11 @@ public class AdminMedicationPlanService {
         return getPlan(claims, id);
     }
 
-    @Transactional
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     public MedicationPlanDTO stopPlan(JwtClaims claims, Long id) {
         MedicationPlan plan = requirePlan(claims, id);
         Long pharmacistId = requireResponsiblePharmacist(claims, plan.getPatientId(), true);
-        plan = requirePlan(claims, id);
+        plan = requireLockedPlan(claims, id);
         if ("STOPPED".equals(plan.getStatus())) return toPlanDto(plan);
         if (!"ACTIVE".equals(plan.getStatus())) throw new BusinessException(409, "PLAN_NOT_ACTIVE");
         LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
@@ -399,6 +400,14 @@ public class AdminMedicationPlanService {
             throw new BusinessException(ErrorCode.ADMIN_AUTH_INVALID.getCode(), ErrorCode.ADMIN_AUTH_INVALID.getMessage());
         }
         MedicationPlan plan = medicationPlanMapper.selectById(claims.getTenantId(), id);
+        if (plan == null) {
+            throw new BusinessException(ErrorCode.MED_PLAN_NOT_FOUND.getCode(), ErrorCode.MED_PLAN_NOT_FOUND.getMessage());
+        }
+        return plan;
+    }
+
+    private MedicationPlan requireLockedPlan(JwtClaims claims, Long id) {
+        MedicationPlan plan = medicationPlanMapper.selectByIdForUpdate(claims.getTenantId(), id);
         if (plan == null) {
             throw new BusinessException(ErrorCode.MED_PLAN_NOT_FOUND.getCode(), ErrorCode.MED_PLAN_NOT_FOUND.getMessage());
         }

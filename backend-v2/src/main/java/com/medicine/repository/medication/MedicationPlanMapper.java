@@ -47,6 +47,18 @@ public interface MedicationPlanMapper {
                    p.name AS patient_name
             FROM medication_plan mp
             INNER JOIN patient p ON p.id = mp.patient_id AND p.deleted = 0
+            WHERE mp.tenant_id = #{tenantId} AND mp.id = #{id} AND mp.deleted = 0
+            FOR UPDATE
+            """)
+    MedicationPlan selectByIdForUpdate(@Param("tenantId") Long tenantId, @Param("id") Long id);
+
+    @Select("""
+            SELECT mp.id, mp.patient_id, mp.plan_name, mp.version_no, mp.status, mp.source_type, mp.source_prescription_id,
+                   mp.effective_from, mp.effective_to, mp.notes, mp.created_by_pharmacist_id, mp.confirmed_at,
+                   mp.creator, mp.create_time, mp.updater, mp.update_time, mp.deleted, mp.tenant_id,
+                   p.name AS patient_name
+            FROM medication_plan mp
+            INNER JOIN patient p ON p.id = mp.patient_id AND p.deleted = 0
             WHERE mp.tenant_id = #{tenantId}
               AND mp.patient_id = #{patientId}
               AND mp.status = 'ACTIVE'
