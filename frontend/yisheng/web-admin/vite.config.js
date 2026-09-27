@@ -34,7 +34,10 @@ export default defineConfig(({ mode }) => {
           target: backendV2Target,
           changeOrigin: true,
           secure: false,
-          ws: true
+          ws: true,
+          configure(proxy) {
+            proxy.on('proxyReqWs', (request) => request.removeHeader('origin'))
+          }
         },
         '/admin-api/help-orders': backendV2Proxy,
         '/admin-api': {

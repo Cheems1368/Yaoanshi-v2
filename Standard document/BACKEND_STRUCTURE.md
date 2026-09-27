@@ -1340,6 +1340,7 @@ Adherence uses Shanghai calendar days including today, due non-cancelled doses a
 | `GET` | `/admin-api/medication-plans/{id}/ddi-check` | responsible pharmacist or same-tenant admin | none | `AdminDdiScreenResult` | preview only; activation always reruns screening against plan and ACTIVE self-reported drugs |
 
 `PlanActivationRequest` contains exact `acknowledgedRiskKeys`, optional `firstExecutionAtByItemId` (item ID to UTC-offset timestamp) and `conflictReason`. When the old plan has a future effective TAKEN dose, every new item needs an explicit first plan time and a reason. Repeated activation and stop calls are idempotent. The patient row serializes plan lifecycle and hourly task maintenance; V15 makes active `(tenant_id, plan_item_id, scheduled_at)` doses unique. UTC `DATETIME` columns remain UTC; `task_date` and time points use `Asia/Shanghai`. Late maintenance fills overdue scheduled doses with `delayed_generated=1` and no past reminder.
+DDI screening errors abort activation and leave the draft unchanged. An acknowledgement is valid only for the current screening keys; editing the draft changes the required confirmation. The plan state is reread with a locking read after acquiring the patient lock so concurrent activation or stop cannot repeat audit events.
 
 #### Help order
 
