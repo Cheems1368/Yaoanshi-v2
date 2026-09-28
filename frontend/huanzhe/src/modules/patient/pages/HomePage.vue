@@ -15,7 +15,7 @@
         <!-- 欢迎区域 -->
         <section class="welcome-section">
           <h2 class="welcome-title">今日用药</h2>
-          <p class="welcome-subtitle">{{ activePlan ? activePlan.planName : '暂无生效计划' }}</p>
+          <p class="welcome-subtitle">{{ activePlan ? activePlan.planName : offlineMode ? '离线缓存任务' : '暂无生效计划' }}</p>
         </section>
 
         <!-- 概览卡片（突出数字 + 进度条） -->
@@ -168,6 +168,7 @@ const router = useRouter()
 
 const loading = ref(false)
 const activePlan = ref<MedicationPlanDTO | null>(null)
+const offlineMode = ref(false)
 const todayTasks = ref<DoseTaskDTO[]>([])
 const showToast = ref(false)
 const toastMessage = ref('')
@@ -226,6 +227,7 @@ const loadDashboard = async () => {
     if (!expectedAccountSubject || patientSession.getAccountSubject() !== expectedAccountSubject
       || expectedRequestEpoch !== dashboardRequestEpoch) return
     activePlan.value = planResponse.data ?? null
+    offlineMode.value = tasksResponse.offline
     const today = new Date().toLocaleDateString('sv-SE')
     todayTasks.value = tasksResponse.tasks.filter((task) => task.taskDate === today)
     const accountType = String((accountResponse.data as any)?.accountType || '').toUpperCase()

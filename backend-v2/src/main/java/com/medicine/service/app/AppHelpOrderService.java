@@ -134,6 +134,7 @@ public class AppHelpOrderService {
         return getDetail(subject, order.getId());
     }
 
+    @Transactional
     public HelpOrderDTO reply(String subject, Long id, HelpOrderReplyRequest request) {
         AppPatientService.AccessContext context = appPatientService.requireAccessContext(subject);
         HelpOrder order = helpOrderMapper.selectById(DEFAULT_TENANT_ID, id);

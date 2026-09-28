@@ -435,7 +435,18 @@ onIonViewWillEnter(async () => {
 
 .task-actions {
   display: flex;
+  flex-direction: column;
   gap: var(--patient-space-3);
   margin-top: var(--patient-space-4);
+}
+
+.task-actions label {
+  min-width: 0;
+}
+
+.task-actions input {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
 }
 </style>

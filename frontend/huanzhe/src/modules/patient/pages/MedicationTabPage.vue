@@ -589,7 +589,20 @@ ion-segment-button {
 
 .task-actions {
   display: flex;
+  flex-direction: column;
   gap: var(--patient-space-2);
+}
+
+.task-actions label,
+.record-actions label {
+  min-width: 0;
+}
+
+.task-actions input,
+.record-actions input {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
 }
 
 .task-actions ion-button {
@@ -637,6 +650,7 @@ ion-segment-button {
 
 .record-actions {
   display: flex;
+  flex-direction: column;
   gap: var(--patient-space-2);
   margin-top: var(--patient-space-3);
 }

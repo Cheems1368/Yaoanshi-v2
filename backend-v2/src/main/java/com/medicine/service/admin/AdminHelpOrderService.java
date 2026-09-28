@@ -32,6 +32,7 @@ import com.medicine.service.helporder.HelpOrderVoiceTranscriptionService;
 import com.medicine.service.notification.NotificationDispatchService;
 import com.medicine.service.storage.S3CompatibleObjectStorage;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.time.Duration;
@@ -118,6 +119,7 @@ public class AdminHelpOrderService {
         return toDto(claims.getTenantId(), order, true);
     }
 
+    @Transactional
     public HelpOrderDTO claim(JwtClaims claims, Long id) {
         PharmacistProfile pharmacist = professionalIdentityService.getOrCreatePharmacistProfile(claims);
         HelpOrder order = requireOrder(claims.getTenantId(), id);
@@ -153,6 +155,7 @@ public class AdminHelpOrderService {
         return getDetail(claims, id);
     }
 
+    @Transactional
     public HelpOrderDTO reply(JwtClaims claims, Long id, HelpOrderReplyRequest request) {
         ProfessionalScope scope = resolveScope(claims);
         HelpOrder order = requireOrder(claims.getTenantId(), id);
@@ -211,6 +214,7 @@ public class AdminHelpOrderService {
         return getDetail(claims, id);
     }
 
+    @Transactional
     public HelpOrderDTO escalate(JwtClaims claims, Long id, HelpOrderEscalateRequest request) {
         PharmacistProfile pharmacist = professionalIdentityService.getOrCreatePharmacistProfile(claims);
         HelpOrder order = requireOrder(claims.getTenantId(), id);
@@ -247,6 +251,7 @@ public class AdminHelpOrderService {
         return getDetail(claims, id);
     }
 
+    @Transactional
     public HelpOrderDTO reject(JwtClaims claims, Long id, HelpOrderRejectRequest request) {
         ProfessionalScope scope = resolveScope(claims);
         HelpOrder order = requireOrder(claims.getTenantId(), id);
@@ -275,6 +280,7 @@ public class AdminHelpOrderService {
         return getDetail(claims, id);
     }
 
+    @Transactional
     public HelpOrderDTO close(JwtClaims claims, Long id, HelpOrderCloseRequest request) {
         ProfessionalScope scope = resolveScope(claims);
         HelpOrder order = requireOrder(claims.getTenantId(), id);
@@ -304,6 +310,7 @@ public class AdminHelpOrderService {
         return getDetail(claims, id);
     }
 
+    @Transactional
     public HelpOrderDTO doctorDecision(JwtClaims claims, Long id, HelpOrderDoctorDecisionRequest request) {
         ProfessionalScope scope = resolveScope(claims);
         if (!"DOCTOR".equals(scope.operatorType())) {
