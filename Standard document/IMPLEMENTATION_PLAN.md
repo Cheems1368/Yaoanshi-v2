@@ -39,7 +39,7 @@ Rules:
 | Phase T6 | Android JDK 21 and enforced APK build gate | ✅ Delivered through PR #37 (`98115b9`) |
 | Phase T7 | SEC-002 refresh-token HttpOnly Cookie closure | ✅ Delivered through PR #39 (`4c90292`) |
 | Phase T8 | SEC-005 AI data-boundary closure | ✅ Delivered through PR #40 (`fc3b646`); post-merge `main` CI run `32570783413` passed |
-| Phase T9 | MVP v0.1.0 formal delivery and gap closure | 🚧 PR A and PR B delivered; PR C code and local gates in progress in `D:/yaoanshi-t9-release`; external acceptance, protected checks and merge remain |
+| Phase T9 | MVP v0.1.0 formal delivery and gap closure | 🚧 PR A and PR B delivered; PR C Draft #44 has local Docker/OCR/browser and 2026-09-28 OPPO PDYT20 partial real-device evidence. Remaining PRD, account isolation, latest-HEAD checks, review and merge gates remain. See `T9_ACCEPTANCE_MATRIX.md`. |
 
 **Current active work:** T9 closes the remaining MVP contract, patient, professional-client, reliability, operations, and release-evidence gaps through three protected PRs. T8/SEC-005 is formally delivered. Android release signing and store publishing remain out of scope.
 
