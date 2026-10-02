@@ -158,7 +158,7 @@ class HttpService {
       return Promise.reject(new Error('AUTHENTICATED_ACCOUNT_CHANGED'))
     }
     if (!config || config._retry || this.shouldSkipRefresh(requestUrl)) {
-      this.clearToken()
+      await this.expireSession()
       this.redirectToLogin()
       return Promise.reject(new Error(fallbackMessage))
     }
@@ -173,7 +173,7 @@ class HttpService {
       if (this.refreshUnavailable) {
         return Promise.reject(new Error('Session temporarily unavailable'))
       }
-      this.clearToken()
+      await this.expireSession()
       this.redirectToLogin()
       return Promise.reject(new Error(fallbackMessage))
     }
@@ -211,12 +211,12 @@ class HttpService {
             }
           }
         )
-        .then((response) => {
+        .then(async (response) => {
           if (patientSession.getSessionGeneration() !== refreshGeneration) return null
           const payload = response.data
           if (payload.code !== 200 && payload.code !== 0) {
             if (payload.code === 40004) {
-              patientSession.markAnonymous()
+              await this.expireSession()
             } else {
               this.refreshUnavailable = true
             }
@@ -226,13 +226,13 @@ class HttpService {
           patientSession.setAccessToken(payload.data.accessToken, true)
           return payload.data.accessToken
         })
-        .catch((error) => {
+        .catch(async (error) => {
           if (patientSession.getSessionGeneration() !== refreshGeneration) return null
           if (error?.response?.status !== 401 && error?.response?.data?.code !== 40004) {
             this.refreshUnavailable = true
             return null
           }
-          patientSession.markAnonymous()
+          await this.expireSession()
           return null
         })
         .finally(() => {
@@ -241,6 +241,17 @@ class HttpService {
     }
 
     return this.refreshPromise
+  }
+
+  private async expireSession() {
+    if (patientSession.getAuthStatus() === 'anonymous') return
+    const generation = patientSession.getSessionGeneration()
+    const { sealPendingCheckinsForSessionExpiry } = await import('@/modules/patient/services/offlineMedication')
+    if (patientSession.getSessionGeneration() !== generation) return
+    await sealPendingCheckinsForSessionExpiry(patientSession.getAccountSubject())
+    if (patientSession.getSessionGeneration() !== generation) return
+    patientSession.markSessionExpired()
+    patientSession.clearGateState()
   }
 
   private redirectToLogin() {

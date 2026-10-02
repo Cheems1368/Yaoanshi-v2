@@ -48,6 +48,7 @@ interface MedicalCacheState {
   tasksExpiresAt: number
   tasks: DoseTaskDTO[]
   pendingCheckins: CachedPendingCheckin[]
+  sealedUntilLogin?: boolean
 }
 
 interface LegacyMedicalCacheState {
@@ -213,6 +214,7 @@ export async function cacheDoseTasks(tasks: DoseTaskDTO[], expectedAccountSubjec
     }
     state.tasks = tasks
     state.tasksExpiresAt = Date.now() + CACHE_TTL_MS
+    state.sealedUntilLogin = false
     return applyPendingCheckins(state.tasks, state.pendingCheckins)
   })
 }
@@ -535,6 +537,43 @@ export function replayPendingCheckins() {
 export async function clearMedicalCache() {
   if (!isNative()) return
   const operation = stateMutationTail.then(() => secureMedicalCache.clear())
+  stateMutationTail = operation.then(() => undefined, () => undefined)
+  await operation
+}
+
+export async function sealPendingCheckinsForSessionExpiry(expectedAccountSubject: string | null) {
+  if (!isNative()) return
+  const operation = stateMutationTail.then(async () => {
+    try {
+      const { value } = await secureMedicalCache.read()
+      if (!value) return
+      const parsed = JSON.parse(value) as MedicalCacheState | LegacyMedicalCacheState
+      if ((parsed.version !== 1 && parsed.version !== 2) || !parsed.accountSubject
+        || (expectedAccountSubject && parsed.accountSubject !== expectedAccountSubject)) {
+        await secureMedicalCache.clear()
+        return
+      }
+      const now = Date.now()
+      const pendingCheckins = parsed.version === 1
+        ? parsed.pendingCheckins.filter(() => parsed.expiresAt > now)
+          .map((pending) => ({ ...pending, expiresAt: parsed.expiresAt }))
+        : parsed.pendingCheckins.filter((pending) => pending.expiresAt > now)
+      if (pendingCheckins.length === 0) {
+        await secureMedicalCache.clear()
+        return
+      }
+      await secureMedicalCache.write({ value: JSON.stringify({
+        version: 2,
+        accountSubject: parsed.accountSubject,
+        tasksExpiresAt: 0,
+        tasks: [],
+        pendingCheckins,
+        sealedUntilLogin: true
+      } satisfies MedicalCacheState) })
+    } catch {
+      await secureMedicalCache.clear().catch(() => undefined)
+    }
+  })
   stateMutationTail = operation.then(() => undefined, () => undefined)
   await operation
 }

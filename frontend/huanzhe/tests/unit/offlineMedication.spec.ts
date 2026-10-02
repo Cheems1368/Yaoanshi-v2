@@ -41,6 +41,7 @@ import {
   loadMedicationTasks,
   OFFLINE_CHECKIN_CONFLICT_EVENT,
   replayPendingCheckins,
+  sealPendingCheckinsForSessionExpiry,
   submitOrQueueCheckin
 } from '@/modules/patient/services/offlineMedication'
 
@@ -174,6 +175,54 @@ describe('native offline medication flow', () => {
     await expect(loadMedicationTasks()).resolves.toEqual({ tasks: [], offline: true })
     expect(mocks.clear).not.toHaveBeenCalled()
     expect(mocks.write).not.toHaveBeenCalled()
+  })
+
+  test('seals only unexpired queued check-ins and replays them after same-account login', async () => {
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: true })
+    const queuedExpiry = Date.now() + 60_000
+    let storedValue = JSON.stringify({
+      version: 2, accountSubject: 'patient-1', accountType: 'PATIENT',
+      tasksExpiresAt: Date.now() + 60_000, tasks: [cachedTask],
+      pendingCheckins: [
+        { clientRequestId: 'kept', doseTaskId: 7, result: 'SKIPPED', expiresAt: queuedExpiry },
+        { clientRequestId: 'expired', doseTaskId: 8, result: 'TAKEN', expiresAt: Date.now() - 1 }
+      ]
+    })
+    mocks.read.mockImplementation(async () => ({ value: storedValue }))
+    mocks.write.mockImplementation(async ({ value }) => { storedValue = value })
+    mocks.clear.mockImplementation(async () => { storedValue = '' })
+
+    await sealPendingCheckinsForSessionExpiry('patient-1')
+    const sealed = JSON.parse(storedValue)
+    expect(sealed.tasks).toEqual([])
+    expect(sealed.accountType).toBeUndefined()
+    expect(sealed.sealedUntilLogin).toBe(true)
+    expect(sealed.pendingCheckins.map((item: { clientRequestId: string }) => item.clientRequestId)).toEqual(['kept'])
+    expect(sealed.pendingCheckins[0].expiresAt).toBe(queuedExpiry)
+
+    mocks.accountSubject = ''
+    await expect(replayPendingCheckins()).resolves.toBe(0)
+    expect(mocks.submitCheckin).not.toHaveBeenCalled()
+
+    mocks.accountSubject = 'patient-1'
+    mocks.submitCheckin.mockResolvedValue({ data: { id: 701, effective: true } })
+    await expect(replayPendingCheckins()).resolves.toBe(1)
+    expect(mocks.submitCheckin).toHaveBeenCalledWith(expect.objectContaining({ clientRequestId: 'kept' }))
+    expect(storedValue).toBe('')
+  })
+
+  test('clears a sealed queue when another account logs in', async () => {
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: true })
+    mocks.read.mockResolvedValue({ value: JSON.stringify({
+      version: 2, accountSubject: 'patient-1', sealedUntilLogin: true,
+      tasksExpiresAt: 0, tasks: [],
+      pendingCheckins: [{ clientRequestId: 'old', doseTaskId: 7, result: 'SKIPPED', expiresAt: Date.now() + 60_000 }]
+    }) })
+    mocks.accountSubject = 'patient-2'
+
+    await expect(replayPendingCheckins()).resolves.toBe(0)
+    expect(mocks.clear).toHaveBeenCalledTimes(1)
+    expect(mocks.submitCheckin).not.toHaveBeenCalled()
   })
 
   test('does not rewrite an old account cache after the session changes during replay', async () => {

@@ -50,6 +50,14 @@ if (typeof window !== 'undefined') {
     void clearMedicalCache()
     void cancelAllMedicationReminders()
   })
+  window.addEventListener('patient-session-expired', () => {
+    void cancelAllMedicationReminders()
+    void router.isReady().then(() => {
+      if (patientSession.getAuthStatus() === 'anonymous' && router.currentRoute.value.path !== '/login') {
+        return router.replace('/login')
+      }
+    }).catch(() => undefined)
+  })
   const clearRevokedMedicalContext = async (expectedAccountSubject?: string) => {
     if (expectedAccountSubject && patientSession.getAccountSubject() !== expectedAccountSubject) return
     await appAuthService.logout().catch(() => undefined)
