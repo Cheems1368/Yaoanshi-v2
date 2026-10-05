@@ -1188,3 +1188,11 @@ PRD第15节 → 实际主链（本轮所需验收完成）
 - 冻结边界：Standard document没有本轮新增改动，V1-V15原文未改，docs不存在；git diff --check通过。初始未提交进度行保留，根工作区不相关改动未动。历史MySQL/MinIO清理/迁移及2026-09-18/24/27/28、2026-10-02证据保持原日期/版本；未受影响结论不虚报重做。
 - 发布边界及当前剩余门槛：源代码验收完成；PR#44仍Draft，需推送最终记录后核对最新main、当前PR HEAD六项CI、有效审核问题和零未解决会话，再ready/squash merge及main六项CI。2026-10-05只读复核reviewThreads/reviews均为空；旧7ce7fcb六项绿不替代此次提交。未新增每次修复必须全机器人审核的门槛。版本0.1.0/code1不变，tag/GitHub Release另待用户最终确认；正式签名、商店、生产执行、T10均未进入本轮。
 - 真机收尾（2026-10-05）：测试应用已回登录，SecureMedicalCache为空，剩余scheduled/delivered通知均为空；清除本测试应用origin的合成登录元数据，移除本轮/data/local/tmp/t9-c-native-synthetic-photo.jpg。Wi-Fi=0/mobile_data=0与验收前一致；仅移除本轮reverse8080/19000和forward9223，映射清单为空。保留调试APK及用户设置的MIUI应用通知/电池条件，未清理其他应用。仅本轮Docker容器/网络待合并后收尾。
+
+T9 PR C 合并及发布验收收尾（2026-10-05，Asia/Shanghai）
+- 合并前复核：origin/main为db006367f73153d0ae20d6c0d76e7579d4d9cd02；PR#44精确HEAD f5791304030c781950bdd9b9bfeea6e99b239429六项检查全部SUCCESS，CI出处https://github.com/Cheems1368/Yaoanshi-v2/actions/runs/37304746638。GraphQL reviewThreads=[]、reviews=[]，无未解决会话；有效问题已按上段实际测试收敛。PR说明已更新为最终行为及验收结果，无新增全机器人审核门槛。
+- PR#44已取消Draft并于2026-10-05T11:48:27Z squash merge：https://github.com/Cheems1368/Yaoanshi-v2/pull/44；合并后的main SHA eee1e56c3008204b2bfd92d944a7472c311d8fb6。git diff f579130 origin/main为空，合并源码与本轮验收内容一致。
+- 合并后main精确SHA六项CI全部SUCCESS：Backend tests and coverage、Patient app quality、Patient Android APK、Pharmacist web build、Doctor web build、CI / Required Quality Gate；push运行37305313404，出处https://github.com/Cheems1368/Yaoanshi-v2/actions/runs/37305313404。
+- 隔离环境收尾：逐名核对容器及专用网络仅含本轮四个服务后，删除yaoanshi-t9-c-backend、yaoanshi-t9-c-minio、yaoanshi-t9-c-redis、yaoanshi-t9-c-mysql及网络yaoanshi-t9-c-20261005；删除后两项清单均为空。本轮合成库随tmpfs容器清理、受控后端进程凭据不再运行；未删除其他环境、应用或Temp合成验收证据。真机网络、缓存、通知及映射收尾见上一段。
+- 本轮C阶段必需验收、修复、PR合并及main CI验证全部完成；无剩余C阶段验收阻断。Standard document冻结、V1-V15不变、docs未创建。版本保持0.1.0/code1；tag与GitHub Release尚未创建，仍待最终确认；生产操作、正式签名、商店发布及T10均未执行。
+- 本段为合并后证据，单独提交并推送原codex/mvp-v0.1.0-release分支；不改变已经通过六项CI的main提交。main中的完整验收矩阵截至f579130，后续合并/清理证据以本段及上述GitHub运行链接为准。
