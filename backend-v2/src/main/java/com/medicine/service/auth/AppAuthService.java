@@ -230,7 +230,7 @@ public class AppAuthService {
         dto.setMobile(subject);
         dto.setDisplayName(appAccount == null ? null : appAccount.getDisplayName());
         dto.setAccountType(appAccount == null ? null : appAccount.getAccountType());
-        dto.setBound(patientSummary != null);
+        dto.setBound(patientSummary != null && patientSummary.isBound());
         dto.setDeviceId(deviceId);
         dto.setPatient(patientSummary);
         dto.setLastLoginAt(appAccount == null || appAccount.getLastLoginTime() == null

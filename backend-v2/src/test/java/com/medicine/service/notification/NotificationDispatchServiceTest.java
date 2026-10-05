@@ -3,6 +3,7 @@ package com.medicine.service.notification;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.medicine.domain.notification.NotificationLog;
 import com.medicine.repository.notification.NotificationLogMapper;
+import com.medicine.repository.notification.NotificationCommitGateMapper;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -10,6 +11,9 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.core.task.TaskExecutor;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.LocalDateTime;
 import java.util.Map;
@@ -18,6 +22,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -27,16 +32,54 @@ class NotificationDispatchServiceTest {
     private NotificationLogMapper notificationLogMapper;
 
     @Mock
+    private NotificationCommitGateMapper notificationCommitGateMapper;
+
+    @Mock
     private AdminNotificationRealtimeService realtimeService;
 
     @Mock
     private AppNotificationRealtimeService appRealtimeService;
+
+    @Mock
+    private TaskExecutor notificationDeliveryExecutor;
+
+    @Mock
+    private PlatformTransactionManager transactionManager;
 
     @Spy
     private ObjectMapper objectMapper = new ObjectMapper();
 
     @InjectMocks
     private NotificationDispatchService notificationDispatchService;
+
+    @Test
+    void shouldPushNewMedicationReviewToConnectedPharmacist() {
+        when(realtimeService.dispatch(any())).thenReturn(NotificationDispatchService.DispatchResult.sent());
+
+        NotificationLog log = notificationDispatchService.createAndDispatch(1L, "unit-test", "PHARMACIST", 101L,
+                "NEW_MEDICATION_REVIEW", 6001L, Map.of("patientId", 201L), LocalDateTime.now());
+
+        verify(realtimeService).dispatch(log);
+        assertThat(log.getChannel()).isEqualTo("WEBSOCKET");
+        assertThat(log.getDeliveryStatus()).isEqualTo("SENT");
+    }
+
+    @Test
+    void commitMustQueueDeliveryWithoutBorrowingAnotherConnectionOnTheCommittingThread() {
+        TransactionSynchronizationManager.initSynchronization();
+        try {
+            notificationDispatchService.createAndDispatch(1L, "unit-test", "PHARMACIST", 101L,
+                    "HELP_ORDER_SUBMITTED", 6001L, Map.of(), LocalDateTime.now());
+            verifyNoInteractions(notificationDeliveryExecutor, realtimeService);
+
+            TransactionSynchronizationManager.getSynchronizations().forEach(sync -> sync.afterCommit());
+
+            verify(notificationDeliveryExecutor).execute(any(Runnable.class));
+            verifyNoInteractions(transactionManager, realtimeService);
+        } finally {
+            TransactionSynchronizationManager.clearSynchronization();
+        }
+    }
 
     @Test
     void shouldMarkProfessionalNotificationAsSentWhenRealtimeDispatchSucceeds() {

@@ -180,7 +180,7 @@ public class AppPrescriptionService {
         PrescriptionOcrRecord ocrRecord = new PrescriptionOcrRecord();
         ocrRecord.setPrescriptionId(prescription.getId());
         if (ocrResult.isSuccess()) {
-            ocrRecord.setProvider("DEEPSEEK_OCR");
+            ocrRecord.setProvider("SILICONFLOW_OCR");
             ocrRecord.setConfidence(ocrResult.getConfidence());
             boolean highConfidence = ocrResult.getConfidence().compareTo(new BigDecimal("0.80")) >= 0 && !ocrResult.getItems().isEmpty();
             ocrRecord.setStatus(highConfidence
@@ -288,7 +288,7 @@ public class AppPrescriptionService {
 
     private Patient requireBoundPatient(AppAccount account) {
         Patient patient = patientMapper.selectByAppAccountId(DEFAULT_TENANT_ID, account.getId());
-        if (patient == null) {
+        if (patient == null || "PENDING".equals(patient.getBindingStatus())) {
             throw new BusinessException(400, "PATIENT_NOT_BOUND");
         }
         return patient;

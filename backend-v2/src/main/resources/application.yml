@@ -82,7 +82,7 @@ medicine:
   ocr:
     base-url: ${MEDICINE_OCR_BASE_URL:https://api.siliconflow.cn/v1/chat/completions}
     api-key: ${MEDICINE_OCR_API_KEY:}
-    model: ${MEDICINE_OCR_MODEL:deepseek-ai/deepseek-vl2}
+    model: ${MEDICINE_OCR_MODEL:Qwen/Qwen3-VL-8B-Instruct}
     timeout-ms: ${MEDICINE_OCR_TIMEOUT_MS:30000}
   speech:
     xfyun:

@@ -16,8 +16,8 @@
             <ion-card-title>上传登记说明</ion-card-title>
           </ion-card-header>
           <ion-card-content>
-            <p class="desc-text">当前先完成处方图片登记和药师复核流转，不依赖真实对象存储上传成功。</p>
-            <p class="note-text">如本地对象存储未接入，当前页面仍可完成登记；图片回看会显示"待对象存储接入"。</p>
+            <p class="desc-text">请上传清晰、完整的处方图片，识别结果需由药师复核确认。</p>
+            <p class="note-text">上传和识别可能需要一些时间，请等待提交完成。识别不清时，药师会手工核对。</p>
           </ion-card-content>
         </ion-card>
 
@@ -30,7 +30,7 @@
               ref="cameraInputRef"
               class="hidden-input"
               type="file"
-              accept="image/png,image/jpeg,image/webp"
+              accept="image/*"
               capture="environment"
               @change="handleFileChange"
             />

@@ -44,6 +44,13 @@
           <p v-if="detail.description" class="detail-description">{{ detail.description }}</p>
         </article>
 
+        <SelfReportedMedicationsPanel
+          v-if="detail.category === 'NEW_MEDICATION_REVIEW'"
+          :order-id="detail.id"
+          :patient-id="detail.patientId"
+          @refresh="refreshAfterAction"
+        />
+
         <article class="timeline">
           <h3>会话记录</h3>
           <div v-for="event in detail.events || []" :key="event.id" class="timeline-item">
@@ -116,6 +123,7 @@ import {
 import { ADMIN_NOTIFICATION_EVENT } from '@/utils/adminNotifications'
 import { categoryText, eventText, formatDate, statusTagType, statusText } from '@/views/workorders/composables/useWorkOrders'
 import OrderActionBar from '@/views/workorders/components/OrderActionBar.vue'
+import SelfReportedMedicationsPanel from '@/views/workorders/components/SelfReportedMedicationsPanel.vue'
 
 const orders = ref([])
 const loading = ref(false)

@@ -81,7 +81,7 @@ public class AppMedicationService {
 
     public List<DoseTaskDTO> getTodayDoseTasks(String subject, String date) {
         AppPatientService.AccessContext context = appPatientService.requireAccessContext(subject);
-        LocalDate taskDate = StringUtils.hasText(date) ? LocalDate.parse(date) : LocalDate.now();
+        LocalDate taskDate = StringUtils.hasText(date) ? LocalDate.parse(date) : LocalDate.now(java.time.ZoneId.of("Asia/Shanghai"));
         int familyBindingCount = patientFamilyBindingMapper.countActiveByPatientId(DEFAULT_TENANT_ID, context.patient().getId());
         LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
         return medicationDoseTaskMapper.selectTodayByPatientId(DEFAULT_TENANT_ID, context.patient().getId(), taskDate)
@@ -107,8 +107,8 @@ public class AppMedicationService {
 
     public PageResult<CheckinRecordDTO> getCheckins(String subject, String dateFrom, String dateTo, int pageNo, int pageSize) {
         AppPatientService.AccessContext context = appPatientService.requireAccessContext(subject);
-        LocalDate from = StringUtils.hasText(dateFrom) ? LocalDate.parse(dateFrom) : LocalDate.now().minusDays(30);
-        LocalDate to = StringUtils.hasText(dateTo) ? LocalDate.parse(dateTo) : LocalDate.now();
+        LocalDate from = StringUtils.hasText(dateFrom) ? LocalDate.parse(dateFrom) : LocalDate.now(java.time.ZoneId.of("Asia/Shanghai")).minusDays(30);
+        LocalDate to = StringUtils.hasText(dateTo) ? LocalDate.parse(dateTo) : LocalDate.now(java.time.ZoneId.of("Asia/Shanghai"));
         List<CheckinRecordDTO> rows = medicationCheckinRecordMapper
                 .selectByPatientIdAndDateRange(DEFAULT_TENANT_ID, context.patient().getId(), from, to)
                 .stream()
@@ -159,7 +159,7 @@ public class AppMedicationService {
         record.setOperatorType(context.operatorType());
         record.setOperatorId(context.appAccount().getId());
         record.setResult(normalizeResult(request.getResult()));
-        record.setActualTakenAt(parseDateTime(request.getActualTakenAt()));
+        record.setActualTakenAt(validateActualTakenAt(record.getResult(), request.getActualTakenAt(), task, now));
         record.setNote(blankToNull(request.getNote()));
         record.setSkipReason(blankToNull(request.getSkipReason()));
         boolean correction = task.getLastEffectiveCheckinId() != null;
@@ -229,7 +229,7 @@ public class AppMedicationService {
         correction.setOperatorType(context.operatorType());
         correction.setOperatorId(context.appAccount().getId());
         correction.setResult(normalizeResult(request.getResult()));
-        correction.setActualTakenAt(parseDateTime(request.getActualTakenAt()));
+        correction.setActualTakenAt(validateActualTakenAt(correction.getResult(), request.getActualTakenAt(), task, now));
         correction.setNote(blankToNull(request.getNote()));
         correction.setSkipReason(blankToNull(request.getSkipReason()));
         correction.setIsCorrection(true);
@@ -265,6 +265,9 @@ public class AppMedicationService {
         MedicationDoseTask task = medicationDoseTaskMapper.selectByIdForUpdate(DEFAULT_TENANT_ID, doseTaskId);
         if (task == null || !patientId.equals(task.getPatientId())) {
             throw new BusinessException(ErrorCode.DOSE_TASK_NOT_FOUND.getCode(), ErrorCode.DOSE_TASK_NOT_FOUND.getMessage());
+        }
+        if ("CANCELLED".equals(task.getStatus())) {
+            throw new BusinessException(ErrorCode.DOSE_TASK_CANCELLED.getCode(), ErrorCode.DOSE_TASK_CANCELLED.getMessage());
         }
         return task;
     }
@@ -328,6 +331,7 @@ public class AppMedicationService {
         dto.setScheduledAt(formatDateTime(task.getScheduledAt()));
         dto.setStatus(task.getStatus());
         dto.setNotificationStatus(task.getNotificationStatus());
+        dto.setDelayedGenerated(task.getDelayedGenerated());
         applyReminderStage(dto, task, familyBindingCount, now);
         dto.setLastEffectiveCheckinId(task.getLastEffectiveCheckinId());
         dto.setLockedAfter(formatDateTime(task.getLockedAfter()));
@@ -401,7 +405,25 @@ public class AppMedicationService {
         if (!StringUtils.hasText(result)) {
             throw new BusinessException(400, "BAD_REQUEST");
         }
-        return result.trim().toUpperCase();
+        String normalized = result.trim().toUpperCase();
+        if (!Set.of("TAKEN", "MISSED", "SKIPPED").contains(normalized)) {
+            throw new BusinessException(400, "CHECKIN_RESULT_INVALID");
+        }
+        return normalized;
+    }
+
+    private LocalDateTime validateActualTakenAt(String result, String value, MedicationDoseTask task, LocalDateTime now) {
+        if (!"TAKEN".equals(result)) return null;
+        LocalDateTime actual;
+        try {
+            actual = StringUtils.hasText(value) ? parseDateTime(value) : now;
+        } catch (RuntimeException ex) {
+            throw new BusinessException(400, "ACTUAL_TAKEN_AT_INVALID");
+        }
+        if (actual.isAfter(now) || (task.getScheduledAt() != null && actual.isBefore(task.getScheduledAt().minusHours(24)))) {
+            throw new BusinessException(400, "ACTUAL_TAKEN_AT_INVALID");
+        }
+        return actual;
     }
 
     private String toTaskStatus(String result) {

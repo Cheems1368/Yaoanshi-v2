@@ -32,15 +32,15 @@ public class AdminNotificationWebSocketAuthenticator {
         }
         if (professionalIdentityService.isPharmacist(claims)) {
             PharmacistProfile profile = professionalIdentityService.getOrCreatePharmacistProfile(claims);
-            return new SessionTarget("PHARMACIST", profile.getId());
+            return new SessionTarget(claims.getTenantId(), "PHARMACIST", profile.getId());
         }
         if (professionalIdentityService.isDoctor(claims)) {
             DoctorProfile profile = professionalIdentityService.getOrCreateDoctorProfile(claims);
-            return new SessionTarget("DOCTOR", profile.getId());
+            return new SessionTarget(claims.getTenantId(), "DOCTOR", profile.getId());
         }
         return null;
     }
 
-    public record SessionTarget(String targetType, Long targetId) {
+    public record SessionTarget(Long tenantId, String targetType, Long targetId) {
     }
 }

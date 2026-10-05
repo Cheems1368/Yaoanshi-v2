@@ -40,6 +40,7 @@ public class AppPatientService {
         this.patientFamilyBindingMapper = patientFamilyBindingMapper;
     }
 
+    @Transactional
     public AppPatientSummaryDTO bindPatient(String subject, BindPatientRequest request) {
         String mobile = normalize(request.getMobile());
         String hospitalPatientId = normalize(request.getHospitalPatientId());
@@ -55,6 +56,9 @@ public class AppPatientService {
 
         AppAccount appAccount = appAccountMapper.selectActiveByMobile(DEFAULT_TENANT_ID, subject);
         if (appAccount == null) {
+            throw new BusinessException(400, "BAD_REQUEST");
+        }
+        if ("FAMILY".equalsIgnoreCase(appAccount.getAccountType())) {
             throw new BusinessException(400, "BAD_REQUEST");
         }
 
@@ -82,16 +86,14 @@ public class AppPatientService {
             patient.setHospitalPatientId(hospitalPatientId);
             patient.setMobile(mobile);
             patient.setName(name);
-            patient.setBindingStatus("BOUND");
-            patient.setBoundAt(now);
+            patient.setBindingStatus("PENDING");
             applyAuditFields(patient, "app-patient");
             patientMapper.insert(patient);
         } else {
+            patient = patientMapper.lockByIdAndTenant(DEFAULT_TENANT_ID, patient.getId());
             patient.setAppAccountId(appAccount.getId());
             patient.setMobile(mobile);
             patient.setName(name);
-            patient.setBindingStatus("BOUND");
-            patient.setBoundAt(now);
             patient.setUpdater("app-patient");
             patient.setUpdateTime(now);
             patientMapper.updateBinding(patient);
@@ -229,6 +231,10 @@ public class AppPatientService {
         if (patient == null) {
             throw new BusinessException(ErrorCode.PATIENT_BIND_CONFLICT.getCode(), ErrorCode.PATIENT_BIND_CONFLICT.getMessage());
         }
+        if ("PENDING".equals(patient.getBindingStatus())) {
+            throw new BusinessException(ErrorCode.PATIENT_BIND_REQUIRES_PHARMACIST_CONFIRM.getCode(),
+                    ErrorCode.PATIENT_BIND_REQUIRES_PHARMACIST_CONFIRM.getMessage());
+        }
         String operatorType = "FAMILY".equalsIgnoreCase(appAccount.getAccountType()) ? "FAMILY" : "PATIENT";
         return new AccessContext(appAccount, patient, operatorType);
     }
@@ -290,6 +296,10 @@ public class AppPatientService {
         Patient patient = patientMapper.selectByAppAccountId(DEFAULT_TENANT_ID, appAccount.getId());
         if (patient == null) {
             throw new BusinessException(ErrorCode.PATIENT_NOT_FOUND.getCode(), ErrorCode.PATIENT_NOT_FOUND.getMessage());
+        }
+        if ("PENDING".equals(patient.getBindingStatus())) {
+            throw new BusinessException(ErrorCode.PATIENT_BIND_REQUIRES_PHARMACIST_CONFIRM.getCode(),
+                    ErrorCode.PATIENT_BIND_REQUIRES_PHARMACIST_CONFIRM.getMessage());
         }
         return patient;
     }

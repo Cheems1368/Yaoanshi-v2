@@ -1,6 +1,7 @@
 package com.medicine.domain.medication;
 
 import com.medicine.domain.common.BaseEntity;
+import java.time.LocalDateTime;
 
 public class MedicationPlanItem extends BaseEntity {
 
@@ -14,6 +15,15 @@ public class MedicationPlanItem extends BaseEntity {
     private String route;
     private String instructions;
     private Integer sortOrder;
+    private LocalDateTime firstExecutionAt;
+
+    public LocalDateTime getFirstExecutionAt() {
+        return firstExecutionAt;
+    }
+
+    public void setFirstExecutionAt(LocalDateTime firstExecutionAt) {
+        this.firstExecutionAt = firstExecutionAt;
+    }
 
     public Long getPlanId() {
         return planId;

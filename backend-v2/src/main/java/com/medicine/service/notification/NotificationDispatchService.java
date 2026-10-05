@@ -3,7 +3,16 @@ package com.medicine.service.notification;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.medicine.domain.notification.NotificationLog;
 import com.medicine.repository.notification.NotificationLogMapper;
+import com.medicine.repository.notification.NotificationCommitGateMapper;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.core.task.TaskExecutor;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.LocalDateTime;
 import java.util.Map;
@@ -14,6 +23,7 @@ public class NotificationDispatchService {
 
     private static final Set<String> ADMIN_REALTIME_BUSINESS_TYPES = Set.of(
             "HELP_ORDER_SUBMITTED",
+            "NEW_MEDICATION_REVIEW",
             "HELP_ORDER_PATIENT_REPLY",
             "HELP_ORDER_ESCALATED",
             "HELP_ORDER_REPLY",
@@ -31,22 +41,32 @@ public class NotificationDispatchService {
     );
 
     private final NotificationLogMapper notificationLogMapper;
+    private final NotificationCommitGateMapper notificationCommitGateMapper;
+    private final PlatformTransactionManager transactionManager;
+    private final TaskExecutor notificationDeliveryExecutor;
     private final AdminNotificationRealtimeService adminRealtimeService;
     private final AppNotificationRealtimeService appRealtimeService;
     private final ObjectMapper objectMapper;
 
     public NotificationDispatchService(
             NotificationLogMapper notificationLogMapper,
+            NotificationCommitGateMapper notificationCommitGateMapper,
+            PlatformTransactionManager transactionManager,
+            @Qualifier("applicationTaskExecutor") TaskExecutor notificationDeliveryExecutor,
             AdminNotificationRealtimeService adminRealtimeService,
             AppNotificationRealtimeService appRealtimeService,
             ObjectMapper objectMapper
     ) {
         this.notificationLogMapper = notificationLogMapper;
+        this.notificationCommitGateMapper = notificationCommitGateMapper;
+        this.transactionManager = transactionManager;
+        this.notificationDeliveryExecutor = notificationDeliveryExecutor;
         this.adminRealtimeService = adminRealtimeService;
         this.appRealtimeService = appRealtimeService;
         this.objectMapper = objectMapper;
     }
 
+    @Transactional
     public NotificationLog createAndDispatch(
             Long tenantId,
             String operator,
@@ -75,8 +95,32 @@ public class NotificationDispatchService {
         log.setFailureReason(null);
         log.setPayloadJson(writeJson(payload));
         applyAudit(log, tenantId, operator, now);
+        notificationCommitGateMapper.lock();
         notificationLogMapper.insert(log);
-        updateDispatchResult(log, now, null);
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    try {
+                        // The committing thread still holds its connection until transaction cleanup.
+                        notificationDeliveryExecutor.execute(() -> {
+                            try {
+                                TransactionTemplate delivery = new TransactionTemplate(transactionManager);
+                                delivery.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+                                delivery.executeWithoutResult(status ->
+                                        updateDispatchResult(log, LocalDateTime.now(java.time.ZoneOffset.UTC), null));
+                            } catch (RuntimeException ignored) {
+                                // A stale PENDING log is claimed by the retry job.
+                            }
+                        });
+                    } catch (RuntimeException ignored) {
+                        // A stale PENDING log is claimed by the retry job.
+                    }
+                }
+            });
+        } else {
+            updateDispatchResult(log, now, null);
+        }
         return log;
     }
 
@@ -108,7 +152,8 @@ public class NotificationDispatchService {
     }
 
     public void retryClaimed(NotificationLog log, LocalDateTime now) {
-        if (log == null || !"FAILED".equals(log.getDeliveryStatus()) || log.getClaimToken() == null) {
+        if (log == null || !("FAILED".equals(log.getDeliveryStatus()) || "PENDING".equals(log.getDeliveryStatus()))
+                || log.getClaimToken() == null) {
             return;
         }
         updateDispatchResult(log, now, log.getClaimToken());

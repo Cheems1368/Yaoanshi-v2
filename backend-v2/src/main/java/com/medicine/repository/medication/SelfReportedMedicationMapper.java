@@ -79,14 +79,6 @@ public interface SelfReportedMedicationMapper {
             """)
     int update(SelfReportedMedication record);
 
-    @Update("""
-            UPDATE self_reported_medication
-            SET deleted = 1, updater = #{updater}, update_time = #{updateTime}
-            WHERE tenant_id = #{tenantId} AND id = #{id} AND status = 'PENDING' AND deleted = 0
-            """)
-    int softDelete(@Param("tenantId") Long tenantId, @Param("id") Long id,
-                   @Param("updater") String updater, @Param("updateTime") java.time.LocalDateTime updateTime);
-
     /** Count PENDING records for a given work order (used to detect if all withdrawn) */
     @Select("""
             SELECT COUNT(*) FROM self_reported_medication

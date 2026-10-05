@@ -34,11 +34,13 @@ class AdminNotificationRealtimeServiceTest {
         when(pharmacistSession.getId()).thenReturn("pharmacist-1");
         when(pharmacistSession.isOpen()).thenReturn(true);
         when(doctorSession.getId()).thenReturn("doctor-1");
-        realtimeService.register(pharmacistSession, "PHARMACIST", 1L);
-        realtimeService.register(doctorSession, "DOCTOR", 2L);
+        realtimeService.register(pharmacistSession, 1L, "PHARMACIST", 1L);
+        realtimeService.register(doctorSession, 1L, "DOCTOR", 2L);
 
         NotificationLog log = new NotificationLog();
         log.setTargetType("PHARMACIST");
+        log.setTenantId(1L);
+        log.setId(100L);
         log.setTargetId(0L);
         log.setBusinessType("HELP_ORDER_SUBMITTED");
         log.setBusinessId(9001L);

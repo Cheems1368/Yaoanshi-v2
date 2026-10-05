@@ -125,6 +125,20 @@ describe('patientSession', () => {
     expect(secureCacheMocks.clear).toHaveBeenCalledTimes(1)
   })
 
+  test('keeps a sealed pending check-in inaccessible until login', async () => {
+    secureCacheMocks.read.mockResolvedValue({
+      value: JSON.stringify({
+        version: 2, accountSubject: 'patient-1', sealedUntilLogin: true,
+        tasksExpiresAt: 0, tasks: [],
+        pendingCheckins: [{ doseTaskId: 7, expiresAt: Date.now() + 60_000 }]
+      })
+    })
+
+    await expect(patientSession.restoreOfflineContext()).resolves.toBe(false)
+    expect(patientSession.getAccountSubject()).toBeNull()
+    expect(secureCacheMocks.clear).not.toHaveBeenCalled()
+  })
+
   test('physically clears an unreadable encrypted native state', async () => {
     secureCacheMocks.read.mockResolvedValue({ value: '{not-json' })
 

@@ -7,7 +7,7 @@ public class OcrProperties {
 
     private String baseUrl = "https://api.siliconflow.cn/v1/chat/completions";
     private String apiKey = "";
-    private String model = "deepseek-ai/deepseek-vl2";
+    private String model = "Qwen/Qwen3-VL-8B-Instruct";
     private long timeoutMs = 30000;
 
     public String getBaseUrl() {

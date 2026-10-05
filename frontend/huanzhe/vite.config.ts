@@ -29,7 +29,10 @@ export default defineConfig(({ mode }) => {
         '/app-api': {
           target: apiTarget,
           changeOrigin: true,
-          secure: false
+          secure: false,
+          configure(proxy) {
+            proxy.on('proxyReq', (request) => request.removeHeader('origin'))
+          }
         }
       }
     },

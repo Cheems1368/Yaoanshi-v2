@@ -1,6 +1,7 @@
 package com.medicine.service.admin;
 
 import com.medicine.api.dto.notification.NotificationLogDTO;
+import com.medicine.common.exception.BusinessException;
 import com.medicine.common.model.PageResult;
 import com.medicine.domain.identity.PharmacistProfile;
 import com.medicine.domain.notification.NotificationLog;
@@ -17,6 +18,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -35,7 +37,7 @@ class AdminNotificationServiceTest {
     @Test
     void shouldNormalizeFiltersAndMapNotificationLogPage() {
         JwtClaims claims = pharmacistClaims();
-        when(professionalIdentityService.getOrCreatePharmacistProfile(claims)).thenReturn(pharmacistProfile());
+        claims.setRoles(List.of("tenant_admin"));
         when(notificationLogMapper.count(1L, "HELP_ORDER", "FAILED")).thenReturn(1L);
         when(notificationLogMapper.search(1L, "HELP_ORDER", "FAILED", 0, 1)).thenReturn(List.of(notificationLog()));
 
@@ -49,6 +51,34 @@ class AdminNotificationServiceTest {
         assertThat(result.getList().get(0).getPayloadJson()).isEqualTo("{\"orderNo\":\"HO1\"}");
         verify(notificationLogMapper).count(1L, "HELP_ORDER", "FAILED");
         verify(notificationLogMapper).search(1L, "HELP_ORDER", "FAILED", 0, 1);
+    }
+
+    @Test
+    void pharmacistCannotUseTenantWideLogList() {
+        assertThatThrownBy(() -> adminNotificationService.list(pharmacistClaims(), null, null, 1, 20))
+                .isInstanceOf(BusinessException.class);
+    }
+
+    @Test
+    void personalCursorAndPagesUseCurrentTenantAndProfessionalProfile() {
+        JwtClaims claims = pharmacistClaims();
+        when(professionalIdentityService.isPharmacist(claims)).thenReturn(true);
+        when(professionalIdentityService.getOrCreatePharmacistProfile(claims)).thenReturn(pharmacistProfile());
+        when(notificationLogMapper.selectLatestPersonalLogId(1L, "PHARMACIST", 101L)).thenReturn(41L);
+        NotificationLog first = notificationLog();
+        first.setId(42L);
+        NotificationLog second = notificationLog();
+        second.setId(43L);
+        NotificationLog third = notificationLog();
+        third.setId(44L);
+        when(notificationLogMapper.selectPersonalLogs(1L, "PHARMACIST", 101L, 41L, 3))
+                .thenReturn(List.of(first, second, third));
+
+        assertThat(adminNotificationService.baseline(claims).cursor()).isEqualTo(41L);
+        AdminNotificationService.PersonalPage page = adminNotificationService.personalLogs(claims, 41L, 2);
+        assertThat(page.list()).extracting(NotificationLogDTO::getId).containsExactly(42L, 43L);
+        assertThat(page.nextCursor()).isEqualTo(43L);
+        assertThat(page.hasMore()).isTrue();
     }
 
     private JwtClaims pharmacistClaims() {

@@ -10,6 +10,7 @@ import org.springframework.web.socket.WebSocketSession;
 import java.io.IOException;
 import java.util.LinkedHashSet;
 import java.time.ZoneOffset;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -25,8 +26,8 @@ public class AdminNotificationRealtimeService {
         this.objectMapper = objectMapper;
     }
 
-    public void register(WebSocketSession session, String targetType, Long targetId) {
-        Subscription subscription = new Subscription(targetType, targetId);
+    public void register(WebSocketSession session, Long tenantId, String targetType, Long targetId) {
+        Subscription subscription = new Subscription(tenantId, targetType, targetId);
         sessionSubscriptions.put(session.getId(), subscription);
         subscriptions.computeIfAbsent(subscription.key(), ignored -> ConcurrentHashMap.newKeySet()).add(session);
     }
@@ -57,13 +58,14 @@ public class AdminNotificationRealtimeService {
 
         String message;
         try {
-            message = objectMapper.writeValueAsString(Map.of(
-                    "businessType", safe(log.getBusinessType()),
-                    "businessId", log.getBusinessId(),
-                    "targetType", safe(log.getTargetType()),
-                    "payload", parsePayload(log.getPayloadJson()),
-                    "createdAt", log.getCreateTime() == null ? null : log.getCreateTime().toInstant(ZoneOffset.UTC).toString()
-            ));
+            Map<String, Object> body = new HashMap<>();
+            body.put("logId", log.getId());
+            body.put("businessType", safe(log.getBusinessType()));
+            body.put("businessId", log.getBusinessId());
+            body.put("targetType", safe(log.getTargetType()));
+            body.put("payload", parsePayload(log.getPayloadJson()));
+            body.put("createdAt", log.getCreateTime() == null ? null : log.getCreateTime().toInstant(ZoneOffset.UTC).toString());
+            message = objectMapper.writeValueAsString(body);
         } catch (Exception ex) {
             return NotificationDispatchService.DispatchResult.failed("PAYLOAD_SERIALIZE_FAILED", ex.getMessage());
         }
@@ -95,14 +97,14 @@ public class AdminNotificationRealtimeService {
             return Set.of();
         }
         if (log.getTargetId() != null && log.getTargetId() > 0) {
-            return subscriptions.get(Subscription.key(log.getTargetType(), log.getTargetId()));
+            return subscriptions.get(Subscription.key(log.getTenantId(), log.getTargetType(), log.getTargetId()));
         }
         if (log.getTargetType() == null || log.getTargetType().isBlank()) {
             return Set.of();
         }
 
         Set<WebSocketSession> matches = new LinkedHashSet<>();
-        String prefix = log.getTargetType() + ":";
+        String prefix = log.getTenantId() + ":" + log.getTargetType() + ":";
         subscriptions.forEach((key, sessions) -> {
             if (key.startsWith(prefix) && sessions != null) {
                 matches.addAll(sessions);
@@ -127,13 +129,13 @@ public class AdminNotificationRealtimeService {
         return value == null ? "" : value;
     }
 
-    private record Subscription(String targetType, Long targetId) {
+    private record Subscription(Long tenantId, String targetType, Long targetId) {
         private String key() {
-            return key(targetType, targetId);
+            return key(tenantId, targetType, targetId);
         }
 
-        private static String key(String targetType, Long targetId) {
-            return (targetType == null ? "UNKNOWN" : targetType) + ":" + (targetId == null ? 0L : targetId);
+        private static String key(Long tenantId, String targetType, Long targetId) {
+            return tenantId + ":" + (targetType == null ? "UNKNOWN" : targetType) + ":" + (targetId == null ? 0L : targetId);
         }
     }
 }

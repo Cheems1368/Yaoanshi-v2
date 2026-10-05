@@ -18,12 +18,12 @@
             {{ statusText(med.status) }}
           </el-tag>
         </div>
-        <div v-if="med.status === 'PENDING'" class="srm-item__actions">
-          <el-button type="success" size="small" :loading="actionLoading === `ack-${med.id}`" @click="acknowledge(med)">
+        <div v-if="med.status === 'PENDING' || med.status === 'ACTIVE'" class="srm-item__actions">
+          <el-button v-if="med.status === 'PENDING'" type="success" size="small" :loading="actionLoading === `ack-${med.id}`" @click="acknowledge(med)">
             已知晓
           </el-button>
           <el-button type="danger" size="small" plain :loading="actionLoading === `rej-${med.id}`" @click="openRejectDialog(med)">
-            驳回
+            {{ med.status === 'ACTIVE' ? '停用' : '驳回' }}
           </el-button>
           <el-button size="small" plain @click="goToTransfer(med)">
             转入正式计划
@@ -32,16 +32,16 @@
       </div>
     </div>
 
-    <el-dialog v-model="rejectDialogVisible" title="驳回原因" width="380px" :append-to-body="true">
+    <el-dialog v-model="rejectDialogVisible" :title="rejectingMed?.status === 'ACTIVE' ? '停用原因' : '驳回原因'" width="380px" :append-to-body="true">
       <el-input
         v-model="rejectReason"
         type="textarea"
         :rows="3"
-        placeholder="请输入驳回原因（可选）"
+        placeholder="请输入原因（可选）"
       />
       <template #footer>
         <el-button @click="rejectDialogVisible = false">取消</el-button>
-        <el-button type="danger" :loading="actionLoading === `rej-${rejectingId}`" @click="confirmReject">确认驳回</el-button>
+        <el-button type="danger" :loading="actionLoading === `rej-${rejectingId}`" @click="confirmReject">{{ rejectingMed?.status === 'ACTIVE' ? '确认停用' : '确认驳回' }}</el-button>
       </template>
     </el-dialog>
   </section>
@@ -114,7 +114,7 @@ const confirmReject = async () => {
   try {
     await rejectSelfReportedMedication(props.orderId, rejectingMed.value.id, rejectReason.value.trim())
     rejectDialogVisible.value = false
-    ElMessage.success('已驳回')
+    ElMessage.success(rejectingMed.value.status === 'ACTIVE' ? '已停用' : '已驳回')
     await loadMedications()
     emit('refresh')
   } catch (e) {

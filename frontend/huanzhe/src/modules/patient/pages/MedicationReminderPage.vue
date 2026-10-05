@@ -80,7 +80,11 @@
               <ion-badge :color="statusColor(task.status)">{{ statusText(task.status) }}</ion-badge>
             </div>
 
-            <div class="task-actions">
+            <div v-if="task.status !== 'CANCELLED'" class="task-actions">
+              <label>实际服药时间（补录可改，北京时间）
+                <input v-model="takenAtByTaskId[task.id]" type="datetime-local" />
+              </label>
+              <input v-model="skipReasonByTaskId[task.id]" placeholder="跳过或漏服原因（选填）" />
               <ion-button
                 size="small"
                 color="success"
@@ -98,6 +102,7 @@
               >
                 漏服
               </ion-button>
+              <ion-button size="small" fill="outline" color="medium" :disabled="submittingTaskId === task.id" @click="saveResult(task, 'SKIPPED')">跳过</ion-button>
             </div>
           </ion-card-content>
         </ion-card>
@@ -136,7 +141,8 @@ import { patientSession } from '@/app/session'
 import {
   cacheOfflineAccountType,
   loadMedicationTasks,
-  submitOrQueueCheckin
+  submitOrQueueCheckin,
+  toShanghaiIso
 } from '@/modules/patient/services/offlineMedication'
 import {
   cancelMedicationReminder,
@@ -148,6 +154,8 @@ const activePlan = ref<MedicationPlanDTO | null>(null)
 const tasks = ref<DoseTaskDTO[]>([])
 const currentAccountType = ref('UNKNOWN')
 const submittingTaskId = ref<number | null>(null)
+const takenAtByTaskId = ref<Record<number, string>>({})
+const skipReasonByTaskId = ref<Record<number, string>>({})
 const showToast = ref(false)
 const toastMessage = ref('')
 const offlineMode = ref(false)
@@ -155,7 +163,7 @@ let taskRequestEpoch = 0
 let taskAccountSubject: string | null = null
 
 const completedCount = computed(() => tasks.value.filter((task) => task.status === 'COMPLETED').length)
-const pendingCount = computed(() => tasks.value.filter((task) => !['COMPLETED', 'MISSED', 'SKIPPED'].includes(task.status)).length)
+const pendingCount = computed(() => tasks.value.filter((task) => !['COMPLETED', 'MISSED', 'SKIPPED', 'CANCELLED'].includes(task.status)).length)
 
 const showMessage = (message: string) => {
   toastMessage.value = message
@@ -209,18 +217,21 @@ const loadTasks = async () => {
   }
 }
 
-const saveResult = async (task: DoseTaskDTO, result: 'TAKEN' | 'MISSED') => {
+const saveResult = async (task: DoseTaskDTO, result: 'TAKEN' | 'MISSED' | 'SKIPPED') => {
   submittingTaskId.value = task.id
   try {
-    const outcome = await submitOrQueueCheckin(task, result)
+    const outcome = await submitOrQueueCheckin(task, result, {
+      actualTakenAt: result === 'TAKEN' ? toShanghaiIso(takenAtByTaskId.value[task.id]) : undefined,
+      skipReason: skipReasonByTaskId.value[task.id]
+    })
     if (outcome === 'queued') {
-      task.status = result === 'TAKEN' ? 'COMPLETED' : 'MISSED'
+      task.status = result === 'TAKEN' ? 'COMPLETED' : result === 'SKIPPED' ? 'SKIPPED' : 'MISSED'
       await cancelMedicationReminder(task.id).catch(() => undefined)
       showMessage('记录已加密保存，将在联网后自动同步')
       return
     }
 
-    showMessage(result === 'TAKEN' ? '已记录为已服药' : '已记录为漏服')
+    showMessage(result === 'TAKEN' ? '已记录为已服药' : result === 'SKIPPED' ? '已记录为跳过' : '已记录为漏服')
     await loadTasks()
   } catch (error: any) {
     showMessage(error?.message || '提交失败')
@@ -238,7 +249,7 @@ const formatTime = (value?: string | null) => {
 }
 
 const statusText = (status: string) => {
-  const map: Record<string, string> = { PENDING: '待执行', COMPLETED: '已服药', MISSED: '漏服', SKIPPED: '跳过' }
+  const map: Record<string, string> = { PENDING: '待执行', COMPLETED: '已服药', MISSED: '漏服', SKIPPED: '跳过', CANCELLED: '已取消' }
   return map[status] || status
 }
 
@@ -424,7 +435,18 @@ onIonViewWillEnter(async () => {
 
 .task-actions {
   display: flex;
+  flex-direction: column;
   gap: var(--patient-space-3);
   margin-top: var(--patient-space-4);
+}
+
+.task-actions label {
+  min-width: 0;
+}
+
+.task-actions input {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
 }
 </style>

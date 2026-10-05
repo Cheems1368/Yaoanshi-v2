@@ -9,11 +9,18 @@
           <div>
             <p class="eyebrow">患者绑定</p>
             <h1>绑定患者身份</h1>
-            <p>登录后填写患者姓名、手机号和院内患者编号，完成身份绑定后即可进入首页。</p>
+            <p>填写患者姓名、手机号和院内患者编号，药师核验确认后即可进入用药流程。</p>
           </div>
         </header>
 
-        <section class="form-card">
+        <section v-if="waitingForConfirmation" class="form-card">
+          <h2>等待药师确认</h2>
+          <p>身份资料已提交，请联系药师核验。确认前暂不能进入用药流程。</p>
+          <p>{{ formData.name }} · {{ formData.hospitalPatientId }}</p>
+          <ion-button expand="block" :disabled="isLoading" @click="refreshBinding">刷新确认状态</ion-button>
+        </section>
+
+        <section v-else class="form-card">
           <div class="form-item">
             <label for="name">姓名</label>
             <ion-input
@@ -48,7 +55,7 @@
           </div>
         </section>
 
-        <div class="submit-section">
+        <div v-if="!waitingForConfirmation" class="submit-section">
           <ion-button expand="block" class="submit-btn" :disabled="isLoading" @click="submitForm">
             提交绑定
           </ion-button>
@@ -73,7 +80,8 @@ import {
   IonInput,
   IonLoading,
   IonPage,
-  IonToast
+  IonToast,
+  onIonViewWillEnter
 } from '@ionic/vue'
 import { patientSession } from '@/app/session'
 import { medicationService, patientService } from '@/modules/patient/api/mvp'
@@ -83,6 +91,7 @@ const router = useRouter()
 const isLoading = ref(false)
 const showToast = ref(false)
 const toastMessage = ref('')
+const waitingForConfirmation = ref(false)
 const formData = reactive({
   name: '',
   mobile: patientSession.getMobile() ?? '',
@@ -96,14 +105,47 @@ const showMessage = (message: string) => {
   showToast.value = true
 }
 
-const syncActivePlanState = async () => {
+const syncActivePlanState = async (subject: string | null) => {
   try {
     const response = await medicationService.getActiveMedicationPlan()
-    patientSession.setActivePlanStatus(Boolean(response.data))
+    if (subject === patientSession.getAccountSubject()) patientSession.setActivePlanStatus(Boolean(response.data))
   } catch {
-    patientSession.setActivePlanStatus(false)
+    if (subject === patientSession.getAccountSubject()) patientSession.setActivePlanStatus(false)
   }
 }
+
+const refreshBinding = async () => {
+  const subject = patientSession.getAccountSubject()
+  isLoading.value = true
+  try {
+    const response = await patientService.getCurrentPatient()
+    if (subject !== patientSession.getAccountSubject()) return
+    const patient = response.data as { bound?: boolean; bindingStatus?: string; name?: string; mobile?: string; hospitalPatientId?: string } | null
+    waitingForConfirmation.value = patient?.bindingStatus === 'PENDING'
+    if (patient) {
+      formData.name = patient.name ?? ''
+      formData.mobile = patient.mobile ?? formData.mobile
+      formData.hospitalPatientId = patient.hospitalPatientId ?? ''
+    }
+    patientSession.setBindingStatus(patient?.bound === true)
+    if (patient?.bound === true) {
+      await syncActivePlanState(subject)
+      if (subject === patientSession.getAccountSubject()) await router.replace('/tabs/home')
+    }
+  } catch (error: any) {
+    if (subject === patientSession.getAccountSubject()) showMessage(error?.message || '确认状态加载失败，请重试')
+  } finally {
+    if (subject === patientSession.getAccountSubject()) isLoading.value = false
+  }
+}
+
+onIonViewWillEnter(() => {
+  waitingForConfirmation.value = false
+  formData.name = ''
+  formData.mobile = patientSession.getMobile() ?? ''
+  formData.hospitalPatientId = ''
+  void refreshBinding()
+})
 
 const syncLocalProfile = (payload: {
   patientId?: number
@@ -155,6 +197,7 @@ const submitForm = async () => {
   }
 
   isLoading.value = true
+  const subject = patientSession.getAccountSubject()
 
   try {
     const response = await patientService.bindPatient({
@@ -162,11 +205,19 @@ const submitForm = async () => {
       hospitalPatientId,
       name
     })
-    const bindData = (response.data ?? {}) as { id?: number }
+    if (subject !== patientSession.getAccountSubject()) return
+    const bindData = (response.data ?? {}) as { id?: number; bound?: boolean }
 
     patientSession.setMobile(mobile)
-    patientSession.setBindingStatus(true)
-    await syncActivePlanState()
+    patientSession.setBindingStatus(bindData.bound === true)
+    if (bindData.bound !== true) {
+      patientSession.setActivePlanStatus(false)
+      waitingForConfirmation.value = true
+      showMessage('身份资料已提交，等待药师确认')
+      return
+    }
+    await syncActivePlanState(subject)
+    if (subject !== patientSession.getAccountSubject()) return
 
     const verifiedAt = new Date().toISOString()
     let successMessage = '绑定成功'
@@ -179,6 +230,7 @@ const submitForm = async () => {
         realNameVerified: true,
         realNameVerifiedTime: verifiedAt
       })
+      if (subject !== patientSession.getAccountSubject()) return
 
       syncLocalProfile({
         patientId: profileResponse.data?.patientId ?? bindData.id,
@@ -189,6 +241,7 @@ const submitForm = async () => {
         realNameVerifiedTime: profileResponse.data?.realNameVerifiedTime || verifiedAt
       })
     } catch {
+      if (subject !== patientSession.getAccountSubject()) return
       syncLocalProfile({
         patientId: bindData.id,
         name,
@@ -202,12 +255,17 @@ const submitForm = async () => {
 
     showMessage(successMessage)
     window.setTimeout(() => {
-      router.replace('/tabs/home')
+      if (subject === patientSession.getAccountSubject()) router.replace('/tabs/home')
     }, 300)
   } catch (error: any) {
-    showMessage(error?.message || '绑定失败')
+    const messages: Record<string, string> = {
+      PATIENT_BIND_REQUIRES_PHARMACIST_CONFIRM: '该院内编号已关联其他患者，请联系药师核验后再绑定',
+      PATIENT_BIND_CONFLICT: '当前账号已绑定其他院内编号，请联系药师核验',
+      BAD_REQUEST: '绑定信息不完整或与登录手机号不一致，请核对后重试'
+    }
+    if (subject === patientSession.getAccountSubject()) showMessage(messages[error?.message] || error?.message || '绑定失败，请重试')
   } finally {
-    isLoading.value = false
+    if (subject === patientSession.getAccountSubject()) isLoading.value = false
   }
 }
 

@@ -2,9 +2,10 @@ import { createApp } from 'vue'
 import App from './App.vue'
 import router from './router';
 import { appAuthService, patientService } from '@/modules/patient/api/mvp'
-import { clearMedicalCache, replayPendingCheckins } from '@/modules/patient/services/offlineMedication'
+import { clearMedicalCache, loadMedicationTasks, replayPendingCheckins } from '@/modules/patient/services/offlineMedication'
 import {
   cancelAllMedicationReminders,
+  enableAndScheduleMedicationReminders,
   registerMedicationReminderActionHandler
 } from '@/modules/patient/services/localMedicationReminders'
 import { patientSession } from '@/app/session'
@@ -48,6 +49,14 @@ if (typeof window !== 'undefined') {
   window.addEventListener('patient-session-anonymous', () => {
     void clearMedicalCache()
     void cancelAllMedicationReminders()
+  })
+  window.addEventListener('patient-session-expired', () => {
+    void cancelAllMedicationReminders()
+    void router.isReady().then(() => {
+      if (patientSession.getAuthStatus() === 'anonymous' && router.currentRoute.value.path !== '/login') {
+        return router.replace('/login')
+      }
+    }).catch(() => undefined)
   })
   const clearRevokedMedicalContext = async (expectedAccountSubject?: string) => {
     if (expectedAccountSubject && patientSession.getAccountSubject() !== expectedAccountSubject) return
@@ -97,6 +106,12 @@ if (typeof window !== 'undefined') {
     if (await httpService.restoreSession() && patientSession.getAccessToken()) {
       if (!await revalidateFamilyAccess()) return
       await replayPendingCheckins()
+      const accountSubject = patientSession.getAccountSubject()
+      const taskResult = await loadMedicationTasks().catch(() => null)
+      if (taskResult && !taskResult.offline && patientSession.getAccountSubject() === accountSubject) {
+        await enableAndScheduleMedicationReminders(taskResult.tasks, patientSession.getAccountType() || undefined)
+          .catch(() => undefined)
+      }
     }
   }
   window.addEventListener('online', () => void restoreAndReplay())

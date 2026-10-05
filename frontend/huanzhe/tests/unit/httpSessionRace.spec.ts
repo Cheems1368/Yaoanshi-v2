@@ -3,7 +3,12 @@ import { beforeEach, describe, expect, test, vi } from 'vitest'
 const mocks = vi.hoisted(() => ({
   refreshPost: vi.fn(),
   instancePost: vi.fn(),
+  sealPending: vi.fn(),
   responseError: null as null | ((error: unknown) => Promise<unknown>)
+}))
+
+vi.mock('@/modules/patient/services/offlineMedication', () => ({
+  sealPendingCheckinsForSessionExpiry: mocks.sealPending
 }))
 
 vi.mock('axios', () => ({
@@ -31,6 +36,8 @@ describe('patient session refresh race', () => {
     patientSession.setAccessToken(token('patient-a'))
     mocks.refreshPost.mockReset()
     mocks.instancePost.mockReset()
+    mocks.sealPending.mockReset()
+    mocks.sealPending.mockResolvedValue(undefined)
   })
 
   test('waits for an old refresh before issuing a new login and never commits its token', async () => {
@@ -62,5 +69,26 @@ describe('patient session refresh race', () => {
       config: { url: '/app-api/dose-tasks', _retry: true, _accountSubject: 'patient-a', _sessionGeneration: oldGeneration }
     })).rejects.toThrow('AUTHENTICATED_ACCOUNT_CHANGED')
     expect(patientSession.getAccessToken()).toBe(token('patient-b'))
+  })
+
+  test('seals pending check-ins before marking a rejected refresh anonymous', async () => {
+    patientSession.resetAuthStatus()
+    mocks.refreshPost.mockRejectedValue({ response: { status: 401 } })
+    const events: string[] = []
+    const expired = () => { events.push('expired') }
+    const cleared = () => { events.push('cleared') }
+    window.addEventListener('patient-session-expired', expired)
+    window.addEventListener('patient-session-anonymous', cleared)
+    mocks.sealPending.mockImplementation(async () => {
+      events.push('sealed')
+    })
+    try {
+      await expect(httpService.restoreSession()).resolves.toBe(false)
+      expect(events).toEqual(['sealed', 'expired'])
+      expect(patientSession.getAuthStatus()).toBe('anonymous')
+    } finally {
+      window.removeEventListener('patient-session-expired', expired)
+      window.removeEventListener('patient-session-anonymous', cleared)
+    }
   })
 })

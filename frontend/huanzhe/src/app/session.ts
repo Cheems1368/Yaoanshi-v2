@@ -109,6 +109,15 @@ export const patientSession = {
     if (typeof window !== 'undefined') window.dispatchEvent(new Event('patient-session-anonymous'))
   },
 
+  markSessionExpired() {
+    sessionGeneration += 1
+    authStatus = 'anonymous'
+    accessTokenMemory = ''
+    accountSubjectMemory = ''
+    accountTypeMemory = ''
+    if (typeof window !== 'undefined') window.dispatchEvent(new Event('patient-session-expired'))
+  },
+
   resetAuthStatus() {
     sessionGeneration += 1
     authStatus = 'unknown'
@@ -130,9 +139,17 @@ export const patientSession = {
         tasksExpiresAt?: number
         tasks?: unknown[]
         pendingCheckins?: Array<{ expiresAt?: number }>
+        sealedUntilLogin?: boolean
       }
       if ((parsed.version !== 1 && parsed.version !== 2) || !parsed.accountSubject) {
         await secureMedicalCache.clear().catch(() => undefined)
+        return false
+      }
+      if (parsed.sealedUntilLogin) {
+        const pendingValid = Array.isArray(parsed.pendingCheckins) && parsed.pendingCheckins.some(
+          (pending) => typeof pending.expiresAt === 'number' && pending.expiresAt > Date.now()
+        )
+        if (!pendingValid) await secureMedicalCache.clear().catch(() => undefined)
         return false
       }
       const now = Date.now()

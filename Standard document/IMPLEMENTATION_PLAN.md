@@ -22,7 +22,7 @@ Rules:
 - Recheck HEAD/gates immediately before an authorized merge and verify post-merge main CI. Preserve unaffected Android/Docker acceptance with its original provenance; rerun only evidence invalidated by relevant changes.
 - Durable rules belong here; incident sources, fix revisions, validation outcomes and the next action belong in `progress.txt`. The project-specific skill holds the detailed root-cause checklist, not transient release status.
 
-## 1.5 Execution Status Summary (as of 2026-09-18)
+## 1.5 Execution Status Summary (as of 2026-09-27)
 
 | Phase | Description | Status |
 |-------|-------------|--------|
@@ -39,17 +39,25 @@ Rules:
 | Phase T6 | Android JDK 21 and enforced APK build gate | ✅ Delivered through PR #37 (`98115b9`) |
 | Phase T7 | SEC-002 refresh-token HttpOnly Cookie closure | ✅ Delivered through PR #39 (`4c90292`) |
 | Phase T8 | SEC-005 AI data-boundary closure | ✅ Delivered through PR #40 (`fc3b646`); post-merge `main` CI run `32570783413` passed |
-| Phase T9 | MVP v0.1.0 formal delivery and gap closure | 🚧 PR A delivered through PR #41 (`2614271`); PR B patient implementation and physical Android acceptance are complete, with protected review qualification in progress |
+| Phase T9 | MVP v0.1.0 formal delivery and gap closure | 🚧 PR A and PR B delivered; PR C Draft #44 has local Docker/OCR/browser and 2026-09-28 OPPO PDYT20 partial real-device evidence, including session-expiry queue recovery and account-switch isolation. Remaining PRD cases, latest-HEAD checks, review and merge gates remain. See `T9_ACCEPTANCE_MATRIX.md`. |
 
 **Current active work:** T9 closes the remaining MVP contract, patient, professional-client, reliability, operations, and release-evidence gaps through three protected PRs. T8/SEC-005 is formally delivered. Android release signing and store publishing remain out of scope.
 
 **Flyway current latest on `main`:** V14 (`V14__mvp_release_closure.sql`), delivered through PR #41. V1–V14 remain immutable.
+**PR C candidate migration:** V15 (`V15__plan_task_lifecycle.sql`); isolated fresh and V14-upgrade migration checks passed on 2026-09-26, but it is not on `main`.
 
 **Known open items:**
-- `MEDICINE_OCR_API_KEY` must be set in `.env.local` for live OCR (graceful fallback if omitted)
+- Live OCR success and failure/manual-import paths passed on 2026-09-27 using controlled process-environment injection in the isolated synthetic environment. The provider's previous default model returned `Model disabled`; the candidate default is now `Qwen/Qwen3-VL-8B-Instruct`. Repeat against the final commit and keep credentials out of the repository and logs.
 - The project owner approved `medication-literacy-v1` on 2026-08-24 as general medication science education and explicitly accepted the risk of releasing without a separate licensed-clinician sign-off; this is an owner waiver, not a claim of clinical credentials
 - T9 disposable MySQL/MinIO migration, cleanup and cleanup-switch rollback acceptance passed on 2026-09-24 (see `progress.txt`); PR C must consolidate this evidence and production execution conditions. PR B physical Android acceptance passed on 2026-09-18; relevant later changes still require impact-based regression.
-- Ops cleanup: `ops/sql/sec-003-clear-legacy-patient-id-card-masked.sql` needs to be run
+- SEC-003/SEC-005 have isolated test evidence; production backup, cleanup and recovery belong to future deployment and have not been performed.
+
+### Phase T9 PR C merge and release gates
+
+1. Implement and verify, in order: time/permissions/plan lifecycle and dose maintenance; check-in/offline sync/adherence; professional assessment/reassignment/notifications; acceptance and release documentation. Run focused behavioral checks before the full gates.
+2. Before PR C merge: isolate new MySQL integration data; verify V1→V15 and V14→V15, backend behavior, patient lint/unit/Web/Android, pharmacist and doctor Web, MVP E2E and affected professional browser flows. Repeat Android physical-device offline/encryption/replay/reminder/relogin acceptance and live OCR success plus failure/manual import with controlled credentials. Record PRD 9.1–9.12 and §15 evidence with version, environment, steps and results in `T9_ACCEPTANCE_MATRIX.md`.
+3. Keep PR C open while any required real-device, live OCR, current-HEAD protected check or review-conversation gate is unmet. Once all are met, squash merge and verify six green `main` CI jobs. Create the `0.1.0` tag and GitHub Release only after the owner's final confirmation; the Release contains source and Chinese notes, and the debug APK stays in CI artifacts.
+4. Android formal signing, store publishing and T10 remain outside PR C. Production cleanup is a future deployment task, not a merge prerequisite. On a release blocker, stop pilot deployment, restore the last usable version, retain the tag and announce the issue and repair version.
 
 ## 1.6 Post-P0 Trial Demo Closed-Loop Sequence
 

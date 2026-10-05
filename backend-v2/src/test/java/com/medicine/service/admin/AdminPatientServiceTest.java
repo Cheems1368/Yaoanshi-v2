@@ -17,6 +17,8 @@ import com.medicine.domain.helporder.HelpOrder;
 import com.medicine.domain.helporder.HelpOrderEvent;
 import com.medicine.repository.assessment.Abcd2AssessmentMapper;
 import com.medicine.repository.assessment.KnowledgeAssessmentMapper;
+import com.medicine.repository.assessment.AssessmentReminderMapper;
+import com.medicine.domain.notification.NotificationLog;
 import com.medicine.repository.assessment.SatisfactionSurveyMapper;
 import com.medicine.repository.helporder.HelpOrderMapper;
 import com.medicine.repository.helporder.HelpOrderEventMapper;
@@ -28,6 +30,7 @@ import com.medicine.service.auth.JwtClaims;
 import com.medicine.service.auth.ProfessionalIdentityService;
 import com.medicine.service.notification.NotificationDispatchService;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -50,6 +53,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.lenient;
 
 @ExtendWith(MockitoExtension.class)
 class AdminPatientServiceTest {
@@ -73,6 +77,9 @@ class AdminPatientServiceTest {
     private KnowledgeAssessmentMapper knowledgeAssessmentMapper;
 
     @Mock
+    private AssessmentReminderMapper assessmentReminderMapper;
+
+    @Mock
     private SatisfactionSurveyMapper satisfactionSurveyMapper;
 
     @Mock
@@ -87,11 +94,24 @@ class AdminPatientServiceTest {
     @Mock
     private ProfessionalIdentityService professionalIdentityService;
 
+    @Mock
+    private AdherenceService adherenceService;
+
     @Spy
     private ObjectMapper objectMapper = new ObjectMapper();
 
     @InjectMocks
     private AdminPatientService adminPatientService;
+
+    @BeforeEach
+    void stubAdherence() {
+        AdherenceService.Summary empty7 = new AdherenceService.Summary(LocalDate.parse("2026-03-01"), LocalDate.parse("2026-03-07"),
+                LocalDateTime.of(2026, 3, 7, 12, 0), 0, 0, 0, 0, 0);
+        AdherenceService.Summary empty30 = new AdherenceService.Summary(LocalDate.parse("2026-02-07"), LocalDate.parse("2026-03-07"),
+                LocalDateTime.of(2026, 3, 7, 12, 0), 0, 0, 0, 0, 0);
+        lenient().when(adherenceService.summarize(eq(1L), any(Long.class), eq(null), eq(7), any(LocalDateTime.class))).thenReturn(empty7);
+        lenient().when(adherenceService.summarize(eq(1L), any(Long.class), eq(null), eq(30), any(LocalDateTime.class))).thenReturn(empty30);
+    }
 
     @Test
     void shouldReassignPatientAndAllNonTerminalOrdersForAdmin() {
@@ -123,6 +143,66 @@ class AdminPatientServiceTest {
     }
 
     @Test
+    void shouldConfirmPendingBindingAndAssignConfirmingPharmacist() {
+        JwtClaims claims = professionalClaims();
+        Patient patient = patient(3001L, null);
+        patient.setAppAccountId(5001L);
+        patient.setBindingStatus("PENDING");
+        when(professionalIdentityService.getOrCreatePharmacistProfile(claims)).thenReturn(pharmacistProfile(9001L));
+        when(patientMapper.lockByIdAndTenant(1L, 3001L)).thenReturn(patient);
+
+        AdminPatientDetailDTO detail = adminPatientService.confirmBinding(claims, 3001L);
+
+        assertThat(detail.getBindingStatus()).isEqualTo("BOUND");
+        assertThat(detail.getResponsiblePharmacistId()).isEqualTo(9001L);
+        assertThat(patient.getBoundAt()).isNotNull();
+        assertThat(patient.getUpdater()).isEqualTo("pharmacist-9001");
+        verify(patientMapper).updateBinding(patient);
+    }
+
+    @Test
+    void shouldKeepConfirmationTimeAndOwnerOnRepeatedConfirmation() {
+        JwtClaims claims = professionalClaims();
+        Patient patient = patient(3001L, 9001L);
+        LocalDateTime original = LocalDateTime.of(2026, 3, 6, 9, 30);
+        patient.setBoundAt(original);
+        when(professionalIdentityService.getOrCreatePharmacistProfile(claims)).thenReturn(pharmacistProfile(9001L));
+        when(patientMapper.lockByIdAndTenant(1L, 3001L)).thenReturn(patient);
+
+        adminPatientService.confirmBinding(claims, 3001L);
+
+        assertThat(patient.getBoundAt()).isEqualTo(original);
+        assertThat(patient.getBoundByPharmacistId()).isEqualTo(9001L);
+        verify(patientMapper, never()).updateBinding(any());
+    }
+
+    @Test
+    void shouldDenyConfirmationByAnotherPatientsPharmacist() {
+        JwtClaims claims = professionalClaims();
+        Patient patient = patient(3001L, 9002L);
+        patient.setBindingStatus("PENDING");
+        when(professionalIdentityService.getOrCreatePharmacistProfile(claims)).thenReturn(pharmacistProfile(9001L));
+        when(patientMapper.lockByIdAndTenant(1L, 3001L)).thenReturn(patient);
+
+        assertThatThrownBy(() -> adminPatientService.confirmBinding(claims, 3001L))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("PATIENT_MANAGEMENT_PERMISSION_DENIED");
+        verify(patientMapper, never()).updateBinding(any());
+    }
+
+    @Test
+    void shouldDenyConfirmationOutsideTenant() {
+        JwtClaims claims = professionalClaims();
+        when(professionalIdentityService.getOrCreatePharmacistProfile(claims)).thenReturn(pharmacistProfile(9001L));
+        when(patientMapper.lockByIdAndTenant(1L, 3001L)).thenReturn(null);
+
+        assertThatThrownBy(() -> adminPatientService.confirmBinding(claims, 3001L))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("PATIENT_NOT_FOUND");
+        verify(patientMapper, never()).updateBinding(any());
+    }
+
+    @Test
     void shouldRejectReassignmentForOrdinaryPharmacist() {
         PatientReassignRequest request = new PatientReassignRequest();
         request.setPharmacistId(9002L);
@@ -137,7 +217,7 @@ class AdminPatientServiceTest {
     void shouldRejectKnowledgeReminderBeforePlanStartDate() {
         JwtClaims claims = professionalClaims();
         when(professionalIdentityService.getOrCreatePharmacistProfile(claims)).thenReturn(pharmacistProfile(9001L));
-        when(patientMapper.selectByIdAndTenant(1L, 3001L)).thenReturn(patient(3001L, 9001L));
+        when(patientMapper.lockByIdAndTenant(1L, 3001L)).thenReturn(patient(3001L, 9001L));
         when(medicationPlanMapper.selectFirstActivatedAt(1L, 3001L)).thenReturn(LocalDate.now(ZoneOffset.UTC).plusDays(1).atStartOfDay());
 
         assertThatThrownBy(() -> adminPatientService.remindKnowledgeAssessment(claims, 3001L))
@@ -151,8 +231,13 @@ class AdminPatientServiceTest {
         JwtClaims claims = professionalClaims();
         claims.setRoles(List.of("admin"));
         claims.setEffectiveRole("doctor");
-        when(patientMapper.selectByIdAndTenant(1L, 3001L)).thenReturn(patient(3001L, 9001L));
+        when(patientMapper.lockByIdAndTenant(1L, 3001L)).thenReturn(patient(3001L, 9001L));
         when(medicationPlanMapper.selectFirstActivatedAt(1L, 3001L)).thenReturn(LocalDate.now(ZoneOffset.UTC).atStartOfDay());
+        when(assessmentReminderMapper.selectId(1L, 3001L, "DAY_1")).thenReturn(null);
+        NotificationLog log = new NotificationLog();
+        log.setId(601L);
+        when(notificationDispatchService.createAndDispatch(eq(1L), eq("assessment-reminder"), eq("PATIENT"), eq(3001L),
+                eq("KNOWLEDGE_ASSESSMENT_REMINDER"), eq(3001L), any(), any())).thenReturn(log);
 
         assertThat(adminPatientService.remindKnowledgeAssessment(claims, 3001L)).isTrue();
 
@@ -178,8 +263,8 @@ class AdminPatientServiceTest {
         row.setFamilyBindingCount(1);
         row.setResponsiblePharmacistName("药师A");
 
-        when(patientMapper.searchForPharmacist(1L, 9001L, "张", 0, 10)).thenReturn(List.of(row));
-        when(patientMapper.countForPharmacist(1L, 9001L, "张")).thenReturn(1L);
+        when(patientMapper.searchForPharmacist(1L, 9001L, false, "张", 0, 10)).thenReturn(List.of(row));
+        when(patientMapper.countForPharmacist(1L, 9001L, false, "张")).thenReturn(1L);
 
         PageResult<AdminPatientListItemDTO> page = adminPatientService.getPatients(claims, "张", 1, 10);
 

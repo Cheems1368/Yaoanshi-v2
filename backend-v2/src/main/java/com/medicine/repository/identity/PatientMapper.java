@@ -112,7 +112,9 @@ public interface PatientMapper {
              AND pp.deleted = 0
             WHERE p.tenant_id = #{tenantId}
               AND p.deleted = 0
+            <if test="!includeAll">
               AND (p.bound_by_pharmacist_id IS NULL OR p.bound_by_pharmacist_id = #{pharmacistProfileId})
+            </if>
             <if test="keyword != null and keyword != ''">
               AND (
                    p.name LIKE CONCAT('%', #{keyword}, '%')
@@ -127,6 +129,7 @@ public interface PatientMapper {
     List<PatientAdminListRow> searchForPharmacist(
             @Param("tenantId") Long tenantId,
             @Param("pharmacistProfileId") Long pharmacistProfileId,
+            @Param("includeAll") boolean includeAll,
             @Param("keyword") String keyword,
             @Param("offset") int offset,
             @Param("pageSize") int pageSize
@@ -138,7 +141,9 @@ public interface PatientMapper {
             FROM patient p
             WHERE p.tenant_id = #{tenantId}
               AND p.deleted = 0
+            <if test="!includeAll">
               AND (p.bound_by_pharmacist_id IS NULL OR p.bound_by_pharmacist_id = #{pharmacistProfileId})
+            </if>
             <if test="keyword != null and keyword != ''">
               AND (
                    p.name LIKE CONCAT('%', #{keyword}, '%')
@@ -151,6 +156,7 @@ public interface PatientMapper {
     long countForPharmacist(
             @Param("tenantId") Long tenantId,
             @Param("pharmacistProfileId") Long pharmacistProfileId,
+            @Param("includeAll") boolean includeAll,
             @Param("keyword") String keyword
     );
 

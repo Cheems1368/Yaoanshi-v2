@@ -48,7 +48,8 @@ public class AdminNotificationWebSocketHandler extends TextWebSocketHandler {
         }
         session.getAttributes().put("targetType", target.targetType());
         session.getAttributes().put("targetId", target.targetId());
-        realtimeService.register(session, target.targetType(), target.targetId());
+        session.getAttributes().put("tenantId", target.tenantId());
+        realtimeService.register(session, target.tenantId(), target.targetType(), target.targetId());
     }
 
     @Override

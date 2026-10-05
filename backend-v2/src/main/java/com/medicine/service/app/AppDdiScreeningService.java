@@ -322,6 +322,10 @@ public class AppDdiScreeningService {
     }
 
     public AdminDdiScreenResult screenPlanDrugsDetailed(Long patientId, List<String> planDrugNames) {
+        return screenPlanDrugsDetailed(DEFAULT_TENANT_ID, patientId, planDrugNames);
+    }
+
+    public AdminDdiScreenResult screenPlanDrugsDetailed(Long tenantId, Long patientId, List<String> planDrugNames) {
         List<String> normalizedPlanDrugs = normalizeDrugNames(planDrugNames);
         AdminDdiScreenResult result = new AdminDdiScreenResult();
         if (normalizedPlanDrugs.isEmpty()) {
@@ -330,7 +334,7 @@ public class AppDdiScreeningService {
         }
 
         List<SelfReportedMedication> activeSelfReported =
-                selfReportedMedicationMapper.selectActiveByPatientId(DEFAULT_TENANT_ID, patientId);
+                selfReportedMedicationMapper.selectActiveByPatientId(tenantId, patientId);
         List<String> selfReportedDrugNames = activeSelfReported.stream()
                 .map(SelfReportedMedication::getDrugName)
                 .filter(StringUtils::hasText)
@@ -338,11 +342,11 @@ public class AppDdiScreeningService {
 
         Patient patient = new Patient();
         patient.setId(patientId);
-        patient.setTenantId(DEFAULT_TENANT_ID);
-        PatientHealthProfile healthProfile = patientHealthProfileMapper.selectByPatientId(DEFAULT_TENANT_ID, patientId);
+        patient.setTenantId(tenantId);
+        PatientHealthProfile healthProfile = patientHealthProfileMapper.selectByPatientId(tenantId, patientId);
 
         List<ScreeningHit> hits = collectScreeningHits(
-                DEFAULT_TENANT_ID,
+                tenantId,
                 patient,
                 healthProfile,
                 normalizedPlanDrugs,

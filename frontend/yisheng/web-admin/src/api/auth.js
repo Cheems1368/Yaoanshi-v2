@@ -49,6 +49,14 @@ export function createNotificationSocketTicket() {
   })
 }
 
+export function getNotificationBaseline() {
+  return request({ url: '/admin-api/notifications/me/baseline', method: 'get', skipErrorToast: true })
+}
+
+export function getPersonalNotifications(afterId, limit = 50) {
+  return request({ url: '/admin-api/notifications/me/logs', method: 'get', params: { afterId, limit }, skipErrorToast: true })
+}
+
 // 修改密码
 export function changePassword(data) {
   return request({

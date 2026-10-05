@@ -152,9 +152,9 @@ class AdminSelfReportedMedicationServiceTest {
     }
 
     @Test
-    void reject_nonPendingRecord_throwsBusinessException() {
+    void reject_transferredRecord_throwsBusinessException() {
         SelfReportedMedication srm = pendingSrm(1L, 42L, "布洛芬");
-        srm.setStatus("ACTIVE");
+        srm.setStatus("TRANSFERRED");
         stubAccessibleWorkOrder(srm);
 
         BusinessException ex = catchThrowableOfType(
@@ -164,6 +164,24 @@ class AdminSelfReportedMedicationServiceTest {
         assertThat(ex).isNotNull();
         verify(notificationDispatchService, never()).createAndDispatch(
                 any(), any(), any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void reject_activeRecord_stopsAndPreservesHistoryWithPatientNotification() {
+        SelfReportedMedication srm = pendingSrm(1L, 42L, "布洛芬");
+        srm.setStatus("ACTIVE");
+        stubAccessibleWorkOrder(srm);
+
+        SelfReportedMedicationDTO result = service.reject(claims, 99L, 1L, "药师核验后停用");
+
+        assertThat(result.getStatus()).isEqualTo("STOPPED");
+        verify(selfReportedMedicationMapper).update(srm);
+        verify(helpOrderEventMapper).insert(argThat(event ->
+                event.getContent().contains("药师核验后停用")));
+        verify(notificationDispatchService).createAndDispatch(
+                eq(1L), anyString(), eq("PATIENT"), eq(42L),
+                eq("SELF_MEDICATION_REJECTED"), eq(1L),
+                argThat(payload -> "药师核验后停用".equals(payload.get("reason"))), any());
     }
 
     @Test

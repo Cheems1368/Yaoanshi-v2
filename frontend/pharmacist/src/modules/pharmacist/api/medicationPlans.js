@@ -28,12 +28,21 @@ export function getMedicationPlan(id) {
   })
 }
 
-export function activateMedicationPlan(id) {
+export function activateMedicationPlan(id, data) {
   return request({
     baseURL: backendV2BaseUrl,
     url: `/admin-api/medication-plans/${id}/activate`,
-    method: 'post'
+    method: 'post',
+    data
   })
+}
+
+export function stopMedicationPlan(id) {
+  return request({ baseURL: backendV2BaseUrl, url: `/admin-api/medication-plans/${id}/stop`, method: 'post' })
+}
+
+export function getMedicationPlanActivationConflicts(id) {
+  return request({ baseURL: backendV2BaseUrl, url: `/admin-api/medication-plans/${id}/activation-conflicts`, method: 'get' })
 }
 
 export function getMedicationPlanTasks(id, params) {

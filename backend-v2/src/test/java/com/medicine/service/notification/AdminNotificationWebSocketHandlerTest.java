@@ -46,13 +46,13 @@ class AdminNotificationWebSocketHandlerTest {
         when(session.getAttributes()).thenReturn(attributes);
         when(socketTicketService.consume("ticket-1")).thenReturn("ticket-token");
         when(authenticator.authenticate("ticket-token"))
-                .thenReturn(new AdminNotificationWebSocketAuthenticator.SessionTarget("PHARMACIST", 11L));
+                .thenReturn(new AdminNotificationWebSocketAuthenticator.SessionTarget(1L, "PHARMACIST", 11L));
 
         handler.afterConnectionEstablished(session);
 
         assertThat(attributes).containsEntry("targetType", "PHARMACIST");
         assertThat(attributes).containsEntry("targetId", 11L);
-        verify(realtimeService).register(session, "PHARMACIST", 11L);
+        verify(realtimeService).register(session, 1L, "PHARMACIST", 11L);
     }
 
     @Test
@@ -71,13 +71,13 @@ class AdminNotificationWebSocketHandlerTest {
         when(session.getAttributes()).thenReturn(attributes);
         when(socketTicketService.consume(null)).thenReturn(null);
         when(authenticator.authenticate("header-token"))
-                .thenReturn(new AdminNotificationWebSocketAuthenticator.SessionTarget("DOCTOR", 22L));
+                .thenReturn(new AdminNotificationWebSocketAuthenticator.SessionTarget(1L, "DOCTOR", 22L));
 
         handler.afterConnectionEstablished(session);
 
         assertThat(attributes).containsEntry("targetType", "DOCTOR");
         assertThat(attributes).containsEntry("targetId", 22L);
-        verify(realtimeService).register(session, "DOCTOR", 22L);
+        verify(realtimeService).register(session, 1L, "DOCTOR", 22L);
     }
 
     @Test

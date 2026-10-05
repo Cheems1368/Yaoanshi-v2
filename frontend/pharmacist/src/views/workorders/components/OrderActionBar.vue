@@ -136,7 +136,8 @@ const showReply = computed(() => {
   return ['WAITING_DOCTOR', 'DOCTOR_IN_PROGRESS'].includes(status.value)
 })
 const showEscalate = computed(() =>
-  isPharmacist.value && ['SUBMITTED', 'PHARMACIST_IN_PROGRESS'].includes(status.value)
+  isPharmacist.value && props.detail.category !== 'NEW_MEDICATION_REVIEW'
+    && ['SUBMITTED', 'PHARMACIST_IN_PROGRESS'].includes(status.value)
 )
 const showReject = computed(() => {
   if (isPharmacist.value) return status.value === 'PHARMACIST_IN_PROGRESS'

@@ -22,6 +22,15 @@ public class MedicationDoseTask extends BaseEntity {
     private String route;
     private String mealRelation;
     private String instructions;
+    private Boolean delayedGenerated;
+
+    public Boolean getDelayedGenerated() {
+        return delayedGenerated;
+    }
+
+    public void setDelayedGenerated(Boolean delayedGenerated) {
+        this.delayedGenerated = delayedGenerated;
+    }
 
     public Long getPatientId() {
         return patientId;

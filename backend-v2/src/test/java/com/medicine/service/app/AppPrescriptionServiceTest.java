@@ -34,6 +34,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -74,6 +75,20 @@ class AppPrescriptionServiceTest {
 
     @InjectMocks
     private AppPrescriptionService appPrescriptionService;
+
+    @Test
+    void shouldRejectPrescriptionHistoryUntilPharmacistConfirmsBinding() {
+        AppAccount account = new AppAccount();
+        account.setId(101L);
+        Patient patient = new Patient();
+        patient.setBindingStatus("PENDING");
+        when(appAccountMapper.selectActiveByMobile(1L, "13800138000")).thenReturn(account);
+        when(patientMapper.selectByAppAccountId(1L, 101L)).thenReturn(patient);
+
+        assertThatThrownBy(() -> appPrescriptionService.getPrescriptions("13800138000", null, 1, 20))
+                .isInstanceOf(BusinessException.class);
+        verifyNoInteractions(prescriptionMapper);
+    }
 
     @Test
     void shouldRegisterPrescriptionUploadFromBoundPatient() {

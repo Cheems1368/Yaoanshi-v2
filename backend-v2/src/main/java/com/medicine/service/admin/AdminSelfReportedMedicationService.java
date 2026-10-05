@@ -95,15 +95,16 @@ public class AdminSelfReportedMedicationService {
     public SelfReportedMedicationDTO reject(JwtClaims claims, Long workOrderId, Long id, String reason) {
         WorkOrderAccess access = requireWorkOrderAccess(claims, workOrderId);
         SelfReportedMedication srm = requireForWorkOrder(access, id);
-        if (!"PENDING".equals(srm.getStatus())) {
+        if (!"PENDING".equals(srm.getStatus()) && !"ACTIVE".equals(srm.getStatus())) {
             throw new BusinessException(400, "SELF_REPORT_NOT_PENDING");
         }
+        boolean stopping = "ACTIVE".equals(srm.getStatus());
         LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
         srm.setStatus("STOPPED");
         srm.setUpdater(claims.getSubject());
         srm.setUpdateTime(now);
         selfReportedMedicationMapper.update(srm);
-        String eventContent = "驳回自报药物：" + srm.getDrugName() +
+        String eventContent = (stopping ? "停用自报药物：" : "驳回自报药物：") + srm.getDrugName() +
                 (StringUtils.hasText(reason) ? "，原因：" + reason.trim() : "");
         addWorkOrderEvent(access.tenantId(), access.order(), "PHARMACIST_REPLY",
                 "PHARMACIST", access.pharmacistId(), eventContent, now);

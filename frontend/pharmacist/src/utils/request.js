@@ -42,6 +42,7 @@ service.interceptors.request.use(
 
 service.interceptors.response.use(
   (response) => {
+    if (response.config.responseType === 'blob') return response.data
     const payload = response.data || {}
     const code = payload.code
     const message = extractMessage(payload)

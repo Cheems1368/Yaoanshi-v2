@@ -16,6 +16,7 @@ import { onBeforeUnmount, onMounted, ref } from 'vue'
 import { IonApp, IonRouterOutlet, IonToast } from '@ionic/vue';
 import {
   consumeOfflineCheckinConflictCount,
+  consumeOfflineCheckinCancelledCount,
   OFFLINE_CHECKIN_CONFLICT_EVENT
 } from '@/modules/patient/services/offlineMedication'
 
@@ -25,9 +26,10 @@ const offlineConflictMessage = ref('')
 const showOfflineConflict = () => {
   const count = consumeOfflineCheckinConflictCount()
   if (count < 1) return
-  offlineConflictMessage.value = count > 1
-    ? `${count} 条离线打卡已超过可提交或修改时限，未能同步；其他记录已继续处理。`
-    : '一条离线打卡已超过可提交或修改时限，未能同步；其他记录已继续处理。'
+  const cancelled = consumeOfflineCheckinCancelledCount()
+  offlineConflictMessage.value = cancelled > 0
+    ? `${cancelled} 条离线打卡因原计划剂次已取消而未生效；其他记录已继续处理。`
+    : `${count} 条离线打卡已超过可提交或修改时限，未能同步；其他记录已继续处理。`
   offlineConflictToastOpen.value = true
 }
 

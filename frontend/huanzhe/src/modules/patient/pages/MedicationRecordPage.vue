@@ -57,12 +57,15 @@
             <div v-if="!record.effective" class="record-note record-note--muted">已被后续更正覆盖</div>
 
             <div v-if="record.effective" class="record-actions">
+              <label>实际服药时间（补录可改，北京时间）<input v-model="takenAtByRecordId[record.id]" type="datetime-local" /></label>
+              <input v-model="reasonByRecordId[record.id]" placeholder="跳过或漏服原因（选填）" />
               <ion-button size="small" color="success" fill="outline" @click="correctRecord(record, 'TAKEN')">
                 更正为已服药
               </ion-button>
               <ion-button size="small" color="warning" fill="outline" @click="correctRecord(record, 'MISSED')">
                 更正为漏服
               </ion-button>
+              <ion-button size="small" color="medium" fill="outline" @click="correctRecord(record, 'SKIPPED')">更正为跳过</ion-button>
             </div>
           </ion-card-content>
         </ion-card>
@@ -92,11 +95,14 @@ import {
 } from '@ionic/vue'
 import { computed, ref } from 'vue'
 import { medicationService, type CheckinRecordDTO } from '@/modules/patient/api/mvp'
+import { toShanghaiIso } from '@/modules/patient/services/offlineMedication'
 
 const loading = ref(false)
 const records = ref<CheckinRecordDTO[]>([])
 const showToast = ref(false)
 const toastMessage = ref('')
+const takenAtByRecordId = ref<Record<number, string>>({})
+const reasonByRecordId = ref<Record<number, string>>({})
 
 const effectiveCount = computed(() => records.value.filter((record) => record.effective).length)
 const completedCount = computed(() => records.value.filter((record) => record.effective && record.result === 'TAKEN').length)
@@ -119,15 +125,15 @@ const loadRecords = async () => {
   }
 }
 
-const correctRecord = async (record: CheckinRecordDTO, result: 'TAKEN' | 'MISSED') => {
+const correctRecord = async (record: CheckinRecordDTO, result: 'TAKEN' | 'MISSED' | 'SKIPPED') => {
   try {
     await medicationService.correctCheckin(record.id, {
       result,
-      actualTakenAt: new Date().toISOString(),
+      actualTakenAt: result === 'TAKEN' ? toShanghaiIso(takenAtByRecordId.value[record.id]) : undefined,
       note: '记录页更正',
-      skipReason: result === 'MISSED' ? 'PATIENT_REPORTED' : ''
+      skipReason: reasonByRecordId.value[record.id]?.trim()
     })
-    showMessage(result === 'TAKEN' ? '已更正为已服药' : '已更正为漏服')
+    showMessage(result === 'TAKEN' ? '已更正为已服药' : result === 'SKIPPED' ? '已更正为跳过' : '已更正为漏服')
     await loadRecords()
   } catch (error: any) {
     showMessage(error?.message || '更正失败')
