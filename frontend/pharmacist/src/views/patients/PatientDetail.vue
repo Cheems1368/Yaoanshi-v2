@@ -28,7 +28,8 @@
           <strong>{{ detail.name }}</strong>
           <p>手机号: {{ detail.mobileMasked }}</p>
           <p>院内患者 ID: {{ detail.hospitalPatientId }}</p>
-          <p>绑定状态: {{ detail.bindingStatus === 'BOUND' ? '已绑定' : detail.bindingStatus }}</p>
+          <p>绑定状态: {{ detail.bindingStatus === 'BOUND' ? '已绑定' : '待药师确认' }}</p>
+          <el-button v-if="detail.bindingStatus === 'PENDING'" type="primary" :loading="confirmingBinding" @click="confirmBinding">核验并确认绑定</el-button>
         </article>
 
         <article class="summary-card">
@@ -240,8 +241,8 @@
 <script setup>
 import { computed, nextTick, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
-import { downloadPatientAdherence, getPatientDetail, getPharmacistOptions, reassignPatient, remindKnowledgeAssessment, updatePatient } from '@/modules/pharmacist/api/patients'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { confirmPatientBinding, downloadPatientAdherence, getPatientDetail, getPharmacistOptions, reassignPatient, remindKnowledgeAssessment, updatePatient } from '@/modules/pharmacist/api/patients'
 import { useUserStore } from '@/store/user'
 import MedicationPlanPanel from '@/views/patients/MedicationPlanPanel.vue'
 
@@ -251,6 +252,7 @@ const userStore = useUserStore()
 
 const loading = ref(false)
 const saving = ref(false)
+const confirmingBinding = ref(false)
 const errorMessage = ref('')
 const detail = ref(null)
 const planSectionRef = ref(null)
@@ -281,6 +283,21 @@ const form = reactive({
 })
 
 const patientId = computed(() => route.query.id)
+const confirmBinding = async () => {
+  const id = patientId.value
+  try {
+    await ElMessageBox.confirm(`请核验 ${detail.value.name} 的手机号与院内患者 ID ${detail.value.hospitalPatientId}。确认后您将成为责任药师。`, '确认患者身份', { type: 'warning' })
+    if (patientId.value !== id) return
+    confirmingBinding.value = true
+    const response = await confirmPatientBinding(id)
+    if (patientId.value === id) detail.value = response.data
+    ElMessage.success('患者绑定已确认')
+  } catch (error) {
+    if (error !== 'cancel' && error !== 'close') ElMessage.error(error?.message || '绑定确认失败')
+  } finally {
+    confirmingBinding.value = false
+  }
+}
 const canReassign = computed(() => userStore.userInfo.roles.some((role) =>
   ['admin', 'super_admin', 'tenant_admin'].includes(String(role).toLowerCase())
 ))

@@ -1,5 +1,9 @@
 import request from '@/utils/request'
 
+export function confirmPatientBinding(id) {
+  return request({ baseURL: backendV2BaseUrl, url: `/admin-api/patients/${id}/confirm-binding`, method: 'post' })
+}
+
 const backendV2BaseUrl = import.meta.env.VITE_BACKEND_V2_API_BASE_URL || ''
 
 export function getPatients(params) {

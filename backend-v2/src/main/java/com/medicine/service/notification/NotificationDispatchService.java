@@ -5,6 +5,8 @@ import com.medicine.domain.notification.NotificationLog;
 import com.medicine.repository.notification.NotificationLogMapper;
 import com.medicine.repository.notification.NotificationCommitGateMapper;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.core.task.TaskExecutor;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
@@ -21,6 +23,7 @@ public class NotificationDispatchService {
 
     private static final Set<String> ADMIN_REALTIME_BUSINESS_TYPES = Set.of(
             "HELP_ORDER_SUBMITTED",
+            "NEW_MEDICATION_REVIEW",
             "HELP_ORDER_PATIENT_REPLY",
             "HELP_ORDER_ESCALATED",
             "HELP_ORDER_REPLY",
@@ -40,6 +43,7 @@ public class NotificationDispatchService {
     private final NotificationLogMapper notificationLogMapper;
     private final NotificationCommitGateMapper notificationCommitGateMapper;
     private final PlatformTransactionManager transactionManager;
+    private final TaskExecutor notificationDeliveryExecutor;
     private final AdminNotificationRealtimeService adminRealtimeService;
     private final AppNotificationRealtimeService appRealtimeService;
     private final ObjectMapper objectMapper;
@@ -48,6 +52,7 @@ public class NotificationDispatchService {
             NotificationLogMapper notificationLogMapper,
             NotificationCommitGateMapper notificationCommitGateMapper,
             PlatformTransactionManager transactionManager,
+            @Qualifier("applicationTaskExecutor") TaskExecutor notificationDeliveryExecutor,
             AdminNotificationRealtimeService adminRealtimeService,
             AppNotificationRealtimeService appRealtimeService,
             ObjectMapper objectMapper
@@ -55,6 +60,7 @@ public class NotificationDispatchService {
         this.notificationLogMapper = notificationLogMapper;
         this.notificationCommitGateMapper = notificationCommitGateMapper;
         this.transactionManager = transactionManager;
+        this.notificationDeliveryExecutor = notificationDeliveryExecutor;
         this.adminRealtimeService = adminRealtimeService;
         this.appRealtimeService = appRealtimeService;
         this.objectMapper = objectMapper;
@@ -96,10 +102,17 @@ public class NotificationDispatchService {
                 @Override
                 public void afterCommit() {
                     try {
-                        TransactionTemplate delivery = new TransactionTemplate(transactionManager);
-                        delivery.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
-                        delivery.executeWithoutResult(status ->
-                                updateDispatchResult(log, LocalDateTime.now(java.time.ZoneOffset.UTC), null));
+                        // The committing thread still holds its connection until transaction cleanup.
+                        notificationDeliveryExecutor.execute(() -> {
+                            try {
+                                TransactionTemplate delivery = new TransactionTemplate(transactionManager);
+                                delivery.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+                                delivery.executeWithoutResult(status ->
+                                        updateDispatchResult(log, LocalDateTime.now(java.time.ZoneOffset.UTC), null));
+                            } catch (RuntimeException ignored) {
+                                // A stale PENDING log is claimed by the retry job.
+                            }
+                        });
                     } catch (RuntimeException ignored) {
                         // A stale PENDING log is claimed by the retry job.
                     }

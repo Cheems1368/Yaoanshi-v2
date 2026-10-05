@@ -3,6 +3,7 @@ package com.medicine.service.admin;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.medicine.api.dto.helporder.HelpOrderCloseRequest;
 import com.medicine.api.dto.helporder.HelpOrderDTO;
+import com.medicine.api.dto.helporder.HelpOrderEscalateRequest;
 import com.medicine.api.dto.helporder.HelpOrderDoctorDecisionRequest;
 import com.medicine.api.dto.helporder.HelpOrderReplyRequest;
 import com.medicine.common.exception.BusinessException;
@@ -88,6 +89,25 @@ class AdminHelpOrderServiceTest {
 
     @InjectMocks
     private AdminHelpOrderService adminHelpOrderService;
+
+    @Test
+    void shouldRejectEscalatingSelfReportedMedicationReviewWithoutSideEffects() {
+        JwtClaims claims = pharmacistClaims();
+        HelpOrder order = helpOrder("PHARMACIST_IN_PROGRESS", 1L, "PHARMACIST", 1L, null);
+        order.setCategory("NEW_MEDICATION_REVIEW");
+        when(professionalIdentityService.getOrCreatePharmacistProfile(claims)).thenReturn(pharmacist(1L));
+        when(helpOrderMapper.selectById(1L, 501L)).thenReturn(order);
+        HelpOrderEscalateRequest request = new HelpOrderEscalateRequest();
+        request.setDoctorId(2L);
+
+        assertThatThrownBy(() -> adminHelpOrderService.escalate(claims, 501L, request))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("HELP_ORDER_STATUS_CONFLICT");
+        assertThat(order.getStatus()).isEqualTo("PHARMACIST_IN_PROGRESS");
+        verify(helpOrderMapper, never()).updateState(any());
+        verify(helpOrderEventMapper, never()).insert(any());
+        org.mockito.Mockito.verifyNoInteractions(notificationDispatchService);
+    }
 
     @Test
     void shouldRejectClaimWhenAnotherPharmacistOwnsInProgressOrder() {

@@ -143,6 +143,66 @@ class AdminPatientServiceTest {
     }
 
     @Test
+    void shouldConfirmPendingBindingAndAssignConfirmingPharmacist() {
+        JwtClaims claims = professionalClaims();
+        Patient patient = patient(3001L, null);
+        patient.setAppAccountId(5001L);
+        patient.setBindingStatus("PENDING");
+        when(professionalIdentityService.getOrCreatePharmacistProfile(claims)).thenReturn(pharmacistProfile(9001L));
+        when(patientMapper.lockByIdAndTenant(1L, 3001L)).thenReturn(patient);
+
+        AdminPatientDetailDTO detail = adminPatientService.confirmBinding(claims, 3001L);
+
+        assertThat(detail.getBindingStatus()).isEqualTo("BOUND");
+        assertThat(detail.getResponsiblePharmacistId()).isEqualTo(9001L);
+        assertThat(patient.getBoundAt()).isNotNull();
+        assertThat(patient.getUpdater()).isEqualTo("pharmacist-9001");
+        verify(patientMapper).updateBinding(patient);
+    }
+
+    @Test
+    void shouldKeepConfirmationTimeAndOwnerOnRepeatedConfirmation() {
+        JwtClaims claims = professionalClaims();
+        Patient patient = patient(3001L, 9001L);
+        LocalDateTime original = LocalDateTime.of(2026, 3, 6, 9, 30);
+        patient.setBoundAt(original);
+        when(professionalIdentityService.getOrCreatePharmacistProfile(claims)).thenReturn(pharmacistProfile(9001L));
+        when(patientMapper.lockByIdAndTenant(1L, 3001L)).thenReturn(patient);
+
+        adminPatientService.confirmBinding(claims, 3001L);
+
+        assertThat(patient.getBoundAt()).isEqualTo(original);
+        assertThat(patient.getBoundByPharmacistId()).isEqualTo(9001L);
+        verify(patientMapper, never()).updateBinding(any());
+    }
+
+    @Test
+    void shouldDenyConfirmationByAnotherPatientsPharmacist() {
+        JwtClaims claims = professionalClaims();
+        Patient patient = patient(3001L, 9002L);
+        patient.setBindingStatus("PENDING");
+        when(professionalIdentityService.getOrCreatePharmacistProfile(claims)).thenReturn(pharmacistProfile(9001L));
+        when(patientMapper.lockByIdAndTenant(1L, 3001L)).thenReturn(patient);
+
+        assertThatThrownBy(() -> adminPatientService.confirmBinding(claims, 3001L))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("PATIENT_MANAGEMENT_PERMISSION_DENIED");
+        verify(patientMapper, never()).updateBinding(any());
+    }
+
+    @Test
+    void shouldDenyConfirmationOutsideTenant() {
+        JwtClaims claims = professionalClaims();
+        when(professionalIdentityService.getOrCreatePharmacistProfile(claims)).thenReturn(pharmacistProfile(9001L));
+        when(patientMapper.lockByIdAndTenant(1L, 3001L)).thenReturn(null);
+
+        assertThatThrownBy(() -> adminPatientService.confirmBinding(claims, 3001L))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("PATIENT_NOT_FOUND");
+        verify(patientMapper, never()).updateBinding(any());
+    }
+
+    @Test
     void shouldRejectReassignmentForOrdinaryPharmacist() {
         PatientReassignRequest request = new PatientReassignRequest();
         request.setPharmacistId(9002L);

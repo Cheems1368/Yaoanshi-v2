@@ -121,7 +121,7 @@ const syncGateState = async () => {
 
   try {
     const patientResponse = await patientService.getCurrentPatient()
-    isBound = Boolean(patientResponse.data)
+    isBound = patientResponse.data?.bound === true
   } catch {
     isBound = false
   }
@@ -193,7 +193,11 @@ const handleLogin = async () => {
       router.replace(gateState.isBound ? '/tabs/home' : '/realname')
     }, 300)
   } catch (error: any) {
-    showMessage(error?.message || '登录失败')
+    const messages: Record<string, string> = {
+      APP_AUTH_OTP_EXPIRED: '验证码已过期，请重新获取',
+      APP_AUTH_OTP_INVALID: '验证码不正确，请核对后重试'
+    }
+    showMessage(messages[error?.message] || error?.message || '登录失败，请重试')
   } finally {
     isLoading.value = false
   }

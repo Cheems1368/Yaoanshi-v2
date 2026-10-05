@@ -8,11 +8,20 @@ const httpMocks = vi.hoisted(() => ({
 
 vi.mock('@/shared/http/client', () => ({ httpService: httpMocks }))
 
-import { appNotificationService, assessmentService, medicationService, patientService } from '@/modules/patient/api/mvp'
+import { appNotificationService, assessmentService, medicationService, patientService, prescriptionService } from '@/modules/patient/api/mvp'
 import { GENERIC_REMINDER_BODY } from '@/modules/patient/services/localMedicationReminders'
 
 describe('MVP release patient contracts', () => {
   beforeEach(() => Object.values(httpMocks).forEach((mock) => mock.mockReset()))
+
+  test('waits for synchronous OCR registration without extending ordinary patient requests', async () => {
+    httpMocks.post.mockResolvedValue({ data: {} })
+    const upload = { fileAssetId: 1, objectKey: 'prescriptions/synthetic.png', originalFilename: 'synthetic.png', contentType: 'image/png', sizeBytes: 10 }
+    await prescriptionService.registerUpload(upload)
+    expect(httpMocks.post).toHaveBeenCalledWith('/app-api/prescriptions/uploads', upload, { timeout: 60000 })
+    await medicationService.submitCheckin({ doseTaskId: 7, result: 'TAKEN', clientRequestId: 'request-1' })
+    expect(httpMocks.post.mock.calls[1]).toHaveLength(2)
+  })
 
   test('uses server-owned assessment questions and selected options only', async () => {
     httpMocks.get.mockResolvedValue({ data: [] })

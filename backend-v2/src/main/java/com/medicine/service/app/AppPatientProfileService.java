@@ -13,6 +13,7 @@ import com.medicine.repository.identity.PatientMapper;
 import com.medicine.repository.identity.PatientProfileMapper;
 import com.medicine.service.auth.AppPatientService;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.nio.charset.StandardCharsets;
@@ -59,6 +60,7 @@ public class AppPatientProfileService {
         return dto;
     }
 
+    @Transactional
     public AppPatientProfileDTO updateProfile(String subject, AppPatientProfileUpdateRequest request) {
         AppPatientService.AccessContext context = appPatientService.requireAccessContext(subject);
         Patient patient = context.patient();
@@ -68,6 +70,7 @@ public class AppPatientProfileService {
         if (profile == null) {
             profile = new PatientProfile();
             profile.setPatientId(patient.getId());
+            profile.setRealNameVerified(false);
             applyAuditFields(profile, "app-patient-profile", tenantId);
         } else {
             touchAuditFields(profile, "app-patient-profile");
@@ -125,6 +128,7 @@ public class AppPatientProfileService {
         return toHealthDto(context.patient().getId(), profile);
     }
 
+    @Transactional
     public AppPatientHealthProfileDTO updateHealthProfile(String subject, AppPatientHealthProfileUpdateRequest request) {
         AppPatientService.AccessContext context = appPatientService.requireAccessContext(subject);
         Patient patient = context.patient();
@@ -169,6 +173,7 @@ public class AppPatientProfileService {
         if (patientProfile == null) {
             patientProfile = new PatientProfile();
             patientProfile.setPatientId(patient.getId());
+            patientProfile.setRealNameVerified(false);
             patientProfile.setContactMobile(patient.getMobile());
             applyAuditFields(patientProfile, "app-patient-health", tenantId);
         } else {

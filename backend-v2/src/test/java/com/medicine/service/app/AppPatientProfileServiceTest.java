@@ -23,7 +23,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.time.LocalDateTime;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -140,6 +139,18 @@ class AppPatientProfileServiceTest {
     }
 
     @Test
+    void shouldCreateUnverifiedProfileWhenNoIdentityVerificationWasSubmitted() {
+        when(appPatientService.requireAccessContext("13800138000"))
+                .thenReturn(new AppPatientService.AccessContext(appAccount(), patient(), "PATIENT"));
+
+        appPatientProfileService.updateProfile("13800138000", new AppPatientProfileUpdateRequest());
+
+        ArgumentCaptor<PatientProfile> profileCaptor = ArgumentCaptor.forClass(PatientProfile.class);
+        verify(patientProfileMapper).upsert(profileCaptor.capture());
+        assertThat(profileCaptor.getValue().getRealNameVerified()).isFalse();
+    }
+
+    @Test
     void shouldPersistHealthQuestionnaireAndSyncPatientSnapshot() {
         Patient patient = patient();
         when(appPatientService.requireAccessContext("13800138000"))
@@ -171,7 +182,9 @@ class AppPatientProfileServiceTest {
         assertThat(patientCaptor.getValue().getPrimaryDiseaseName()).isEqualTo("高血压");
         assertThat(patientCaptor.getValue().getMedicalHistoryJson()).contains("阿司匹林");
 
-        verify(patientProfileMapper).upsert(any(PatientProfile.class));
+        ArgumentCaptor<PatientProfile> profileCaptor = ArgumentCaptor.forClass(PatientProfile.class);
+        verify(patientProfileMapper).upsert(profileCaptor.capture());
+        assertThat(profileCaptor.getValue().getRealNameVerified()).isFalse();
         assertThat(dto.getLayer1().getAllergy()).isEqualTo("青霉素过敏");
         assertThat(dto.getSubmitTime()).isNotNull();
     }

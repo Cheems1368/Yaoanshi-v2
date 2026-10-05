@@ -67,6 +67,11 @@ public class AdminPatientController {
         return CommonResult.ok(adminPatientService.reassignPatient((JwtClaims) authentication.getDetails(), id, request));
     }
 
+    @PostMapping("/{id}/confirm-binding")
+    public CommonResult<AdminPatientDetailDTO> confirmBinding(@PathVariable("id") Long id, Authentication authentication) {
+        return CommonResult.ok(adminPatientService.confirmBinding((JwtClaims) authentication.getDetails(), id));
+    }
+
     @PostMapping("/{id}/knowledge-assessments/remind")
     public CommonResult<Boolean> remindKnowledgeAssessment(@PathVariable("id") Long id, Authentication authentication) {
         return CommonResult.ok(adminPatientService.remindKnowledgeAssessment((JwtClaims) authentication.getDetails(), id));

@@ -13,6 +13,16 @@ export interface BindPatientRequest {
   name: string
 }
 
+export interface AppPatientSummaryDTO {
+  id: number
+  name: string
+  mobile: string
+  hospitalPatientId: string
+  bindingStatus: string
+  bound: boolean
+  boundAt: string | null
+}
+
 export interface FilePresignResponse {
   fileAssetId: number
   objectKey: string
@@ -410,11 +420,11 @@ export const appAuthService = {
 
 export const patientService = {
   bindPatient(payload: BindPatientRequest) {
-    return httpService.post('/app-api/patients/bind', payload)
+    return httpService.post<AppPatientSummaryDTO>('/app-api/patients/bind', payload)
   },
 
   getCurrentPatient() {
-    return httpService.get('/app-api/patients/me')
+    return httpService.get<AppPatientSummaryDTO | null>('/app-api/patients/me')
   },
 
   getFamilyBindings() {
@@ -704,7 +714,7 @@ export const prescriptionService = {
     sizeBytes: number
     sha256?: string
   }) {
-    return httpService.post<PrescriptionDTO>('/app-api/prescriptions/uploads', payload)
+    return httpService.post<PrescriptionDTO>('/app-api/prescriptions/uploads', payload, { timeout: 60000 })
   }
 }
 

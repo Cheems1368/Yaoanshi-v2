@@ -77,7 +77,7 @@ public class AppSelfReportedMedicationService {
         order.setSubmittedById(context.appAccount().getId());
         order.setCategory("NEW_MEDICATION_REVIEW");
         order.setTitle(buildTitle(request));
-        order.setDescription(StringUtils.hasText(request.getNotes()) ? request.getNotes().trim() : null);
+        order.setDescription(StringUtils.hasText(request.getNotes()) ? request.getNotes().trim() : buildTitle(request));
         order.setStatus("SUBMITTED");
         order.setPriority(StringUtils.hasText(resolvedPriority) ? resolvedPriority.toUpperCase() : "NORMAL");
         order.setRequiresOfflineEmergency(false);
@@ -147,9 +147,12 @@ public class AppSelfReportedMedicationService {
             throw new BusinessException(400, "SELF_REPORT_NOT_WITHDRAWABLE");
         }
         LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
-        selfReportedMedicationMapper.softDelete(DEFAULT_TENANT_ID, id, OPERATOR_TAG, now);
+        srm.setStatus("STOPPED");
+        srm.setUpdater(OPERATOR_TAG);
+        srm.setUpdateTime(now);
+        selfReportedMedicationMapper.update(srm);
 
-        // Auto-close the work order if all medications in the batch are now withdrawn/deleted
+        // Auto-close the work order if all medications in the batch are now stopped.
         if (srm.getWorkOrderId() != null) {
             int remaining = selfReportedMedicationMapper.countActiveByWorkOrderId(DEFAULT_TENANT_ID, srm.getWorkOrderId());
             if (remaining == 0) {

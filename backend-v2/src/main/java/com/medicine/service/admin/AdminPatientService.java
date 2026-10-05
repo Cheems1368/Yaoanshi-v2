@@ -199,6 +199,30 @@ public class AdminPatientService {
         return buildDetailDto(claims.getTenantId(), patient);
     }
 
+    @Transactional
+    public AdminPatientDetailDTO confirmBinding(JwtClaims claims, Long patientId) {
+        PharmacistProfile pharmacist = professionalIdentityService.getOrCreatePharmacistProfile(claims);
+        Patient patient = patientMapper.lockByIdAndTenant(claims.getTenantId(), patientId);
+        if (patient == null) {
+            throw new BusinessException(ErrorCode.PATIENT_NOT_FOUND.getCode(), ErrorCode.PATIENT_NOT_FOUND.getMessage());
+        }
+        ensurePatientEditableByPharmacist(patient, pharmacist);
+        if ("BOUND".equals(patient.getBindingStatus())) {
+            return buildDetailDto(claims.getTenantId(), patient);
+        }
+        if (!"PENDING".equals(patient.getBindingStatus()) || patient.getAppAccountId() == null) {
+            throw new BusinessException(400, "BAD_REQUEST");
+        }
+        LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
+        patient.setBindingStatus("BOUND");
+        patient.setBoundByPharmacistId(pharmacist.getId());
+        patient.setBoundAt(now);
+        patient.setUpdater("pharmacist-" + pharmacist.getId());
+        patient.setUpdateTime(now);
+        patientMapper.updateBinding(patient);
+        return buildDetailDto(claims.getTenantId(), patient);
+    }
+
     public AdherenceService.Summary getPatientAdherence(JwtClaims claims, Long patientId, int days) {
         Patient patient = requirePatient(claims.getTenantId(), patientId);
         if (!isAdmin(claims)) {

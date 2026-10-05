@@ -152,8 +152,47 @@ class AppPatientServiceTest {
         AppPatientSummaryDTO result = appPatientService.bindPatient("13800138000", bindRequest("HZY-1001"));
 
         assertThat(result.getId()).isEqualTo(3001L);
-        assertThat(result.isBound()).isEqualTo(true);
+        assertThat(result.isBound()).isFalse();
+        assertThat(result.getBindingStatus()).isEqualTo("PENDING");
+        assertThat(result.getBoundAt()).isNull();
         verify(patientMapper).insert(any(Patient.class));
+    }
+
+    @Test
+    void shouldDenyMedicalAccessUntilPharmacistConfirmsBinding() {
+        AppAccount account = appAccount(1001L, "13800138000");
+        Patient patient = new Patient();
+        patient.setId(3001L);
+        patient.setBindingStatus("PENDING");
+        when(appAccountMapper.selectActiveByMobile(1L, "13800138000")).thenReturn(account);
+        when(patientMapper.selectByAppAccountId(1L, 1001L)).thenReturn(patient);
+
+        assertThatThrownBy(() -> appPatientService.requireAccessContext("13800138000"))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("PATIENT_BIND_REQUIRES_PHARMACIST_CONFIRM");
+    }
+
+    @Test
+    void shouldPreserveExistingConfirmedBindingOnResubmission() {
+        AppAccount account = appAccount(1001L, "13800138000");
+        Patient patient = new Patient();
+        patient.setId(3001L);
+        patient.setAppAccountId(1001L);
+        patient.setHospitalPatientId("HZY-1001");
+        patient.setMobile("13800138000");
+        patient.setBindingStatus("BOUND");
+        LocalDateTime confirmedAt = LocalDateTime.of(2026, 3, 6, 9, 30);
+        patient.setBoundAt(confirmedAt);
+        when(appAccountMapper.selectActiveByMobile(1L, "13800138000")).thenReturn(account);
+        when(patientMapper.selectByAppAccountId(1L, 1001L)).thenReturn(patient);
+        when(patientMapper.selectByHospitalPatientId(1L, "HZY-1001")).thenReturn(patient);
+        when(patientMapper.selectByMobileAndHospitalPatientId(1L, "13800138000", "HZY-1001")).thenReturn(patient);
+        org.mockito.Mockito.lenient().when(patientMapper.lockByIdAndTenant(1L, 3001L)).thenReturn(patient);
+
+        AppPatientSummaryDTO result = appPatientService.bindPatient("13800138000", bindRequest("HZY-1001"));
+
+        assertThat(result.isBound()).isTrue();
+        assertThat(patient.getBoundAt()).isEqualTo(confirmedAt);
     }
 
     @Test

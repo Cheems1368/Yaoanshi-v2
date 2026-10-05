@@ -45,6 +45,7 @@ function resolveWebSocketUrl() {
 function notificationTitle(businessType) {
   const map = {
     HELP_ORDER_SUBMITTED: '新工单到达',
+    NEW_MEDICATION_REVIEW: '新药品待审核',
     HELP_ORDER_ESCALATED: '工单已升级',
     HELP_ORDER_REPLY: '工单有新回复',
     HELP_ORDER_CLOSED: '工单已关闭'
@@ -53,6 +54,9 @@ function notificationTitle(businessType) {
 }
 
 function notificationMessage(payload) {
+  if (payload.businessType === 'NEW_MEDICATION_REVIEW') {
+    return '患者提交了自报药品，请查看新药品审核工单。'
+  }
   if (payload.businessType === 'HELP_ORDER_SUBMITTED') {
     return '患者提交了新的帮助工单，请及时处理。'
   }

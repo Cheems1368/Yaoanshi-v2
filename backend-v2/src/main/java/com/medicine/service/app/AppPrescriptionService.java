@@ -288,7 +288,7 @@ public class AppPrescriptionService {
 
     private Patient requireBoundPatient(AppAccount account) {
         Patient patient = patientMapper.selectByAppAccountId(DEFAULT_TENANT_ID, account.getId());
-        if (patient == null) {
+        if (patient == null || "PENDING".equals(patient.getBindingStatus())) {
             throw new BusinessException(400, "PATIENT_NOT_BOUND");
         }
         return patient;

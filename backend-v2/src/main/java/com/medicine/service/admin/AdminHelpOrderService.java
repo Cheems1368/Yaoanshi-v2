@@ -219,7 +219,8 @@ public class AdminHelpOrderService {
         PharmacistProfile pharmacist = professionalIdentityService.getOrCreatePharmacistProfile(claims);
         HelpOrder order = requireOrder(claims.getTenantId(), id);
         ensurePharmacistCanHandle(pharmacist.getId(), order);
-        if (!"SUBMITTED".equals(order.getStatus()) && !"PHARMACIST_IN_PROGRESS".equals(order.getStatus())) {
+        if ("NEW_MEDICATION_REVIEW".equals(order.getCategory())
+                || (!"SUBMITTED".equals(order.getStatus()) && !"PHARMACIST_IN_PROGRESS".equals(order.getStatus()))) {
             throw new BusinessException(ErrorCode.HELP_ORDER_STATUS_CONFLICT.getCode(), ErrorCode.HELP_ORDER_STATUS_CONFLICT.getMessage());
         }
 
