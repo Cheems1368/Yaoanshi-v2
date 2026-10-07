@@ -5,8 +5,13 @@ import type { DoseTaskDTO } from '@/modules/patient/api/mvp'
 export const GENERIC_REMINDER_TITLE = '用药提醒'
 export const GENERIC_REMINDER_BODY = '您有一项用药任务待处理，请打开药按时查看。'
 const MEDICATION_REMINDER_ROUTE = '/medication-reminder'
+export interface ReminderOptions { sound: boolean; vibration: boolean }
+export const reminderOptions: ReminderOptions = { sound: true, vibration: true }
 
 const notificationId = (taskId: number) => Math.abs(taskId % 2_000_000_000) + 1
+const isLegacyReminder = (notification: { title?: string; extra?: Record<string, unknown> }) =>
+  typeof notification.extra?.scope === 'string' && Array.isArray(notification.extra?.ids)
+  && notification.title?.startsWith('该服药了') === true
 
 let reminderOperationTail: Promise<void> = Promise.resolve()
 let exactSettingRequested = false
@@ -19,7 +24,20 @@ function enqueueReminderOperation<T>(operation: () => Promise<T>): Promise<T> {
 
 export async function cancelMedicationReminder(taskId: number) {
   if (!Capacitor.isNativePlatform()) return
-  await enqueueReminderOperation(() => LocalNotifications.cancel({ notifications: [{ id: notificationId(taskId) }] }))
+  await enqueueReminderOperation(async () => {
+    const pending = await LocalNotifications.getPending()
+    const grouped = pending.notifications.find(n => n.extra?.kind === 'MEDICATION_TASK'
+      && n.extra?.taskIds?.includes(taskId))
+    const delivered = await LocalNotifications.getDeliveredNotifications()
+    const deliveredGroup = delivered.notifications.find(n => n.extra?.kind === 'MEDICATION_TASK'
+      && n.extra?.taskIds?.includes(taskId))
+    await LocalNotifications.cancel({ notifications: [{ id: grouped?.id ?? deliveredGroup?.id ?? notificationId(taskId) }] })
+    if (grouped) {
+      const remaining = (grouped.extra.taskIds as number[]).filter(id => id !== taskId)
+      if (remaining.length) await LocalNotifications.schedule({ notifications: [{ ...grouped,
+        extra: { ...grouped.extra, taskIds: remaining } }] })
+    }
+  })
 }
 
 export async function cancelAllMedicationReminders() {
@@ -27,11 +45,14 @@ export async function cancelAllMedicationReminders() {
   await enqueueReminderOperation(async () => {
     const pending = await LocalNotifications.getPending()
     const medicationNotifications = pending.notifications
-      .filter((notification) => notification.extra?.kind === 'MEDICATION_TASK')
+      .filter((notification) => notification.extra?.kind === 'MEDICATION_TASK' || isLegacyReminder(notification))
       .map((notification) => ({ id: notification.id }))
     if (medicationNotifications.length) {
       await LocalNotifications.cancel({ notifications: medicationNotifications })
     }
+    const delivered = await LocalNotifications.getDeliveredNotifications()
+    await LocalNotifications.removeDeliveredNotifications({ notifications: delivered.notifications
+      .filter(notification => notification.extra?.kind === 'MEDICATION_TASK' || isLegacyReminder(notification)) })
   })
 }
 
@@ -46,7 +67,8 @@ export async function registerMedicationReminderActionHandler(
   })
 }
 
-export async function enableAndScheduleMedicationReminders(tasks: DoseTaskDTO[], accountType?: string) {
+export async function enableAndScheduleMedicationReminders(tasks: DoseTaskDTO[], accountType?: string,
+  options: ReminderOptions = reminderOptions) {
   if (!Capacitor.isNativePlatform()) return false
   return enqueueReminderOperation(async () => {
     const now = Date.now()
@@ -57,17 +79,29 @@ export async function enableAndScheduleMedicationReminders(tasks: DoseTaskDTO[],
       .filter((task) => Boolean(task.scheduledAt))
     const reminderCandidates = normalizedAccountType ? pendingTasks
       .map((task) => ({ task, at: new Date(new Date(task.scheduledAt as string).getTime() + reminderDelayMs) }))
-      .filter(({ at }) => !Number.isNaN(at.getTime()) && at.getTime() > now && at.getTime() <= now + 48 * 60 * 60 * 1000) : []
+      .filter(({ at }) => !Number.isNaN(at.getTime()) && at.getTime() > now && at.getTime() <= now + 7 * 24 * 60 * 60 * 1000) : []
+    const groups = new Map<number, typeof reminderCandidates>()
+    for (const candidate of reminderCandidates) {
+      const group = groups.get(candidate.at.getTime()) || []
+      group.push(candidate)
+      groups.set(candidate.at.getTime(), group)
+    }
 
     const desiredIds = new Set(
-      (normalizedAccountType ? reminderCandidates.map(({ task }) => task) : pendingTasks)
+      (normalizedAccountType ? [...groups.values()].map(group => group[0].task) : pendingTasks)
         .map((task) => notificationId(task.id))
     )
     const pending = await LocalNotifications.getPending()
     const obsolete = pending.notifications
-      .filter((notification) => notification.extra?.kind === 'MEDICATION_TASK' && !desiredIds.has(notification.id))
+      .filter((notification) => isLegacyReminder(notification)
+        || (notification.extra?.kind === 'MEDICATION_TASK' && !desiredIds.has(notification.id)))
       .map((notification) => ({ id: notification.id }))
     if (obsolete.length) await LocalNotifications.cancel({ notifications: obsolete })
+    const delivered = await LocalNotifications.getDeliveredNotifications()
+    const obsoleteDelivered = delivered.notifications.filter(notification => isLegacyReminder(notification)
+      || (notification.extra?.kind === 'MEDICATION_TASK' && !pendingTasks.some(task =>
+        notification.extra?.taskIds?.includes(task.id) || notification.id === notificationId(task.id))))
+    if (obsoleteDelivered.length) await LocalNotifications.removeDeliveredNotifications({ notifications: obsoleteDelivered })
     if (!normalizedAccountType || !reminderCandidates.length) return true
 
     let permission = await LocalNotifications.checkPermissions()
@@ -87,12 +121,18 @@ export async function enableAndScheduleMedicationReminders(tasks: DoseTaskDTO[],
       exactAlarmGranted = exactSetting.exact_alarm === 'granted'
     }
 
-    const notifications = reminderCandidates.map(({ task, at }) => ({
-        id: notificationId(task.id),
+    const channelId = `medication-${Number(options.sound)}-${Number(options.vibration)}`
+    if (Capacitor.getPlatform() === 'android') {
+      await LocalNotifications.createChannel({ id: channelId, name: '用药提醒', importance: 4,
+        visibility: 1, vibration: options.vibration, sound: options.sound ? 'medication_reminder.wav' : undefined })
+    }
+    const notifications = [...groups.values()].map(group => ({
+        id: notificationId(group[0].task.id),
         title: GENERIC_REMINDER_TITLE,
         body: GENERIC_REMINDER_BODY,
-        schedule: { at, allowWhileIdle: exactAlarmGranted },
-        extra: { kind: 'MEDICATION_TASK', route: MEDICATION_REMINDER_ROUTE }
+        channelId,
+        schedule: { at: group[0].at, allowWhileIdle: exactAlarmGranted },
+        extra: { kind: 'MEDICATION_TASK', route: MEDICATION_REMINDER_ROUTE, taskIds: group.map(({ task }) => task.id) }
       }))
 
     await LocalNotifications.schedule({ notifications })

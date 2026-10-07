@@ -386,7 +386,7 @@ Columns:
 | `patient_id` | `BIGINT` | No |  | `IDX_prescription_patient` | target patient |
 | `source_type` | `VARCHAR(20)` | No |  |  | `PHOTO_UPLOAD`, `MANUAL`, `LEGACY_IMPORT` |
 | `status` | `VARCHAR(20)` | No | `'UPLOADED'` | `IDX_prescription_status` | `UPLOADED`, `OCR_DONE`, `PHARMACIST_CONFIRMED`, `PLAN_GENERATED`, `REJECTED` |
-| `ocr_confidence` | `DECIMAL(5,2)` | Yes |  |  | 0-100 |
+| `ocr_confidence` | `DECIMAL(5,2)` | Yes |  |  | 0-1 recognition admission score; not clinical correctness probability |
 | `uploaded_file_asset_id` | `BIGINT` | No |  | `FK_prescription_file` | original image |
 | `submitted_by_type` | `VARCHAR(20)` | No |  |  | `PATIENT`, `FAMILY`, `PHARMACIST` |
 | `submitted_by_id` | `BIGINT` | No |  |  | logical submitter |
@@ -461,10 +461,20 @@ Columns:
 
 T4 OCR rules:
 
-1. OCR prompt must ask for medication detail only and must not extract patient identity fields.
+1. Local `RAPIDOCR_LOCAL` extracts text/boxes in Python; Java identifies medication tables or explicit medication labels. Only medication-region text and safe structured drafts may be stored. Identity headers and diagnosis are excluded; unsupported layouts store no whole-page text.
 2. Structured OCR with confidence `>= 0.80` and at least one item writes `prescription_item.source = OCR` and sets prescription status to `OCR_DONE`.
 3. Low-confidence, empty, or failed OCR keeps the prescription in manual review flow and records `failure_reason`.
 4. Stored OCR record may keep safe structured JSON and extracted medication text; do not persist image base64 or full upstream raw payload.
+
+Local OCR rules (2026-10-06):
+
+- `OcrService.performOcr(byte[], contentType)` and public prescription DTOs/endpoints stay unchanged; no schema migration.
+- Every prefilled drug name/field and table header used for admission requires score `>= 0.90` and unambiguous row/column association. Lower-score optional fields stay empty; lower-score names do not create draft items. Overall admission score is the minimum of used text/header scores, not a calibrated clinical correctness probability.
+- Missing dosage, route and duration stay null. Drug specification is never substituted for dose. Frequency/route/dose in a usage cell are extracted only from explicit text; unknown layouts and merged/duplicate columns fall back to manual review.
+- Successful and failed records identify `RAPIDOCR_LOCAL`; manual cases retain a failure code and safe medication text only when its region is known. No valid items means no `OCR_DONE`; pharmacist confirmation remains authoritative.
+- Internal `GET http://127.0.0.1:19090/health` reports model readiness. `POST /ocr` accepts at most 10 MiB of JPEG/PNG/WebP bytes with the matching image Content-Type, returning `{blocks:[{text,score,box:[[x,y],...] }],elapsedMs}`. Empty/no-text responses and invalid images are handled separately. No remote image URLs are accepted.
+- Backend connects only to the exact loopback `/ocr` endpoint (2-second connect / 30-second request timeout), bypasses proxies and refuses redirects. `MEDICINE_LOCAL_OCR_BASE_URL` replaces cloud OCR configuration; old OCR API keys, model and base-URL variables are unused.
+- Models are explicitly local and hash-verified; runtime downloads and Python outbound connections are blocked. The internal endpoint is not exposed to patients or browsers. Rotation samples currently fall back to manual review when coordinates no longer describe an upright medication table.
 
 ### 4.5 Medication domain
 

@@ -27,6 +27,12 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.ArgumentCaptor;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+import com.medicine.domain.prescription.PrescriptionItem;
+import java.math.BigDecimal;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -36,6 +42,8 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.never;
 
 @ExtendWith(MockitoExtension.class)
 class AppPrescriptionServiceTest {
@@ -75,6 +83,51 @@ class AppPrescriptionServiceTest {
 
     @InjectMocks
     private AppPrescriptionService appPrescriptionService;
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    void shouldPersistLocalProviderAndSafeMedicationText(boolean prefilled) {
+        AppAccount account = new AppAccount();
+        account.setId(101L);
+        Patient patient = new Patient();
+        patient.setId(201L);
+        when(appAccountMapper.selectActiveByMobile(1L, "13800138000")).thenReturn(account);
+        when(patientMapper.selectByAppAccountId(1L, 101L)).thenReturn(patient);
+        when(objectStorage.readObjectBytes("prescriptions/local.png")).thenReturn(new byte[]{1});
+        doAnswer(invocation -> { ((FileAsset) invocation.getArgument(0)).setId(301L); return 1; })
+                .when(fileAssetMapper).insert(any(FileAsset.class));
+        doAnswer(invocation -> { ((Prescription) invocation.getArgument(0)).setId(401L); return 1; })
+                .when(prescriptionMapper).insert(any(Prescription.class));
+        OcrService.OcrItem item = new OcrService.OcrItem();
+        item.setDrugName("二甲双胍片");
+        item.setDrugSpec("0.5g/片");
+        item.setConfidence(new BigDecimal("0.96"));
+        when(ocrService.performOcr(any(byte[].class), any())).thenReturn(prefilled
+                ? OcrService.OcrResult.success("二甲双胍片 0.5g/片", List.of(item), new BigDecimal("0.96"), "{}")
+                : OcrService.OcrResult.reviewRequired("二甲双胍片 0.5g/片", "OCR_MEDICATION_LOW_CONFIDENCE"));
+        PrescriptionUploadRequest request = new PrescriptionUploadRequest();
+        request.setObjectKey("prescriptions/local.png");
+        request.setOriginalFilename("local.png");
+        request.setContentType("image/png");
+        request.setSizeBytes(1L);
+        PrescriptionDTO dto = appPrescriptionService.registerUpload("13800138000", request);
+        ArgumentCaptor<PrescriptionOcrRecord> record = ArgumentCaptor.forClass(PrescriptionOcrRecord.class);
+        verify(prescriptionOcrRecordMapper).insert(record.capture());
+        assertThat(record.getValue().getProvider()).isEqualTo("RAPIDOCR_LOCAL");
+        assertThat(record.getValue().getExtractedText()).isEqualTo("二甲双胍片 0.5g/片");
+        assertThat(record.getValue().getManualFallbackUsed()).isEqualTo(!prefilled);
+        if (prefilled) {
+            assertThat(dto.getStatus()).isEqualTo("OCR_DONE");
+            ArgumentCaptor<PrescriptionItem> draft = ArgumentCaptor.forClass(PrescriptionItem.class);
+            verify(prescriptionItemMapper).insert(draft.capture());
+            assertThat(draft.getValue().getDosage()).isNull();
+            assertThat(draft.getValue().getSource()).isEqualTo("OCR");
+        } else {
+            assertThat(dto.getStatus()).isEqualTo("UPLOADED");
+            assertThat(record.getValue().getFailureReason()).isEqualTo("OCR_MEDICATION_LOW_CONFIDENCE");
+            verify(prescriptionItemMapper, never()).insert(any(PrescriptionItem.class));
+        }
+    }
 
     @Test
     void shouldRejectPrescriptionHistoryUntilPharmacistConfirmsBinding() {

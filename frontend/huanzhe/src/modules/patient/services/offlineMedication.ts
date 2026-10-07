@@ -242,7 +242,7 @@ const formatLocalDate = (date: Date) => {
   }).format(date)
 }
 
-export async function loadMedicationTasks(days = 3): Promise<{ tasks: DoseTaskDTO[]; offline: boolean }> {
+export async function loadMedicationTasks(days = 7): Promise<{ tasks: DoseTaskDTO[]; offline: boolean }> {
   const accountSubject = patientSession.getAccountSubject()
   const dateFrom = formatLocalDate(new Date())
   const dateTo = new Date(`${dateFrom}T00:00:00+08:00`)

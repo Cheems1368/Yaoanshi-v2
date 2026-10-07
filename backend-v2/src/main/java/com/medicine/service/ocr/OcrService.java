@@ -40,6 +40,10 @@ public interface OcrService {
             return new OcrResult(false, null, List.of(), BigDecimal.ZERO, responseJson, failureReason);
         }
 
+        public static OcrResult reviewRequired(String medicationText, String failureReason) {
+            return new OcrResult(false, medicationText, List.of(), BigDecimal.ZERO, null, failureReason);
+        }
+
         public boolean isSuccess() {
             return success;
         }

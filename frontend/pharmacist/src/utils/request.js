@@ -52,7 +52,7 @@ service.interceptors.response.use(
     }
 
     ElMessage.error(message)
-    return Promise.reject(new Error(message))
+    return Promise.reject(Object.assign(new Error(message), { code, response }))
   },
   async (error) => {
     const status = error.response?.status
