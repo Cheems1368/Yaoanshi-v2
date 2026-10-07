@@ -1252,3 +1252,8 @@ Post-C 最终推送与真机检查点（2026-10-07，Asia/Shanghai）
 - 收尾：只停止指定测试包com.yaoanshi.patient，清除其LocalNotifications调度存储shared_prefs/NOTIFICATION_STORE.xml和本轮/data/local/tmp/yaoanshi-int-synthetic-prescription.png；dumpsys匹配本包任务闹钟0。仅旧未发布提醒Preferences的CapacitorStorage.xml于测试阶段清理，标准加密医疗缓存未扩大清理；最终缓存读取调用未返回，未声称其已清空。保留调试APK，不清理其他应用。
 - 真机wifi0/mobile0与验收前一致，没有改变全局网络；USB重连已移除本轮reverse，收尾移除本轮forward9233后两清单为空。拥有的Web3011/3013、按PID/启动时间/JAR路径核验的后端18080已停止；只删除本轮yaoanshi-int-20261007-mysql/redis/minio三个合成容器，相关端口无监听。原D:/RapidOCR服务改回D:/yaoanshi/ops/local-ocr/start.ps1 -OcrOnly启动，health ready/offline=true/version3.9.2；原环境/旧验证数据及所有证据保留。
 - 发布边界：此次只完成提交/推送准备与Draft PR，main仍eee1e56，V1-V15原文及版本0.1.0/code1不变；未merge、tag、GitHub Release、生产、正式签名或商店发布。最终APK后台验收、实际声音/触感反馈、既有Cookie恢复边界及Docker后端OCR部署选择均须在后续发布决定中明确，不以旧C/旧APK证据假充新验证。
+
+Post-C CI 推送收尾（2026-10-07，Asia/Shanghai）
+- 已推送4124d2d2caae74ed4b380b73df8e08f48e4912de，其包含通知修复67f2123及最终验收/未验边界；六项CI全部SUCCESS，运行37575856092：https://github.com/Cheems1368/Yaoanshi-v2/actions/runs/37575856092。最新只读复核PR#45 reviewThreads=[]、reviews=[]，无未解决会话；PR保持Draft/OPEN，main没有新增合并。
+- 本段仅追加证据，不改代码、测试或构建配置；随本段产生的记录提交之最新检查以https://github.com/Cheems1368/Yaoanshi-v2/pull/45/checks动态显示为准，不将37575856092的SHA冒充新提交。最终交付时复核当前HEAD六项结果；无新增全机器人审核要求。
+- 隔离整合工作区提交前git diff --check通过、无未提交源代码；V1-V15相对eee1e56无变更、docs不存在。原D:/yaoanshi工作区与演示图片未清理；原补丁保存/复核SHA256均BE2B726B26F1BC46FF5E1702571C3E2440E8352CCD4515300364A9A51BF15060。
