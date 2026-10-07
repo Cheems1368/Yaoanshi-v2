@@ -171,6 +171,19 @@ describe('local medication reminder lifecycle', () => {
     expect(mocks.cancel).toHaveBeenCalledWith({ notifications: [{ id: 8 }] })
   })
 
+  test('cancels Android delivered groups even when the plugin omits extra metadata', async () => {
+    const scheduledAt = new Date(Date.now() + 60_000).toISOString()
+    await enableAndScheduleMedicationReminders([
+      { id: 7, status: 'PENDING', scheduledAt },
+      { id: 8, status: 'PENDING', scheduledAt }
+    ] as any, 'PATIENT')
+    const id = mocks.schedule.mock.calls[0][0].notifications[0].id
+    mocks.getDeliveredNotifications.mockResolvedValue({ notifications: [{ id, title: '用药提醒',
+      body: '您有一项用药任务待处理，请打开药按时查看。', data: {} }] })
+    await cancelMedicationReminder(7)
+    expect(mocks.cancel).toHaveBeenCalledWith({ notifications: [{ id }] })
+  })
+
   test.each([[false, false], [false, true], [true, false], [true, true]])(
     'selects the channel for sound=%s and vibration=%s', async (sound, vibration) => {
       await enableAndScheduleMedicationReminders([{
