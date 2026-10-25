@@ -1276,3 +1276,9 @@ PR#45 合并前审查收敛（2026-10-25，Asia/Shanghai）
 - 最终包FADBCA6EF98ECC21EDCFF9EBAABDC77C82B4791B783656FA3CFBA922556CA3B2另复验公共加载器来自其他页面的绑定失效：失效前active含19004001、未来19004002有闹钟；实际loadMedicationTasks返回PATIENT_NOT_FOUND后active/pending/delivered为空、cacheEmpty=true，原后续到期后仍为空。此轮专门覆盖最后的公共失效事件改动；中间包的亲情号/共用打卡成功路径未受最后失效分支改动影响，保留其原哈希出处。声音WAV、Java插件和底层调度器未改，四组合实际听感继续引用此前EB68B7FE的用户确认，不改标为新包听感。
 - 独立证据D:/RapidOCR/results/integration-20261025-review/native-runtime-6003FB9A.json、native-runtime-final.json及三个保留APK，均不进入Git。新包保留手机；本轮测试缓存/通知/闹钟已空，forward/reverse为空，wifi0/mobile0未改；设置布尔值恢复测试前可见的true/true，系统发声权限及vibrate_in_normal未改，临时API方法随进程停止消失。自有3011 Vite进程已停止，旧工作区/演示图片/原OCR环境未改。
 - 当前补丁无新增API、DTO、迁移或版本变更，冻结Standard document未改、docs未创建。修复提交推送后处理上述有效审查会话，复核精确HEAD六项CI、主线新鲜度再squash merge并验证main CI；tag/Release、生产及正式签名不在本次授权范围。
+
+PR#45 合并收尾（2026-10-25，Asia/Shanghai）
+- 修复HEAD 96a5bc2c031f3ed4af2ed9d49eb5e9e10f15f172六项CI全部SUCCESS，运行https://github.com/Cheems1368/Yaoanshi-v2/actions/runs/40186807452；三条有效审查意见经行为复现/修复及真机影响回归后已解决，最后复核未解决会话0、主线仍eee1e56。未新增每次修复后必须全机器人复审的门槛。
+- PR#45已按用户本次明确授权于2026-10-25T10:59:35Z squash merge：https://github.com/Cheems1368/Yaoanshi-v2/pull/45。main提交b37eab037bfe50d79f60d85a396f0ae4430bafbe；git diff 96a5bc2 origin/main为空，合并树与通过验收的修复HEAD完全一致。
+- 合并后main精确SHA的独立push CI运行40187008246：https://github.com/Cheems1368/Yaoanshi-v2/actions/runs/40187008246；Backend tests and coverage、Patient app quality、Patient Android APK、Pharmacist web build、Doctor web build、CI / Required Quality Gate六项全部SUCCESS。
+- 收尾记录单独留在原codex/rapidocr-reminder-integration分支，不改写已合并的main源码或验收SHA。原工作区、演示图片、RapidOCR环境及历史APK证据保留；本轮真机缓存/通知/闹钟/映射和自有Web进程均已清理，未做生产操作、tag、GitHub Release、正式签名或依赖分支合并。
