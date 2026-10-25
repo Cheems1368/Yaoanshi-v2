@@ -18,11 +18,18 @@ Project
 - Yaoshian MVP P0
 
 Branch / Context
-- Delivery state: `main` through PR #41 (`2614271`); post-merge `main` CI run `32692544044` passed all six jobs
-- Active workstream: T9 PR B / patient MVP gap closure on `codex/mvp-v0.1.0-patient`
-- Active surfaces: patient family management, knowledge assessment, satisfaction, notification polling, native reminders, and encrypted offline check-ins
+- Delivery state: `main` through PR #45 (`b37eab037bfe50d79f60d85a396f0ae4430bafbe`); post-merge `main` CI run `40187008246` passed all six jobs on 2026-10-25.
+- Worktree: `D:/yaoanshi-ocr-integration`, branch `codex/rapidocr-reminder-integration`; retained for post-merge progress records. The delivered source is on `main`; later progress-only commits on this branch are not additional business changes awaiting merge.
+- Completed workstream: local RapidOCR / pharmacist review, grouped medication reminders, page fixes, final-device acceptance and three valid review fixes. PR #41/#42/#44/#45 are merged.
+- Evidence: detailed 2026-10-25 entries at the end of this file; native runtime and retained APKs under `D:/RapidOCR/results/integration-20261025-reminder` and `integration-20261025-review`.
 
 Current State
+- 2026-10-25 current: PR #45 is merged; its qualified HEAD `96a5bc2` and resulting `main` commit `b37eab0` have identical file trees. PR CI `40186807452` and main CI `40187008246` each passed all six jobs; the three review threads were resolved before merge.
+- Patient validation: 134/134 unit tests, lint, Web build, sequential Capacitor sync / Android debug build, and mocked MVP E2E at 390/430 widths passed. Backend integration evidence remains 252 tests / 72.03% coverage with original provenance; backend CI also passed on the merged main SHA.
+- Device evidence: final APK `FADBCA6EF98ECC21EDCFF9EBAABDC77C82B4791B783656FA3CFBA922556CA3B2` covers the last cross-page binding-loss fix. Family settings/background/shared check-in and four-mode human sound/vibration confirmations retain their respective earlier APK/date scopes as detailed below.
+- Cleanup: synthetic cache, pending/delivered notifications, test alarms, ADB mappings and owned Vite process were cleared; network settings, original workspace, demo images and historical evidence were preserved.
+- Boundaries: version remains `0.1.0` / Android code 1; V1-V15 unchanged. Local OCR supports the Windows native backend; container/production OCR and the existing WebView Cookie hard-refresh boundary are not newly qualified. No tag, GitHub Release, production deployment or formal signing has been performed.
+- The dated state notes below are historical; current delivery and next actions are the 2026-10-25 entries above and the current In Progress / Next sections.
 - 2026-08-14 update: PR #32 was squash-merged as `35b1e8a`; the post-merge `main` CI run #38 passed. The old `codex/mobile-demo` branches were deleted while local protection reference `codex/backup-mobile-demo-20260814` was retained.
 - PR #37 (https://github.com/Cheems1368/Yaoanshi-v2/pull/37) was squash-merged as `98115b9`; the post-merge `main` CI run #46 (https://github.com/Cheems1368/Yaoanshi-v2/actions/runs/31795827722) passed all six checks and produced the 14-day Android APK artifact. Eclipse Temurin `21.0.12+8` is installed under `JAVA21_HOME`; default `JAVA_HOME` remains Microsoft OpenJDK 17.0.15 for backend work.
 - GitHub `main` branch protection and CI governance are officially enabled. The governance-enablement baseline was 92 backend tests with 64.33% JaCoCo line coverage; the enforced floor is 60%.
@@ -40,14 +47,15 @@ Current State
 - Last session (2026-03-27): Phase A–F completed (see below)
 
 In Progress
-- T9 PR B implementation and protected review preparation are in progress on `codex/mvp-v0.1.0-patient`.
+- No remaining implementation, review or merge work for PR #45. This worktree is maintaining the post-merge progress record only.
 
 Next
-- Publish PR B and clear protected checks/review conversations. Complete Android physical-device offline, force-stop, encrypted persistence, idempotent replay, and logout-clear acceptance before squash merge.
+- Start any further development from the latest `origin/main`; do not treat retained historical branches as the delivery baseline. Five Dependabot dependency-upgrade PRs remain independent and unmerged.
+- Tag / GitHub Release, formal Android signing and production deployment require separate user direction. Preserve the native-only OCR and device-evidence boundaries when preparing any release.
 
 Last Updated
-- 2026-08-24 Asia/Shanghai
-- Reason: PR A is delivered and PR B code/browser/Android compilation gates pass; no ADB device is currently connected for the required physical-device acceptance.
+- 2026-10-25 Asia/Shanghai
+- Reason: user requested updating the TXT after PR #45 merge and green main CI; synchronized the top-level status with the already recorded closeout, preserving historical entries and frozen standard documents.
 
 Android JDK 21 and APK Gate (2026-08-14)
 - Changed:
