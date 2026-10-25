@@ -1257,3 +1257,13 @@ Post-C CI 推送收尾（2026-10-07，Asia/Shanghai）
 - 已推送4124d2d2caae74ed4b380b73df8e08f48e4912de，其包含通知修复67f2123及最终验收/未验边界；六项CI全部SUCCESS，运行37575856092：https://github.com/Cheems1368/Yaoanshi-v2/actions/runs/37575856092。最新只读复核PR#45 reviewThreads=[]、reviews=[]，无未解决会话；PR保持Draft/OPEN，main没有新增合并。
 - 本段仅追加证据，不改代码、测试或构建配置；随本段产生的记录提交之最新检查以https://github.com/Cheems1368/Yaoanshi-v2/pull/45/checks动态显示为准，不将37575856092的SHA冒充新提交。最终交付时复核当前HEAD六项结果；无新增全机器人审核要求。
 - 隔离整合工作区提交前git diff --check通过、无未提交源代码；V1-V15相对eee1e56无变更、docs不存在。原D:/yaoanshi工作区与演示图片未清理；原补丁保存/复核SHA256均BE2B726B26F1BC46FF5E1702571C3E2440E8352CCD4515300364A9A51BF15060。
+
+Post-C 最终 APK 后台提醒与缓存补验（2026-10-25，Asia/Shanghai）
+- 基线：D:/yaoanshi-ocr-integration，codex/rapidocr-reminder-integration，HEAD 10d2efd8a0df7d8574d21356a13338c7bac8022f；工作区开始时干净，origin/main仍eee1e56。PR#45仍OPEN/Draft，基线CI运行37576527821成功，reviewThreads=[]、reviews=[]。本轮只追加验收记录，不改源码、版本、迁移或冻结Standard document。
+- 用户确认Redmi K20 Pro cf0b75c/API30已解锁并提供测试窗口。ADB读取已安装base.apk的SHA256与本地最终包完全相同：EB68B7FE3D9B1B6AA43CFF14225370E7486425BFE7860FE2E3D5773E14C2CDED（源码67f2123；后续仅记录提交）。通过CDP导入该APK现有/assets/index-Mr68RWJo.js的实际调度函数，传入同刻两个临时合成任务；原生插件、AlarmManager和Android通知服务均真实执行，未替换原生通知实现。未启动后端、未伪称本轮重新验收认证接口取任务或真实打卡事务。
+- 后台18:16:27及重测18:18:06均投递一条通用分组通知，WebView为hidden，内容无药名/剂量；用户对重测明确反馈声音/震动均无。排查确认用户已将系统响铃调为NORMAL、通知扬声器音量7、勿扰关闭，但MIUI本应用“发声权限”关闭、系统vibrate_in_normal=0；旧渠道配置通过不能覆盖这两个限制。保留该失败反馈，不冒充通过。
+- 临时开启上述两项后，18:20:16后台有声+震动得到用户明确“双有”确认，系统震动日志从effect:null变成实际[0,300,150,300]波形。18:22:00仅声音（触发前mWakefulness=Asleep、Display OFF、WebView hidden），18:22:40仅震动、18:23:17均关闭仍投递通知；用户明确确认后三轮依次符合。四个有效组合的实际投递较计划晚20–25ms；仅代表本机短时后台/熄屏测试，不扩展为强制停止、重启、多日或新版Android保证。先前标为locked-silent-vibration的一轮未取得可靠触发前锁屏状态，不计作锁屏证明。
+- 最终包已投递通知实际响应仍只有data/标题/正文、无extra。通过相同调度函数把首个合成任务改为COMPLETED后通知保留，把第二个也改为COMPLETED后已投递及待触发均为空，验证67f2123稳定分组ID修复；这是合成状态转换，未冒充新的真实后端打卡。
+- 缓存：启动前no_backup/medical-cache-v1.enc旧文件44829字节，启动后原生read为空；临时合成标记write/read一致，应用clearMedicalCache后原生read为空且no_backup目录total 0。用实际原生存储验证过期V2任务恢复被拒并清空、未过期sealed队列不恢复登录但保留，最后应用清理成功。另写入有效合成任务/待同步队列并恢复offline，预置一条未来提醒后调用patientSession.clearAuthState；仅依靠实际anonymous事件处理，随后auth=anonymous、缓存为空、pending=0、delivered=0，no_backup再次total 0。
+- 证据D:/RapidOCR/results/integration-20261025-reminder/runtime.json及MIUI设置前PNG、前后XML，全部独立保存，不覆盖2026-10-06/07证据，不进入Git。系统开关已恢复为本应用发声权限false、vibrate_in_normal=0；用户亲自选择的NORMAL响铃模式保留，因此恢复原限制后实际声音/震动仍会受系统设置约束。网络wifi0/mobile0保持、未创建reverse；本轮forward9233及临时UI XML在收尾移除，测试缓存/闹钟/投递通知均清空，保留原APK和其他应用。
+- 本轮补齐最终APK短时后台/熄屏投递、分组取消、四组合人工反馈及缓存清理证据，无需代码修复。既有WebView Cookie硬刷新边界、Windows原生RapidOCR而非容器部署的范围不变；未合并、创建tag/Release、正式签名或生产操作。记录提交推送后，须复核其精确HEAD检查再转为可审查，不把基线CI冒充新提交CI。
