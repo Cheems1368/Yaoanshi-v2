@@ -262,9 +262,12 @@ export async function loadMedicationTasks(days = 7): Promise<{ tasks: DoseTaskDT
   } catch (error) {
     if (!isNative()) throw error
     const message = error instanceof Error ? error.message : ''
-    if (message === 'AUTHENTICATED_ACCOUNT_CHANGED') return { tasks: [], offline: true }
+    if (message === 'AUTHENTICATED_ACCOUNT_CHANGED' || patientSession.getAccountSubject() !== accountSubject) {
+      return { tasks: [], offline: true }
+    }
     if (message === 'PATIENT_BIND_CONFLICT' || message === 'PATIENT_NOT_FOUND') {
       patientSession.clearGateState()
+      window.dispatchEvent(new CustomEvent('patient-binding-invalidated', { detail: { accountSubject } }))
       await clearMedicalCache()
       await cancelAllMedicationReminders()
       throw error
@@ -280,6 +283,14 @@ export async function submitOrQueueCheckin(
   options: { actualTakenAt?: string; skipReason?: string } = {}
 ): Promise<'submitted' | 'queued'> {
   const expectedAccountSubject = patientSession.getAccountSubject()
+  const notifyCheckin = (outcome: 'submitted' | 'queued') => {
+    if (expectedAccountSubject && patientSession.getAccountSubject() === expectedAccountSubject) {
+      window.dispatchEvent(new CustomEvent('medication-checkin-updated', {
+        detail: { taskId: task.id, accountSubject: expectedAccountSubject }
+      }))
+    }
+    return outcome
+  }
   const payload: PendingCheckin = {
     clientRequestId: makeRequestId(),
     doseTaskId: task.id,
@@ -301,7 +312,7 @@ export async function submitOrQueueCheckin(
         throw new Error('AUTHENTICATED_ACCOUNT_CHANGED')
       }
       const latestState = await readState()
-      return latestState.pendingCheckins.some((item) => item.doseTaskId === task.id) ? 'queued' : 'submitted'
+      return notifyCheckin(latestState.pendingCheckins.some((item) => item.doseTaskId === task.id) ? 'queued' : 'submitted')
     }
   }
 
@@ -325,7 +336,7 @@ export async function submitOrQueueCheckin(
       throw new Error('AUTHENTICATED_ACCOUNT_CHANGED')
     }
     await mergePendingCheckin(payload, expectedAccountSubject, true)
-    return 'queued'
+    return notifyCheckin('queued')
   }
   if (isNative() && expectedAccountSubject && submitted.data?.id) {
     if (patientSession.getAccountSubject() !== expectedAccountSubject) {
@@ -362,7 +373,7 @@ export async function submitOrQueueCheckin(
       await cancelMedicationReminder(task.id).catch(() => undefined)
     }
   }
-  return 'submitted'
+  return notifyCheckin('submitted')
 }
 
 interface ReplayAttempt {

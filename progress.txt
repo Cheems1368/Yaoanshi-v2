@@ -1267,3 +1267,12 @@ Post-C 最终 APK 后台提醒与缓存补验（2026-10-25，Asia/Shanghai）
 - 缓存：启动前no_backup/medical-cache-v1.enc旧文件44829字节，启动后原生read为空；临时合成标记write/read一致，应用clearMedicalCache后原生read为空且no_backup目录total 0。用实际原生存储验证过期V2任务恢复被拒并清空、未过期sealed队列不恢复登录但保留，最后应用清理成功。另写入有效合成任务/待同步队列并恢复offline，预置一条未来提醒后调用patientSession.clearAuthState；仅依靠实际anonymous事件处理，随后auth=anonymous、缓存为空、pending=0、delivered=0，no_backup再次total 0。
 - 证据D:/RapidOCR/results/integration-20261025-reminder/runtime.json及MIUI设置前PNG、前后XML，全部独立保存，不覆盖2026-10-06/07证据，不进入Git。系统开关已恢复为本应用发声权限false、vibrate_in_normal=0；用户亲自选择的NORMAL响铃模式保留，因此恢复原限制后实际声音/震动仍会受系统设置约束。网络wifi0/mobile0保持、未创建reverse；本轮forward9233及临时UI XML在收尾移除，测试缓存/闹钟/投递通知均清空，保留原APK和其他应用。
 - 本轮补齐最终APK短时后台/熄屏投递、分组取消、四组合人工反馈及缓存清理证据，无需代码修复。既有WebView Cookie硬刷新边界、Windows原生RapidOCR而非容器部署的范围不变；未合并、创建tag/Release、正式签名或生产操作。记录提交推送后，须复核其精确HEAD检查再转为可审查，不把基线CI冒充新提交CI。
+
+PR#45 合并前审查收敛（2026-10-25，Asia/Shanghai）
+- 用户授权合并PR#45；最后复核发现转Ready后新增三条未解决意见：discussion_r4370528159亲情号设置空任务取消、discussion_r4370528166其他打卡入口未刷新全局提醒、discussion_r4370528171绑定失效内存残留。先修复再合并，不以旧8374d02的六绿覆盖新补丁。
+- 最小变更限患者端reminders/service.ts、services/offlineMedication.ts及两个对应单测。设置动作加载七天真实/有效离线任务后按原账号类型调度，亲情号保持30分钟延迟且不弹患者窗口；提交/更正/离线入队/既有队列合并统一发送带账号/任务ID的事件，立即去掉活动任务并防止旧PENDING响应建回闹钟；绑定失效清空内存，公共加载器通知其他页面且旧账号迟到错误不得清新账号数据。
+- 新增回归先复现七个失败用例，另两个迟到快照/网页错误用例及三个公共加载器跨页面/账号用例均先失败后通过；患者全量134/134（原112，新增22）、npm run lint、npm run build通过。Web构建后顺序npm run android:build通过；最后改动后再次npm run e2e:mvp-release于390/430宽通过，API为模拟数据。未改后端，原252项/72.03%证据保留出处，当前提交的后端门槛由新CI另行核对。
+- 中间包6003FB9AFB90C0F917A2535B9F28C00CD5148DC21A7013DA95CF3197D6135BC8真机cf0b75c/API30：设置页声音/震动切换和启用保留亲情号同刻两任务与30分钟延迟，实际后台通用通知投递；公共打卡函数提交后缓存COMPLETED，原到期时active/pending/delivered均0；绑定失效自身同步路径清空活动及后续提醒。仅药物API方法在WebView内存返回合成数据，原生缓存、插件及Android通知均真实，未冒充真实服务端事务或真人登录。
+- 最终包FADBCA6EF98ECC21EDCFF9EBAABDC77C82B4791B783656FA3CFBA922556CA3B2另复验公共加载器来自其他页面的绑定失效：失效前active含19004001、未来19004002有闹钟；实际loadMedicationTasks返回PATIENT_NOT_FOUND后active/pending/delivered为空、cacheEmpty=true，原后续到期后仍为空。此轮专门覆盖最后的公共失效事件改动；中间包的亲情号/共用打卡成功路径未受最后失效分支改动影响，保留其原哈希出处。声音WAV、Java插件和底层调度器未改，四组合实际听感继续引用此前EB68B7FE的用户确认，不改标为新包听感。
+- 独立证据D:/RapidOCR/results/integration-20261025-review/native-runtime-6003FB9A.json、native-runtime-final.json及三个保留APK，均不进入Git。新包保留手机；本轮测试缓存/通知/闹钟已空，forward/reverse为空，wifi0/mobile0未改；设置布尔值恢复测试前可见的true/true，系统发声权限及vibrate_in_normal未改，临时API方法随进程停止消失。自有3011 Vite进程已停止，旧工作区/演示图片/原OCR环境未改。
+- 当前补丁无新增API、DTO、迁移或版本变更，冻结Standard document未改、docs未创建。修复提交推送后处理上述有效审查会话，复核精确HEAD六项CI、主线新鲜度再squash merge并验证main CI；tag/Release、生产及正式签名不在本次授权范围。
