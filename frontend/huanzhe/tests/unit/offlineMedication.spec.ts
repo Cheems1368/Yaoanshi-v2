@@ -130,6 +130,35 @@ describe('native offline medication flow', () => {
     }
   )
 
+
+  test.each(['submitted', 'queued', 'corrected', 'merged'])('notifies all reminder entry points after %s check-ins', async (mode) => {
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: mode !== 'queued' && mode !== 'merged' })
+    mocks.submitCheckin.mockResolvedValue({ data: { id: 90, result: 'TAKEN' } })
+    mocks.correctCheckin.mockResolvedValue({ data: { id: 91, result: 'TAKEN' } })
+    if (mode === 'queued') mocks.submitCheckin.mockRejectedValue(new Error('Network error'))
+    if (mode === 'merged') mocks.read.mockResolvedValue({ value: JSON.stringify({
+      version: 2, accountSubject: mocks.accountSubject, tasksExpiresAt: Date.now() + 60000, tasks: [cachedTask],
+      pendingCheckins: [{ doseTaskId: 7, clientRequestId: 'existing', result: 'TAKEN', expiresAt: Date.now() + 60000 }]
+    }) })
+    const dispatch = vi.spyOn(window, 'dispatchEvent')
+    try {
+      const task = { ...cachedTask, ...(mode === 'corrected' ? { lastEffectiveCheckinId: 89 } : {}) }
+      await submitOrQueueCheckin(task as any, 'TAKEN')
+      const updates = dispatch.mock.calls.map(([event]) => event).filter(event => event.type === 'medication-checkin-updated')
+      expect(updates).toHaveLength(1)
+      expect((updates[0] as CustomEvent).detail).toEqual({ taskId: 7, accountSubject: mocks.accountSubject })
+    } finally { dispatch.mockRestore() }
+  })
+
+  test('does not announce a failed check-in as handled', async () => {
+    mocks.submitCheckin.mockRejectedValue(new Error('No permission'))
+    const dispatch = vi.spyOn(window, 'dispatchEvent')
+    try {
+      await expect(submitOrQueueCheckin(cachedTask as any, 'TAKEN')).rejects.toThrow('No permission')
+      expect(dispatch.mock.calls.some(([event]) => event.type === 'medication-checkin-updated')).toBe(false)
+    } finally { dispatch.mockRestore() }
+  })
+
   test('does not queue online business failures', async () => {
     Object.defineProperty(navigator, 'onLine', { configurable: true, value: true })
     mocks.submitCheckin.mockRejectedValue(new Error('CHECKIN_WINDOW_EXPIRED'))
@@ -935,6 +964,32 @@ describe('native offline medication flow', () => {
     expect(mocks.submitCheckin).toHaveBeenCalledTimes(2)
     expect(JSON.parse(storedValue).pendingCheckins).toEqual([])
     expect(consumeOfflineCheckinConflictCount()).toBe(1)
+  })
+
+
+  test('does not clear the new account after an old task request reports binding loss', async () => {
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: false })
+    let reject!: (error: Error) => void
+    mocks.getDoseTasks.mockReturnValue(new Promise((_, r) => { reject = r }))
+    const pending = loadMedicationTasks()
+    await vi.waitFor(() => expect(mocks.getDoseTasks).toHaveBeenCalled())
+    mocks.accountSubject = 'patient-2'
+    reject(new Error('PATIENT_NOT_FOUND'))
+    await expect(pending).resolves.toEqual({ tasks: [], offline: true })
+    expect(mocks.clearGateState).not.toHaveBeenCalled()
+    expect(mocks.clear).not.toHaveBeenCalled()
+    expect(mocks.cancelAllReminders).not.toHaveBeenCalled()
+  })
+
+  test('announces binding loss from the shared loader to every reminder view', async () => {
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: false })
+    mocks.getDoseTasks.mockRejectedValue(new Error('PATIENT_NOT_FOUND'))
+    const dispatch = vi.spyOn(window, 'dispatchEvent')
+    try {
+      await expect(loadMedicationTasks()).rejects.toThrow('PATIENT_NOT_FOUND')
+      const event = dispatch.mock.calls.map(([event]) => event).find(event => event.type === 'patient-binding-invalidated') as CustomEvent
+      expect(event?.detail).toEqual({ accountSubject: mocks.accountSubject })
+    } finally { dispatch.mockRestore() }
   })
 
   test('does not expose cached tasks after the patient binding is revoked online', async () => {

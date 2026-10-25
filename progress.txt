@@ -1188,3 +1188,91 @@ PRD第15节 → 实际主链（本轮所需验收完成）
 - 冻结边界：Standard document没有本轮新增改动，V1-V15原文未改，docs不存在；git diff --check通过。初始未提交进度行保留，根工作区不相关改动未动。历史MySQL/MinIO清理/迁移及2026-09-18/24/27/28、2026-10-02证据保持原日期/版本；未受影响结论不虚报重做。
 - 发布边界及当前剩余门槛：源代码验收完成；PR#44仍Draft，需推送最终记录后核对最新main、当前PR HEAD六项CI、有效审核问题和零未解决会话，再ready/squash merge及main六项CI。2026-10-05只读复核reviewThreads/reviews均为空；旧7ce7fcb六项绿不替代此次提交。未新增每次修复必须全机器人审核的门槛。版本0.1.0/code1不变，tag/GitHub Release另待用户最终确认；正式签名、商店、生产执行、T10均未进入本轮。
 - 真机收尾（2026-10-05）：测试应用已回登录，SecureMedicalCache为空，剩余scheduled/delivered通知均为空；清除本测试应用origin的合成登录元数据，移除本轮/data/local/tmp/t9-c-native-synthetic-photo.jpg。Wi-Fi=0/mobile_data=0与验收前一致；仅移除本轮reverse8080/19000和forward9223，映射清单为空。保留调试APK及用户设置的MIUI应用通知/电池条件，未清理其他应用。仅本轮Docker容器/网络待合并后收尾。
+
+
+历史本地工作记录导入（原日期与旧分支验证范围保留）
+Current State Update — 2026-10-05 Asia/Shanghai
+- Workstream: application/report screenshots; current working tree retained.
+- Changed: added isolated screenshot infrastructure, encrypted runtime credentials outside workspace, capture helpers, route/behavior inventory, HTML preview and five actual login/failure evidence screenshots under 演示图片. No business-source changes; original AdminDrugCatalogController modification retained.
+- Validated: current-source Maven package passed; independent MySQL/Redis/MinIO started; three frontends served on 3001/3002/3003; five PNG dimensions and visual contact sheet checked; support-script syntax checked.
+- Open risks: backend startup fails with HttpAiUpstreamClient No default constructor found (two constructors without injection selection). No successful representative samples, clinical dataset, AI/OCR/transcription verification or full capture yet.
+- Next: await separately authorized/source repair of startup defect, then produce five representative samples for user review before full capture. Do not mark screenshot task complete.
+
+Current State Update — 2026-10-05 Asia/Shanghai (authorized repair and screenshot pilot)
+- Changed: added @Autowired to the existing HttpAiUpstreamClient public constructor and a real Spring-container regression test. Extended screenshot support for five representative images, four-step white-background collage, complete long views, segmented Ionic content, current HTML gallery and captions. Original AdminDrugCatalogController change preserved by SHA-256 comparison.
+- Validated: regression reproduced No default constructor found before repair; all 8 HttpAiUpstreamClient tests and Maven package pass after repair; isolated backend health is 200/UP. Real patient/professional login, patient/family/profile/plan preparation, pharmacist claim/reply/escalate, doctor decision and patient final CLOSED result/conclusion verified. Five representative samples, 15 raw/source PNG dimensions, visual review and gallery role/source filters pass.
+- Open risks: full screenshot coverage and 7/30-day synthetic history still pending; real AI/OCR/transcription success not yet verified. Existing controller EOF whitespace warning left intact. No API/DTO/migration changes or merge performed.
+- Next: wait for user review of five samples, then complete the approved full-capture plan. Retain isolated environment and encrypted credentials outside artifact directory; do not mark full screenshot task complete.
+
+Local RapidOCR installation and replacement (2026-10-06 Asia/Shanghai)
+- Workstream: approved local OCR implementation, local changes only; no commit, push or merge.
+- Changed: installed Python 3.13.16 / RapidOCR 3.9.2 / ONNX Runtime CPU 1.30.0 under D:\RapidOCR; verified installer signature, registry wheel digests and upstream model SHA-256; exact dependency/model locks retained. Added offline serial loopback service, native start/stop ownership tracking, Java table/label parser and local adapter; removed cloud OCR code/configuration. Added original-image preview and removed the pharmacist form's automatic 7-day duration.
+- Validated: four Python tests; mvn -q clean verify (185 tests, zero failures/errors/skips, JaCoCo 64.73%); patient ESLint, 6 Vitest tests and production build; pharmacist production build; real Web upload, two correct medication drafts with missing fields null, image enlargement, pharmacist correction/confirmation, patient status, OCR-down manual confirmation and restart recovery. Rotation/blank inputs safely require manual review; blur retains two correct drafts. No identity text or image payload appeared in stored OCR records.
+- Offline/performance: new engine startup with Python outbound sockets/model downloads blocked and ONNX telemetry disabled; 20/20 warm recognitions, median 874.785 ms, P95 966.30 ms. Evidence in D:\RapidOCR\results (benchmark.json, backend-verify.json, web-e2e.json, manifests and reviewed PNGs). Java verification used the already installed Temurin 21.0.12, targeting Java 17 bytecode; no JDK/default PATH changes were made.
+- Environment adjustment: Windows excludes TCP 13257-13356, so original MySQL's 13306 cannot bind. Added a separate digest-pinned validation MySQL container at 18306, database yaoanshi_ocr_validation; Redis DB 15 and MinIO bucket yaoanshi-ocr-validation isolate verification data. Original MySQL and all existing data remain intact.
+- Open risks: one synthetic prescription and derived variants establish integration, not clinical accuracy or general template coverage. Arbitrary/rotated layouts and handwriting are manual-review cases. Docker-backend OCR and Android physical-device acceptance are outside this delivery. Existing AdminDrugCatalogController EOF whitespace warning and unrelated pending work retained.
+- Next: review retained OCR evidence; gather representative de-identified real printed prescriptions before claiming wider recognition accuracy. The native validation stack is running; stop via ops/local-ocr/stop.ps1, retaining infrastructure and records.
+
+Screenshot delivery update — 2026-10-06 Asia/Shanghai
+- Scope: user approved five representative samples and full capture. Retained current local OCR changes and original controller modifications; screenshot work changed only delivery/support artifacts and this progress entry.
+- Delivered in D:\yaoanshi\演示图片: 391 indexed raw PNGs (380 ordinary materials, 11 layout defect evidence), 147 Chinese flow plates, five approved samples, HTML gallery, captions/coverage, synthetic assets, sanitized replay scripts and retained isolated infrastructure/data. Historical cloud OCR images and old generated plates remain separate from current materials.
+- Validated: 39 route coverage rows with aliases deduplicated, no route missing images; PNG dimensions/readability/contact-sheet review and key native long views checked; 1086 gallery image/thumbnail links and filters pass. Local RapidOCR HIGH_CONFIDENCE two-item drafts, real AI, real speech transcription and browser recording/transcription succeed. Main and independent collaboration/risk branches verified through real backend operations. Five stored demo credential values found in zero textual delivery artifacts. Original AdminDrugCatalogController SHA-256 unchanged.
+- Environment: screenshot MySQL23306/Redis26379/MinIO19000 retained; backend8080 /health UP, patient3001/doctor3002/pharmacist3003, local RapidOCR19090 ready, gallery4179. OCR-only service resumed; separate local OCR validation database18306 retained. Professional support-only Vite wrappers route to screenshot backend.
+- Open gaps: questionnaire and patient profile successful saves blocked by HTTP500 / real_name_verified non-null constraint; patient workorder list long text overlaps (11 evidence images excluded from normal plates); prescription DDI first-submit UI requires drawer close/reopen before confirmation. Existing unimplemented interfaces explicitly listed. No business fixes were made in this capture task.
+- Next: materials ready for report selection. Separately authorized business repair is required before capturing the two blocked successful-save states and replacing layout defect evidence. Overall screenshot acceptance remains incomplete for those gaps; replay instructions and failure evidence are retained.
+
+2026-10-06 提醒与四项修复本地验收：问卷/资料初始化及事务、工单窄屏布局、首次DDI风险卡已复验。七天北京时间任务窗口、Android/Web提醒及离线防重冲突同步完成。后端194测试、患者15测试、lint与各端构建通过；Redmi K20 Pro API30完成前后台、锁屏调度及重启通知证据，声音震动四组合渠道验证通过，人工听感触感及新版Android真机未确认。新增28张真实截图，原391张及147图版保留；交付10张精选图与验收记录，未提交/推送/合并，原未提交改动保留。
+
+
+T9 PR C 合并及发布验收收尾（2026-10-05，Asia/Shanghai）
+- 合并前复核：origin/main为db006367f73153d0ae20d6c0d76e7579d4d9cd02；PR#44精确HEAD f5791304030c781950bdd9b9bfeea6e99b239429六项检查全部SUCCESS，CI出处https://github.com/Cheems1368/Yaoanshi-v2/actions/runs/37304746638。GraphQL reviewThreads=[]、reviews=[]，无未解决会话；有效问题已按上段实际测试收敛。PR说明已更新为最终行为及验收结果，无新增全机器人审核门槛。
+- PR#44已取消Draft并于2026-10-05T11:48:27Z squash merge：https://github.com/Cheems1368/Yaoanshi-v2/pull/44；合并后的main SHA eee1e56c3008204b2bfd92d944a7472c311d8fb6。git diff f579130 origin/main为空，合并源码与本轮验收内容一致。
+- 合并后main精确SHA六项CI全部SUCCESS：Backend tests and coverage、Patient app quality、Patient Android APK、Pharmacist web build、Doctor web build、CI / Required Quality Gate；push运行37305313404，出处https://github.com/Cheems1368/Yaoanshi-v2/actions/runs/37305313404。
+- 隔离环境收尾：逐名核对容器及专用网络仅含本轮四个服务后，删除yaoanshi-t9-c-backend、yaoanshi-t9-c-minio、yaoanshi-t9-c-redis、yaoanshi-t9-c-mysql及网络yaoanshi-t9-c-20261005；删除后两项清单均为空。本轮合成库随tmpfs容器清理、受控后端进程凭据不再运行；未删除其他环境、应用或Temp合成验收证据。真机网络、缓存、通知及映射收尾见上一段。
+- 本轮C阶段必需验收、修复、PR合并及main CI验证全部完成；无剩余C阶段验收阻断。Standard document冻结、V1-V15不变、docs未创建。版本保持0.1.0/code1；tag与GitHub Release尚未创建，仍待最终确认；生产操作、正式签名、商店发布及T10均未执行。
+- 本段为合并后证据，单独提交并推送原codex/mvp-v0.1.0-release分支；不改变已经通过六项CI的main提交。main中的完整验收矩阵截至f579130，后续合并/清理证据以本段及上述GitHub运行链接为准。
+
+Post-C RapidOCR 与提醒整合（2026-10-07，Asia/Shanghai；提交准备检查点）
+- 用户授权合并本地 RapidOCR、提醒/离线及四项业务修复并推送；演示截图保留本地。隔离工作区D:/yaoanshi-ocr-integration，codex/rapidocr-reminder-integration，基线origin/main eee1e56（已合并PR#44）；D:/yaoanshi旧分支及全部原未提交文件、演示图片保留，未直接reset/rebase该脏工作区。原补丁保存在用户Temp目录。
+- 旧分支重叠收敛：保留C阶段新患者PENDING/药师确认、健康档案事务、原生Keystore/AES-GCM缓存、会话封存/换号/解绑、已有幂等打卡和V15上海时间/剂次维护。旧本地V14重复迁移、重复DTO/Mapper字段及Preferences明文医疗队列不合入；V1-V15没有改动，接口继续使用既有七天剂次范围。C已包含健康/问卷保存及AI构造器注入修复；本次仅追加档案字段默认false、工单窄屏换行及首次处方DDI卡即时刷新等剩余增量。
+- OCR：RAPIDOCR_LOCAL替换云端类/专用密钥配置；保留0.90字段/表头准入、未知/旋转版式手工兜底、药物区域安全持久化、缺失剂量/途径/疗程留空、原图放大。只支持Windows原生后端访问127.0.0.1:19090，Docker后端走人工兜底，不能声称容器OCR已经验收。标准文档只合入此已授权OCR说明及实际提醒整合边界，不覆盖C记录、不创建docs。
+- 提醒：七天任务加载、同刻分组、声音/震动四渠道与前台逐药打卡接入C原调度/加密队列；原医疗缓存/待同步队列仍48小时TTL，Web无新增持久医疗数据，localStorage仅两个布尔设置。锁屏通知始终通用文案。真机发现未发布旧测试APK的scope/ids提醒未被取消；行为测试先失败，最小修复识别旧提醒并处理已投递分组通知，保留其他类型通知。
+- 本地门槛：OCR/解析/处方/档案/AI相关行为测试通过；Python4测试；mvn -q clean verify通过252测试、0失败/错误、JaCoCo72.03%（旧分支185/64.73%及194属于上段历史，不冒充当前main整合验证）；患者lint、111/111单测、Web构建及顺序Android debug构建通过；药师、医生构建通过；MVP E2E390/430通过。最终提醒升级修复后患者门槛正在重跑，最终APK哈希和真机结果另追加。
+- 真实隔离运行：本轮MySQL/tmpfs t9_int18406、Redis18479、MinIO19400、原生后端18080、Web3011/3013；无生产或旧开发数据。JAR SHA2563FEEE15CF74DD973E7407D4570588E83804B2904113042971CD59C69D05D8AE0。真实处方上传/原图放大/药师补充确认/患者回看、OCR停机人工确认/恢复及旋转/模糊/空白变体均通过。新增真实合成HIGH规则首提DDI即显示风险卡、同一抽屉确认继续后提交成功；规则验收后INACTIVE，仅合成数据。
+- 新运行证据D:/RapidOCR/results/integration-20261007/web-e2e.json及integration-20261007-ddi/web-e2e.json、各自PNG；旧D:/RapidOCR/results/validation-summary.md与20次预热0.87s报告保持2026-10-06/ead0620出处，不改写为本轮性能复测。截图/模型/虚拟环境/JAR/APK/环境密钥不进入Git；WAV作为提醒源码资源保留。
+- 提交边界：准备推送独立分支并创建Draft PR。本次用户连接Redmi cf0b75c/API30，已记录wifi0/mobile0、原reverse/forward为空，安装了整合APK；系统锁屏/hidden导致后续交互暂待用户解锁。最终APK真机回归、原有网络/映射恢复和最新HEAD六项CI尚未在本检查点完成，不自动merge/tag/Release；0.1.0/code1保持。
+
+Post-C 最终推送与真机检查点（2026-10-07，Asia/Shanghai）
+- 整合代码提交5e6b7b48cab2a6c9926657f180224b2a4444d26c已推送，Draft PR#45：https://github.com/Cheems1368/Yaoanshi-v2/pull/45。该HEAD六项CI全部通过，运行37562605416：https://github.com/Cheems1368/Yaoanshi-v2/actions/runs/37562605416；不把这些检查改标为后续通知修复的CI。
+- Android API30实际getDeliveredNotifications仅提供data/标题/正文而无extra，造成分组中部分药物取消目标错误。新增真实响应形状行为测试修复前失败；67f2123通知修复建立稳定分组ID，并识别本应用通用通知/未发布旧提醒，处理已投递与后续分组取消。未知账号类型保持旧单项提醒兼容；相关行为及患者完整门槛再次通过112/112、lint、Web build、随后Android debug build；MVP E2E390/430再次通过。后端代码未变，252测试/72.03%及JAR3FEEE15C证据继续适用。
+- 最终真机APK SHA256 EB68B7FE3D9B1B6AA43CFF14225370E7486425BFE7860FE2E3D5773E14C2CDED，源67f2123，version0.1.0/code1，Redmi cf0b75c/API30。本机实际设置页循环四种声音/震动组合，Android四渠道分别为sound=null/WAV与vibration=false/true；7天两次每日窗口14个提醒、每组2个任务，通知均通用文案，无药名剂量，旧scope/ids提醒剩余0。此四组合实测使用前一APK72D962E1（后续仅分组取消ID修复），保留适用范围；用户明确反馈未注意到实际声音/触感，不能标为已确认。
+- 最终EB68B7FE包10:46前台准时显示两药打卡弹窗并真实Android已投递通知；前台实际操作后计划3的181/241两任务均COMPLETED，投递通知清空。操作中有用户实际点击，不把全部步骤虚报为自动化按固定顺序执行。下一分钟另两任务也出现并打卡，但应用保持前台，不能计作后台提醒验收。后续尝试因页面回登录/调试上下文变化及中断未完成；最终APK后台提醒/取消稳定验收仍待补齐，保持Draft，不合并。
+- 最终APK真实无个人信息PNG通过Android文件输入上传至本轮MinIO/本地RapidOCR，处方22 HIGH_CONFIDENCE/2项，药师页面补剂量/途径并确认PHARMACIST_CONFIRMED；真机重新登录进入历史显示已完成复核。明确为合成文件选择/上传，未冒充第二次系统相机实拍。硬刷新曾回登录，重新登录后完成回看；未声称解决既有C阶段WebView Cookie持久化竞态。
+- 最新脱敏真机记录D:/RapidOCR/results/integration-20261007-ddi/native-runtime.json，SHA256 2DDD1E2DAC5B4E6159B668AF524DBEA4FA25609B74F322D67E6065885250B96F；native-foreground.png、native-local-ocr-confirmed.png同目录，仅合成数据。D:/RapidOCR/results原2026-10-06报告/PNG未覆盖；新结果使用单独目录。
+- 收尾：只停止指定测试包com.yaoanshi.patient，清除其LocalNotifications调度存储shared_prefs/NOTIFICATION_STORE.xml和本轮/data/local/tmp/yaoanshi-int-synthetic-prescription.png；dumpsys匹配本包任务闹钟0。仅旧未发布提醒Preferences的CapacitorStorage.xml于测试阶段清理，标准加密医疗缓存未扩大清理；最终缓存读取调用未返回，未声称其已清空。保留调试APK，不清理其他应用。
+- 真机wifi0/mobile0与验收前一致，没有改变全局网络；USB重连已移除本轮reverse，收尾移除本轮forward9233后两清单为空。拥有的Web3011/3013、按PID/启动时间/JAR路径核验的后端18080已停止；只删除本轮yaoanshi-int-20261007-mysql/redis/minio三个合成容器，相关端口无监听。原D:/RapidOCR服务改回D:/yaoanshi/ops/local-ocr/start.ps1 -OcrOnly启动，health ready/offline=true/version3.9.2；原环境/旧验证数据及所有证据保留。
+- 发布边界：此次只完成提交/推送准备与Draft PR，main仍eee1e56，V1-V15原文及版本0.1.0/code1不变；未merge、tag、GitHub Release、生产、正式签名或商店发布。最终APK后台验收、实际声音/触感反馈、既有Cookie恢复边界及Docker后端OCR部署选择均须在后续发布决定中明确，不以旧C/旧APK证据假充新验证。
+
+Post-C CI 推送收尾（2026-10-07，Asia/Shanghai）
+- 已推送4124d2d2caae74ed4b380b73df8e08f48e4912de，其包含通知修复67f2123及最终验收/未验边界；六项CI全部SUCCESS，运行37575856092：https://github.com/Cheems1368/Yaoanshi-v2/actions/runs/37575856092。最新只读复核PR#45 reviewThreads=[]、reviews=[]，无未解决会话；PR保持Draft/OPEN，main没有新增合并。
+- 本段仅追加证据，不改代码、测试或构建配置；随本段产生的记录提交之最新检查以https://github.com/Cheems1368/Yaoanshi-v2/pull/45/checks动态显示为准，不将37575856092的SHA冒充新提交。最终交付时复核当前HEAD六项结果；无新增全机器人审核要求。
+- 隔离整合工作区提交前git diff --check通过、无未提交源代码；V1-V15相对eee1e56无变更、docs不存在。原D:/yaoanshi工作区与演示图片未清理；原补丁保存/复核SHA256均BE2B726B26F1BC46FF5E1702571C3E2440E8352CCD4515300364A9A51BF15060。
+
+Post-C 最终 APK 后台提醒与缓存补验（2026-10-25，Asia/Shanghai）
+- 基线：D:/yaoanshi-ocr-integration，codex/rapidocr-reminder-integration，HEAD 10d2efd8a0df7d8574d21356a13338c7bac8022f；工作区开始时干净，origin/main仍eee1e56。PR#45仍OPEN/Draft，基线CI运行37576527821成功，reviewThreads=[]、reviews=[]。本轮只追加验收记录，不改源码、版本、迁移或冻结Standard document。
+- 用户确认Redmi K20 Pro cf0b75c/API30已解锁并提供测试窗口。ADB读取已安装base.apk的SHA256与本地最终包完全相同：EB68B7FE3D9B1B6AA43CFF14225370E7486425BFE7860FE2E3D5773E14C2CDED（源码67f2123；后续仅记录提交）。通过CDP导入该APK现有/assets/index-Mr68RWJo.js的实际调度函数，传入同刻两个临时合成任务；原生插件、AlarmManager和Android通知服务均真实执行，未替换原生通知实现。未启动后端、未伪称本轮重新验收认证接口取任务或真实打卡事务。
+- 后台18:16:27及重测18:18:06均投递一条通用分组通知，WebView为hidden，内容无药名/剂量；用户对重测明确反馈声音/震动均无。排查确认用户已将系统响铃调为NORMAL、通知扬声器音量7、勿扰关闭，但MIUI本应用“发声权限”关闭、系统vibrate_in_normal=0；旧渠道配置通过不能覆盖这两个限制。保留该失败反馈，不冒充通过。
+- 临时开启上述两项后，18:20:16后台有声+震动得到用户明确“双有”确认，系统震动日志从effect:null变成实际[0,300,150,300]波形。18:22:00仅声音（触发前mWakefulness=Asleep、Display OFF、WebView hidden），18:22:40仅震动、18:23:17均关闭仍投递通知；用户明确确认后三轮依次符合。四个有效组合的实际投递较计划晚20–25ms；仅代表本机短时后台/熄屏测试，不扩展为强制停止、重启、多日或新版Android保证。先前标为locked-silent-vibration的一轮未取得可靠触发前锁屏状态，不计作锁屏证明。
+- 最终包已投递通知实际响应仍只有data/标题/正文、无extra。通过相同调度函数把首个合成任务改为COMPLETED后通知保留，把第二个也改为COMPLETED后已投递及待触发均为空，验证67f2123稳定分组ID修复；这是合成状态转换，未冒充新的真实后端打卡。
+- 缓存：启动前no_backup/medical-cache-v1.enc旧文件44829字节，启动后原生read为空；临时合成标记write/read一致，应用clearMedicalCache后原生read为空且no_backup目录total 0。用实际原生存储验证过期V2任务恢复被拒并清空、未过期sealed队列不恢复登录但保留，最后应用清理成功。另写入有效合成任务/待同步队列并恢复offline，预置一条未来提醒后调用patientSession.clearAuthState；仅依靠实际anonymous事件处理，随后auth=anonymous、缓存为空、pending=0、delivered=0，no_backup再次total 0。
+- 证据D:/RapidOCR/results/integration-20261025-reminder/runtime.json及MIUI设置前PNG、前后XML，全部独立保存，不覆盖2026-10-06/07证据，不进入Git。系统开关已恢复为本应用发声权限false、vibrate_in_normal=0；用户亲自选择的NORMAL响铃模式保留，因此恢复原限制后实际声音/震动仍会受系统设置约束。网络wifi0/mobile0保持、未创建reverse；本轮forward9233及临时UI XML在收尾移除，测试缓存/闹钟/投递通知均清空，保留原APK和其他应用。
+- 本轮补齐最终APK短时后台/熄屏投递、分组取消、四组合人工反馈及缓存清理证据，无需代码修复。既有WebView Cookie硬刷新边界、Windows原生RapidOCR而非容器部署的范围不变；未合并、创建tag/Release、正式签名或生产操作。记录提交推送后，须复核其精确HEAD检查再转为可审查，不把基线CI冒充新提交CI。
+
+PR#45 合并前审查收敛（2026-10-25，Asia/Shanghai）
+- 用户授权合并PR#45；最后复核发现转Ready后新增三条未解决意见：discussion_r4370528159亲情号设置空任务取消、discussion_r4370528166其他打卡入口未刷新全局提醒、discussion_r4370528171绑定失效内存残留。先修复再合并，不以旧8374d02的六绿覆盖新补丁。
+- 最小变更限患者端reminders/service.ts、services/offlineMedication.ts及两个对应单测。设置动作加载七天真实/有效离线任务后按原账号类型调度，亲情号保持30分钟延迟且不弹患者窗口；提交/更正/离线入队/既有队列合并统一发送带账号/任务ID的事件，立即去掉活动任务并防止旧PENDING响应建回闹钟；绑定失效清空内存，公共加载器通知其他页面且旧账号迟到错误不得清新账号数据。
+- 新增回归先复现七个失败用例，另两个迟到快照/网页错误用例及三个公共加载器跨页面/账号用例均先失败后通过；患者全量134/134（原112，新增22）、npm run lint、npm run build通过。Web构建后顺序npm run android:build通过；最后改动后再次npm run e2e:mvp-release于390/430宽通过，API为模拟数据。未改后端，原252项/72.03%证据保留出处，当前提交的后端门槛由新CI另行核对。
+- 中间包6003FB9AFB90C0F917A2535B9F28C00CD5148DC21A7013DA95CF3197D6135BC8真机cf0b75c/API30：设置页声音/震动切换和启用保留亲情号同刻两任务与30分钟延迟，实际后台通用通知投递；公共打卡函数提交后缓存COMPLETED，原到期时active/pending/delivered均0；绑定失效自身同步路径清空活动及后续提醒。仅药物API方法在WebView内存返回合成数据，原生缓存、插件及Android通知均真实，未冒充真实服务端事务或真人登录。
+- 最终包FADBCA6EF98ECC21EDCFF9EBAABDC77C82B4791B783656FA3CFBA922556CA3B2另复验公共加载器来自其他页面的绑定失效：失效前active含19004001、未来19004002有闹钟；实际loadMedicationTasks返回PATIENT_NOT_FOUND后active/pending/delivered为空、cacheEmpty=true，原后续到期后仍为空。此轮专门覆盖最后的公共失效事件改动；中间包的亲情号/共用打卡成功路径未受最后失效分支改动影响，保留其原哈希出处。声音WAV、Java插件和底层调度器未改，四组合实际听感继续引用此前EB68B7FE的用户确认，不改标为新包听感。
+- 独立证据D:/RapidOCR/results/integration-20261025-review/native-runtime-6003FB9A.json、native-runtime-final.json及三个保留APK，均不进入Git。新包保留手机；本轮测试缓存/通知/闹钟已空，forward/reverse为空，wifi0/mobile0未改；设置布尔值恢复测试前可见的true/true，系统发声权限及vibrate_in_normal未改，临时API方法随进程停止消失。自有3011 Vite进程已停止，旧工作区/演示图片/原OCR环境未改。
+- 当前补丁无新增API、DTO、迁移或版本变更，冻结Standard document未改、docs未创建。修复提交推送后处理上述有效审查会话，复核精确HEAD六项CI、主线新鲜度再squash merge并验证main CI；tag/Release、生产及正式签名不在本次授权范围。

@@ -6,6 +6,7 @@
           <ion-back-button default-href="/tabs/home" />
         </ion-buttons>
         <ion-title>用药提醒</ion-title>
+        <ion-buttons slot="end"><ion-button @click="reminderState.settingsOpen = true">提醒设置</ion-button></ion-buttons>
       </ion-toolbar>
     </ion-header>
 
@@ -114,6 +115,7 @@
 </template>
 
 <script setup lang="ts">
+import { reminderState } from '@/modules/patient/reminders/service'
 import {
   IonBackButton,
   IonBadge,

@@ -221,7 +221,13 @@ ORDER BY u.username;
 "@
 
 Write-Host "Ensuring local professional test accounts in $MysqlContainer/$Database..."
-$sql | docker exec -i $MysqlContainer mysql -uroot "-p$DbPassword" $Database
+$previousMysqlPassword = $env:MYSQL_PWD
+try {
+    $env:MYSQL_PWD = $DbPassword
+    $sql | docker exec -i -e MYSQL_PWD $MysqlContainer mysql -uroot $Database
+} finally {
+    $env:MYSQL_PWD = $previousMysqlPassword
+}
 if ($LASTEXITCODE -ne 0) {
     throw "Failed to ensure local professional test accounts."
 }

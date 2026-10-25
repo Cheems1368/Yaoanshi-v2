@@ -1,5 +1,6 @@
 import { createApp } from 'vue'
 import App from './App.vue'
+import { startReminders } from '@/modules/patient/reminders/service'
 import router from './router';
 import { appAuthService, patientService } from '@/modules/patient/api/mvp'
 import { clearMedicalCache, loadMedicationTasks, replayPendingCheckins } from '@/modules/patient/services/offlineMedication'
@@ -149,5 +150,6 @@ const app = createApp(App)
   .component('EmptyState', EmptyState);
 
 router.isReady().then(() => {
+  startReminders()
   app.mount('#app');
 });

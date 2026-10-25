@@ -616,7 +616,20 @@ onIonViewWillEnter(async () => {
   align-items: flex-start;
 }
 
+.order-top > div {
+  flex: 1;
+  min-width: 0;
+}
+
+.order-top ion-badge {
+  flex-shrink: 0;
+  line-height: var(--patient-leading-normal);
+  white-space: nowrap;
+}
+
 .order-title {
+  line-height: var(--patient-leading-normal);
+  overflow-wrap: anywhere;
   font-size: var(--patient-font-body);
   font-weight: var(--patient-font-bold);
   color: var(--patient-text-primary);
@@ -625,6 +638,8 @@ onIonViewWillEnter(async () => {
 .order-meta,
 .order-desc {
   color: var(--patient-text-secondary);
+  line-height: var(--patient-leading-normal);
+  overflow-wrap: anywhere;
 }
 
 .order-desc {

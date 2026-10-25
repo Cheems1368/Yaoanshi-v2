@@ -22,7 +22,7 @@ public class PatientProfile extends BaseEntity {
     private String emergencyContactPhone;
     private String emergencyContactRelationship;
     private String identityMaterialHash;
-    private Boolean realNameVerified;
+    private Boolean realNameVerified = false;
     private LocalDateTime realNameVerifiedTime;
 
     public Long getPatientId() {

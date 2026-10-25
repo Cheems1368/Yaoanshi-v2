@@ -113,13 +113,22 @@
           <div v-if="detail.attachments.length" class="attachment-list">
             <article v-for="attachment in detail.attachments" :key="attachment.id" class="attachment-card">
               <strong>{{ attachment.originalFilename }}</strong>
+              <el-image
+                v-if="attachment.downloadUrl"
+                class="prescription-image"
+                :src="attachment.downloadUrl"
+                :preview-src-list="[attachment.downloadUrl]"
+                preview-teleported
+                fit="contain"
+                alt="原始处方图片，点击放大核对"
+              />
               <span>{{ attachment.mimeType }} / {{ formatSize(attachment.sizeBytes) }}</span>
               <span>对象键：{{ attachment.objectKey }}</span>
               <span>
                 {{
                   attachment.downloadUrl
-                    ? '对象存储待接入，可使用当前下载地址占位'
-                    : '待对象存储接入'
+                    ? '点击图片放大核对原始处方'
+                    : '原始处方图片暂不可用'
                 }}
               </span>
             </article>
@@ -250,7 +259,7 @@ const openDetail = async (id) => {
           dosage: item.dosage || '',
           frequency: item.frequency || '',
           route: item.route || '',
-          durationDays: item.durationDays || 7,
+          durationDays: item.durationDays ?? null,
           source: item.source || 'MANUAL'
         }))
       : [createEmptyItem()]
@@ -268,7 +277,7 @@ const createEmptyItem = () => ({
   dosage: '',
   frequency: '',
   route: '',
-  durationDays: 7,
+  durationDays: null,
   source: 'MANUAL'
 })
 
@@ -303,7 +312,7 @@ const buildSubmitItems = () =>
       dosage: item.dosage?.trim() || '',
       frequency: item.frequency?.trim() || '',
       route: item.route?.trim() || '',
-      durationDays: item.durationDays || 7
+      durationDays: item.durationDays ?? null
     }))
 
 const reloadCurrentDetail = async () => {
@@ -331,7 +340,8 @@ const handleConfirm = async () => {
     ElMessage.success('处方复核已完成')
     await loadPrescriptions()
   } catch (error) {
-    if (error.message === 'DDI_CONFIRM_REQUIRED') {
+    if ((error.response?.data?.code ?? error.code) === 40013 ||
+        (error.response?.data?.msg ?? error.message) === 'DDI_CONFIRM_REQUIRED') {
       await reloadCurrentDetail()
       ElMessage.warning('检测到高风险联用，请先确认 DDI 风险后再继续提交')
     }
@@ -502,6 +512,12 @@ loadPrescriptions()
 
 .item-grid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.prescription-image {
+  width: 100%;
+  height: 240px;
+  border-radius: var(--pro-radius-sm);
 }
 
 .item-actions,

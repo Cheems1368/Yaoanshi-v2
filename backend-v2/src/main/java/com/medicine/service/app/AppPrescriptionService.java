@@ -179,8 +179,9 @@ public class AppPrescriptionService {
         OcrService.OcrResult ocrResult = performOcrFromStoredObject(fileAsset);
         PrescriptionOcrRecord ocrRecord = new PrescriptionOcrRecord();
         ocrRecord.setPrescriptionId(prescription.getId());
+        ocrRecord.setProvider("RAPIDOCR_LOCAL");
+        ocrRecord.setExtractedText(ocrResult.getExtractedText());
         if (ocrResult.isSuccess()) {
-            ocrRecord.setProvider("SILICONFLOW_OCR");
             ocrRecord.setConfidence(ocrResult.getConfidence());
             boolean highConfidence = ocrResult.getConfidence().compareTo(new BigDecimal("0.80")) >= 0 && !ocrResult.getItems().isEmpty();
             ocrRecord.setStatus(highConfidence
@@ -188,7 +189,10 @@ public class AppPrescriptionService {
             ocrRecord.setResponsePayloadJson(ocrResult.getResponseJson());
             ocrRecord.setExtractedText(ocrResult.getExtractedText());
             ocrRecord.setStructuredItemsJson(writeStructuredItems(ocrResult.getItems()));
-            ocrRecord.setManualFallbackUsed(false);
+            ocrRecord.setManualFallbackUsed(!highConfidence);
+            if (!highConfidence) {
+                ocrRecord.setFailureReason("OCR_STRUCTURED_LOW_CONFIDENCE");
+            }
             if (highConfidence) {
                 writeOcrDraftItems(prescription.getId(), ocrResult.getItems(), now);
                 prescription.setStatus("OCR_DONE");
@@ -198,7 +202,6 @@ public class AppPrescriptionService {
                 prescriptionMapper.updateOcrResult(prescription);
             }
         } else {
-            ocrRecord.setProvider("MANUAL_REVIEW_REQUIRED");
             ocrRecord.setConfidence(BigDecimal.ZERO);
             ocrRecord.setStatus("LOW_CONFIDENCE");
             ocrRecord.setFailureReason(ocrResult.getFailureReason());

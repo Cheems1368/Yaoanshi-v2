@@ -52,7 +52,7 @@ Exact response shape:
 
 - Primary API style: JSON over HTTP/HTTPS
 - Realtime notification for Web: WebSocket
-- OCR input transport: multipart file upload
+- Prescription upload: existing presigned object-storage upload; backend reads stored bytes. Internal local OCR transport: image bytes over loopback HTTP, with text/coordinate JSON returned.
 - Help-order speech-to-text provider: XFYUN voice dictation streaming WebAPI, proxied by `backend-v2`; credentials are environment variables only
 
 ### 3.4 Port baseline
@@ -563,3 +563,49 @@ The effective standard to follow now is:
 3. Pharmacist Web development follows the exact locked versions listed for `frontend/pharmacist`.
 4. Doctor Web development follows the exact locked versions listed for `frontend/yisheng/web-admin`.
 5. Any new backend implementation must target the `backend-v2` standard in Section 7 and Section 8.
+
+## Local OCR runtime (2026-10-06)
+
+- Windows-only host runtime: Python `3.13.16`, RapidOCR `3.9.2`, ONNX Runtime CPU `1.30.0`; PP-OCRv6 small detection/recognition and the matching mobile direction-classification model. Full dependency versions are in `ops/local-ocr/requirements.lock.txt`; published model SHA-256 values are in `ops/local-ocr/models.lock.json`.
+- Installation root: `D:\RapidOCR` (Python, venv, models, wheel downloads, cache, temporary files, logs and evidence). The existing C-drive Python and global PATH are retained. Downloads happen during installation only; runtime checks local hashes, disables model downloads and rejects Python outbound connections.
+- Serial internal service: `127.0.0.1:19090`; image bytes in, text/score/box JSON out. Java parses medication fields, requires `0.90` per admitted text/header and unambiguous layout, and retains the existing `0.80` structured-status gate. Recognition scores do not estimate clinical correctness.
+- Main backend and patient/pharmacist Web run natively. MySQL, Redis and MinIO use Docker. Verification uses a separate `yaoanshi-ocr-mysql` container at `18306`, database `yaoanshi_ocr_validation`, Redis DB `15`, and MinIO bucket `yaoanshi-ocr-validation`. The separate MySQL image is pinned by digest in `ops/local-ocr/compose.validation.yml`; the original MySQL container/data remains untouched. This machine currently reserves Windows TCP ports 13257-13356, including the regular 13306 mapping.
+- Runtime scripts record owned process IDs, start timestamps and executable paths in `D:\RapidOCR\processes.json`. Stop validates ownership and stops the recorded processes and their children only; Docker services, databases, buckets and test records are retained. No Windows startup task is installed.
+
+From `D:\yaoanshi`:
+
+```powershell
+# Install or verify the exact runtime and model files.
+powershell -NoProfile -ExecutionPolicy Bypass -File ops/local-ocr/install.ps1
+# Start the isolated Windows validation stack.
+powershell -NoProfile -ExecutionPolicy Bypass -File ops/local-ocr/start.ps1 -Validation
+# Stop the owned applications, retaining Docker services and all verification data.
+powershell -NoProfile -ExecutionPolicy Bypass -File ops/local-ocr/stop.ps1
+# Start/stop OCR alone when verifying failure and recovery.
+powershell -NoProfile -ExecutionPolicy Bypass -File ops/local-ocr/start.ps1 -OcrOnly
+powershell -NoProfile -ExecutionPolicy Bypass -File ops/local-ocr/stop.ps1 -OcrOnly
+```
+
+Validation commands:
+
+```powershell
+$env:PYTHONPYCACHEPREFIX = 'D:\RapidOCR\cache\pycache'
+& 'D:\RapidOCR\venv\Scripts\python.exe' -m unittest discover -s ops/local-ocr -p 'test_*.py' -v
+& 'D:\RapidOCR\venv\Scripts\python.exe' ops/local-ocr/benchmark.py
+# Stop owned applications first: Windows holds the backend JAR open, and the HTTP adapter unit test uses port 19090.
+powershell -NoProfile -ExecutionPolicy Bypass -File ops/local-ocr/stop.ps1
+mvn -q clean verify -f backend-v2/pom.xml
+# After restarting the validation stack, run the real browser flow using the existing
+# local fixture credential supplied through E2E_PHARMACIST_PASSWORD; never echo it.
+node frontend/huanzhe/scripts/e2e-local-ocr.mjs
+```
+
+The E2E script requires the generated rotated/blurred/blank inputs from `benchmark.py`. Evidence is retained under `D:\RapidOCR\results`: installer/wheel/model manifests, backend verification, benchmark JSON, browser result JSON and screenshots. The benchmark uses one synthetic demonstration prescription; it does not establish clinical accuracy or arbitrary hospital-template coverage. Upright demonstration and moderate blur produce correct drafts; the 90/180-degree samples and blank images enter manual review. Handwriting, ambiguous layouts and automatic image orientation correction are outside this delivery.
+
+## Reminder integration on the C baseline (2026-10-07)
+
+Reminder integration uses the existing `/app-api/dose-tasks` seven-day date-range API, V15 task maintenance, idempotent checkins and the native Keystore/AES-GCM medical cache. Flyway V1–V15 remain unchanged; the older local V14 timestamp/idempotency migration and parallel Preferences queue are not installed. The task list defaults to seven days, while the existing medical-cache and pending-queue TTL remains 48 hours. Web reminders do not add durable offline medical storage.
+
+Same-time tasks share a generic Android notification; no drug, dose, name or phone is stored in notification text. Sound/vibration default on and select four native notification channels backed by the bundled one-second WAV. Only the two boolean device preferences use localStorage. Foreground task dialogs and taken actions use existing session guards and `submitOrQueueCheckin`; logout/identity change/expiry clears foreground state and preserves the existing encrypted-cache cleanup/sealing behavior.
+
+The Windows host-run backend is the supported local OCR deployment. A Docker backend cannot reach the strict host-loopback OCR endpoint and falls back to manual review. This change does not qualify a production/container OCR deployment. Integrated APK/device acceptance and production deployment remain separate gates.

@@ -1,4 +1,4 @@
-﻿# IMPLEMENTATION_PLAN.md
+# IMPLEMENTATION_PLAN.md
 
 ## 1. Document role
 
@@ -1044,6 +1044,8 @@ Committed all Phase 6+7 backend + frontend + standard doc changes (57 files) to 
 
 ### Phase C — DeepSeek-OCR Integration ✅ (commit `201525c`)
 
+Historical delivery record: replaced by local RapidOCR on 2026-10-06; the cloud class and dedicated configuration below no longer exist in the active implementation.
+
 - `OcrProperties`: `@ConfigurationProperties` for `medicine.ocr.*`
 - `OcrService` interface + `OcrResult` (success/extractedText/confidence/responseJson)
 - `DeepSeekOcrService`: SiliconFlow vision API (`deepseek-ai/deepseek-vl2`), graceful fallback if key missing
@@ -1104,3 +1106,13 @@ The following items are intentionally excluded from the primary execution sequen
 6. Ops cleanup: `ops/sql/sec-003-clear-legacy-patient-id-card-masked.sql` (historical `id_card_masked` rows)
 7. S3 presigned URL upload end-to-end browser test (Phase B, pending manual verification)
 
+
+### Local OCR replacement (2026-10-06)
+
+Approved order: verify pinned installer/dependency/model provenance and a real sample -> install the loopback-only Python service -> replace the Java provider and add conservative geometry/label parsing -> verify structured persistence and manual fallback -> prepare isolated MySQL/Redis/MinIO data -> complete Web upload, original-image inspection, pharmacist correction/confirmation, failure/manual confirmation and recovery -> run backend verify, patient lint/unit/build and pharmacist build -> retain offline/performance/browser evidence.
+
+Public prescription endpoints/DTOs and Flyway V1-V15 remain unchanged. Cloud OCR is removed; other AI and speech providers are unchanged. Deployment covered here is the native Windows backend plus native OCR service. Docker-backend OCR integration and Android physical-device acceptance remain outside this delivery. This implementation is integrated on the post-C main baseline; submission results are recorded in progress.txt.
+
+### Post-C integration qualification (2026-10-07)
+
+Port only local OCR, page fixes and reminder behavior onto the current main baseline; retain the original dirty checkout and screenshots. Preserve V1–V15 and existing encrypted queue/session boundaries. Run OCR/parser/persistence regressions and Python offline/input tests, backend clean verify, patient lint/unit/Web, professional builds and MVP E2E; then sync/build Android after the patient Web build. Verify the integrated native backend with isolated synthetic data and real browser OCR upload/confirmation/fallback/recovery. Record precise evidence and device gaps in progress.txt; push an isolated review branch and keep the PR Draft until the new APK's required device acceptance is complete.

@@ -5,13 +5,13 @@
 - `backend-v2/.env.local` 仅供 `backend-v2/scripts/run-local-with-env.ps1` 这类 host-run 本机 PowerShell 启动脚本使用。
 - `ops/.env.backend-v2.local` 仅供 `ops/docker-compose.yml` 和 Portainer 本地栈使用；Docker 不会自动读取 `backend-v2/.env.local`。
 - `ops/.env.backend-v2.local` 是可选文件。缺省情况下，Docker 栈仍可启动；AI/OCR 默认值继续使用 `backend-v2/src/main/resources/application.yml` 中的应用配置。
-- 只有在需要启用或覆盖 AI、OCR 或 XFYUN secret 时，才需要创建 `ops/.env.backend-v2.local`。
+- 只有在需要启用或覆盖 AI 或 XFYUN secret 时，才需要创建 `ops/.env.backend-v2.local`。OCR 已改用本机 RapidOCR，不需要 API Key；Windows 本机后端的启动与验证命令见 `Standard document/TECH_STACK.md` 的本地 OCR 章节。
 - 不要把宿主机地址（例如 `127.0.0.1:13306`、`127.0.0.1:9000`）写进 `ops/.env.backend-v2.local`，容器内地址仍以 `ops/docker-compose.yml` 中的 `mysql`、`redis`、`minio` 为准。
 
 ## 启动前准备
 
 1. 可选：复制 `ops/.env.backend-v2.local.example` 为 `ops/.env.backend-v2.local`
-2. 如需 AI/OCR 增强能力，在 `ops/.env.backend-v2.local` 中填写 `MEDICINE_AI_API_KEY`，并按需填写 `MEDICINE_OCR_API_KEY`
+2. 如需 AI 增强能力，在 `ops/.env.backend-v2.local` 中填写 `MEDICINE_AI_API_KEY`。当前 Docker 后端无法连接仅监听宿主机回环地址的 OCR，处方仍可转药师人工复核
 3. host-run 语音转写配置写入 `backend-v2/.env.local`；Docker 语音转写配置单独写入 `ops/.env.backend-v2.local`。这些值不要提交到 Git，也不要假设两份文件会自动同步
 4. 保持数据库、Redis、MinIO 地址配置继续由 `ops/docker-compose.yml` 提供
 

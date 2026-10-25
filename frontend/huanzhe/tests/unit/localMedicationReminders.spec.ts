@@ -2,7 +2,8 @@ import { beforeEach, describe, expect, test, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
   checkPermissions: vi.fn(), requestPermissions: vi.fn(), getPending: vi.fn(), cancel: vi.fn(), schedule: vi.fn(), addListener: vi.fn(),
-  checkExactNotificationSetting: vi.fn(), changeExactNotificationSetting: vi.fn()
+  checkExactNotificationSetting: vi.fn(), changeExactNotificationSetting: vi.fn(), createChannel: vi.fn(),
+  getDeliveredNotifications: vi.fn(), removeDeliveredNotifications: vi.fn()
 }))
 
 vi.mock('@capacitor/core', () => ({ Capacitor: { isNativePlatform: () => true, getPlatform: () => 'android' } }))
@@ -24,6 +25,10 @@ describe('local medication reminder lifecycle', () => {
     mocks.addListener.mockResolvedValue({ remove: vi.fn() })
     mocks.checkExactNotificationSetting.mockResolvedValue({ exact_alarm: 'granted' })
     mocks.changeExactNotificationSetting.mockResolvedValue({ exact_alarm: 'granted' })
+    mocks.createChannel.mockResolvedValue(undefined)
+    mocks.getPending.mockResolvedValue({ notifications: [] })
+    mocks.getDeliveredNotifications.mockResolvedValue({ notifications: [] })
+    mocks.removeDeliveredNotifications.mockResolvedValue(undefined)
   })
 
   test('cancels a previously scheduled reminder after the task is completed', async () => {
@@ -127,6 +132,66 @@ describe('local medication reminder lifecycle', () => {
     expect(mocks.schedule.mock.calls[0][0].notifications[0].schedule.at.getTime())
       .toBe(scheduledAt.getTime() + 30 * 60 * 1000)
   })
+
+  test('removes legacy unpublished reminders during upgrade without cancelling unrelated notifications', async () => {
+    mocks.getPending.mockResolvedValue({ notifications: [
+      { id: 90, title: '该服药了 · 20:13', extra: { scope: 'legacy', ids: [1] } },
+      { id: 91, title: '其他提醒', extra: { kind: 'OTHER' } }
+    ] })
+    await enableAndScheduleMedicationReminders([], 'PATIENT')
+    expect(mocks.cancel).toHaveBeenCalledWith({ notifications: [{ id: 90 }] })
+  })
+
+  test('groups same-time tasks across seven days without disclosing medication fields', async () => {
+    mocks.getPending.mockResolvedValue({ notifications: [] })
+    const scheduledAt = new Date(Date.now() + 6 * 86400_000).toISOString()
+    await enableAndScheduleMedicationReminders([
+      { id: 7, status: 'PENDING', scheduledAt, drugName: 'PRIVATE-A' },
+      { id: 8, status: 'PENDING', scheduledAt, drugName: 'PRIVATE-B' }
+    ] as any, 'PATIENT', { sound: false, vibration: true })
+    const notifications = mocks.schedule.mock.calls[0][0].notifications
+    expect(notifications).toHaveLength(1)
+    expect(notifications[0].extra.taskIds).toEqual([7, 8])
+    expect(notifications[0].channelId).toBe('medication-0-1')
+    expect(JSON.stringify(notifications)).not.toContain('PRIVATE')
+  })
+
+  test('preserves the grouped reminder for medications not yet taken', async () => {
+    mocks.getPending.mockResolvedValue({ notifications: [{ id: 8, title: '用药提醒', body: '待处理',
+      extra: { kind: 'MEDICATION_TASK', taskIds: [7, 8] } }] })
+    await cancelMedicationReminder(7)
+    expect(mocks.cancel).toHaveBeenCalledWith({ notifications: [{ id: 8 }] })
+    expect(mocks.schedule.mock.calls[0][0].notifications[0].extra.taskIds).toEqual([8])
+  })
+
+  test('cancels an already delivered group when its medication is recorded', async () => {
+    mocks.getDeliveredNotifications.mockResolvedValue({ notifications: [{ id: 8,
+      extra: { kind: 'MEDICATION_TASK', taskIds: [7, 9] } }] })
+    await cancelMedicationReminder(9)
+    expect(mocks.cancel).toHaveBeenCalledWith({ notifications: [{ id: 8 }] })
+  })
+
+  test('cancels Android delivered groups even when the plugin omits extra metadata', async () => {
+    const scheduledAt = new Date(Date.now() + 60_000).toISOString()
+    await enableAndScheduleMedicationReminders([
+      { id: 7, status: 'PENDING', scheduledAt },
+      { id: 8, status: 'PENDING', scheduledAt }
+    ] as any, 'PATIENT')
+    const id = mocks.schedule.mock.calls[0][0].notifications[0].id
+    mocks.getDeliveredNotifications.mockResolvedValue({ notifications: [{ id, title: '用药提醒',
+      body: '您有一项用药任务待处理，请打开药按时查看。', data: {} }] })
+    await cancelMedicationReminder(7)
+    expect(mocks.cancel).toHaveBeenCalledWith({ notifications: [{ id }] })
+  })
+
+  test.each([[false, false], [false, true], [true, false], [true, true]])(
+    'selects the channel for sound=%s and vibration=%s', async (sound, vibration) => {
+      await enableAndScheduleMedicationReminders([{
+        id: 7, status: 'PENDING', scheduledAt: new Date(Date.now() + 60_000).toISOString()
+      } as any], 'PATIENT', { sound, vibration })
+      expect(mocks.schedule.mock.calls[0][0].notifications[0].channelId)
+        .toBe(`medication-${Number(sound)}-${Number(vibration)}`)
+    })
 
   test('cleans completed reminders but preserves pending reminders when account type is unavailable', async () => {
     mocks.getPending.mockResolvedValue({

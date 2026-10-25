@@ -902,7 +902,7 @@ Route: `/prescription/prescriptionDetail`
 
 Purpose:
 
-- Review original prescription image
+- Review and enlarge the original prescription image from object storage
 - confirm OCR result
 - manually enter medicine items if OCR fails
 
@@ -919,6 +919,7 @@ Decision points:
 Success:
 
 - Confirmed medicine items are saved
+- Local RapidOCR drafts prefill only admitted medication fields. Missing dose/route/duration remains empty in both the editor and confirmation request; the form must not add a default 7-day course.
 - DDI high-risk alert requires pharmacist confirmation before final save
 
 Error:
@@ -1368,6 +1369,7 @@ Behavior:
 
 - Keep the original image
 - Switch to manual template entry
+- Local OCR unavailable, no text, or an unsupported/ambiguous layout keeps the upload visible and records a reason. Pharmacists can enter and confirm medication items without OCR; later uploads resume recognition when the local service recovers. No cloud fallback.
 
 ## 8. Empty states
 
@@ -1413,3 +1415,13 @@ The following path must work end to end:
 8. Pharmacist handles or escalates it
 9. Doctor handles escalated cases
 10. Patient sees the final outcome
+
+## Medication reminders and repair acceptance (2026-10-06)
+
+Patient reminder pages expose independent sound/vibration settings, defaulting on. Android schedules seven days of grouped local notifications. App/Web foreground reminders have per-medication 已服药 actions and one 关闭 action; closing never creates a checkin. Family reminder stages remain unchanged.
+
+Offline taken actions persist their original time and stable request ID in account/patient-scoped storage. On reconnection the existing session refresh flow is reused, then pending records replay. Conflicts require explicit confirmation; expired corrections and invalid tasks retain their local records with an explanation. Choosing the server record retains the local timestamp as resolved history. Logout cancels notifications and removes the active-cache pointer; pending records stay isolated for the original account.
+
+System notifications contain drug, dose and Beijing time. Permission/browser limits remain visible while manual tasks stay usable. Native foreground receipt does not replay another sound/vibration. Web audio requires user interaction; background Web reminders are outside this feature.
+
+Save acceptance requires read-back. Long help orders wrap without compressing status badges. First prescription DDI rejection refreshes risks inside the current drawer without losing edited medication fields.

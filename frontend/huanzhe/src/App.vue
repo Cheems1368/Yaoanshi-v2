@@ -1,6 +1,7 @@
 <template>
   <ion-app>
     <ion-router-outlet />
+    <ReminderHost />
     <ion-toast
       :is-open="offlineConflictToastOpen"
       :message="offlineConflictMessage"
@@ -14,6 +15,7 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref } from 'vue'
 import { IonApp, IonRouterOutlet, IonToast } from '@ionic/vue';
+import ReminderHost from '@/modules/patient/reminders/ReminderHost.vue'
 import {
   consumeOfflineCheckinConflictCount,
   consumeOfflineCheckinCancelledCount,

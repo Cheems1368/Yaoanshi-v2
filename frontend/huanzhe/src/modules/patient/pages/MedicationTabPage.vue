@@ -3,6 +3,7 @@
     <ion-header>
       <ion-toolbar>
         <ion-title>用药</ion-title>
+        <ion-button slot="end" fill="clear" @click="reminderState.settingsOpen = true">提醒设置</ion-button>
       </ion-toolbar>
       <ion-toolbar>
         <ion-segment v-model="activeSegment" class="med-segment">
@@ -174,6 +175,7 @@
 </template>
 
 <script setup lang="ts">
+import { reminderState } from '@/modules/patient/reminders/service'
 import {
   IonBadge,
   IonButton,
